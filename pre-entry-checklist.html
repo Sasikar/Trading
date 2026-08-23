@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pre-Entry Checklist</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --paper: #F6F3EC;
+    --ink: #262220;
+    --ink-soft: #5A534C;
+    --sage: #3F5D4E;
+    --sage-light: #E4EBE3;
+    --amber: #B5651D;
+    --amber-light: #F3E4D2;
+    --red: #C0392B;
+    --red-light: #FBEAE8;
+    --line: #D9D2C4;
+    --card: #FFFFFF;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+
+  body{
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    padding: 28px 16px 50px;
+  }
+
+  .wrap{ max-width: 520px; margin: 0 auto; }
+
+  header{ text-align:center; margin-bottom: 24px; }
+
+  .eyebrow{
+    font-size: 11px;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  h1{
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+  }
+
+  .subtitle{ font-size: 13px; color: var(--ink-soft); margin-top:8px; }
+
+  .card{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .q-num{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width: 24px; height:24px;
+    border-radius: 50%;
+    background: var(--sage);
+    color:#fff;
+    font-size: 12px;
+    font-weight:700;
+    margin-right:8px;
+  }
+
+  .q-title{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size: 15.5px;
+    display:flex;
+    align-items:center;
+    margin-bottom: 12px;
+  }
+
+  input[type=text], input[type=number], textarea{
+    width:100%;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-family:'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--ink);
+    background: var(--paper);
+    margin-bottom: 10px;
+  }
+
+  textarea{ resize: vertical; min-height: 50px; }
+
+  label.field-label{
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    font-weight:600;
+    margin-bottom: 4px;
+    display:block;
+  }
+
+  .btn-row{ display:flex; gap:8px; margin-top:4px; }
+
+  .toggle-btn{
+    flex:1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1.5px solid var(--line);
+    background: var(--paper);
+    font-weight:600;
+    font-size: 13px;
+    cursor:pointer;
+    color: var(--ink-soft);
+  }
+
+  .toggle-btn.active-green{ background: var(--sage-light); border-color: var(--sage); color: var(--sage); }
+  .toggle-btn.active-red{ background: var(--red-light); border-color: var(--red); color: var(--red); }
+
+  .fomo-box{
+    background: var(--amber-light);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: var(--amber);
+    font-weight:600;
+    margin-bottom: 10px;
+  }
+
+  .submit-btn{
+    width:100%;
+    background: var(--sage);
+    color:#fff;
+    border:none;
+    border-radius: 14px;
+    padding: 16px;
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size: 16px;
+    cursor:pointer;
+    margin-top: 8px;
+  }
+
+  .submit-btn:active{ opacity:0.85; }
+
+  .history-section{ margin-top: 32px; }
+
+  .history-title{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size: 20px;
+    margin-bottom: 14px;
+  }
+
+  .entry-card{
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--sage);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+
+  .entry-card.red-entry{ border-left-color: var(--red); }
+
+  .entry-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom: 6px;
+  }
+
+  .entry-title{ font-weight:700; font-size: 14.5px; }
+  .entry-date{ color: var(--ink-soft); font-size: 11px; }
+
+  .entry-row{ margin-bottom: 3px; color: var(--ink); }
+  .entry-row b{ color: var(--ink-soft); font-weight:600; }
+
+  .delete-btn{
+    background:none;
+    border:none;
+    color: var(--red);
+    font-size: 11px;
+    font-weight:600;
+    cursor:pointer;
+    margin-top: 8px;
+    padding:0;
+  }
+
+  .empty-state{
+    text-align:center;
+    color: var(--ink-soft);
+    font-size: 13px;
+    padding: 20px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Pre-Entry Discipline</div>
+    <h1>10-Second Checklist</h1>
+    <div class="subtitle">Fill this before you buy. Not after.</div>
+  </header>
+
+  <div class="card">
+    <div class="q-title"><span class="q-num">1</span>Size</div>
+    <label class="field-label">Max position ($)</label>
+    <input type="number" id="maxSize" placeholder="300">
+    <label class="field-label">First entry ($)</label>
+    <input type="number" id="firstEntry" placeholder="100">
+  </div>
+
+  <div class="card">
+    <div class="q-title"><span class="q-num">2</span>Thesis</div>
+    <label class="field-label">Why am I buying?</label>
+    <textarea id="thesis" placeholder="My reason..."></textarea>
+  </div>
+
+  <div class="card">
+    <div class="q-title"><span class="q-num">3</span>Market</div>
+    <div class="btn-row" id="marketBtns">
+      <button type="button" class="toggle-btn" data-val="Bullish">Bullish</button>
+      <button type="button" class="toggle-btn" data-val="Neutral">Neutral</button>
+      <button type="button" class="toggle-btn" data-val="Weak">Weak</button>
+    </div>
+    <label class="field-label" style="margin-top:10px;">Why</label>
+    <textarea id="marketWhy" placeholder="Why this environment..."></textarea>
+  </div>
+
+  <div class="card">
+    <div class="q-title"><span class="q-num">4</span>Entry Type</div>
+    <div class="btn-row" id="entryBtns">
+      <button type="button" class="toggle-btn" data-val="LADDER" data-color="red">🟥 RED → LADDER</button>
+      <button type="button" class="toggle-btn" data-val="STAGE" data-color="green">🟩 GREEN → STAGE</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="q-title"><span class="q-num">5</span>Invalidation</div>
+    <label class="field-label">If ___ happens, I stop adding / exit</label>
+    <textarea id="invalidation" placeholder="If this happens, I stop..."></textarea>
+  </div>
+
+  <div class="card">
+    <div class="q-title"><span class="q-num">6</span>Reserve</div>
+    <label class="field-label">Dry powder remaining after this entry ($)</label>
+    <input type="number" id="reserve" placeholder="500">
+  </div>
+
+  <div class="card">
+    <div class="q-title"><span class="q-num">7</span>FOMO Test</div>
+    <div class="fomo-box">"If I don't buy this right now and it pumps 50%, will I chase it?"</div>
+    <div class="btn-row" id="fomoBtns">
+      <button type="button" class="toggle-btn" data-val="No">No</button>
+      <button type="button" class="toggle-btn" data-val="Yes — pause">Yes — pause</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="q-title">Final Line</div>
+    <label class="field-label">I am entering because ___, NOT because ___</label>
+    <input type="text" id="finalBecause" placeholder="...because I like the setup...">
+    <input type="text" id="finalNotBecause" placeholder="...NOT because I'm afraid of missing out...">
+  </div>
+
+  <div class="card">
+    <div class="q-title">Asset / Ticker</div>
+    <input type="text" id="ticker" placeholder="e.g. GIKO">
+  </div>
+
+  <button class="submit-btn" onclick="saveEntry()">Save Entry</button>
+
+  <div class="history-section">
+    <div class="history-title">History</div>
+    <div id="syncBadge" style="font-size:12px; color:var(--ink-soft); margin-bottom:10px;">Connecting…</div>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button type="button" class="toggle-btn" onclick="exportData()">⬇ Export Backup</button>
+      <button type="button" class="toggle-btn" onclick="document.getElementById('importFile').click()">⬆ Import Backup</button>
+    </div>
+    <div class="btn-row" style="margin-bottom:14px;">
+      <button type="button" class="toggle-btn" onclick="setBinIdPrompt()">🔗 Set Bin ID (reconnect)</button>
+    </div>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+    <div id="historyList"></div>
+  </div>
+
+</div>
+
+<script>
+  let selectedMarket = '';
+  let selectedEntry = '';
+  let selectedFomo = '';
+
+  document.querySelectorAll('#marketBtns .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#marketBtns .toggle-btn').forEach(b => b.classList.remove('active-green'));
+      btn.classList.add('active-green');
+      selectedMarket = btn.dataset.val;
+    });
+  });
+
+  document.querySelectorAll('#entryBtns .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#entryBtns .toggle-btn').forEach(b => {
+        b.classList.remove('active-green'); b.classList.remove('active-red');
+      });
+      btn.classList.add(btn.dataset.color === 'red' ? 'active-red' : 'active-green');
+      selectedEntry = btn.dataset.val;
+    });
+  });
+
+  document.querySelectorAll('#fomoBtns .toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#fomoBtns .toggle-btn').forEach(b => {
+        b.classList.remove('active-green'); b.classList.remove('active-red');
+      });
+      btn.classList.add(btn.dataset.val === 'No' ? 'active-green' : 'active-red');
+      selectedFomo = btn.dataset.val;
+    });
+  });
+
+  // ===== JSONBin config =====
+  const JSONBIN_KEY = '$2a$10$qSCGrMZoFURUOE9NnfOm3eWWYeugzwY28RFF1BlbqJAO2eNnh/XVK';
+  let BIN_ID = localStorage.getItem('preEntryBinId') || '';
+  let cloudEntries = [];
+  let syncStatus = 'idle';
+
+  function setSyncBadge(text){
+    const el = document.getElementById('syncBadge');
+    if(el) el.textContent = text;
+  }
+
+  async function createBin(entries){
+    const res = await fetch('https://api.jsonbin.io/v3/b', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Access-Key': JSONBIN_KEY,
+        'X-Bin-Name': 'pre-entry-checklist'
+      },
+      body: JSON.stringify(entries)
+    });
+    const data = await res.json();
+    BIN_ID = data.metadata.id;
+    localStorage.setItem('preEntryBinId', BIN_ID);
+    return BIN_ID;
+  }
+
+  async function pushToCloud(entries){
+    setSyncBadge('Saving…');
+    try {
+      if(!BIN_ID){
+        await createBin(entries);
+        setSyncBadge('Synced ✓ (Bin ID: ' + BIN_ID + ')');
+        alert('First save — your Bin ID is:\n\n' + BIN_ID + '\n\nCopy this and save it somewhere. If you ever reinstall/clear your browser, paste it back in via the "Set Bin ID" button to reconnect.');
+        return;
+      }
+      await fetch('https://api.jsonbin.io/v3/b/' + BIN_ID, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Access-Key': JSONBIN_KEY
+        },
+        body: JSON.stringify(entries)
+      });
+      setSyncBadge('Synced ✓');
+    } catch(err){
+      setSyncBadge('Sync failed — saved locally only');
+    }
+  }
+
+  async function pullFromCloud(){
+    if(!BIN_ID){
+      setSyncBadge('Not linked yet — save an entry to create your cloud bin');
+      return JSON.parse(localStorage.getItem('preEntryChecklist') || '[]');
+    }
+    setSyncBadge('Loading…');
+    try {
+      const res = await fetch('https://api.jsonbin.io/v3/b/' + BIN_ID + '/latest', {
+        headers: { 'X-Access-Key': JSONBIN_KEY }
+      });
+      const data = await res.json();
+      setSyncBadge('Synced ✓');
+      return data.record || [];
+    } catch(err){
+      setSyncBadge('Offline — showing last local copy');
+      return JSON.parse(localStorage.getItem('preEntryChecklist') || '[]');
+    }
+  }
+
+  function setBinIdPrompt(){
+    const id = prompt('Paste your Bin ID to reconnect to your saved history:');
+    if(id){
+      BIN_ID = id.trim();
+      localStorage.setItem('preEntryBinId', BIN_ID);
+      loadHistory();
+    }
+  }
+
+  async function loadHistory(){
+    cloudEntries = await pullFromCloud();
+    localStorage.setItem('preEntryChecklist', JSON.stringify(cloudEntries));
+    renderHistory(cloudEntries);
+  }
+
+  function renderHistory(entries){
+    const list = document.getElementById('historyList');
+    if(entries.length === 0){
+      list.innerHTML = '<div class="empty-state">No entries yet. Fill the checklist above before your next buy.</div>';
+      return;
+    }
+    list.innerHTML = entries.slice().reverse().map((e, revIdx) => {
+      const idx = entries.length - 1 - revIdx;
+      const isRed = e.entryType === 'LADDER';
+      return `<div class="entry-card ${isRed ? 'red-entry' : ''}">
+        <div class="entry-header">
+          <div class="entry-title">${e.ticker || 'Untitled'}</div>
+          <div class="entry-date">${e.date}</div>
+        </div>
+        <div class="entry-row"><b>Size:</b> Max $${e.maxSize || '-'} / First $${e.firstEntry || '-'}</div>
+        <div class="entry-row"><b>Thesis:</b> ${e.thesis || '-'}</div>
+        <div class="entry-row"><b>Market:</b> ${e.market || '-'} — ${e.marketWhy || ''}</div>
+        <div class="entry-row"><b>Entry Type:</b> ${e.entryType || '-'}</div>
+        <div class="entry-row"><b>Invalidation:</b> ${e.invalidation || '-'}</div>
+        <div class="entry-row"><b>Reserve:</b> $${e.reserve || '-'}</div>
+        <div class="entry-row"><b>FOMO Check:</b> ${e.fomo || '-'}</div>
+        <div class="entry-row"><b>Because:</b> ${e.finalBecause || '-'}</div>
+        <div class="entry-row"><b>Not because:</b> ${e.finalNotBecause || '-'}</div>
+        <button class="delete-btn" onclick="deleteEntry(${idx})">Delete</button>
+      </div>`;
+    }).join('');
+  }
+
+  async function deleteEntry(idx){
+    cloudEntries.splice(idx, 1);
+    localStorage.setItem('preEntryChecklist', JSON.stringify(cloudEntries));
+    renderHistory(cloudEntries);
+    await pushToCloud(cloudEntries);
+  }
+
+  async function saveEntry(){
+    const entry = {
+      date: new Date().toLocaleString(),
+      ticker: document.getElementById('ticker').value,
+      maxSize: document.getElementById('maxSize').value,
+      firstEntry: document.getElementById('firstEntry').value,
+      thesis: document.getElementById('thesis').value,
+      market: selectedMarket,
+      marketWhy: document.getElementById('marketWhy').value,
+      entryType: selectedEntry,
+      invalidation: document.getElementById('invalidation').value,
+      reserve: document.getElementById('reserve').value,
+      fomo: selectedFomo,
+      finalBecause: document.getElementById('finalBecause').value,
+      finalNotBecause: document.getElementById('finalNotBecause').value
+    };
+
+    cloudEntries.push(entry);
+    localStorage.setItem('preEntryChecklist', JSON.stringify(cloudEntries));
+    renderHistory(cloudEntries);
+
+    // reset form
+    document.getElementById('ticker').value = '';
+    document.getElementById('maxSize').value = '';
+    document.getElementById('firstEntry').value = '';
+    document.getElementById('thesis').value = '';
+    document.getElementById('marketWhy').value = '';
+    document.getElementById('invalidation').value = '';
+    document.getElementById('reserve').value = '';
+    document.getElementById('finalBecause').value = '';
+    document.getElementById('finalNotBecause').value = '';
+    document.querySelectorAll('.toggle-btn').forEach(b => {
+      b.classList.remove('active-green'); b.classList.remove('active-red');
+    });
+    selectedMarket = ''; selectedEntry = ''; selectedFomo = '';
+
+    window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
+    await pushToCloud(cloudEntries);
+  }
+
+  function exportData(){
+    const entries = JSON.stringify(cloudEntries);
+    const blob = new Blob([entries], {type: 'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pre-entry-checklist-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importData(event){
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e){
+      try {
+        const imported = JSON.parse(e.target.result);
+        const merged = cloudEntries.concat(imported.filter(imp =>
+          !cloudEntries.some(ex => JSON.stringify(ex) === JSON.stringify(imp))
+        ));
+        cloudEntries = merged;
+        localStorage.setItem('preEntryChecklist', JSON.stringify(cloudEntries));
+        renderHistory(cloudEntries);
+        await pushToCloud(cloudEntries);
+        alert('Backup imported — ' + imported.length + ' entries merged.');
+      } catch(err){
+        alert('Could not read this file. Make sure it\'s a valid backup JSON.');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+  }
+
+  loadHistory();
+</script>
+</body>
+</html>
