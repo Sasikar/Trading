@@ -1,0 +1,50 @@
+name: Refresh Trump high-impact news
+on:
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch Reuters and AP news via Google News RSS
+        run: |
+          python - <<'PY'
+          import json, re, html, requests, xml.etree.ElementTree as ET
+          from datetime import datetime, timezone
+          from urllib.parse import quote
+          q='Trump (tariffs OR Canada OR Fed OR crypto OR Iran OR China OR immigration OR markets) when:1d'
+          url='https://news.google.com/rss/search?q='+quote(q)+'&hl=en-US&gl=US&ceid=US:en'
+          r=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=30); r.raise_for_status()
+          root=ET.fromstring(r.text)
+          allowed={'Reuters','Associated Press','AP','Bloomberg','CNBC','Financial Times','The Wall Street Journal','Politico','BBC'}
+          items=[]
+          for item in root.findall('./channel/item'):
+              title=html.unescape(item.findtext('title') or '').strip()
+              link=item.findtext('link') or ''
+              source=(item.findtext('{http://search.yahoo.com/mrss/}source') or item.findtext('source') or '').strip()
+              if not any(s.lower() in source.lower() for s in allowed): continue
+              low=title.lower()
+              if 'trump' not in low and 'white house' not in low and 'administration' not in low: continue
+              pub=item.findtext('pubDate') or ''
+              items.append({'title':title,'source':source,'url':link,'time':pub})
+          seen=set(); out=[]
+          for x in items:
+              key=re.sub(r'[^a-z0-9]','',x['title'].lower())
+              if key in seen: continue
+              seen.add(key); out.append(x)
+          out=out[:25]
+          if len(out)<3: raise SystemExit('Not enough reputable Trump news items; refusing overwrite')
+          data={'updated':datetime.now(timezone.utc).isoformat(),'source':'Reuters/AP + reputable news RSS','items':out}
+          with open('trump-news.json','w',encoding='utf-8') as f: json.dump(data,f,separators=(',',':'))
+          print('Saved',len(out),'items')
+          PY
+      - name: Commit news data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add trump-news.json
+          if git diff --cached --quiet; then echo "No Trump news changes."; else git commit -m "Refresh Trump high-impact news"; git push; fi
