@@ -27,10 +27,8 @@ jobs:
           pip install playwright cryptography
           playwright install --with-deps chromium
 
-      - name: Scrape Koinly transactions
+      - name: Scrape Koinly transactions using Google-authenticated session
         env:
-          KOINLY_EMAIL: ${{ secrets.KOINLY_EMAIL }}
-          KOINLY_PASSWORD: ${{ secrets.KOINLY_PASSWORD }}
           KOINLY_STORAGE_STATE_B64: ${{ secrets.KOINLY_STORAGE_STATE_B64 }}
           KOINLY_LOGIN_URL: https://app.koinly.io/login
           KOINLY_TRANSACTIONS_URL: https://app.koinly.io/transactions
