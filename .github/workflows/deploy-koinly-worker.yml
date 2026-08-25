@@ -22,8 +22,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: cloudflare/koinly-worker/package.json
 
       - name: Install dependencies
         run: npm install
@@ -34,15 +32,13 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          D1_ID="$(npx wrangler d1 list --json | node -e '
-            let s="";
-            process.stdin.on("data", d => s += d);
-            process.stdin.on("end", () => {
-              const rows = JSON.parse(s);
-              const db = rows.find(x => x.name === "trading-koinly");
-              if (!db) { console.error("D1 database trading-koinly was not found"); process.exit(2); }
-              process.stdout.write(db.uuid || db.database_id || "");
-            });
+          npx wrangler d1 list --json > /tmp/d1.json
+          D1_ID="$(node -e '
+            const fs=require("fs");
+            const rows=JSON.parse(fs.readFileSync("/tmp/d1.json","utf8"));
+            const db=rows.find(x=>x.name==="trading-koinly");
+            if(!db){console.error("D1 database trading-koinly was not found");process.exit(2)}
+            process.stdout.write(db.uuid || db.database_id || "");
           ')"
           test -n "$D1_ID" || { echo "Could not resolve D1 database ID"; exit 1; }
           sed -i "s/REPLACE_AFTER_D1_CREATE/$D1_ID/" wrangler.jsonc
