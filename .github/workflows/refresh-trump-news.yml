@@ -15,6 +15,7 @@ jobs:
           python - <<'PY'
           import json, re, html, requests, xml.etree.ElementTree as ET
           from datetime import datetime, timezone
+          from email.utils import parsedate_to_datetime
           from urllib.parse import quote
           q='Trump (tariffs OR Canada OR Fed OR crypto OR Iran OR China OR immigration OR markets) when:1d'
           url='https://news.google.com/rss/search?q='+quote(q)+'&hl=en-US&gl=US&ceid=US:en'
@@ -30,17 +31,23 @@ jobs:
               low=title.lower()
               if 'trump' not in low and 'white house' not in low and 'administration' not in low: continue
               pub=item.findtext('pubDate') or ''
-              items.append({'title':title,'source':source,'url':link,'time':pub})
+              try:
+                  published_at=parsedate_to_datetime(pub).astimezone(timezone.utc)
+              except Exception:
+                  continue
+              items.append({'title':title,'source':source,'url':link,'time':pub,'_published_at':published_at})
           seen=set(); out=[]
-          for x in items:
+          for x in sorted(items,key=lambda x:x['_published_at'],reverse=True):
               key=re.sub(r'[^a-z0-9]','',x['title'].lower())
               if key in seen: continue
-              seen.add(key); out.append(x)
+              seen.add(key)
+              x.pop('_published_at',None)
+              out.append(x)
           out=out[:25]
           if len(out)<3: raise SystemExit('Not enough reputable Trump news items; refusing overwrite')
           data={'updated':datetime.now(timezone.utc).isoformat(),'source':'Reuters/AP + reputable news RSS','items':out}
           with open('trump-news.json','w',encoding='utf-8') as f: json.dump(data,f,separators=(',',':'))
-          print('Saved',len(out),'items')
+          print('Saved',len(out),'items, sorted newest first by publication time')
           PY
       - name: Commit news data
         run: |
