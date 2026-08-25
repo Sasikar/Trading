@@ -19,6 +19,7 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          from datetime import date, timedelta
           import pandas as pd
           import requests
           url='https://farside.co.uk/bitcoin-etf-flow-all-data/'
@@ -32,20 +33,21 @@ jobs:
           if table is None: raise SystemExit('Farside ETF flow table not found')
           dc=next(c for c in table.columns if 'date' in str(c).lower())
           tc=next(c for c in table.columns if 'total' in str(c).lower())
+          cutoff=date.today()-timedelta(days=180)
           rows=[]
           for _,r in table.iterrows():
               d=pd.to_datetime(r[dc],errors='coerce')
-              if pd.isna(d): continue
+              if pd.isna(d) or d.date()<cutoff: continue
               raw=str(r[tc]).strip().replace(',','').replace('(','-').replace(')','')
               if raw in {'-','—','nan','None',''}: continue
               v=pd.to_numeric(raw,errors='coerce')
               if pd.isna(v): continue
               rows.append([d.strftime('%Y-%m-%d'),float(v)])
-          rows=sorted(set(tuple(x) for x in rows))[-180:]
+          rows=sorted(set(tuple(x) for x in rows))
           if len(rows)<30: raise SystemExit(f'Only parsed {len(rows)} rows; refusing to overwrite historical dataset')
           with open('etf-flows.json','w',encoding='utf-8') as f:
               json.dump({'updated':rows[-1][0],'source':'Farside Investors','data':[list(x) for x in rows]},f,separators=(',',':'))
-          print('Parsed',len(rows),'rows through',rows[-1][0])
+          print('Parsed',len(rows),'rows from',rows[0][0],'through',rows[-1][0])
           PY
       - name: Commit updated data
         run: |
@@ -53,4 +55,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add etf-flows.json
           if git diff --cached --quiet; then echo "No ETF flow changes."; else git commit -m "Refresh BTC ETF flow data"; git push; fi
-# force refresh 2026-08-25
+# calendar-based 180-day window
