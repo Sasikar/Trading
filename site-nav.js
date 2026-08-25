@@ -8,4 +8,5 @@
   const nav=document.createElement('nav');nav.id='site-nav';nav.setAttribute('aria-label','Trading navigation');
   nav.innerHTML='<a class="site-brand" href="index.html">TRADING<i>.</i></a><div class="site-links">'+links.map(([label,href])=>'<a class="site-link '+(current===href.split('?')[0]?'active':'')+'" href="'+href+'">'+label+'</a>').join('')+'</div>';
   const existing=document.querySelector('nav.nav');if(existing)existing.replaceWith(nav);else document.body.insertBefore(nav,document.body.firstChild);
+  if(current==='pulse.html'){const s=document.createElement('script');s.src='trump-news-widget.js?v=20260825';document.body.appendChild(s);}
 })();
