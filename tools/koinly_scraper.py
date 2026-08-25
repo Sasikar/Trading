@@ -12,34 +12,26 @@ TX_URL = os.getenv("KOINLY_TRANSACTIONS_URL", "https://app.koinly.io/transaction
 OUT = Path("artifacts/koinly-transactions.json")
 
 async def main():
-    email = os.getenv("KOINLY_EMAIL", "")
-    password = os.getenv("KOINLY_PASSWORD", "")
     state_b64 = os.getenv("KOINLY_STORAGE_STATE_B64", "")
+    if not state_b64:
+        raise RuntimeError("KOINLY_STORAGE_STATE_B64 is required. Provide an authenticated Playwright storage-state secret after signing in to Koinly with Google.")
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        if state_b64:
-            state = json.loads(base64.b64decode(state_b64).decode("utf-8"))
-            context = await browser.new_context(storage_state=state)
-        else:
-            context = await browser.new_context()
-
+        state = json.loads(base64.b64decode(state_b64).decode("utf-8"))
+        context = await browser.new_context(storage_state=state)
         page = await context.new_page()
+
         await page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=60000)
-
-        # Uses ordinary login controls only. It does not bypass MFA, CAPTCHA, or bot protection.
-        if "login" in page.url.lower() and email and password:
-            await page.locator('input[type="email"], input[name="email"]').first.fill(email)
-            await page.locator('input[type="password"], input[name="password"]').first.fill(password)
-            await page.locator('button[type="submit"], input[type="submit"]').first.click()
-            await page.wait_for_timeout(3000)
-
         if "login" in page.url.lower():
-            raise RuntimeError("Koinly authentication is still required. Use an authenticated storage-state secret when MFA is enabled.")
+            raise RuntimeError("The saved Google-authenticated Koinly session has expired or is invalid. Create a fresh storage state.")
 
         await page.goto(TX_URL, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(3000)
+        if "login" in page.url.lower():
+            raise RuntimeError("Koinly redirected to login; the saved Google session has expired or been revoked.")
 
         rows = await page.locator('table tbody tr, [role="row"]').all()
         transactions = []
@@ -50,7 +42,7 @@ async def main():
 
         payload = {
             "synced_at": datetime.now(timezone.utc).isoformat(),
-            "source": "Koinly Transactions page",
+            "source": "Koinly Transactions page via Google-authenticated Playwright session",
             "transaction_count": len(transactions),
             "transactions": transactions,
         }
