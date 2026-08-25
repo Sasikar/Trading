@@ -23,9 +23,10 @@ jobs:
           changed = []
           for path in Path('.').glob('*.html'):
               text = path.read_text(encoding='utf-8')
-              tag = '<script src="site-nav.js"></script>'
-              if tag not in text:
+              has_nav = 'site-nav.js' in text
+              if not has_nav:
                   marker = '</body>'
+                  tag = '<script src="site-nav.js?v=20260825-final"></script>'
                   if marker in text:
                       text = text.replace(marker, f'  {tag}\n{marker}', 1)
                   else:
@@ -44,6 +45,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No navigation changes needed."
           else
-            git commit -m "Add universal navigation to all pages"
+            git commit -m "Keep universal navigation single-instance"
             git push
           fi
