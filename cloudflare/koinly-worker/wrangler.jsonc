@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "trading-koinly-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-25",
+  "account_id": "7adfceca9b8ca55614a4c8008ab4814d",
+  "browser": {
+    "binding": "BROWSER"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "trading-koinly",
+      "database_id": "REPLACE_AFTER_D1_CREATE"
+    }
+  ]
+}
