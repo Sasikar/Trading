@@ -14,15 +14,17 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    #site-nav{position:sticky;top:0;z-index:9999;width:100%;min-height:72px;background:rgba(7,10,15,.96);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:24px;padding:10px 24px;box-sizing:border-box;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+    #site-nav{position:sticky;top:0;z-index:9999;width:100%;min-height:72px;background:rgba(7,10,15,.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;gap:24px;padding:10px 24px;box-sizing:border-box;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
     #site-nav .site-brand{flex:0 0 auto;color:#f4f7fb;text-decoration:none;font-size:14px;font-weight:900;letter-spacing:.18em;white-space:nowrap}
     #site-nav .site-brand i{color:#62e3a0;font-style:normal}
     #site-nav .site-links{display:flex;align-items:center;justify-content:flex-start;gap:4px;min-width:0;flex:1;flex-wrap:wrap}
     #site-nav .site-link{color:#7f8b9b;text-decoration:none;font-size:13px;font-weight:650;padding:10px 12px;border-radius:10px;white-space:nowrap;transition:.15s ease}
     #site-nav .site-link:hover{color:#f4f7fb;background:rgba(255,255,255,.06)}
     #site-nav .site-link.active{color:#f4f7fb;background:rgba(98,227,160,.10);box-shadow:inset 0 0 0 1px rgba(98,227,160,.18)}
-    @media(max-width:700px){
-      #site-nav{position:sticky;top:0;display:grid;grid-template-columns:1fr;gap:8px;min-height:0;height:auto;padding:11px 12px 10px}
+
+    /* Phones and narrow browser viewports: brand on top, all 6 tabs visible below. */
+    @media(max-width:1000px){
+      #site-nav{display:grid;grid-template-columns:1fr;gap:8px;min-height:0;height:auto;padding:11px 12px 10px}
       #site-nav .site-brand{display:block;width:100%;font-size:12px;letter-spacing:.16em;padding:2px 2px 5px}
       #site-nav .site-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:5px;min-width:0}
       #site-nav .site-link{display:flex;align-items:center;justify-content:center;width:100%;font-size:11px;padding:9px 4px;box-sizing:border-box;white-space:nowrap}
