@@ -8,7 +8,7 @@
   },
   "devDependencies": {
     "@cloudflare/playwright": "^1.3.0",
-    "@cloudflare/workers-types": "^4.20260825.0",
+    "@cloudflare/workers-types": "5.20260823.1",
     "wrangler": "^4.33.0"
   }
 }
