@@ -6,7 +6,7 @@ on:
     - cron: '17 * * * *'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   sync:
@@ -21,10 +21,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Playwright
+      - name: Install Playwright and encryption library
         run: |
           python -m pip install --upgrade pip
-          pip install playwright
+          pip install playwright cryptography
           playwright install --with-deps chromium
 
       - name: Scrape Koinly transactions
@@ -36,9 +36,21 @@ jobs:
           KOINLY_TRANSACTIONS_URL: https://app.koinly.io/transactions
         run: python tools/koinly_scraper.py
 
-      - name: Upload private transaction artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: koinly-transactions-${{ github.run_number }}
-          path: artifacts/koinly-transactions.json
-          retention-days: 7
+      - name: Encrypt transaction dataset
+        env:
+          KOINLY_DATA_KEY: ${{ secrets.KOINLY_DATA_KEY }}
+        run: python tools/koinly_encrypt.py
+
+      - name: Publish encrypted dataset
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/koinly-transactions.enc.json
+          if git diff --cached --quiet; then
+            echo "No encrypted dataset changes."
+          else
+            git commit -m "Update encrypted Koinly transaction sync"
+            git push
+          fi
