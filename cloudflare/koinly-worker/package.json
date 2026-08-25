@@ -1,0 +1,14 @@
+{
+  "name": "trading-koinly-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/playwright": "^1.3.0",
+    "@cloudflare/workers-types": "^4.20260825.0",
+    "wrangler": "^4.33.0"
+  }
+}
