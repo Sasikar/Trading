@@ -1,4 +1,4 @@
-import { connect, launch, type Browser } from "@cloudflare/playwright";
+import { connect, launch, limits, sessions, type Browser } from "@cloudflare/playwright";
 import { DurableObject } from "cloudflare:workers";
 
 interface Env {
@@ -24,6 +24,7 @@ export default {
 
       const session = env.BROWSER_SESSION.getByName("koinly-private-session");
       const token = request.headers.get("x-login-token") || "";
+      if (url.pathname === "/browser-status") return browserStatus(env);
       if (url.pathname === "/login") return session.fetch(new Request(`${url.origin}/session/login`));
       if (url.pathname === "/complete-login") return session.fetch(new Request(`${url.origin}/session/complete-login`, { method: "POST", headers: { "x-login-token": token } }));
       if (url.pathname === "/sync") return session.fetch(new Request(`${url.origin}/session/sync`, { method: "POST", headers: { "x-login-token": token } }));
@@ -55,13 +56,13 @@ export class BrowserSession extends DurableObject<Env> {
     const sessionId = await this.ctx.storage.get<string>(BROWSER_KEY);
     const token = await this.ctx.storage.get<string>(LOGIN_TOKEN_KEY);
 
-    // Reconnect to the waiting browser instead of launching another one.
+    // Reuse the existing Browser Run session when it is genuinely still open.
     if (sessionId && token) {
       try {
-        return await this.liveViewExisting(sessionId, token);
-      } catch {
-        await this.ctx.storage.delete(BROWSER_KEY);
-      }
+        const live = await sessions(this.env.BROWSER);
+        if (live.some((s) => s.sessionId === sessionId)) return await this.liveViewExisting(sessionId, token);
+      } catch {}
+      await this.ctx.storage.delete(BROWSER_KEY);
     }
 
     // A saved authenticated session means there is nothing to log in again.
@@ -71,6 +72,11 @@ export class BrowserSession extends DurableObject<Env> {
 
     const loginToken = token || crypto.randomUUID();
     try {
+      const browserLimits = await limits(this.env.BROWSER);
+      if (browserLimits.allowedBrowserAcquisitions < 1) {
+        return rateLimitedResponse(browserLimits.timeUntilNextAllowedBrowserAcquisition, "Cloudflare says a new browser cannot be acquired yet.");
+      }
+
       const { browser, page } = await this.getFreshBrowser();
       await page.goto(KOINLY_LOGIN, { waitUntil: "domcontentloaded", timeout: 30000 });
       const cdp = await page.context().newCDPSession(page);
@@ -105,6 +111,11 @@ export class BrowserSession extends DurableObject<Env> {
     }
 
     try {
+      const live = await sessions(this.env.BROWSER);
+      if (!live.some((s) => s.sessionId === sessionId)) {
+        await this.ctx.storage.delete(BROWSER_KEY);
+        return json({ status: "login_session_expired", message: "The previous browser session expired. Tap Connect Koinly once to create a fresh session." }, 409);
+      }
       this.browser = await connect(this.env.BROWSER, sessionId);
       const page = this.browser.contexts()[0]?.pages()[0] ?? await this.browser.newPage();
       await page.goto(KOINLY_TRANSACTIONS, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -134,10 +145,7 @@ export class BrowserSession extends DurableObject<Env> {
     const now = Date.now();
     if (lastSync && now - lastSync < SYNC_COOLDOWN_MS) {
       const retryAfter = Math.max(1, Math.ceil((SYNC_COOLDOWN_MS - (now - lastSync)) / 1000));
-      return new Response(JSON.stringify({ status: "rate_limited", message: `Sync already ran recently. Try again in ${retryAfter}s.` }), {
-        status: 429,
-        headers: { ...cors(), "content-type": "application/json; charset=utf-8", "retry-after": String(retryAfter) }
-      });
+      return new Response(JSON.stringify({ status: "rate_limited", message: `Sync already ran recently. Try again in ${retryAfter}s.` }), { status: 429, headers: { ...cors(), "content-type": "application/json; charset=utf-8", "retry-after": String(retryAfter) } });
     }
 
     await this.ctx.storage.put(LAST_SYNC_KEY, now);
@@ -177,9 +185,6 @@ export class BrowserSession extends DurableObject<Env> {
       }
 
       await this.ctx.storage.put(SESSION_KEY, JSON.stringify(await page.context().storageState()));
-
-      // Keep the Browser Run session alive for reuse. This avoids a fresh browser
-      // acquisition on every sync and prevents Browser Run retry/rate-limit storms.
       await this.ctx.storage.put(BROWSER_KEY, browser.sessionId());
       await browser.disconnect();
       this.browser = undefined;
@@ -211,13 +216,20 @@ export class BrowserSession extends DurableObject<Env> {
     const existingSessionId = await this.ctx.storage.get<string>(BROWSER_KEY);
     if (existingSessionId) {
       try {
-        this.browser = await connect(this.env.BROWSER, existingSessionId);
-        const page = this.browser.contexts()[0]?.pages()[0] ?? await this.browser.newPage();
-        return { browser: this.browser, page, persistent: true };
-      } catch {
-        await this.ctx.storage.delete(BROWSER_KEY);
-        this.browser = undefined;
-      }
+        const live = await sessions(this.env.BROWSER);
+        if (live.some((s) => s.sessionId === existingSessionId)) {
+          this.browser = await connect(this.env.BROWSER, existingSessionId);
+          const page = this.browser.contexts()[0]?.pages()[0] ?? await this.browser.newPage();
+          return { browser: this.browser, page, persistent: true };
+        }
+      } catch {}
+      await this.ctx.storage.delete(BROWSER_KEY);
+      this.browser = undefined;
+    }
+
+    const browserLimits = await limits(this.env.BROWSER);
+    if (browserLimits.allowedBrowserAcquisitions < 1) {
+      throw new BrowserRateLimitError(browserLimits.timeUntilNextAllowedBrowserAcquisition);
     }
 
     this.browser = await launch(this.env.BROWSER, { keep_alive: 600000 });
@@ -227,14 +239,31 @@ export class BrowserSession extends DurableObject<Env> {
   }
 }
 
-function rateLimitOrError(error: unknown, fallback: string) {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/429|too many requests|too many retries|rate.?limit|acquisition/i.test(message)) {
-    return new Response(JSON.stringify({ status: "rate_limited", message: "Cloudflare Browser Run is temporarily rate-limiting a browser acquisition. Wait a little and try Sync once; the worker now reuses the existing browser session instead of repeatedly launching new browsers." }), {
-      status: 429,
-      headers: { ...cors(), "content-type": "application/json; charset=utf-8", "retry-after": "60" }
-    });
+class BrowserRateLimitError extends Error {
+  constructor(public retryAfterSeconds: number) {
+    super(`Browser acquisition is rate limited. Retry in ${retryAfterSeconds}s.`);
+    this.name = "BrowserRateLimitError";
   }
+}
+
+async function browserStatus(env: Env) {
+  try {
+    const [browserLimits, openSessions] = await Promise.all([limits(env.BROWSER), sessions(env.BROWSER)]);
+    return json({ status: "ok", browser_limits: browserLimits, open_sessions: openSessions });
+  } catch (error) {
+    return json({ status: "error", message: error instanceof Error ? error.message : String(error) }, 500);
+  }
+}
+
+function rateLimitedResponse(retryAfterSeconds: number, message: string) {
+  const retry = Math.max(1, Math.ceil(retryAfterSeconds || 20));
+  return new Response(JSON.stringify({ status: "rate_limited", message, retry_after_seconds: retry, reason: "browser_acquisition_rate_limit" }), { status: 429, headers: { ...cors(), "content-type": "application/json; charset=utf-8", "retry-after": String(retry) } });
+}
+
+function rateLimitOrError(error: unknown, fallback: string) {
+  if (error instanceof BrowserRateLimitError) return rateLimitedResponse(error.retryAfterSeconds, "Cloudflare says a new browser cannot be acquired yet.");
+  const message = error instanceof Error ? error.message : String(error);
+  if (/429|too many requests|too many retries|rate.?limit|acquisition/i.test(message)) return rateLimitedResponse(60, "Cloudflare Browser Run is rate-limiting a browser acquisition. The worker now checks limits and reuses live sessions before launching a new browser.");
   return json({ status: fallback, message }, 500);
 }
 
@@ -244,16 +273,9 @@ async function sha256(input: string) {
 }
 
 function cors() {
-  return {
-    "access-control-allow-origin": "*",
-    "access-control-allow-headers": "content-type,x-login-token",
-    "access-control-allow-methods": "GET,POST,OPTIONS"
-  };
+  return { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type,x-login-token", "access-control-allow-methods": "GET,POST,OPTIONS" };
 }
 
 function json(value: unknown, status = 200) {
-  return new Response(JSON.stringify(value), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", ...cors() }
-  });
+  return new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json; charset=utf-8", ...cors() } });
 }
