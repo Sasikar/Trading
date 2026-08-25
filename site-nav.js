@@ -4,7 +4,7 @@
   const links = [
     ['Overview', 'index.html'],
     ['Markets', 'watchlist.html'],
-    ['Pulse', 'pulse.html'],
+    ['Pulse', 'pulse-live.html'],
     ['Catalysts', 'market-catalysts.html'],
     ['Process', 'pre-entry-checklist.html'],
     ['Research', 'upload.html']
@@ -21,14 +21,7 @@
     #site-nav .site-link{color:#7f8b9b;text-decoration:none;font-size:13px;font-weight:650;padding:10px 12px;border-radius:10px;white-space:nowrap;transition:.15s ease}
     #site-nav .site-link:hover{color:#f4f7fb;background:rgba(255,255,255,.06)}
     #site-nav .site-link.active{color:#f4f7fb;background:rgba(98,227,160,.10);box-shadow:inset 0 0 0 1px rgba(98,227,160,.18)}
-
-    /* Phones and narrow browser viewports: brand on top, all 6 tabs visible below. */
-    @media(max-width:1000px){
-      #site-nav{display:grid;grid-template-columns:1fr;gap:8px;min-height:0;height:auto;padding:11px 12px 10px}
-      #site-nav .site-brand{display:block;width:100%;font-size:12px;letter-spacing:.16em;padding:2px 2px 5px}
-      #site-nav .site-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:5px;min-width:0}
-      #site-nav .site-link{display:flex;align-items:center;justify-content:center;width:100%;font-size:11px;padding:9px 4px;box-sizing:border-box;white-space:nowrap}
-    }
+    @media(max-width:1000px){#site-nav{display:grid;grid-template-columns:1fr;gap:8px;min-height:0;height:auto;padding:11px 12px 10px}#site-nav .site-brand{display:block;width:100%;font-size:12px;letter-spacing:.16em;padding:2px 2px 5px}#site-nav .site-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;gap:5px;min-width:0}#site-nav .site-link{display:flex;align-items:center;justify-content:center;width:100%;font-size:11px;padding:9px 4px;box-sizing:border-box;white-space:nowrap}}
   `;
   document.head.appendChild(style);
 
