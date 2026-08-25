@@ -46,17 +46,12 @@ jobs:
               const parsed = JSON.parse(s);
               const rows = Array.isArray(parsed) ? parsed : (parsed.result || parsed.databases || []);
               const db = rows.find(x => x.name === "trading-koinly");
-              if (!db) {
-                console.error("D1 database trading-koinly was not found");
-                process.exit(2);
-              }
+              if (!db) { console.error("D1 database trading-koinly was not found"); process.exit(2); }
               process.stdout.write(db.uuid || db.database_id || "");
             });
           ')"
           test -n "$D1_ID"
-          echo "Resolved D1 database: $D1_ID"
           sed -i "s/REPLACE_AFTER_D1_CREATE/$D1_ID/" wrangler.jsonc
-          echo "Effective Wrangler config:"
           cat wrangler.jsonc
 
       - name: Generate Worker types
@@ -79,6 +74,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
+
+      - name: Verify live Worker health
+        run: |
+          set -euxo pipefail
+          curl --fail --show-error --retry 5 --retry-delay 3 https://trading-koinly-worker.sasipudi.workers.dev/health
 
       - name: Verify Worker deployment
         env:
