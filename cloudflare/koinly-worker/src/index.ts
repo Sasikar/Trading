@@ -5,6 +5,7 @@ interface Env {
   BROWSER: Fetcher;
   BROWSER_SESSION: DurableObjectNamespace;
   DB: D1Database;
+  KOINLY_ACCESS_KEY: string;
 }
 
 const KOINLY_LOGIN = "https://app.koinly.io/login";
@@ -16,6 +17,10 @@ export default {
 
     if (url.pathname === "/health") {
       return json({ ok: true, service: "trading-koinly-worker" });
+    }
+
+    if (!authorized(request, env)) {
+      return new Response("Unauthorized", { status: 401 });
     }
 
     const session = env.BROWSER_SESSION.getByName("koinly-private-session");
@@ -68,8 +73,7 @@ export class BrowserSession extends DurableObject<Env> {
         const { browser, page } = await this.getPage(KOINLY_TRANSACTIONS);
         await page.waitForLoadState("domcontentloaded").catch(() => undefined);
 
-        const currentUrl = page.url();
-        if (currentUrl.includes("/login")) {
+        if (page.url().includes("/login")) {
           const cdp = await page.createCDPSession();
           const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", {
             mode: "tab",
@@ -136,6 +140,11 @@ export class BrowserSession extends DurableObject<Env> {
     await page.goto(url, { waitUntil: "domcontentloaded" });
     return { browser: this.browser, page };
   }
+}
+
+function authorized(request: Request, env: Env): boolean {
+  const value = request.headers.get("authorization") || "";
+  return value === `Bearer ${env.KOINLY_ACCESS_KEY}`;
 }
 
 async function sha256(input: string): Promise<string> {
