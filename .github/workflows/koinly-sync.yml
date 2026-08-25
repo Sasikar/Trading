@@ -1,0 +1,52 @@
+name: Koinly Live Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install --with-deps chromium
+
+      - name: Scrape Koinly transactions
+        env:
+          KOINLY_EMAIL: ${{ secrets.KOINLY_EMAIL }}
+          KOINLY_PASSWORD: ${{ secrets.KOINLY_PASSWORD }}
+          KOINLY_STORAGE_STATE_B64: ${{ secrets.KOINLY_STORAGE_STATE_B64 }}
+          KOINLY_LOGIN_URL: https://app.koinly.io/login
+          KOINLY_TRANSACTIONS_URL: https://app.koinly.io/transactions
+        run: python tools/koinly_scraper.py
+
+      - name: Upload private transaction artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: koinly-transactions-${{ github.run_number }}
+          path: artifacts/koinly-transactions.json
+          retention-days: 7
+
+      - name: Upload scraper diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: koinly-sync-diagnostics-${{ github.run_number }}
+          path: artifacts/koinly-storage-state.json
+          retention-days: 1
