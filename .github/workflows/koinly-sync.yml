@@ -42,11 +42,3 @@ jobs:
           name: koinly-transactions-${{ github.run_number }}
           path: artifacts/koinly-transactions.json
           retention-days: 7
-
-      - name: Upload scraper diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: koinly-sync-diagnostics-${{ github.run_number }}
-          path: artifacts/koinly-storage-state.json
-          retention-days: 1
