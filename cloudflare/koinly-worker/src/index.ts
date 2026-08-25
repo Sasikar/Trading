@@ -50,7 +50,33 @@ export class BrowserSession extends DurableObject<Env> {
   }
 
   private async startManualLogin() {
-    const loginToken = crypto.randomUUID();
+    const existingSessionId = await this.ctx.storage.get<string>(BROWSER_KEY);
+    const existingToken = await this.ctx.storage.get<string>(LOGIN_TOKEN_KEY);
+
+    // Reuse the browser that was already opened for Google login. Do NOT launch
+    // another browser if one is waiting; this avoids Cloudflare 429 rate limits.
+    if (existingSessionId && existingToken) {
+      try {
+        this.browser = await connect(this.env.BROWSER, existingSessionId);
+        const page = this.browser.contexts()[0]?.pages()[0] ?? await this.browser.newPage();
+        const cdp = await page.context().newCDPSession(page);
+        const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
+        await this.browser.disconnect();
+        this.browser = undefined;
+        return json({
+          status: "login_required",
+          login_token: existingToken,
+          message: "Existing Koinly login session found. Finish Google login in Live View, then tap Complete Login.",
+          live_view_url: devtoolsFrontendUrl
+        });
+      } catch {
+        // The old browser session has expired; clear only the browser handle.
+        await this.ctx.storage.delete(BROWSER_KEY);
+        this.browser = undefined;
+      }
+    }
+
+    const loginToken = existingToken || crypto.randomUUID();
     const { browser, page } = await this.getFreshBrowser();
     try {
       await page.goto(KOINLY_LOGIN, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -75,7 +101,7 @@ export class BrowserSession extends DurableObject<Env> {
   private async completeManualLogin(request: Request) {
     if (!(await this.validToken(request))) return json({ status: "unauthorized" }, 401);
     const sessionId = await this.ctx.storage.get<string>(BROWSER_KEY);
-    if (!sessionId) return json({ status: "no_login_session", message: "Start Login first." }, 409);
+    if (!sessionId) return json({ status: "no_login_session", message: "No pending browser login. Tap Connect Koinly to start one." }, 409);
     try {
       this.browser = await connect(this.env.BROWSER, sessionId);
       const page = this.browser.contexts()[0]?.pages()[0] ?? await this.browser.newPage();
@@ -84,14 +110,15 @@ export class BrowserSession extends DurableObject<Env> {
         const cdp = await page.context().newCDPSession(page);
         const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
         await this.browser.disconnect();
-        return json({ status: "login_required", message: "Finish Google login in Live View, then tap Complete Login again.", live_view_url: devtoolsFrontendUrl }, 401);
+        return json({ status: "login_required", login_token: await this.ctx.storage.get<string>(LOGIN_TOKEN_KEY), message: "Finish Google login in Live View, then tap Complete Login again.", live_view_url: devtoolsFrontendUrl }, 401);
       }
       await this.ctx.storage.put(SESSION_KEY, JSON.stringify(await page.context().storageState()));
       await this.ctx.storage.delete(BROWSER_KEY);
-      await this.ctx.storage.delete(LOGIN_TOKEN_KEY);
+      // IMPORTANT: keep LOGIN_TOKEN_KEY. Sync and transactions use the same
+      // token after login, so deleting it here made every later request 401.
       await this.browser.close();
       this.browser = undefined;
-      return json({ status: "logged_in", message: "Koinly session saved. Sync can now run without logging in each time unless Koinly expires the session." });
+      return json({ status: "logged_in", message: "Koinly session saved. Sync Latest is now ready." });
     } catch (error) {
       try { await this.browser?.close(); } catch {}
       this.browser = undefined;
@@ -103,7 +130,7 @@ export class BrowserSession extends DurableObject<Env> {
     if (!(await this.validToken(request))) return json({ status: "unauthorized" }, 401);
     try {
       const stateJson = await this.ctx.storage.get<string>(SESSION_KEY);
-      if (!stateJson) return this.startManualLogin();
+      if (!stateJson) return json({ status: "no_saved_session", message: "Complete Koinly Login first." }, 409);
       const { browser, page } = await this.getBrowserWithState(JSON.parse(stateJson));
       await page.goto(KOINLY_TRANSACTIONS, { waitUntil: "domcontentloaded", timeout: 30000 });
       if (page.url().includes("/login")) {
@@ -111,11 +138,12 @@ export class BrowserSession extends DurableObject<Env> {
         const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
         await this.ctx.storage.put(BROWSER_KEY, browser.sessionId());
         await browser.disconnect();
-        return json({ status: "login_required", message: "Koinly session expired. Log in again in Live View, then tap Complete Login.", live_view_url: devtoolsFrontendUrl }, 401);
+        return json({ status: "login_required", message: "Koinly session expired. Log in again in Live View, then tap Complete Login.", live_view_url: devtoolsFrontendUrl });
       }
       const rows = await page.locator("table tbody tr").evaluateAll((els: Element[]) => els.map(el => ({ text: (el.textContent || "").replace(/\s+/g, " ").trim() })));
       if (!rows.length) {
-        await browser.disconnect();
+        await browser.close();
+        this.browser = undefined;
         return json({ status: "needs_selector_check", message: "Koinly loaded, but no transaction rows were detected. The authenticated DOM needs one selector update." }, 422);
       }
       const syncedAt = new Date().toISOString();
