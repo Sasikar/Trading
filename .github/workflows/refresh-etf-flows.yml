@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/refresh-etf-flows.yml'
 permissions:
   contents: write
 jobs:
@@ -12,32 +15,36 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install parser
         run: python -m pip install --disable-pip-version-check pandas lxml requests
-      - name: Fetch Bitbo ETF flow table
+      - name: Fetch Farside BTC ETF flow history
         run: |
           python - <<'PY'
           import json
           import pandas as pd
           import requests
-          url='https://bitbo.io/treasuries/etf-flows/'
+          url='https://farside.co.uk/bitcoin-etf-flow-all-data/'
           html=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=30).text
           tables=pd.read_html(html)
           table=None
           for t in tables:
               cols=[str(c).strip().lower() for c in t.columns]
-              if any('date' in c for c in cols) and any('total' in c for c in cols): table=t; break
-          if table is None: raise SystemExit('ETF flow table not found')
+              if any('date' in c for c in cols) and any('total' in c for c in cols):
+                  table=t; break
+          if table is None: raise SystemExit('Farside ETF flow table not found')
           dc=next(c for c in table.columns if 'date' in str(c).lower())
           tc=next(c for c in table.columns if 'total' in str(c).lower())
           rows=[]
           for _,r in table.iterrows():
               d=pd.to_datetime(r[dc],errors='coerce')
               if pd.isna(d): continue
-              v=pd.to_numeric(str(r[tc]).replace(',',''),errors='coerce')
+              raw=str(r[tc]).strip().replace(',','').replace('(','-').replace(')','')
+              if raw in {'-','—','nan','None',''}: continue
+              v=pd.to_numeric(raw,errors='coerce')
               if pd.isna(v): continue
               rows.append([d.strftime('%Y-%m-%d'),float(v)])
           rows=sorted(set(tuple(x) for x in rows))[-180:]
           if not rows: raise SystemExit('No ETF flow rows parsed')
-          with open('etf-flows.json','w',encoding='utf-8') as f: json.dump({'updated':rows[-1][0],'source':'Bitbo','data':[list(x) for x in rows]},f,separators=(',',':'))
+          with open('etf-flows.json','w',encoding='utf-8') as f:
+              json.dump({'updated':rows[-1][0],'source':'Farside Investors','data':[list(x) for x in rows]},f,separators=(',',':'))
           print('Parsed',len(rows),'rows through',rows[-1][0])
           PY
       - name: Commit updated data
