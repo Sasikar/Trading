@@ -53,7 +53,7 @@ export class BrowserSession extends DurableObject<Env> {
         expiresInMs: 3600000,
       });
 
-      await this.env.KOINLY_SESSION_STATE.put("last_live_view", devtoolsFrontendUrl);
+      await this.ctx.storage.put("last_live_view", devtoolsFrontendUrl);
       await browser.disconnect();
 
       return json({
@@ -96,8 +96,7 @@ export class BrowserSession extends DurableObject<Env> {
         }
 
         const syncedAt = new Date().toISOString();
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
+        for (const row of rows) {
           const id = await sha256(row.text);
           await this.env.DB.prepare(
             "INSERT OR REPLACE INTO koinly_transactions (id, timestamp, raw_json, synced_at) VALUES (?, ?, ?, ?)"
@@ -118,7 +117,7 @@ export class BrowserSession extends DurableObject<Env> {
   }
 
   private async getPage(url: string) {
-    const savedSessionId = await this.env.KOINLY_SESSION_STATE.get("session_id");
+    const savedSessionId = await this.ctx.storage.get<string>("session_id");
 
     if (savedSessionId) {
       try {
@@ -127,12 +126,12 @@ export class BrowserSession extends DurableObject<Env> {
         await page.goto(url, { waitUntil: "domcontentloaded" });
         return { browser: this.browser, page };
       } catch {
-        await this.env.KOINLY_SESSION_STATE.delete("session_id");
+        await this.ctx.storage.delete("session_id");
       }
     }
 
     this.browser = await launch(this.env.BROWSER, { keep_alive: 600000 });
-    await this.env.KOINLY_SESSION_STATE.put("session_id", this.browser.sessionId());
+    await this.ctx.storage.put("session_id", this.browser.sessionId());
     const page = await this.browser.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded" });
     return { browser: this.browser, page };
