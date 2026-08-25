@@ -26,4 +26,5 @@ rows.forEach((r,i)=>{const v=Number(r[1]),x=p.l+(i+.5)*slot,bh=Math.max(2,Math.a
 const recent=rows.slice(-6).reduce((a,r)=>a+Number(r[1]),0);s+=`<text x="${w-p.r-4}" y="${p.t+16}" text-anchor="end" fill="#62e3a0" font-size="13" font-weight="800">6D ${recent>=0?'+':''}${fmt(recent)}</text></svg>`;document.getElementById('chartMount').innerHTML=s;document.getElementById('stat').innerHTML=`Last 6D <b>${recent>=0?'+':''}${fmt(recent)}</b>`}
 function boot(){draw(30);fetch('./etf-flows.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&Array.isArray(j.data)&&j.data.length){all=j.data;draw(document.querySelector('.range .active').dataset.days)}}).catch(()=>{});}
 boot();document.querySelectorAll('.range button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.range button').forEach(x=>x.classList.remove('active'));b.classList.add('active');draw(Number(b.dataset.days))});
-</script><script src="site-nav.js?v=20260825f"></script></body></html>
+</script><script src="site-nav.js?v=20260825f"></script>  <script src="site-nav.js"></script>
+</body></html>
