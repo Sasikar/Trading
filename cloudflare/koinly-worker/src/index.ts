@@ -54,7 +54,7 @@ export class BrowserSession extends DurableObject<Env> {
     const { browser, page } = await this.getFreshBrowser();
     try {
       await page.goto(KOINLY_LOGIN, { waitUntil: "domcontentloaded", timeout: 30000 });
-      const cdp = await page.createCDPSession();
+      const cdp = await page.context().newCDPSession(page);
       const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
       await this.ctx.storage.put(BROWSER_KEY, browser.sessionId());
       await this.ctx.storage.put(LOGIN_TOKEN_KEY, loginToken);
@@ -81,7 +81,7 @@ export class BrowserSession extends DurableObject<Env> {
       const page = this.browser.contexts()[0]?.pages()[0] ?? await this.browser.newPage();
       await page.goto(KOINLY_TRANSACTIONS, { waitUntil: "domcontentloaded", timeout: 30000 });
       if (page.url().includes("/login")) {
-        const cdp = await page.createCDPSession();
+        const cdp = await page.context().newCDPSession(page);
         const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
         await this.browser.disconnect();
         return json({ status: "login_required", message: "Finish Google login in Live View, then tap Complete Login again.", live_view_url: devtoolsFrontendUrl }, 401);
@@ -107,7 +107,7 @@ export class BrowserSession extends DurableObject<Env> {
       const { browser, page } = await this.getBrowserWithState(JSON.parse(stateJson));
       await page.goto(KOINLY_TRANSACTIONS, { waitUntil: "domcontentloaded", timeout: 30000 });
       if (page.url().includes("/login")) {
-        const cdp = await page.createCDPSession();
+        const cdp = await page.context().newCDPSession(page);
         const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
         await this.ctx.storage.put(BROWSER_KEY, browser.sessionId());
         await browser.disconnect();
