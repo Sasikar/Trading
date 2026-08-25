@@ -3,8 +3,8 @@ import { DurableObject } from "cloudflare:workers";
 
 interface Env {
   BROWSER: Fetcher;
+  BROWSER_SESSION: DurableObjectNamespace;
   DB: D1Database;
-  KOINLY_LOGIN_KEY: string;
 }
 
 const KOINLY_LOGIN = "https://app.koinly.io/login";
@@ -13,22 +13,19 @@ const KOINLY_TRANSACTIONS = "https://app.koinly.io/transactions";
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    const origin = url.origin;
 
     if (url.pathname === "/health") {
       return json({ ok: true, service: "trading-koinly-worker" });
     }
 
+    const session = env.BROWSER_SESSION.getByName("koinly-private-session");
+
     if (url.pathname === "/login") {
-      return env.BROWSER_SESSION.fetch(new Request(`${origin}/session/login`, {
-        headers: { "X-Koinly-Key": env.KOINLY_LOGIN_KEY },
-      }));
+      return session.fetch(new Request(`${url.origin}/session/login`));
     }
 
     if (url.pathname === "/sync") {
-      return env.BROWSER_SESSION.fetch(new Request(`${origin}/session/sync`, {
-        headers: { "X-Koinly-Key": env.KOINLY_LOGIN_KEY },
-      }));
+      return session.fetch(new Request(`${url.origin}/session/sync`));
     }
 
     if (url.pathname === "/transactions") {
@@ -44,76 +41,101 @@ export default {
 
 export class BrowserSession extends DurableObject<Env> {
   private browser?: Browser;
-  private page?: any;
 
   async fetch(request: Request): Promise<Response> {
-    if (request.headers.get("X-Koinly-Key") !== this.env.KOINLY_LOGIN_KEY) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-
     const path = new URL(request.url).pathname;
 
     if (path === "/session/login") {
-      const page = await this.getPage(KOINLY_LOGIN);
+      const { browser, page } = await this.getPage(KOINLY_LOGIN);
       const cdp = await page.createCDPSession();
       const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", {
         mode: "tab",
         expiresInMs: 3600000,
       });
 
-      return new Response(
-        JSON.stringify({
-          status: "login_required",
-          message: "Open the Live View link on your phone, sign in to Koinly with Google, then tap Done/return to Trading and call Sync.",
-          live_view_url: devtoolsFrontendUrl,
-        }),
-        { headers: { "content-type": "application/json" } },
-      );
+      await this.env.KOINLY_SESSION_STATE.put("last_live_view", devtoolsFrontendUrl);
+      await browser.disconnect();
+
+      return json({
+        status: "login_required",
+        message: "Open the Live View link, sign in to Koinly with Google, then return to Trading and tap Sync.",
+        live_view_url: devtoolsFrontendUrl,
+      });
     }
 
     if (path === "/session/sync") {
-      const page = await this.getPage(KOINLY_TRANSACTIONS);
-      await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+      try {
+        const { browser, page } = await this.getPage(KOINLY_TRANSACTIONS);
+        await page.waitForLoadState("domcontentloaded").catch(() => undefined);
 
-      // Koinly's DOM is intentionally treated as an adapter layer. Selectors
-      // will be tightened after the first real authenticated session is tested.
-      const rows = await page.locator("table tbody tr").evaluateAll((els: Element[]) =>
-        els.map((el) => ({ text: (el.textContent || "").replace(/\\s+/g, " ").trim() }))
-      );
+        const currentUrl = page.url();
+        if (currentUrl.includes("/login")) {
+          const cdp = await page.createCDPSession();
+          const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", {
+            mode: "tab",
+            expiresInMs: 3600000,
+          });
+          await browser.disconnect();
+          return json({
+            status: "login_required",
+            message: "Koinly session is not authenticated. Open the Live View, log in with Google, then tap Sync again.",
+            live_view_url: devtoolsFrontendUrl,
+          }, 401);
+        }
 
-      if (!rows.length) {
+        const rows = await page.locator("table tbody tr").evaluateAll((els: Element[]) =>
+          els.map((el) => ({ text: (el.textContent || "").replace(/\s+/g, " ").trim() }))
+        );
+
+        if (!rows.length) {
+          await browser.disconnect();
+          return json({
+            status: "needs_selector_check",
+            message: "Koinly loaded, but no transaction table rows were detected. We need to inspect the authenticated Koinly DOM once.",
+          }, 422);
+        }
+
+        const syncedAt = new Date().toISOString();
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const id = await sha256(row.text);
+          await this.env.DB.prepare(
+            "INSERT OR REPLACE INTO koinly_transactions (id, timestamp, raw_json, synced_at) VALUES (?, ?, ?, ?)"
+          ).bind(id, syncedAt, JSON.stringify(row), syncedAt).run();
+        }
+
+        await browser.disconnect();
+        return json({ status: "ok", count: rows.length, synced_at: syncedAt });
+      } catch (error) {
         return json({
-          status: "needs_selector_check",
-          message: "Koinly loaded, but no transaction table rows were detected yet.",
-        }, 422);
+          status: "browser_session_error",
+          message: error instanceof Error ? error.message : String(error),
+        }, 500);
       }
-
-      const syncedAt = new Date().toISOString();
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const id = await sha256(`${syncedAt}:${i}:${row.text}`);
-        await this.env.DB.prepare(
-          "INSERT OR REPLACE INTO koinly_transactions (id, timestamp, raw_json, synced_at) VALUES (?, ?, ?, ?)"
-        ).bind(id, syncedAt, JSON.stringify(row), syncedAt).run();
-      }
-
-      return json({ status: "ok", count: rows.length, synced_at: syncedAt });
     }
 
     return new Response("Not found", { status: 404 });
   }
 
   private async getPage(url: string) {
-    if (!this.browser) {
-      this.browser = await launch(this.env.BROWSER, { keep_alive: 600000 });
+    const savedSessionId = await this.env.KOINLY_SESSION_STATE.get("session_id");
+
+    if (savedSessionId) {
+      try {
+        this.browser = await connect(this.env.BROWSER, savedSessionId);
+        const page = this.browser.contexts()[0]?.pages()[0] ?? await this.browser.newPage();
+        await page.goto(url, { waitUntil: "domcontentloaded" });
+        return { browser: this.browser, page };
+      } catch {
+        await this.env.KOINLY_SESSION_STATE.delete("session_id");
+      }
     }
 
-    if (!this.page || this.page.isClosed()) {
-      this.page = await this.browser.newPage();
-    }
-
-    await this.page.goto(url, { waitUntil: "domcontentloaded" });
-    return this.page;
+    this.browser = await launch(this.env.BROWSER, { keep_alive: 600000 });
+    await this.env.KOINLY_SESSION_STATE.put("session_id", this.browser.sessionId());
+    const page = await this.browser.newPage();
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    return { browser: this.browser, page };
   }
 }
 
