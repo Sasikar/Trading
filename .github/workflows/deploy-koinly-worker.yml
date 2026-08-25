@@ -22,43 +22,66 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: cloudflare/koinly-worker/package.json
 
-      - name: Install Wrangler and Cloudflare Playwright
+      - name: Install Worker dependencies
         run: |
-          npm install --global wrangler@4.33.0
-          npm install --no-save --package-lock=false @cloudflare/playwright@1.3.6
+          set -euxo pipefail
+          npm install --no-fund --no-audit
+          npx wrangler --version
+          node -e "console.log('Playwright:', require('./node_modules/@cloudflare/playwright/package.json').version)"
+          node -e "console.log('Workers types:', require('./node_modules/@cloudflare/workers-types/package.json').version)"
 
       - name: Resolve D1 database ID
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          set -euo pipefail
-          D1_ID="$(wrangler d1 list --json | node -e '
+          set -euxo pipefail
+          D1_ID="$(npx wrangler d1 list --json | node -e '
             let s="";
             process.stdin.on("data", d => s += d);
             process.stdin.on("end", () => {
-              const rows = JSON.parse(s);
+              const parsed = JSON.parse(s);
+              const rows = Array.isArray(parsed) ? parsed : (parsed.result || parsed.databases || []);
               const db = rows.find(x => x.name === "trading-koinly");
-              if (!db) { console.error("D1 database trading-koinly was not found"); process.exit(2); }
+              if (!db) {
+                console.error("D1 database trading-koinly was not found");
+                process.exit(2);
+              }
               process.stdout.write(db.uuid || db.database_id || "");
             });
           ')"
-          test -n "$D1_ID" || { echo "Could not resolve D1 database ID"; exit 1; }
+          test -n "$D1_ID"
+          echo "Resolved D1 database: $D1_ID"
           sed -i "s/REPLACE_AFTER_D1_CREATE/$D1_ID/" wrangler.jsonc
-          echo "D1 database resolved."
+          echo "Effective Wrangler config:"
+          cat wrangler.jsonc
+
+      - name: Generate Worker types
+        run: npx wrangler types
 
       - name: Apply D1 schema
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: wrangler d1 execute trading-koinly --remote --file=schema.sql
+        run: npx wrangler d1 execute trading-koinly --remote --file=schema.sql
+
+      - name: Validate Worker bundle
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --dry-run
 
       - name: Deploy Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: wrangler deploy
+        run: npx wrangler deploy
 
       - name: Verify Worker deployment
-        run: echo "Worker deployment command completed successfully."
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deployments list
