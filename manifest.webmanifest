@@ -1,0 +1,14 @@
+{
+  "name": "TRADING — Command Center",
+  "short_name": "Trading",
+  "description": "Personal trading market intelligence dashboard.",
+  "start_url": "/Trading/index.html?source=pwa",
+  "scope": "/Trading/",
+  "display": "standalone",
+  "background_color": "#070a0f",
+  "theme_color": "#070a0f",
+  "orientation": "portrait-primary",
+  "icons": [
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
