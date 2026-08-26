@@ -23,18 +23,46 @@ jobs:
           changed = []
           for path in Path('.').glob('*.html'):
               text = path.read_text(encoding='utf-8')
-              has_nav = 'site-nav.js' in text
-              if not has_nav:
+              original = text
+              # Always version the nav script so browsers cannot reuse an older
+              # cached copy that contains obsolete homepage behavior.
+              text = text.replace('src="site-nav.js"', 'src="site-nav.js?v=20260826-fix"')
+              text = text.replace('src="site-nav.js?v=20260825-final"', 'src="site-nav.js?v=20260826-fix"')
+              if 'site-nav.js' not in original:
                   marker = '</body>'
-                  tag = '<script src="site-nav.js?v=20260825-final"></script>'
+                  tag = '<script src="site-nav.js?v=20260826-fix"></script>'
                   if marker in text:
                       text = text.replace(marker, f'  {tag}\n{marker}', 1)
                   else:
                       text += f'\n{tag}\n'
+              if text != original:
                   path.write_text(text, encoding='utf-8')
                   changed.append(str(path))
 
           print('Updated:', ', '.join(changed) if changed else 'none')
+          PY
+
+      - name: Make market monitor immune to stale navigation scripts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('index.html')
+          text = path.read_text(encoding='utf-8')
+          original = text
+
+          # The live BTC/ETH monitor used class="hero". Older cached versions of
+          # site-nav.js removed .hero on the homepage. Give the market monitor a
+          # unique class so even an obsolete cached script cannot delete it.
+          text = text.replace('class="hero"', 'class="market-hero"')
+          text = text.replace('.hero{', '.market-hero{')
+          text = text.replace('.hero,.intel{', '.market-hero,.intel{')
+          text = text.replace('.hero{padding-top:', '.market-hero{padding-top:')
+
+          if text != original:
+              path.write_text(text, encoding='utf-8')
+              print('Renamed homepage market monitor class to prevent stale JS removal.')
+          else:
+              print('Market monitor class already protected.')
           PY
 
       - name: Remove homepage hero copy but preserve live BTC/ETH market grid
@@ -45,25 +73,18 @@ jobs:
           text = path.read_text(encoding='utf-8')
           original = text
 
-          # Remove only the left-side "Personal trading operating system" hero copy.
-          # Keep the terminal intact because it contains the live BTC/ETH prices,
-          # change indicators and Fear & Greed/FOMO market data.
-          start = text.find('<section class="hero"><div>')
+          # Remove only the old left-side operating-system hero copy if it ever
+          # exists. Never remove the live market monitor.
+          start = text.find('<section class="market-hero"><div>')
           aside = text.find('<aside class="terminal">', start)
           if start != -1 and aside != -1:
-              text = text[:start] + '<section class="hero">' + text[aside:]
-
-          # With the copy removed, let the preserved market grid use the full width.
-          text = text.replace(
-              '.hero{padding:70px 0 28px;display:grid;grid-template-columns:1.05fr .95fr;gap:22px}',
-              '.hero{padding:42px 0 28px;display:grid;grid-template-columns:1fr;gap:22px}'
-          )
+              text = text[:start] + '<section class="market-hero">' + text[aside:]
 
           if text != original:
               path.write_text(text, encoding='utf-8')
-              print('Removed homepage hero copy; preserved live BTC/ETH market grid.')
+              print('Removed old homepage hero copy; preserved market monitor.')
           else:
-              print('No homepage hero change needed.')
+              print('No old homepage hero copy found.')
           PY
 
       - name: Commit navigation and homepage updates
@@ -74,6 +95,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No navigation or homepage changes needed."
           else
-            git commit -m "Remove homepage hero copy and preserve market grid"
+            git commit -m "Protect BTC ETH market monitor from stale navigation JS"
             git push
           fi
