@@ -14,17 +14,10 @@ import java.util.Locale
 class MarketWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.sasikar.trading.action.REFRESH_WIDGET"
-
         private fun refreshIntent(context: Context): PendingIntent {
-            val intent = Intent(context, MarketWidget::class.java).apply {
-                action = ACTION_REFRESH
-            }
-            return PendingIntent.getBroadcast(
-                context,
-                1001,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val intent = Intent(context, MarketWidget::class.java).apply { action = ACTION_REFRESH }
+            return PendingIntent.getBroadcast(context, 1001, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
     }
 
@@ -43,8 +36,8 @@ class MarketWidget : AppWidgetProvider() {
 
     private fun refreshWidget(context: Context, manager: AppWidgetManager, id: Int) {
         val initial = RemoteViews(context.packageName, R.layout.market_widget)
-        initial.setTextViewText(R.id.btc, "₿  BTC  $—")
-        initial.setTextViewText(R.id.eth, "Ξ  ETH  $—")
+        initial.setTextViewText(R.id.btc, "₿  $—")
+        initial.setTextViewText(R.id.eth, "Ξ  $—")
         initial.setTextViewText(R.id.fomo, "⚡  —")
         initial.setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
         manager.updateAppWidget(id, initial)
@@ -54,8 +47,8 @@ class MarketWidget : AppWidgetProvider() {
             val eth = fetchPrice("ETHUSDT")
             val fomo = fetchFomo()
             val views = RemoteViews(context.packageName, R.layout.market_widget)
-            views.setTextViewText(R.id.btc, "₿  BTC  ${btc ?: "$—"}")
-            views.setTextViewText(R.id.eth, "Ξ  ETH  ${eth ?: "$—"}")
+            views.setTextViewText(R.id.btc, "₿  ${btc ?: "$—"}")
+            views.setTextViewText(R.id.eth, "Ξ  ${eth ?: "$—"}")
             views.setTextViewText(R.id.fomo, "⚡  ${fomo ?: "—"}")
             views.setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
             manager.updateAppWidget(id, views)
