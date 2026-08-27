@@ -43,10 +43,9 @@ class MarketWidget : AppWidgetProvider() {
 
     private fun refreshWidget(context: Context, manager: AppWidgetManager, id: Int) {
         val initial = RemoteViews(context.packageName, R.layout.market_widget)
-        initial.setTextViewText(R.id.title, "₿  ·  Ξ  ·  😱")
-        initial.setTextViewText(R.id.btc, "$—")
-        initial.setTextViewText(R.id.eth, "$—")
-        initial.setTextViewText(R.id.fomo, "😱  —")
+        initial.setTextViewText(R.id.btc, "₿  BTC  $—")
+        initial.setTextViewText(R.id.eth, "Ξ  ETH  $—")
+        initial.setTextViewText(R.id.fomo, "⚡  —")
         initial.setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
         manager.updateAppWidget(id, initial)
 
@@ -55,10 +54,9 @@ class MarketWidget : AppWidgetProvider() {
             val eth = fetchPrice("ETHUSDT")
             val fomo = fetchFomo()
             val views = RemoteViews(context.packageName, R.layout.market_widget)
-            views.setTextViewText(R.id.title, "₿  ·  Ξ  ·  😱")
-            views.setTextViewText(R.id.btc, btc ?: "$—")
-            views.setTextViewText(R.id.eth, eth ?: "$—")
-            views.setTextViewText(R.id.fomo, "😱  ${fomo ?: "—"}")
+            views.setTextViewText(R.id.btc, "₿  BTC  ${btc ?: "$—"}")
+            views.setTextViewText(R.id.eth, "Ξ  ETH  ${eth ?: "$—"}")
+            views.setTextViewText(R.id.fomo, "⚡  ${fomo ?: "—"}")
             views.setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
             manager.updateAppWidget(id, views)
         }.start()
