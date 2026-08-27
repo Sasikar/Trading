@@ -14,42 +14,61 @@ import java.util.Locale
 class MarketWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.sasikar.trading.action.REFRESH_WIDGET"
+
         private fun refreshIntent(context: Context): PendingIntent {
             val intent = Intent(context, MarketWidget::class.java).apply { action = ACTION_REFRESH }
-            return PendingIntent.getBroadcast(context, 1001, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            return PendingIntent.getBroadcast(
+                context,
+                1001,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
+        private fun baseViews(context: Context): RemoteViews {
+            return RemoteViews(context.packageName, R.layout.market_widget).apply {
+                setImageViewResource(R.id.btc_icon, R.drawable.ic_btc)
+                setImageViewResource(R.id.eth_icon, R.drawable.ic_eth)
+                setImageViewResource(R.id.fomo_icon, R.drawable.ic_lightning)
+                setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
+            }
         }
     }
+
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         ids.forEach { refreshWidget(context, manager, it) }
     }
+
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == ACTION_REFRESH) {
             val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(android.content.ComponentName(context, MarketWidget::class.java))
+            val ids = manager.getAppWidgetIds(
+                android.content.ComponentName(context, MarketWidget::class.java)
+            )
             ids.forEach { refreshWidget(context, manager, it) }
         }
     }
+
     private fun refreshWidget(context: Context, manager: AppWidgetManager, id: Int) {
-        val initial = RemoteViews(context.packageName, R.layout.market_widget)
+        val initial = baseViews(context)
         initial.setTextViewText(R.id.btc, "$—")
         initial.setTextViewText(R.id.eth, "$—")
         initial.setTextViewText(R.id.fomo, "—")
-        initial.setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
         manager.updateAppWidget(id, initial)
+
         Thread {
             val btc = fetchPrice("BTCUSDT")
             val eth = fetchPrice("ETHUSDT")
             val fomo = fetchFomo()
-            val views = RemoteViews(context.packageName, R.layout.market_widget)
+            val views = baseViews(context)
             views.setTextViewText(R.id.btc, btc ?: "$—")
             views.setTextViewText(R.id.eth, eth ?: "$—")
             views.setTextViewText(R.id.fomo, fomo ?: "—")
-            views.setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
             manager.updateAppWidget(id, views)
         }.start()
     }
+
     private fun fetchPrice(symbol: String): String? = try {
         val json = get("https://api.binance.com/api/v3/ticker/price?symbol=$symbol")
         val price = JSONObject(json).getString("price").toDouble()
@@ -58,16 +77,24 @@ class MarketWidget : AppWidgetProvider() {
             price >= 1 -> String.format(Locale.US, "$%.2f", price)
             else -> String.format(Locale.US, "$%.6f", price).trimEnd('0').trimEnd('.')
         }
-    } catch (_: Exception) { null }
+    } catch (_: Exception) {
+        null
+    }
+
     private fun fetchFomo(): String? = try {
         val json = get("https://api.alternative.me/fng/?limit=1")
         JSONObject(json).getJSONArray("data").getJSONObject(0).getString("value")
-    } catch (_: Exception) { null }
+    } catch (_: Exception) {
+        null
+    }
+
     private fun get(urlString: String): String {
         val connection = URL(urlString).openConnection() as HttpURLConnection
         connection.connectTimeout = 8000
         connection.readTimeout = 8000
         connection.requestMethod = "GET"
-        return connection.inputStream.bufferedReader().use { it.readText() }.also { connection.disconnect() }
+        return connection.inputStream.bufferedReader().use { it.readText() }.also {
+            connection.disconnect()
+        }
     }
 }
