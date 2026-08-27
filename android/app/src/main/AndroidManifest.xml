@@ -13,8 +13,7 @@
         </activity>
         <receiver
             android:name=".MarketWidget"
-            android:exported="true"
-            android:label="Meme Market">
+            android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
