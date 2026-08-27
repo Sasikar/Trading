@@ -1,56 +1,89 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="18dp"
-    android:background="#10141B">
+    android:background="#10141B"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
     <TextView
         android:id="@+id/refresh"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
-        android:layout_gravity="end"
-        android:gravity="center"
         android:text="↻"
         android:textColor="#16C784"
         android:textSize="34sp"
         android:textStyle="bold"
-        android:contentDescription="Refresh" />
+        android:gravity="center"
+        android:contentDescription="Refresh market data"
+        android:layout_gravity="end"
+        android:layout_width="44dp"
+        android:layout_height="44dp" />
+
     <LinearLayout
+        android:orientation="horizontal"
+        android:layout_marginTop="2dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-        <TextView
-            android:id="@+id/btc"
+        android:layout_height="wrap_content">
+
+        <LinearLayout
+            android:orientation="vertical"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="₿ BTC  $—"
-            android:textColor="#FFFFFF"
-            android:textSize="30sp"
-            android:textStyle="bold" />
-        <TextView
-            android:id="@+id/eth"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_height="wrap_content">
+            <TextView
+                android:id="@+id/btc_label"
+                android:text=""
+                android:visibility="gone"
+                android:layout_width="match_parent"
+                android:layout_height="0dp" />
+            <TextView
+                android:id="@+id/btc"
+                android:text="₿  BTC  $—"
+                android:textColor="#FFFFFF"
+                android:textSize="31sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:orientation="vertical"
             android:gravity="end"
-            android:text="Ξ ETH  $—"
-            android:textColor="#FFFFFF"
-            android:textSize="30sp"
-            android:textStyle="bold" />
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content">
+            <TextView
+                android:id="@+id/eth_label"
+                android:text=""
+                android:visibility="gone"
+                android:layout_width="match_parent"
+                android:layout_height="0dp" />
+            <TextView
+                android:id="@+id/eth"
+                android:text="Ξ  ETH  $—"
+                android:textColor="#FFFFFF"
+                android:textSize="31sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:gravity="end"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
     </LinearLayout>
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginTop="18dp"
-        android:background="#252A32" />
+        android:background="#252A32"
+        android:layout_marginTop="18dp" />
+
     <TextView
         android:id="@+id/fomo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="18dp"
-        android:text="⚡  —"
+        android:text="⚡  71"
         android:textColor="#16C784"
         android:textSize="30sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:includeFontPadding="false"
+        android:layout_marginTop="18dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
 </LinearLayout>
