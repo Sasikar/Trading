@@ -13,9 +13,9 @@
 
         <TextView
             android:id="@+id/title"
-            android:text="BTC  ·  ETH  ·  FEAR &amp; GREED"
+            android:text="₿  ·  Ξ  ·  😱"
             android:textColor="#FFFFFF"
-            android:textSize="15sp"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:layout_width="0dp"
             android:layout_weight="1"
@@ -43,7 +43,7 @@
 
         <TextView
             android:id="@+id/btc"
-            android:text="BTC  —"
+            android:text="$—"
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold"
@@ -53,7 +53,7 @@
 
         <TextView
             android:id="@+id/eth"
-            android:text="ETH  —"
+            android:text="$—"
             android:textColor="#FFFFFF"
             android:textSize="14sp"
             android:textStyle="bold"
@@ -65,7 +65,7 @@
 
     <TextView
         android:id="@+id/fomo"
-        android:text="Fear &amp; Greed Index  —"
+        android:text="😱  —"
         android:textColor="#16C784"
         android:textSize="14sp"
         android:textStyle="bold"
