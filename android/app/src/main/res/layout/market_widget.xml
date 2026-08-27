@@ -4,28 +4,144 @@
     android:background="#10141B"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
-    <LinearLayout android:orientation="horizontal" android:gravity="center_vertical" android:layout_width="match_parent" android:layout_height="64dp">
-        <ImageView android:src="@drawable/ic_btc" android:contentDescription="Bitcoin" android:layout_width="64dp" android:layout_height="64dp" />
-        <TextView android:text="•" android:textColor="#FFFFFF" android:textSize="28sp" android:gravity="center" android:layout_width="40dp" android:layout_height="64dp" />
-        <ImageView android:src="@drawable/ic_eth" android:contentDescription="Ethereum" android:layout_width="64dp" android:layout_height="64dp" />
-        <TextView android:text="•" android:textColor="#FFFFFF" android:textSize="28sp" android:gravity="center" android:layout_width="40dp" android:layout_height="64dp" />
-        <ImageView android:src="@drawable/ic_lightning" android:contentDescription="Fear and Greed" android:layout_width="64dp" android:layout_height="64dp" />
-        <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
-        <TextView android:id="@+id/refresh" android:text="↻" android:textColor="#16C784" android:textSize="42sp" android:textStyle="bold" android:gravity="center" android:contentDescription="Refresh market data" android:layout_width="54dp" android:layout_height="64dp" />
+
+    <!-- Exact compact icon row: BTC • ETH • lightning, then refresh -->
+    <LinearLayout
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_width="match_parent"
+        android:layout_height="52dp">
+        <ImageView
+            android:src="@drawable/ic_btc"
+            android:contentDescription="Bitcoin"
+            android:layout_width="48dp"
+            android:layout_height="48dp" />
+        <TextView
+            android:text="•"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:gravity="center"
+            android:layout_width="32dp"
+            android:layout_height="52dp" />
+        <ImageView
+            android:src="@drawable/ic_eth"
+            android:contentDescription="Ethereum"
+            android:layout_width="48dp"
+            android:layout_height="48dp" />
+        <TextView
+            android:text="•"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:gravity="center"
+            android:layout_width="32dp"
+            android:layout_height="52dp" />
+        <ImageView
+            android:src="@drawable/ic_lightning"
+            android:contentDescription="Fear and Greed"
+            android:layout_width="48dp"
+            android:layout_height="48dp" />
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+        <TextView
+            android:id="@+id/refresh"
+            android:text="↻"
+            android:textColor="#16C784"
+            android:textSize="38sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:contentDescription="Refresh market data"
+            android:layout_width="48dp"
+            android:layout_height="52dp" />
     </LinearLayout>
-    <LinearLayout android:orientation="horizontal" android:layout_marginTop="18dp" android:layout_width="match_parent" android:layout_height="wrap_content">
-        <LinearLayout android:orientation="vertical" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content">
-            <TextView android:id="@+id/btc_label" android:text="BTC" android:textColor="#F7931A" android:textSize="20sp" android:textStyle="bold" android:includeFontPadding="false" android:layout_width="match_parent" android:layout_height="wrap_content" />
-            <TextView android:id="@+id/btc" android:text="$—" android:textColor="#FFFFFF" android:textSize="31sp" android:textStyle="bold" android:includeFontPadding="false" android:layout_marginTop="8dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_marginTop="12dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content">
+            <TextView
+                android:id="@+id/btc_label"
+                android:text="BTC"
+                android:textColor="#F7931A"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/btc"
+                android:text="$—"
+                android:textColor="#FFFFFF"
+                android:textSize="31sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:layout_marginTop="6dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
         </LinearLayout>
-        <LinearLayout android:orientation="vertical" android:gravity="end" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content">
-            <TextView android:id="@+id/eth_label" android:text="ETH" android:textColor="#627EEA" android:textSize="20sp" android:textStyle="bold" android:includeFontPadding="false" android:gravity="end" android:layout_width="match_parent" android:layout_height="wrap_content" />
-            <TextView android:id="@+id/eth" android:text="$—" android:textColor="#FFFFFF" android:textSize="31sp" android:textStyle="bold" android:includeFontPadding="false" android:gravity="end" android:layout_marginTop="8dp" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <LinearLayout
+            android:orientation="vertical"
+            android:gravity="end"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content">
+            <TextView
+                android:id="@+id/eth_label"
+                android:text="ETH"
+                android:textColor="#627EEA"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:gravity="end"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+            <TextView
+                android:id="@+id/eth"
+                android:text="$—"
+                android:textColor="#FFFFFF"
+                android:textSize="31sp"
+                android:textStyle="bold"
+                android:includeFontPadding="false"
+                android:gravity="end"
+                android:layout_marginTop="6dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
         </LinearLayout>
     </LinearLayout>
-    <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#252A32" android:layout_marginTop="18dp" />
-    <LinearLayout android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="18dp" android:layout_width="match_parent" android:layout_height="64dp">
-        <ImageView android:src="@drawable/ic_lightning" android:contentDescription="Fear and Greed" android:layout_width="64dp" android:layout_height="64dp" />
-        <TextView android:id="@+id/fomo" android:text="71" android:textColor="#16C784" android:textSize="30sp" android:textStyle="bold" android:includeFontPadding="false" android:layout_marginStart="16dp" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#252A32"
+        android:layout_marginTop="14dp" />
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginTop="14dp"
+        android:layout_width="match_parent"
+        android:layout_height="48dp">
+        <ImageView
+            android:src="@drawable/ic_lightning"
+            android:contentDescription="Fear and Greed"
+            android:layout_width="48dp"
+            android:layout_height="48dp" />
+        <TextView
+            android:id="@+id/fomo"
+            android:text="71"
+            android:textColor="#16C784"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:includeFontPadding="false"
+            android:layout_marginStart="12dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 </LinearLayout>
