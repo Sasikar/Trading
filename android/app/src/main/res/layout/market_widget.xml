@@ -1,0 +1,4 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:orientation="vertical" android:padding="12dp" android:background="#10141B" android:layout_width="match_parent" android:layout_height="match_parent">
+<TextView android:id="@+id/title" android:text="BTC  ·  ETH" android:textColor="#FFFFFF" android:textSize="15sp" android:textStyle="bold" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+<TextView android:id="@+id/values" android:text="Loading…" android:textColor="#16C784" android:textSize="13sp" android:layout_marginTop="6dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+</LinearLayout>
