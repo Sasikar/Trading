@@ -6,7 +6,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- Top: BTC · ETH · ⚡ ........ ↻ -->
     <LinearLayout
         android:orientation="horizontal"
         android:gravity="center_vertical"
@@ -19,7 +18,7 @@
             android:layout_height="28dp" />
         <TextView
             android:text="·"
-            android:textColor="#6B7280"
+            android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:gravity="center"
             android:layout_width="14dp"
@@ -31,7 +30,7 @@
             android:layout_height="28dp" />
         <TextView
             android:text="·"
-            android:textColor="#6B7280"
+            android:textColor="#FFFFFF"
             android:textSize="16sp"
             android:gravity="center"
             android:layout_width="14dp"
@@ -49,15 +48,14 @@
         <TextView
             android:id="@+id/refresh"
             android:text="↻"
-            android:textColor="#9CA3AF"
-            android:textSize="22sp"
+            android:textColor="#16C784"
+            android:textSize="30sp"
             android:gravity="center"
             android:contentDescription="Refresh"
-            android:layout_width="32dp"
-            android:layout_height="32dp" />
+            android:layout_width="36dp"
+            android:layout_height="36dp" />
     </LinearLayout>
 
-    <!-- Prices -->
     <LinearLayout
         android:orientation="horizontal"
         android:layout_marginTop="10dp"
@@ -72,7 +70,7 @@
                 android:id="@+id/btc_label"
                 android:text="BTC"
                 android:textColor="#F7931A"
-                android:textSize="12sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"
                 android:layout_width="match_parent"
@@ -81,7 +79,7 @@
                 android:id="@+id/btc"
                 android:text="$—"
                 android:textColor="#FFFFFF"
-                android:textSize="22sp"
+                android:textSize="28sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"
                 android:layout_marginTop="2dp"
@@ -98,7 +96,7 @@
                 android:id="@+id/eth_label"
                 android:text="ETH"
                 android:textColor="#627EEA"
-                android:textSize="12sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"
                 android:gravity="end"
@@ -108,7 +106,7 @@
                 android:id="@+id/eth"
                 android:text="$—"
                 android:textColor="#FFFFFF"
-                android:textSize="22sp"
+                android:textSize="28sp"
                 android:textStyle="bold"
                 android:includeFontPadding="false"
                 android:gravity="end"
@@ -118,13 +116,14 @@
         </LinearLayout>
     </LinearLayout>
 
-    <View
+    <!-- RemoteViews does not support a generic View; use TextView as divider. -->
+    <TextView
+        android:text=""
+        android:background="#252A32"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="#252A32"
         android:layout_marginTop="10dp" />
 
-    <!-- Fear & Greed -->
     <LinearLayout
         android:orientation="horizontal"
         android:gravity="center_vertical"
@@ -134,13 +133,13 @@
         <ImageView
             android:src="@drawable/ic_lightning"
             android:contentDescription="Fear and Greed"
-            android:layout_width="18dp"
-            android:layout_height="18dp" />
+            android:layout_width="22dp"
+            android:layout_height="22dp" />
         <TextView
             android:id="@+id/fomo"
             android:text="—"
             android:textColor="#16C784"
-            android:textSize="18sp"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:includeFontPadding="false"
             android:layout_marginStart="8dp"
