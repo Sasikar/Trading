@@ -14,6 +14,7 @@ import java.util.Locale
 class MarketWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.sasikar.trading.action.REFRESH_WIDGET"
+        private const val PREFS = "market_widget_cache"
 
         private fun refreshIntent(context: Context): PendingIntent {
             val intent = Intent(context, MarketWidget::class.java).apply { action = ACTION_REFRESH }
@@ -46,35 +47,57 @@ class MarketWidget : AppWidgetProvider() {
     }
 
     private fun refreshWidget(context: Context, manager: AppWidgetManager, id: Int) {
+        val cached = cachedValues(context)
         val initial = baseViews(context)
-        initial.setTextViewText(R.id.btc, "$—")
-        initial.setTextViewText(R.id.eth, "$—")
-        initial.setTextViewText(R.id.sol, "$—")
-        initial.setTextViewText(R.id.fomo, "—")
+        initial.setTextViewText(R.id.btc, cached["bitcoin"] ?: "$—")
+        initial.setTextViewText(R.id.eth, cached["ethereum"] ?: "$—")
+        initial.setTextViewText(R.id.sol, cached["solana"] ?: "$—")
+        initial.setTextViewText(R.id.fomo, cached["fomo"] ?: "—")
         manager.updateAppWidget(id, initial)
 
         Thread {
             val prices = fetchPrices()
             val fomo = fetchFomo()
-            val views = baseViews(context)
-            views.setTextViewText(R.id.btc, prices["bitcoin"] ?: "$—")
-            views.setTextViewText(R.id.eth, prices["ethereum"] ?: "$—")
-            views.setTextViewText(R.id.sol, prices["solana"] ?: "$—")
-            views.setTextViewText(R.id.fomo, fomo ?: "—")
-            manager.updateAppWidget(id, views)
+            if (prices.isNotEmpty() || fomo != null) {
+                val views = baseViews(context)
+                views.setTextViewText(R.id.btc, prices["bitcoin"] ?: cached["bitcoin"] ?: "$—")
+                views.setTextViewText(R.id.eth, prices["ethereum"] ?: cached["ethereum"] ?: "$—")
+                views.setTextViewText(R.id.sol, prices["solana"] ?: cached["solana"] ?: "$—")
+                views.setTextViewText(R.id.fomo, fomo ?: cached["fomo"] ?: "—")
+                saveValues(context, prices, fomo)
+                manager.updateAppWidget(id, views)
+            }
         }.start()
     }
 
-    private fun fetchPrices(): Map<String, String> = try {
-        val json = get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd")
-        val root = JSONObject(json)
-        mapOf(
-            "bitcoin" to formatPrice(root.getJSONObject("bitcoin").getDouble("usd")),
-            "ethereum" to formatPrice(root.getJSONObject("ethereum").getDouble("usd")),
-            "solana" to formatPrice(root.getJSONObject("solana").getDouble("usd"))
+    private fun fetchPrices(): Map<String, String> {
+        // Coinbase is used first because it is a simple public endpoint and does not
+        // require an API key. CoinGecko remains a fallback if Coinbase is unavailable.
+        val coinbaseIds = mapOf(
+            "bitcoin" to "BTC-USD",
+            "ethereum" to "ETH-USD",
+            "solana" to "SOL-USD"
         )
-    } catch (_: Exception) {
-        emptyMap()
+        val result = mutableMapOf<String, String>()
+        coinbaseIds.forEach { (id, symbol) ->
+            try {
+                val root = JSONObject(get("https://api.coinbase.com/v2/prices/$symbol/spot"))
+                val amount = root.getJSONObject("data").getString("amount").toDouble()
+                result[id] = formatPrice(amount)
+            } catch (_: Exception) { }
+        }
+        if (result.size == coinbaseIds.size) return result
+
+        try {
+            val json = get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd")
+            val root = JSONObject(json)
+            coinbaseIds.keys.forEach { id ->
+                if (!result.containsKey(id)) {
+                    result[id] = formatPrice(root.getJSONObject(id).getDouble("usd"))
+                }
+            }
+        } catch (_: Exception) { }
+        return result
     }
 
     private fun formatPrice(price: Double): String = when {
@@ -90,14 +113,35 @@ class MarketWidget : AppWidgetProvider() {
 
     private fun get(urlString: String): String {
         val connection = URL(urlString).openConnection() as HttpURLConnection
-        connection.connectTimeout = 10000
-        connection.readTimeout = 10000
+        connection.connectTimeout = 8000
+        connection.readTimeout = 8000
         connection.requestMethod = "GET"
-        connection.setRequestProperty("User-Agent", "Meme-Android-Widget/1.0")
+        connection.setRequestProperty("Accept", "application/json")
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) MemeWidget/1.1")
         return try {
+            if (connection.responseCode !in 200..299) throw IllegalStateException("HTTP ${connection.responseCode}")
             connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
             connection.disconnect()
         }
+    }
+
+    private fun cachedValues(context: Context): Map<String, String> {
+        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        return mapOf(
+            "bitcoin" to p.getString("bitcoin", null),
+            "ethereum" to p.getString("ethereum", null),
+            "solana" to p.getString("solana", null),
+            "fomo" to p.getString("fomo", null)
+        ).filterValues { it != null }.mapValues { it.value!! }
+    }
+
+    private fun saveValues(context: Context, prices: Map<String, String>, fomo: String?) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
+            prices["bitcoin"]?.let { putString("bitcoin", it) }
+            prices["ethereum"]?.let { putString("ethereum", it) }
+            prices["solana"]?.let { putString("solana", it) }
+            fomo?.let { putString("fomo", it) }
+        }.apply()
     }
 }
