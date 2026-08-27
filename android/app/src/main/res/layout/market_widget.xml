@@ -19,7 +19,7 @@
         <TextView android:id="@+id/eth" android:text="$—" android:textColor="#FFFFFF" android:textSize="30sp" android:textStyle="bold" android:gravity="right" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" />
     </LinearLayout>
 
-    <View android:background="#252A32" android:layout_width="match_parent" android:layout_height="1dp" />
+    <TextView android:layout_width="match_parent" android:layout_height="1dp" android:background="#252A32" android:text="" />
 
     <LinearLayout android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="8dp" android:layout_width="match_parent" android:layout_height="36dp">
         <ImageView android:id="@+id/sol_icon" android:src="@drawable/ic_sol" android:layout_width="26dp" android:layout_height="26dp" />
