@@ -83,7 +83,7 @@ export class BrowserSession extends DurableObject<Env> {
       const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
       await this.ctx.storage.put(BROWSER_KEY, browser.sessionId());
       await this.ctx.storage.put(LOGIN_TOKEN_KEY, loginToken);
-      await browser.disconnect();
+      await releaseBrowserConnection(browser);
       this.browser = undefined;
       return json({ status: "login_required", login_token: loginToken, message: "Sign in to Koinly in Live View, then tap Complete Login.", live_view_url: devtoolsFrontendUrl });
     } catch (error) {
@@ -97,7 +97,7 @@ export class BrowserSession extends DurableObject<Env> {
     const page = this.browser.contexts()[0]?.pages()[0] ?? await this.browser.newPage();
     const cdp = await page.context().newCDPSession(page);
     const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
-    await this.browser.disconnect();
+    await releaseBrowserConnection(this.browser);
     this.browser = undefined;
     return json({ status: "login_required", login_token: token, message: "Existing Koinly browser session found. Finish login, then tap Complete Login.", live_view_url: devtoolsFrontendUrl });
   }
@@ -122,7 +122,7 @@ export class BrowserSession extends DurableObject<Env> {
       if (page.url().includes("/login")) {
         const cdp = await page.context().newCDPSession(page);
         const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
-        await this.browser.disconnect();
+        await releaseBrowserConnection(this.browser);
         this.browser = undefined;
         return json({ status: "login_required", login_token: await this.ctx.storage.get<string>(LOGIN_TOKEN_KEY), message: "Finish Google login in Live View, then tap Complete Login again.", live_view_url: devtoolsFrontendUrl }, 401);
       }
@@ -160,7 +160,7 @@ export class BrowserSession extends DurableObject<Env> {
         const cdp = await page.context().newCDPSession(page);
         const { devtoolsFrontendUrl } = await cdp.send("Cloudflare.getLiveView", { mode: "tab", expiresInMs: 3600000 });
         await this.ctx.storage.put(BROWSER_KEY, browser.sessionId());
-        await browser.disconnect();
+        await releaseBrowserConnection(browser);
         this.browser = undefined;
         return json({ status: "login_required", message: "Koinly session expired. Log in again in Live View, then tap Complete Login.", live_view_url: devtoolsFrontendUrl }, 401);
       }
@@ -169,7 +169,7 @@ export class BrowserSession extends DurableObject<Env> {
       if (!rows.length) {
         if (persistent) {
           await this.ctx.storage.put(BROWSER_KEY, browser.sessionId());
-          await browser.disconnect();
+          await releaseBrowserConnection(browser);
           this.browser = undefined;
         } else {
           await browser.close();
@@ -186,7 +186,7 @@ export class BrowserSession extends DurableObject<Env> {
 
       await this.ctx.storage.put(SESSION_KEY, JSON.stringify(await page.context().storageState()));
       await this.ctx.storage.put(BROWSER_KEY, browser.sessionId());
-      await browser.disconnect();
+      await releaseBrowserConnection(browser);
       this.browser = undefined;
       return json({ status: "ok", count: rows.length, synced_at: syncedAt });
     } catch (error) {
@@ -237,6 +237,14 @@ export class BrowserSession extends DurableObject<Env> {
     const page = await context.newPage();
     return { browser: this.browser, page, persistent: true };
   }
+}
+
+async function releaseBrowserConnection(browser: Browser) {
+  // Cloudflare's Playwright runtime has shipped builds where disconnect() is
+  // missing at runtime even though the type definitions expose it. Never call
+  // a missing method: leaving the keep-alive session open is the safe fallback.
+  const candidate = browser as Browser & { disconnect?: () => void | Promise<void> };
+  if (typeof candidate.disconnect === "function") await candidate.disconnect();
 }
 
 class BrowserRateLimitError extends Error {
