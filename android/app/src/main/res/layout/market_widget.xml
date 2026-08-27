@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
-    android:padding="14dp"
+    android:padding="12dp"
     android:background="@drawable/widget_bg"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -10,116 +10,92 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <LinearLayout
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1">
-            <ImageView
-                android:id="@+id/btc_icon"
-                android:layout_width="30dp"
-                android:layout_height="30dp" />
-            <TextView
-                android:text="BTC"
-                android:textColor="#F7931A"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false"
-                android:layout_marginStart="6dp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:orientation="horizontal"
-            android:gravity="center_vertical|end"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1">
-            <ImageView
-                android:id="@+id/eth_icon"
-                android:layout_width="30dp"
-                android:layout_height="30dp" />
-            <TextView
-                android:text="ETH"
-                android:textColor="#627EEA"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:includeFontPadding="false"
-                android:layout_marginStart="6dp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
-
+        android:layout_height="36dp">
+        <ImageView
+            android:id="@+id/btc_icon"
+            android:src="@drawable/ic_btc"
+            android:layout_width="28dp"
+            android:layout_height="28dp" />
+        <TextView
+            android:text="BTC"
+            android:textColor="#F7931A"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginLeft="6dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
         <TextView
             android:id="@+id/refresh"
             android:text="↻"
             android:textColor="#16C784"
-            android:textSize="30sp"
+            android:textSize="28sp"
             android:gravity="center"
-            android:contentDescription="Refresh"
-            android:layout_width="36dp"
-            android:layout_height="36dp" />
+            android:layout_width="0dp"
+            android:layout_height="36dp"
+            android:layout_weight="1" />
+        <ImageView
+            android:id="@+id/eth_icon"
+            android:src="@drawable/ic_eth"
+            android:layout_width="28dp"
+            android:layout_height="28dp" />
+        <TextView
+            android:text="ETH"
+            android:textColor="#627EEA"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginLeft="6dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
     <LinearLayout
         android:orientation="horizontal"
-        android:layout_marginTop="6dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
+        android:layout_height="40dp">
         <TextView
             android:id="@+id/btc"
             android:text="$—"
             android:textColor="#FFFFFF"
             android:textSize="30sp"
             android:textStyle="bold"
-            android:includeFontPadding="false"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1" />
-
         <TextView
             android:id="@+id/eth"
             android:text="$—"
             android:textColor="#FFFFFF"
             android:textSize="30sp"
             android:textStyle="bold"
-            android:includeFontPadding="false"
-            android:gravity="end"
+            android:gravity="right"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1" />
     </LinearLayout>
 
-    <TextView
-        android:text=""
+    <View
         android:background="#252A32"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="12dp" />
+        android:layout_height="1dp" />
 
     <LinearLayout
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="8dp"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="32dp">
         <ImageView
             android:id="@+id/fomo_icon"
-            android:layout_width="28dp"
-            android:layout_height="28dp" />
+            android:src="@drawable/ic_lightning"
+            android:layout_width="26dp"
+            android:layout_height="26dp" />
         <TextView
             android:id="@+id/fomo"
             android:text="—"
             android:textColor="#16C784"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:includeFontPadding="false"
-            android:layout_marginStart="6dp"
+            android:layout_marginLeft="6dp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
     </LinearLayout>
