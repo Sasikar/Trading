@@ -10,32 +10,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch Reuters and AP news via Google News RSS
+      - name: Fetch fresh high-impact news via Google News RSS
         run: |
           python - <<'PY'
           import json, re, html, requests, xml.etree.ElementTree as ET
           from datetime import datetime, timezone
           from email.utils import parsedate_to_datetime
           from urllib.parse import quote
-          q='Trump (tariffs OR Canada OR Fed OR crypto OR Iran OR China OR immigration OR markets) when:1d'
-          url='https://news.google.com/rss/search?q='+quote(q)+'&hl=en-US&gl=US&ceid=US:en'
-          r=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=30); r.raise_for_status()
-          root=ET.fromstring(r.text)
-          allowed={'Reuters','Associated Press','AP','Bloomberg','CNBC','Financial Times','The Wall Street Journal','Politico','BBC'}
+
+          queries = [
+            'Trump tariffs Canada markets when:2d',
+            'Trump Fed crypto markets when:2d',
+            'Trump China Iran immigration markets when:2d',
+          ]
+          allowed = {'Reuters','Associated Press','AP','Bloomberg','CNBC','Financial Times','The Wall Street Journal','Politico','BBC'}
           items=[]
-          for item in root.findall('./channel/item'):
-              title=html.unescape(item.findtext('title') or '').strip()
-              link=item.findtext('link') or ''
-              source=(item.findtext('{http://search.yahoo.com/mrss/}source') or item.findtext('source') or '').strip()
-              if not any(s.lower() in source.lower() for s in allowed): continue
-              low=title.lower()
-              if 'trump' not in low and 'white house' not in low and 'administration' not in low: continue
-              pub=item.findtext('pubDate') or ''
-              try:
-                  published_at=parsedate_to_datetime(pub).astimezone(timezone.utc)
-              except Exception:
-                  continue
-              items.append({'title':title,'source':source,'url':link,'time':pub,'_published_at':published_at})
+          for q in queries:
+              url='https://news.google.com/rss/search?q='+quote(q)+'&hl=en-US&gl=US&ceid=US:en'
+              r=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=30)
+              r.raise_for_status()
+              root=ET.fromstring(r.text)
+              for item in root.findall('./channel/item'):
+                  title=html.unescape(item.findtext('title') or '').strip()
+                  link=item.findtext('link') or ''
+                  source_el=item.find('source')
+                  source=(source_el.text if source_el is not None else '') or ''
+                  source=html.unescape(source).strip()
+                  if not any(s.lower() == source.lower() or s.lower() in source.lower() for s in allowed):
+                      continue
+                  low=title.lower()
+                  if not any(k in low for k in ('trump','white house','administration','tariff','canada','fed','crypto','iran','china')):
+                      continue
+                  pub=item.findtext('pubDate') or ''
+                  try:
+                      published_at=parsedate_to_datetime(pub).astimezone(timezone.utc)
+                  except Exception:
+                      continue
+                  items.append({'title':title,'source':source,'url':link,'time':pub,'_published_at':published_at})
+
           seen=set(); out=[]
           for x in sorted(items,key=lambda x:x['_published_at'],reverse=True):
               key=re.sub(r'[^a-z0-9]','',x['title'].lower())
@@ -43,11 +55,32 @@ jobs:
               seen.add(key)
               x.pop('_published_at',None)
               out.append(x)
-          out=out[:25]
-          if len(out)<3: raise SystemExit('Not enough reputable Trump news items; refusing overwrite')
-          data={'updated':datetime.now(timezone.utc).isoformat(),'source':'Reuters/AP + reputable news RSS','items':out}
-          with open('trump-news.json','w',encoding='utf-8') as f: json.dump(data,f,separators=(',',':'))
-          print('Saved',len(out),'items, sorted newest first by publication time')
+          out=out[:30]
+          if len(out)<3:
+              raise SystemExit(f'Only {len(out)} reputable items found; refusing to replace existing news')
+
+          data={
+              'updated':datetime.now(timezone.utc).isoformat(),
+              'source':'Reuters/AP + reputable news RSS',
+              'items':out
+          }
+          with open('trump-news.json','w',encoding='utf-8') as f:
+              json.dump(data,f,ensure_ascii=False,separators=(',',':'))
+          print('Saved',len(out),'fresh items. Newest:',out[0]['time'])
+          PY
+      - name: Verify freshness
+        run: |
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from email.utils import parsedate_to_datetime
+          data=json.load(open('trump-news.json',encoding='utf-8'))
+          items=data.get('items',[])
+          if len(items)<3: raise SystemExit('News payload is too small')
+          newest=parsedate_to_datetime(items[0]['time']).astimezone(timezone.utc)
+          age=(datetime.now(timezone.utc)-newest).total_seconds()/3600
+          print(f'Newest article: {items[0]["time"]}; age={age:.2f}h')
+          if age > 48: raise SystemExit('Newest article is older than 48 hours')
           PY
       - name: Commit news data
         run: |
