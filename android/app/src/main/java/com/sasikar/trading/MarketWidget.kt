@@ -20,11 +20,9 @@ class MarketWidget : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
     }
-
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         ids.forEach { refreshWidget(context, manager, it) }
     }
-
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == ACTION_REFRESH) {
@@ -33,28 +31,25 @@ class MarketWidget : AppWidgetProvider() {
             ids.forEach { refreshWidget(context, manager, it) }
         }
     }
-
     private fun refreshWidget(context: Context, manager: AppWidgetManager, id: Int) {
         val initial = RemoteViews(context.packageName, R.layout.market_widget)
-        initial.setTextViewText(R.id.btc, "₿  $—")
-        initial.setTextViewText(R.id.eth, "Ξ  $—")
-        initial.setTextViewText(R.id.fomo, "⚡  —")
+        initial.setTextViewText(R.id.btc, "$—")
+        initial.setTextViewText(R.id.eth, "$—")
+        initial.setTextViewText(R.id.fomo, "—")
         initial.setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
         manager.updateAppWidget(id, initial)
-
         Thread {
             val btc = fetchPrice("BTCUSDT")
             val eth = fetchPrice("ETHUSDT")
             val fomo = fetchFomo()
             val views = RemoteViews(context.packageName, R.layout.market_widget)
-            views.setTextViewText(R.id.btc, "₿  ${btc ?: "$—"}")
-            views.setTextViewText(R.id.eth, "Ξ  ${eth ?: "$—"}")
-            views.setTextViewText(R.id.fomo, "⚡  ${fomo ?: "—"}")
+            views.setTextViewText(R.id.btc, btc ?: "$—")
+            views.setTextViewText(R.id.eth, eth ?: "$—")
+            views.setTextViewText(R.id.fomo, fomo ?: "—")
             views.setOnClickPendingIntent(R.id.refresh, refreshIntent(context))
             manager.updateAppWidget(id, views)
         }.start()
     }
-
     private fun fetchPrice(symbol: String): String? = try {
         val json = get("https://api.binance.com/api/v3/ticker/price?symbol=$symbol")
         val price = JSONObject(json).getString("price").toDouble()
@@ -64,12 +59,10 @@ class MarketWidget : AppWidgetProvider() {
             else -> String.format(Locale.US, "$%.6f", price).trimEnd('0').trimEnd('.')
         }
     } catch (_: Exception) { null }
-
     private fun fetchFomo(): String? = try {
         val json = get("https://api.alternative.me/fng/?limit=1")
         JSONObject(json).getJSONArray("data").getJSONObject(0).getString("value")
     } catch (_: Exception) { null }
-
     private fun get(urlString: String): String {
         val connection = URL(urlString).openConnection() as HttpURLConnection
         connection.connectTimeout = 8000
