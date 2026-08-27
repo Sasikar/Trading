@@ -3,8 +3,16 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-android { namespace = "com.sasikar.trading"; compileSdk = 35
-    defaultConfig { applicationId = "com.sasikar.trading"; minSdk = 26; targetSdk = 35; versionCode = 2; versionName = "1.1" }
+android {
+    namespace = "com.sasikar.trading"
+    compileSdk = 35
+    defaultConfig {
+        applicationId = "com.sasikar.trading"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 3
+        versionName = "1.2"
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -14,4 +22,7 @@ android { namespace = "com.sasikar.trading"; compileSdk = 35
     }
 }
 
-dependencies { implementation("androidx.core:core-ktx:1.15.0"); implementation("androidx.appcompat:appcompat:1.7.0") }
+dependencies {
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+}
