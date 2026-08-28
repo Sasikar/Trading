@@ -6,13 +6,17 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.widget.RemoteViews
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MarketWidget : AppWidgetProvider() {
     companion object {
@@ -49,7 +53,30 @@ class MarketWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.eth, cached["ethereum"] ?: "$—")
             views.setTextViewText(R.id.sol, cached["solana"] ?: "$—")
             views.setTextViewText(R.id.fomo, cached["fomo"] ?: "—")
+            views.setTextViewText(R.id.last_refreshed, cached["last_refreshed"] ?: "Last refreshed —")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                views.setViewRotation(R.id.refresh, 0f)
+            }
             manager.updateAppWidget(id, views)
+        }
+
+        private fun setRefreshRotation(context: Context, manager: AppWidgetManager, id: Int, degrees: Float) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+            val views = baseViews(context, id)
+            views.setViewRotation(R.id.refresh, degrees)
+            manager.updateAppWidget(id, views)
+        }
+
+        private fun animateRefresh(context: Context, ids: IntArray, running: AtomicBoolean): Thread {
+            val manager = AppWidgetManager.getInstance(context)
+            return Thread {
+                var angle = 0f
+                while (running.get()) {
+                    ids.forEach { id -> setRefreshRotation(context, manager, id, angle) }
+                    angle = (angle + 30f) % 360f
+                    try { Thread.sleep(100) } catch (_: InterruptedException) { break }
+                }
+            }.also { it.start() }
         }
 
         private fun refreshAll(context: Context) {
@@ -57,18 +84,32 @@ class MarketWidget : AppWidgetProvider() {
             val ids = manager.getAppWidgetIds(ComponentName(context, MarketWidget::class.java))
             if (ids.isEmpty()) return
 
-            val prices = fetchPrices()
-            val fomo = fetchFomo()
-            if (prices.isNotEmpty() || fomo != null) saveValues(context, prices, fomo)
-            ids.forEach { id -> render(context, manager, id) }
+            val running = AtomicBoolean(true)
+            val animator = animateRefresh(context, ids, running)
+            try {
+                val prices = fetchPrices()
+                val fomo = fetchFomo()
+                if (prices.isNotEmpty() || fomo != null) saveValues(context, prices, fomo)
+            } finally {
+                running.set(false)
+                try { animator.join(500) } catch (_: InterruptedException) { }
+                ids.forEach { id -> render(context, manager, id) }
+            }
         }
 
         private fun refreshOne(context: Context, id: Int) {
             val manager = AppWidgetManager.getInstance(context)
-            val prices = fetchPrices()
-            val fomo = fetchFomo()
-            if (prices.isNotEmpty() || fomo != null) saveValues(context, prices, fomo)
-            render(context, manager, id)
+            val running = AtomicBoolean(true)
+            val animator = animateRefresh(context, intArrayOf(id), running)
+            try {
+                val prices = fetchPrices()
+                val fomo = fetchFomo()
+                if (prices.isNotEmpty() || fomo != null) saveValues(context, prices, fomo)
+            } finally {
+                running.set(false)
+                try { animator.join(500) } catch (_: InterruptedException) { }
+                render(context, manager, id)
+            }
         }
 
         private fun cachedValues(context: Context): Map<String, String> {
@@ -77,7 +118,8 @@ class MarketWidget : AppWidgetProvider() {
                 "bitcoin" to p.getString("bitcoin", null),
                 "ethereum" to p.getString("ethereum", null),
                 "solana" to p.getString("solana", null),
-                "fomo" to p.getString("fomo", null)
+                "fomo" to p.getString("fomo", null),
+                "last_refreshed" to p.getString("last_refreshed", null)
             ).filterValues { it != null }.mapValues { it.value!! }
         }
 
@@ -87,6 +129,10 @@ class MarketWidget : AppWidgetProvider() {
                 prices["ethereum"]?.let { putString("ethereum", it) }
                 prices["solana"]?.let { putString("solana", it) }
                 fomo?.let { putString("fomo", it) }
+                putString(
+                    "last_refreshed",
+                    "Last refreshed " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+                )
             }.apply()
         }
 
