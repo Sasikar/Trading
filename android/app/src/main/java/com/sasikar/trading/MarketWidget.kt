@@ -36,45 +36,78 @@ class MarketWidget : AppWidgetProvider() {
             )
         }
 
-        private fun baseViews(context: Context, widgetId: Int): RemoteViews {
-            return RemoteViews(context.packageName, R.layout.market_widget).apply {
-                setImageViewResource(R.id.btc_icon, R.drawable.ic_btc)
-                setImageViewResource(R.id.eth_icon, R.drawable.ic_eth)
-                setImageViewResource(R.id.sol_icon, R.drawable.ic_sol)
-                setImageViewResource(R.id.fomo_icon, R.drawable.ic_lightning)
-                setOnClickPendingIntent(R.id.refresh, refreshIntent(context, widgetId))
+        private fun nowStamp(): String =
+            SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date())
+
+        private fun applyData(
+            views: RemoteViews,
+            context: Context,
+            widgetId: Int,
+            loading: Boolean,
+            rotation: Float = 0f
+        ) {
+            val c = cachedValues(context)
+            views.setImageViewResource(R.id.btc_icon, R.drawable.ic_btc)
+            views.setImageViewResource(R.id.eth_icon, R.drawable.ic_eth)
+            views.setImageViewResource(R.id.sol_icon, R.drawable.ic_sol)
+            views.setImageViewResource(R.id.fomo_icon, R.drawable.ic_lightning)
+            views.setTextViewText(R.id.btc, c["bitcoin"] ?: "$—")
+            views.setTextViewText(R.id.eth, c["ethereum"] ?: "$—")
+            views.setTextViewText(R.id.sol, c["solana"] ?: "$—")
+            views.setTextViewText(R.id.fomo, c["fomo"] ?: "—")
+            if (loading) {
+                views.setTextViewText(R.id.refresh, "⏳")
+                views.setTextViewText(R.id.last_refreshed, "Refreshing…")
+                views.setTextColor(R.id.last_refreshed, 0xFF16C784.toInt())
+            } else {
+                views.setTextViewText(R.id.refresh, "↻")
+                views.setTextViewText(
+                    R.id.last_refreshed,
+                    c["last_refreshed"] ?: "Last refreshed —"
+                )
+                views.setTextColor(R.id.last_refreshed, 0xFF747B86.toInt())
             }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                views.setViewRotation(R.id.refresh, if (loading) rotation else 0f)
+            }
+            views.setOnClickPendingIntent(R.id.refresh, refreshIntent(context, widgetId))
         }
 
         private fun render(context: Context, manager: AppWidgetManager, id: Int) {
-            val cached = cachedValues(context)
-            val views = baseViews(context, id)
-            views.setTextViewText(R.id.btc, cached["bitcoin"] ?: "$—")
-            views.setTextViewText(R.id.eth, cached["ethereum"] ?: "$—")
-            views.setTextViewText(R.id.sol, cached["solana"] ?: "$—")
-            views.setTextViewText(R.id.fomo, cached["fomo"] ?: "—")
-            views.setTextViewText(R.id.last_refreshed, cached["last_refreshed"] ?: "Last refreshed —")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                views.setViewRotation(R.id.refresh, 0f)
-            }
+            val views = RemoteViews(context.packageName, R.layout.market_widget)
+            applyData(views, context, id, loading = false)
             manager.updateAppWidget(id, views)
         }
 
-        private fun setRefreshRotation(context: Context, manager: AppWidgetManager, id: Int, degrees: Float) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
-            val views = baseViews(context, id)
-            views.setViewRotation(R.id.refresh, degrees)
-            manager.updateAppWidget(id, views)
+        private fun showLoading(context: Context, manager: AppWidgetManager, ids: IntArray) {
+            ids.forEach { id ->
+                val views = RemoteViews(context.packageName, R.layout.market_widget)
+                applyData(views, context, id, loading = true, rotation = 0f)
+                manager.updateAppWidget(id, views)
+            }
         }
 
         private fun animateRefresh(context: Context, ids: IntArray, running: AtomicBoolean): Thread {
             val manager = AppWidgetManager.getInstance(context)
             return Thread {
                 var angle = 0f
+                val frames = arrayOf("↻", "⟳", "↻", "⟳")
+                var fi = 0
                 while (running.get()) {
-                    ids.forEach { id -> setRefreshRotation(context, manager, id, angle) }
-                    angle = (angle + 30f) % 360f
-                    try { Thread.sleep(100) } catch (_: InterruptedException) { break }
+                    ids.forEach { id ->
+                        val views = RemoteViews(context.packageName, R.layout.market_widget)
+                        applyData(views, context, id, loading = true, rotation = angle)
+                        // Pulse icon text so pre-S devices still see motion
+                        views.setTextViewText(R.id.refresh, frames[fi % frames.size])
+                        manager.updateAppWidget(id, views)
+                    }
+                    angle = (angle + 36f) % 360f
+                    fi++
+                    try {
+                        Thread.sleep(120)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
                 }
             }.also { it.start() }
         }
@@ -83,7 +116,7 @@ class MarketWidget : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, MarketWidget::class.java))
             if (ids.isEmpty()) return
-
+            showLoading(context, manager, ids)
             val running = AtomicBoolean(true)
             val animator = animateRefresh(context, ids, running)
             try {
@@ -92,13 +125,17 @@ class MarketWidget : AppWidgetProvider() {
                 if (prices.isNotEmpty() || fomo != null) saveValues(context, prices, fomo)
             } finally {
                 running.set(false)
-                try { animator.join(500) } catch (_: InterruptedException) { }
+                try {
+                    animator.join(600)
+                } catch (_: InterruptedException) {
+                }
                 ids.forEach { id -> render(context, manager, id) }
             }
         }
 
         private fun refreshOne(context: Context, id: Int) {
             val manager = AppWidgetManager.getInstance(context)
+            showLoading(context, manager, intArrayOf(id))
             val running = AtomicBoolean(true)
             val animator = animateRefresh(context, intArrayOf(id), running)
             try {
@@ -107,7 +144,10 @@ class MarketWidget : AppWidgetProvider() {
                 if (prices.isNotEmpty() || fomo != null) saveValues(context, prices, fomo)
             } finally {
                 running.set(false)
-                try { animator.join(500) } catch (_: InterruptedException) { }
+                try {
+                    animator.join(600)
+                } catch (_: InterruptedException) {
+                }
                 render(context, manager, id)
             }
         }
@@ -129,10 +169,7 @@ class MarketWidget : AppWidgetProvider() {
                 prices["ethereum"]?.let { putString("ethereum", it) }
                 prices["solana"]?.let { putString("solana", it) }
                 fomo?.let { putString("fomo", it) }
-                putString(
-                    "last_refreshed",
-                    "Last refreshed " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
-                )
+                putString("last_refreshed", "Updated " + nowStamp())
             }.apply()
         }
 
@@ -157,13 +194,16 @@ class MarketWidget : AppWidgetProvider() {
                 if (result.size == ids.size) return result
 
                 try {
-                    val root = JSONObject(get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd"))
+                    val root = JSONObject(
+                        get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd")
+                    )
                     ids.forEach { id ->
                         if (!result.containsKey(id)) {
                             result[id] = formatPrice(root.getJSONObject(id).getDouble("usd"))
                         }
                     }
-                } catch (_: Throwable) { }
+                } catch (_: Throwable) {
+                }
                 result
             } finally {
                 executor.shutdownNow()
@@ -198,7 +238,7 @@ class MarketWidget : AppWidgetProvider() {
             connection.setRequestProperty("Accept", "application/json")
             connection.setRequestProperty("Cache-Control", "no-cache, no-store")
             connection.setRequestProperty("Pragma", "no-cache")
-            connection.setRequestProperty("User-Agent", "MemeWidget/1.4 (Android)")
+            connection.setRequestProperty("User-Agent", "MemeWidget/1.8 (Android)")
             return try {
                 if (connection.responseCode !in 200..299) throw IllegalStateException("HTTP ${connection.responseCode}")
                 connection.inputStream.bufferedReader().use { it.readText() }
@@ -212,13 +252,18 @@ class MarketWidget : AppWidgetProvider() {
         ids.forEach { id -> render(context, manager, id) }
         val pending = goAsync()
         Thread {
-            try { refreshAll(context.applicationContext) } finally { pending.finish() }
+            try {
+                refreshAll(context.applicationContext)
+            } finally {
+                pending.finish()
+            }
         }.start()
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == ACTION_REFRESH || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-            val requestedId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+            val requestedId =
+                intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             val pending = goAsync()
             Thread {
                 try {

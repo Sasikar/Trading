@@ -10,7 +10,6 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- TOP: BTC | refresh | ETH -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="48dp"
@@ -42,7 +41,7 @@
 
             <TextView
                 android:id="@+id/refresh"
-                android:layout_width="38dp"
+                android:layout_width="42dp"
                 android:layout_height="48dp"
                 android:gravity="center"
                 android:includeFontPadding="false"
@@ -76,7 +75,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- PRICES -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="52dp"
@@ -115,7 +113,6 @@
             android:layout_height="1dp"
             android:background="#252A32" />
 
-        <!-- BOTTOM: SOL | Fear & Greed -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="48dp"
@@ -170,7 +167,6 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- VALUES: SOL price | F&G score -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="52dp"
@@ -203,16 +199,16 @@
                 android:maxLines="1" />
         </LinearLayout>
 
-        <!-- Small status line; does not alter the existing market layout. -->
         <TextView
             android:id="@+id/last_refreshed"
             android:layout_width="match_parent"
-            android:layout_height="18dp"
+            android:layout_height="20dp"
             android:gravity="end|center_vertical"
             android:includeFontPadding="false"
-            android:text="Last refreshed —"
+            android:text="Updated —"
             android:textColor="#747B86"
-            android:textSize="9sp"
+            android:textSize="11sp"
+            android:textStyle="bold"
             android:maxLines="1" />
     </LinearLayout>
 </FrameLayout>
