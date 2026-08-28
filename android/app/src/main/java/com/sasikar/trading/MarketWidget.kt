@@ -15,6 +15,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MarketWidget : AppWidgetProvider() {
     companion object {
@@ -28,7 +29,7 @@ class MarketWidget : AppWidgetProvider() {
             }
             return PendingIntent.getBroadcast(
                 context,
-                2000 + widgetId,
+                3000 + widgetId,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -37,7 +38,12 @@ class MarketWidget : AppWidgetProvider() {
         private fun nowStamp(): String =
             SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date())
 
-        private fun buildViews(context: Context, widgetId: Int, loading: Boolean): RemoteViews {
+        private fun buildViews(
+            context: Context,
+            widgetId: Int,
+            loading: Boolean,
+            rotation: Float = 0f
+        ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.market_widget)
             val c = cachedValues(context)
             try {
@@ -49,51 +55,94 @@ class MarketWidget : AppWidgetProvider() {
                 views.setTextViewText(R.id.eth, c["ethereum"] ?: "$—")
                 views.setTextViewText(R.id.sol, c["solana"] ?: "$—")
                 views.setTextViewText(R.id.fomo, c["fomo"] ?: "—")
+                views.setTextViewText(R.id.nasdaq, c["nasdaq"] ?: "—")
+                views.setTextViewText(R.id.refresh, "↻")
                 if (loading) {
-                    views.setTextViewText(R.id.refresh, "…")
                     views.setTextViewText(R.id.last_refreshed, "Refreshing…")
+                    try {
+                        views.setFloat(R.id.refresh, "setRotation", rotation)
+                    } catch (_: Throwable) {
+                    }
                 } else {
-                    views.setTextViewText(R.id.refresh, "↻")
                     views.setTextViewText(R.id.last_refreshed, c["last_refreshed"] ?: "Updated —")
+                    try {
+                        views.setFloat(R.id.refresh, "setRotation", 0f)
+                    } catch (_: Throwable) {
+                    }
                 }
                 views.setOnClickPendingIntent(R.id.refresh, refreshIntent(context, widgetId))
+                // Also allow tapping the whole card to refresh
+                views.setOnClickPendingIntent(R.id.root, refreshIntent(context, widgetId))
             } catch (_: Throwable) {
-                // keep minimal views
             }
             return views
         }
 
-        private fun render(context: Context, manager: AppWidgetManager, id: Int, loading: Boolean = false) {
+        private fun render(
+            context: Context,
+            manager: AppWidgetManager,
+            id: Int,
+            loading: Boolean = false,
+            rotation: Float = 0f
+        ) {
             try {
-                manager.updateAppWidget(id, buildViews(context, id, loading))
+                manager.updateAppWidget(id, buildViews(context, id, loading, rotation))
             } catch (_: Throwable) {
+            }
+        }
+
+        private fun animateSpin(
+            context: Context,
+            ids: IntArray,
+            running: AtomicBoolean
+        ): Thread {
+            val manager = AppWidgetManager.getInstance(context)
+            return Thread {
+                var angle = 0f
+                while (running.get()) {
+                    ids.forEach { id ->
+                        render(context, manager, id, loading = true, rotation = angle)
+                    }
+                    angle = (angle + 45f) % 360f
+                    try {
+                        Thread.sleep(100)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                }
+            }.also { it.start() }
+        }
+
+        private fun doRefresh(context: Context, ids: IntArray) {
+            if (ids.isEmpty()) return
+            val manager = AppWidgetManager.getInstance(context)
+            ids.forEach { render(context, manager, it, loading = true, rotation = 0f) }
+            val running = AtomicBoolean(true)
+            val spinner = animateSpin(context, ids, running)
+            try {
+                val prices = fetchPrices()
+                val fomo = fetchFomo()
+                val nasdaq = fetchNasdaq()
+                saveValues(context, prices, fomo, nasdaq)
+            } catch (_: Throwable) {
+            } finally {
+                running.set(false)
+                try {
+                    spinner.join(400)
+                } catch (_: InterruptedException) {
+                }
+                ids.forEach { render(context, manager, it, loading = false) }
             }
         }
 
         private fun refreshAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, MarketWidget::class.java))
-            if (ids.isEmpty()) return
-            ids.forEach { render(context, manager, it, loading = true) }
-            try {
-                val prices = fetchPrices()
-                val fomo = fetchFomo()
-                if (prices.isNotEmpty() || fomo != null) saveValues(context, prices, fomo)
-            } catch (_: Throwable) {
-            }
-            ids.forEach { render(context, manager, it, loading = false) }
+            doRefresh(context, ids)
         }
 
         private fun refreshOne(context: Context, id: Int) {
-            val manager = AppWidgetManager.getInstance(context)
-            render(context, manager, id, loading = true)
-            try {
-                val prices = fetchPrices()
-                val fomo = fetchFomo()
-                if (prices.isNotEmpty() || fomo != null) saveValues(context, prices, fomo)
-            } catch (_: Throwable) {
-            }
-            render(context, manager, id, loading = false)
+            doRefresh(context, intArrayOf(id))
         }
 
         private fun cachedValues(context: Context): Map<String, String> {
@@ -104,6 +153,7 @@ class MarketWidget : AppWidgetProvider() {
                     "ethereum" to p.getString("ethereum", null),
                     "solana" to p.getString("solana", null),
                     "fomo" to p.getString("fomo", null),
+                    "nasdaq" to p.getString("nasdaq", null),
                     "last_refreshed" to p.getString("last_refreshed", null)
                 ).filterValues { it != null }.mapValues { it.value!! }
             } catch (_: Throwable) {
@@ -111,13 +161,19 @@ class MarketWidget : AppWidgetProvider() {
             }
         }
 
-        private fun saveValues(context: Context, prices: Map<String, String>, fomo: String?) {
+        private fun saveValues(
+            context: Context,
+            prices: Map<String, String>,
+            fomo: String?,
+            nasdaq: String?
+        ) {
             try {
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
                     prices["bitcoin"]?.let { putString("bitcoin", it) }
                     prices["ethereum"]?.let { putString("ethereum", it) }
                     prices["solana"]?.let { putString("solana", it) }
                     fomo?.let { putString("fomo", it) }
+                    nasdaq?.let { putString("nasdaq", it) }
                     putString("last_refreshed", "Updated " + nowStamp())
                 }.apply()
             } catch (_: Throwable) {
@@ -177,6 +233,9 @@ class MarketWidget : AppWidgetProvider() {
             else -> String.format(Locale.US, "$%.6f", price).trimEnd('0').trimEnd('.')
         }
 
+        private fun formatIndex(value: Double): String =
+            String.format(Locale.US, "%,.2f", value)
+
         private fun fetchFomo(): String? = try {
             val json = get("https://api.alternative.me/fng/?limit=1")
             JSONObject(json).getJSONArray("data").getJSONObject(0).getString("value")
@@ -184,14 +243,38 @@ class MarketWidget : AppWidgetProvider() {
             null
         }
 
+        private fun fetchNasdaq(): String? {
+            // Yahoo Finance chart for ^IXIC (NASDAQ Composite)
+            return try {
+                val json = get("https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?interval=1d&range=1d")
+                val meta = JSONObject(json)
+                    .getJSONObject("chart")
+                    .getJSONArray("result")
+                    .getJSONObject(0)
+                    .getJSONObject("meta")
+                val price = meta.optDouble("regularMarketPrice", Double.NaN)
+                if (price.isNaN()) null else formatIndex(price)
+            } catch (_: Throwable) {
+                try {
+                    // Fallback: Stooq CSV
+                    val csv = get("https://stooq.com/q/l/?s=^ndq&f=sd2t2ohlcv&h&e=csv")
+                    val line = csv.lineSequence().drop(1).firstOrNull() ?: return null
+                    val close = line.split(",").getOrNull(6)?.toDoubleOrNull() ?: return null
+                    formatIndex(close)
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+        }
+
         private fun get(urlString: String): String {
             val connection = URL(urlString).openConnection() as HttpURLConnection
-            connection.connectTimeout = 5000
-            connection.readTimeout = 5000
+            connection.connectTimeout = 6000
+            connection.readTimeout = 6000
             connection.requestMethod = "GET"
             connection.useCaches = false
-            connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "MemeWidget/1.9 (Android)")
+            connection.setRequestProperty("Accept", "application/json,text/plain,*/*")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) MemeWidget/2.0")
             return try {
                 if (connection.responseCode !in 200..299) throw IllegalStateException("HTTP ${connection.responseCode}")
                 connection.inputStream.bufferedReader().use { it.readText() }
@@ -222,7 +305,8 @@ class MarketWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         try {
-            if (intent.action == ACTION_REFRESH || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+            val action = intent.action
+            if (action == ACTION_REFRESH || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
                 val requestedId =
                     intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
                 val pending = goAsync()
