@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.widget.RemoteViews
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -44,7 +43,7 @@ class MarketWidget : AppWidgetProvider() {
             context: Context,
             widgetId: Int,
             loading: Boolean,
-            rotation: Float = 0f
+            spinFrame: Int = 0
         ) {
             val c = cachedValues(context)
             views.setImageViewResource(R.id.btc_icon, R.drawable.ic_btc)
@@ -56,19 +55,17 @@ class MarketWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.sol, c["solana"] ?: "$—")
             views.setTextViewText(R.id.fomo, c["fomo"] ?: "—")
             if (loading) {
-                views.setTextViewText(R.id.refresh, "⏳")
+                val frames = arrayOf("↻", "⟳", "↻", "⟳")
+                views.setTextViewText(R.id.refresh, frames[spinFrame % frames.size])
                 views.setTextViewText(R.id.last_refreshed, "Refreshing…")
                 views.setTextColor(R.id.last_refreshed, 0xFF16C784.toInt())
             } else {
                 views.setTextViewText(R.id.refresh, "↻")
                 views.setTextViewText(
                     R.id.last_refreshed,
-                    c["last_refreshed"] ?: "Last refreshed —"
+                    c["last_refreshed"] ?: "Updated —"
                 )
                 views.setTextColor(R.id.last_refreshed, 0xFF747B86.toInt())
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                views.setViewRotation(R.id.refresh, if (loading) rotation else 0f)
             }
             views.setOnClickPendingIntent(R.id.refresh, refreshIntent(context, widgetId))
         }
@@ -82,7 +79,7 @@ class MarketWidget : AppWidgetProvider() {
         private fun showLoading(context: Context, manager: AppWidgetManager, ids: IntArray) {
             ids.forEach { id ->
                 val views = RemoteViews(context.packageName, R.layout.market_widget)
-                applyData(views, context, id, loading = true, rotation = 0f)
+                applyData(views, context, id, loading = true, spinFrame = 0)
                 manager.updateAppWidget(id, views)
             }
         }
@@ -90,21 +87,16 @@ class MarketWidget : AppWidgetProvider() {
         private fun animateRefresh(context: Context, ids: IntArray, running: AtomicBoolean): Thread {
             val manager = AppWidgetManager.getInstance(context)
             return Thread {
-                var angle = 0f
-                val frames = arrayOf("↻", "⟳", "↻", "⟳")
-                var fi = 0
+                var frame = 0
                 while (running.get()) {
                     ids.forEach { id ->
                         val views = RemoteViews(context.packageName, R.layout.market_widget)
-                        applyData(views, context, id, loading = true, rotation = angle)
-                        // Pulse icon text so pre-S devices still see motion
-                        views.setTextViewText(R.id.refresh, frames[fi % frames.size])
+                        applyData(views, context, id, loading = true, spinFrame = frame)
                         manager.updateAppWidget(id, views)
                     }
-                    angle = (angle + 36f) % 360f
-                    fi++
+                    frame++
                     try {
-                        Thread.sleep(120)
+                        Thread.sleep(140)
                     } catch (_: InterruptedException) {
                         break
                     }
