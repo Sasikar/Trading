@@ -22,8 +22,7 @@ class MarketWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.sasikar.trading.action.REFRESH_WIDGET"
         private const val PREFS = "market_widget_cache"
-
-        private val SPIN_FRAMES = arrayOf("↻", "⟳", "↻", "⟳", "↻", "⟳", "↻", "⟳")
+        private val SPIN = arrayOf("↻", "⟳", "↻", "⟳", "↻", "⟳")
 
         private fun refreshIntent(context: Context, widgetId: Int): PendingIntent {
             val intent = Intent(context, MarketWidget::class.java).apply {
@@ -32,7 +31,7 @@ class MarketWidget : AppWidgetProvider() {
             }
             return PendingIntent.getBroadcast(
                 context,
-                5000 + widgetId,
+                6000 + widgetId,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
@@ -49,22 +48,26 @@ class MarketWidget : AppWidgetProvider() {
         ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.market_widget)
             val c = cachedValues(context)
+
+            views.setImageViewResource(R.id.btc_icon, R.drawable.ic_btc)
+            views.setImageViewResource(R.id.eth_icon, R.drawable.ic_eth)
+            views.setImageViewResource(R.id.sol_icon, R.drawable.ic_sol)
+            views.setImageViewResource(R.id.fomo_icon, R.drawable.ic_lightning)
+
             views.setTextViewText(R.id.btc, c["bitcoin"] ?: "$—")
             views.setTextViewText(R.id.eth, c["ethereum"] ?: "$—")
             views.setTextViewText(R.id.sol, c["solana"] ?: "$—")
             views.setTextViewText(R.id.fomo, c["fomo"] ?: "—")
             views.setTextViewText(R.id.nasdaq, c["nasdaq"] ?: "—")
 
-            // Color NASDAQ by day direction when cached
-            val dir = c["nasdaq_dir"]
-            when (dir) {
+            when (c["nasdaq_dir"]) {
                 "up" -> views.setTextColor(R.id.nasdaq, Color.parseColor("#16C784"))
                 "down" -> views.setTextColor(R.id.nasdaq, Color.parseColor("#EA3943"))
                 else -> views.setTextColor(R.id.nasdaq, Color.parseColor("#FFFFFF"))
             }
 
             if (loading) {
-                views.setTextViewText(R.id.refresh, SPIN_FRAMES[spinIndex % SPIN_FRAMES.size])
+                views.setTextViewText(R.id.refresh, SPIN[spinIndex % SPIN.size])
                 views.setTextViewText(R.id.last_refreshed, "Refreshing…")
                 views.setTextColor(R.id.last_refreshed, Color.parseColor("#16C784"))
             } else {
@@ -92,7 +95,6 @@ class MarketWidget : AppWidgetProvider() {
             }
         }
 
-        /** Visible spin by swapping ↻ / ⟳ while fetch runs (safe on all OEMs). */
         private fun spinWhile(
             context: Context,
             ids: IntArray,
@@ -102,10 +104,10 @@ class MarketWidget : AppWidgetProvider() {
             return Thread {
                 var i = 0
                 while (running.get()) {
-                    ids.forEach { id -> render(context, manager, id, loading = true, spinIndex = i) }
+                    ids.forEach { id -> render(context, manager, id, true, i) }
                     i++
                     try {
-                        Thread.sleep(120)
+                        Thread.sleep(130)
                     } catch (_: InterruptedException) {
                         break
                     }
@@ -116,11 +118,9 @@ class MarketWidget : AppWidgetProvider() {
         private fun doRefresh(context: Context, ids: IntArray) {
             if (ids.isEmpty()) return
             val manager = AppWidgetManager.getInstance(context)
-            ids.forEach { render(context, manager, it, loading = true, spinIndex = 0) }
-
+            ids.forEach { render(context, manager, it, true, 0) }
             val running = AtomicBoolean(true)
             val spinner = spinWhile(context, ids, running)
-
             try {
                 val prices = fetchPrices()
                 val fomo = fetchFomo()
@@ -133,7 +133,7 @@ class MarketWidget : AppWidgetProvider() {
                     spinner.join(500)
                 } catch (_: InterruptedException) {
                 }
-                ids.forEach { render(context, manager, it, loading = false) }
+                ids.forEach { render(context, manager, it, false) }
             }
         }
 
@@ -151,7 +151,7 @@ class MarketWidget : AppWidgetProvider() {
             return try {
                 val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 listOf("bitcoin", "ethereum", "solana", "fomo", "nasdaq", "nasdaq_dir", "last_refreshed")
-                    .mapNotNull { key -> p.getString(key, null)?.let { key to it } }
+                    .mapNotNull { k -> p.getString(k, null)?.let { k to it } }
                     .toMap()
             } catch (_: Throwable) {
                 emptyMap()
@@ -237,7 +237,6 @@ class MarketWidget : AppWidgetProvider() {
             null
         }
 
-        /** Returns (display text, direction up/down/flat) for today's NASDAQ move. */
         private fun fetchNasdaq(): Pair<String, String>? {
             return try {
                 val json = get("https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?interval=1d&range=5d")
@@ -246,28 +245,22 @@ class MarketWidget : AppWidgetProvider() {
                     .getJSONArray("result")
                     .getJSONObject(0)
                 val meta = result.getJSONObject("meta")
-                val price = meta.optDouble("regularMarketPrice", Double.NaN)
+                var price = meta.optDouble("regularMarketPrice", Double.NaN)
                 var prev = meta.optDouble("chartPreviousClose", Double.NaN)
                 if (prev.isNaN()) prev = meta.optDouble("previousClose", Double.NaN)
 
-                // Fallback: last two daily closes from indicators
                 if ((price.isNaN() || prev.isNaN()) && result.has("indicators")) {
-                    val closes = result
-                        .getJSONObject("indicators")
-                        .getJSONArray("quote")
-                        .getJSONObject(0)
-                        .getJSONArray("close")
+                    val closes = result.getJSONObject("indicators")
+                        .getJSONArray("quote").getJSONObject(0).getJSONArray("close")
                     val vals = mutableListOf<Double>()
                     for (i in 0 until closes.length()) {
                         if (!closes.isNull(i)) vals.add(closes.getDouble(i))
                     }
                     if (vals.size >= 2) {
-                        val last = vals.last()
-                        val before = vals[vals.size - 2]
-                        return formatNasdaqDay(last, before)
+                        price = vals.last()
+                        prev = vals[vals.size - 2]
                     }
                 }
-
                 if (price.isNaN() || prev.isNaN()) return null
                 formatNasdaqDay(price, prev)
             } catch (_: Throwable) {
@@ -278,30 +271,18 @@ class MarketWidget : AppWidgetProvider() {
         private fun formatNasdaqDay(price: Double, prev: Double): Pair<String, String> {
             val change = price - prev
             val pct = if (prev != 0.0) (change / prev) * 100.0 else 0.0
-            val sign = when {
-                change > 0 -> "+"
-                change < 0 -> ""
-                else -> ""
-            }
             val arrow = when {
                 change > 0 -> "▲"
                 change < 0 -> "▼"
                 else -> "•"
             }
+            val sign = if (change > 0) "+" else ""
             val dir = when {
                 change > 0 -> "up"
                 change < 0 -> "down"
                 else -> "flat"
             }
-            // e.g. 18,245.12  ▲ +0.85%
-            val text = String.format(
-                Locale.US,
-                "%,.2f  %s %s%.2f%%",
-                price,
-                arrow,
-                sign,
-                pct
-            )
+            val text = String.format(Locale.US, "%,.2f  %s %s%.2f%%", price, arrow, sign, pct)
             return text to dir
         }
 
@@ -312,7 +293,7 @@ class MarketWidget : AppWidgetProvider() {
             connection.requestMethod = "GET"
             connection.useCaches = false
             connection.setRequestProperty("Accept", "*/*")
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 MemeWidget/2.2")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 MemeWidget/2.3")
             return try {
                 if (connection.responseCode !in 200..299) {
                     throw IllegalStateException("HTTP ${connection.responseCode}")
@@ -326,7 +307,7 @@ class MarketWidget : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         try {
-            ids.forEach { id -> render(context.applicationContext, manager, id, loading = false) }
+            ids.forEach { id -> render(context.applicationContext, manager, id, false) }
         } catch (_: Throwable) {
         }
         val pending = goAsync()
