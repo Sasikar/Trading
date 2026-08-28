@@ -2,7 +2,7 @@
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:padding="24dp"
+    android:padding="16dp"
     android:background="@drawable/widget_bg">
 
     <LinearLayout
@@ -11,71 +11,73 @@
         android:orientation="vertical">
 
         <!-- TOP: BTC | refresh | ETH -->
-        <FrameLayout
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="72dp">
+            android:layout_height="54dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="54dp"
-                android:layout_gravity="start|center_vertical"
-                android:gravity="center_vertical"
+                android:layout_weight="1"
+                android:gravity="center_vertical|start"
                 android:orientation="horizontal">
                 <ImageView
                     android:id="@+id/btc_icon"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:src="@drawable/ic_btc" />
                 <TextView
                     android:id="@+id/btc_label"
                     android:layout_width="wrap_content"
-                    android:layout_height="54dp"
-                    android:layout_marginStart="12dp"
-                    android:gravity="center_vertical"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
                     android:text="BTC"
                     android:textColor="#F7931A"
-                    android:textSize="30sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/refresh"
-                android:layout_width="58dp"
-                android:layout_height="72dp"
-                android:layout_gravity="center"
+                android:layout_width="44dp"
+                android:layout_height="54dp"
                 android:gravity="center"
+                android:includeFontPadding="false"
                 android:text="↻"
                 android:textColor="#16C784"
-                android:textSize="46sp" />
+                android:textSize="32sp"
+                android:clickable="true"
+                android:focusable="true" />
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="54dp"
-                android:layout_gravity="end|center_vertical"
+                android:layout_weight="1"
                 android:gravity="center_vertical|end"
                 android:orientation="horizontal">
                 <TextView
                     android:id="@+id/eth_label"
                     android:layout_width="wrap_content"
-                    android:layout_height="54dp"
-                    android:layout_marginEnd="12dp"
-                    android:gravity="center_vertical|end"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
                     android:text="ETH"
                     android:textColor="#627EEA"
-                    android:textSize="30sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
                 <ImageView
                     android:id="@+id/eth_icon"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:src="@drawable/ic_eth" />
             </LinearLayout>
-        </FrameLayout>
+        </LinearLayout>
 
         <!-- PRICES -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="72dp"
+            android:layout_height="58dp"
             android:orientation="horizontal">
             <TextView
                 android:id="@+id/btc"
@@ -86,7 +88,7 @@
                 android:includeFontPadding="false"
                 android:text="$—"
                 android:textColor="#FFFFFF"
-                android:textSize="48sp"
+                android:textSize="32sp"
                 android:textStyle="bold" />
             <TextView
                 android:id="@+id/eth"
@@ -97,7 +99,7 @@
                 android:includeFontPadding="false"
                 android:text="$—"
                 android:textColor="#FFFFFF"
-                android:textSize="48sp"
+                android:textSize="32sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -108,62 +110,62 @@
             android:background="#252A32"
             android:text="" />
 
-        <!-- BOTTOM HEADERS: SOL | Fear & Greed -->
-        <FrameLayout
+        <!-- BOTTOM: SOL | Fear & Greed -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="72dp">
+            android:layout_height="54dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
             <LinearLayout
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="54dp"
-                android:layout_gravity="start|center_vertical"
-                android:gravity="center_vertical"
+                android:layout_weight="1"
+                android:gravity="center_vertical|start"
                 android:orientation="horizontal">
                 <ImageView
                     android:id="@+id/sol_icon"
-                    android:layout_width="54dp"
-                    android:layout_height="54dp"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
                     android:src="@drawable/ic_sol" />
                 <TextView
                     android:id="@+id/sol_label"
                     android:layout_width="wrap_content"
-                    android:layout_height="54dp"
-                    android:layout_marginStart="12dp"
-                    android:gravity="center_vertical"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
                     android:text="SOL"
                     android:textColor="#9945FF"
-                    android:textSize="30sp"
+                    android:textSize="22sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
             <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:layout_gravity="end|center_vertical"
+                android:layout_width="0dp"
+                android:layout_height="54dp"
+                android:layout_weight="1"
                 android:gravity="center_vertical|end"
                 android:orientation="horizontal">
                 <ImageView
                     android:id="@+id/fomo_icon"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
+                    android:layout_width="34dp"
+                    android:layout_height="34dp"
                     android:src="@drawable/ic_lightning" />
                 <TextView
                     android:id="@+id/fomo_label"
                     android:layout_width="wrap_content"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="12dp"
-                    android:gravity="center_vertical"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
                     android:text="Fear &amp; Greed"
                     android:textColor="#FFC107"
-                    android:textSize="28sp"
+                    android:textSize="20sp"
                     android:textStyle="bold" />
             </LinearLayout>
-        </FrameLayout>
+        </LinearLayout>
 
         <!-- VALUES: SOL price | F&G score -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="72dp"
+            android:layout_height="58dp"
             android:orientation="horizontal">
             <TextView
                 android:id="@+id/sol"
@@ -174,19 +176,19 @@
                 android:includeFontPadding="false"
                 android:text="$—"
                 android:textColor="#FFFFFF"
-                android:textSize="48sp"
+                android:textSize="32sp"
                 android:textStyle="bold" />
             <TextView
                 android:id="@+id/fomo"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:gravity="start|center_vertical"
+                android:gravity="end|center_vertical"
                 android:includeFontPadding="false"
-                android:paddingStart="60dp"
+                android:paddingEnd="8dp"
                 android:text="—"
                 android:textColor="#16C784"
-                android:textSize="48sp"
+                android:textSize="32sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>
