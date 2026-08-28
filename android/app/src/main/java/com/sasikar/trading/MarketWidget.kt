@@ -237,32 +237,51 @@ class MarketWidget : AppWidgetProvider() {
             null
         }
 
+        /**
+         * Day change = live price vs prior *completed session* close.
+         * Do NOT use chartPreviousClose — Yahoo sets that to an older reference (~4 sessions back),
+         * which was causing the fake +1.3% vs TradingView.
+         */
         private fun fetchNasdaq(): Pair<String, String>? {
             return try {
-                val json = get("https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?interval=1d&range=5d")
+                val json = get("https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?interval=1d&range=10d")
                 val result = JSONObject(json)
                     .getJSONObject("chart")
                     .getJSONArray("result")
                     .getJSONObject(0)
                 val meta = result.getJSONObject("meta")
-                var price = meta.optDouble("regularMarketPrice", Double.NaN)
-                var prev = meta.optDouble("chartPreviousClose", Double.NaN)
-                if (prev.isNaN()) prev = meta.optDouble("previousClose", Double.NaN)
+                val live = meta.optDouble("regularMarketPrice", Double.NaN)
 
-                if ((price.isNaN() || prev.isNaN()) && result.has("indicators")) {
-                    val closes = result.getJSONObject("indicators")
-                        .getJSONArray("quote").getJSONObject(0).getJSONArray("close")
-                    val vals = mutableListOf<Double>()
-                    for (i in 0 until closes.length()) {
-                        if (!closes.isNull(i)) vals.add(closes.getDouble(i))
-                    }
-                    if (vals.size >= 2) {
-                        price = vals.last()
-                        prev = vals[vals.size - 2]
-                    }
+                val closes = result.getJSONObject("indicators")
+                    .getJSONArray("quote")
+                    .getJSONObject(0)
+                    .getJSONArray("close")
+
+                val completed = mutableListOf<Double>()
+                for (i in 0 until closes.length()) {
+                    if (!closes.isNull(i)) completed.add(closes.getDouble(i))
                 }
-                if (price.isNaN() || prev.isNaN()) return null
-                formatNasdaqDay(price, prev)
+
+                // Prior session close = second-to-last daily close in the series.
+                // Last value is often today's in-progress print (same as regularMarketPrice).
+                val priorClose: Double
+                val price: Double
+                when {
+                    completed.size >= 2 -> {
+                        priorClose = completed[completed.size - 2]
+                        price = if (!live.isNaN()) live else completed.last()
+                    }
+                    completed.size == 1 && !live.isNaN() -> {
+                        // Only one bar — fall back to previousClose if present
+                        val prev = meta.optDouble("previousClose", Double.NaN)
+                        if (prev.isNaN()) return null
+                        priorClose = prev
+                        price = live
+                    }
+                    else -> return null
+                }
+
+                formatNasdaqDay(price, priorClose)
             } catch (_: Throwable) {
                 null
             }
@@ -272,16 +291,17 @@ class MarketWidget : AppWidgetProvider() {
             val change = price - prev
             val pct = if (prev != 0.0) (change / prev) * 100.0 else 0.0
             val arrow = when {
-                change > 0 -> "▲"
-                change < 0 -> "▼"
+                change > 0.01 -> "▲"
+                change < -0.01 -> "▼"
                 else -> "•"
             }
             val sign = if (change > 0) "+" else ""
             val dir = when {
-                change > 0 -> "up"
-                change < 0 -> "down"
+                change > 0.01 -> "up"
+                change < -0.01 -> "down"
                 else -> "flat"
             }
+            // Match TradingView style: price + arrow + %
             val text = String.format(Locale.US, "%,.2f  %s %s%.2f%%", price, arrow, sign, pct)
             return text to dir
         }
@@ -293,7 +313,7 @@ class MarketWidget : AppWidgetProvider() {
             connection.requestMethod = "GET"
             connection.useCaches = false
             connection.setRequestProperty("Accept", "*/*")
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 MemeWidget/2.3")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 MemeWidget/2.4")
             return try {
                 if (connection.responseCode !in 200..299) {
                     throw IllegalStateException("HTTP ${connection.responseCode}")
