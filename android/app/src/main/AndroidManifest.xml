@@ -13,7 +13,8 @@
         </activity>
         <receiver
             android:name=".MarketWidget"
-            android:exported="true">
+            android:exported="true"
+            android:enabled="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
