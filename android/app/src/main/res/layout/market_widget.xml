@@ -202,5 +202,17 @@
                 android:textStyle="bold"
                 android:maxLines="1" />
         </LinearLayout>
+
+        <!-- Small status line; does not alter the existing market layout. -->
+        <TextView
+            android:id="@+id/last_refreshed"
+            android:layout_width="match_parent"
+            android:layout_height="18dp"
+            android:gravity="end|center_vertical"
+            android:includeFontPadding="false"
+            android:text="Last refreshed —"
+            android:textColor="#747B86"
+            android:textSize="9sp"
+            android:maxLines="1" />
     </LinearLayout>
 </FrameLayout>
