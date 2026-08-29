@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070a0f"><title>TRADING — Crypto Pulse</title>
 <style>
-:root{--bg:#070a0f;--panel:#0d151e;--panel2:#0a1017;--line:#263341;--text:#f4f7fb;--muted:#7f8c9b;--green:#62e3a0;--red:#ff6262;--blue:#78a9ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}.shell{width:min(1100px,calc(100% - 28px));margin:auto}.box{margin:24px 0 34px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,#121b25,#090d13);overflow:hidden;box-shadow:0 18px 55px #0008}.head{padding:18px 20px 15px;border-bottom:1px solid #ffffff0d;display:flex;justify-content:space-between;align-items:center;gap:12px}.title{font-size:16px;font-weight:900}.sub{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5}.live{font-size:8px;font-weight:900;letter-spacing:.12em;color:var(--green);padding:7px 9px;border:1px solid #62e3a033;border-radius:999px;white-space:nowrap}.chart-wrap{padding:14px}.range{display:flex;gap:7px;align-items:center;padding:0 0 11px}.range button{border:1px solid #ffffff14;background:#0b1118;color:#8793a1;border-radius:9px;padding:7px 10px;font-size:9px;font-weight:900}.range button.active{color:var(--green);border-color:#62e3a044;background:#10231d}.stat{margin-left:auto;font-size:9px;font-weight:900;color:#dfe8ef}.stat b{color:var(--green)}.chart{display:block;width:100%;height:420px;background:#080d13;border:1px solid #ffffff0b;border-radius:16px}.foot{padding:11px 16px 15px;border-top:1px solid #ffffff0d;color:#647181;font-size:8px;line-height:1.5}.foot a{color:var(--green);font-weight:800;text-decoration:none}.xfeed{height:520px;overflow-y:auto;padding:12px 14px 18px}.xitem{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:13px 10px;border:1px solid #ffffff0b;border-radius:14px;background:#0b1118;margin-bottom:9px;text-decoration:none;color:inherit}.avatar{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#182637,#0d141e);color:#a98cff;font-weight:950;font-size:12px}.name{font-size:12px;font-weight:850}.handle{font-size:9px;color:var(--muted);margin-top:3px}.topic{font-size:8px;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-top:6px}.open{font-size:9px;color:var(--green);font-weight:800;border:1px solid #62e3a033;border-radius:9px;padding:7px 8px;white-space:nowrap}.hot{color:#ff9b61;border-color:#ff9b6133;background:#ff9b6114}@media(max-width:650px){.shell{width:calc(100% - 28px)}.head{padding:16px}.chart{height:420px}.stat{font-size:8px}.xitem{grid-template-columns:38px 1fr auto;gap:10px}.avatar{width:38px;height:38px}.open{font-size:8px;padding:6px}}
+:root{--bg:#070a0f;--panel:#0d151e;--panel2:#0a1017;--line:#263341;--text:#f4f7fb;--muted:#7f8c9b;--green:#62e3a0;--red:#ff6262;--blue:#78a9ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}.shell{width:min(1100px,calc(100% - 28px));margin:auto}.box{margin:24px 0 34px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,#121b25,#090d13);overflow:hidden;box-shadow:0 18px 55px #0008}.head{padding:18px 20px 15px;border-bottom:1px solid #ffffff0d;display:flex;justify-content:space-between;align-items:center;gap:12px}.title{font-size:16px;font-weight:900}.sub{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5}.live{font-size:8px;font-weight:900;letter-spacing:.12em;color:var(--green);padding:7px 9px;border:1px solid #62e3a033;border-radius:999px;white-space:nowrap}.chart-wrap{position:relative;padding:14px}.range{display:flex;gap:7px;align-items:center;padding:0 0 11px}.range button{border:1px solid #ffffff14;background:#0b1118;color:#8793a1;border-radius:9px;padding:7px 10px;font-size:9px;font-weight:900}.range button.active{color:var(--green);border-color:#62e3a044;background:#10231d}.stat{margin-left:auto;font-size:9px;font-weight:900;color:#dfe8ef}.stat b{color:var(--green)}.chart{display:block;width:100%;height:420px;background:#080d13;border:1px solid #ffffff0b;border-radius:16px}.chart .bar{transition:opacity .15s, transform .15s;cursor:pointer}.chart .bar:hover,.chart .bar.active{opacity:.95;stroke:#ffffff;stroke-width:1.5px}.foot{padding:11px 16px 15px;border-top:1px solid #ffffff0d;color:#647181;font-size:8px;line-height:1.5}.foot a{color:var(--green);font-weight:800;text-decoration:none}.xfeed{height:520px;overflow-y:auto;padding:12px 14px 18px}.xitem{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:13px 10px;border:1px solid #ffffff0b;border-radius:14px;background:#0b1118;margin-bottom:9px;text-decoration:none;color:inherit}.avatar{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#182637,#0d141e);color:#a98cff;font-weight:950;font-size:12px}.name{font-size:12px;font-weight:850}.handle{font-size:9px;color:var(--muted);margin-top:3px}.topic{font-size:8px;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-top:6px}.open{font-size:9px;color:var(--green);font-weight:800;border:1px solid #62e3a033;border-radius:999px;padding:7px 8px;white-space:nowrap}.hot{color:#ff9b61;border-color:#ff9b6133;background:#ff9b6114}.etf-popup{display:none;position:absolute;top:55px;right:24px;z-index:90;background:rgba(10,16,24,0.96);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(16px);border-radius:18px;padding:18px 24px;box-shadow:0 20px 50px rgba(0,0,0,0.9);min-width:280px;pointer-events:none;animation:popFade .15s ease-out}.etf-popup.visible{display:block}.etf-popup .p-date{font-size:16px;font-weight:800;color:#c0cbda;margin-bottom:6px;letter-spacing:.01em}.etf-popup .p-val{font-size:36px;font-weight:950;line-height:1.1;letter-spacing:-.02em}.etf-popup .p-val.pos{color:var(--green)}.etf-popup .p-val.neg{color:var(--red)}.etf-popup .p-badge{display:inline-block;margin-top:10px;font-size:11px;font-weight:900;letter-spacing:.12em;padding:6px 12px;border-radius:6px;text-transform:uppercase}.etf-popup .p-badge.pos{background:rgba(98,227,160,0.15);color:var(--green);border:1px solid rgba(98,227,160,0.3)}.etf-popup .p-badge.neg{background:rgba(255,98,98,0.15);color:var(--red);border:1px solid rgba(255,98,98,0.3)}@keyframes popFade{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}@media(max-width:650px){.shell{width:calc(100% - 28px)}.head{padding:16px}.chart{height:420px}.stat{font-size:8px}.xitem{grid-template-columns:38px 1fr auto;gap:10px}.avatar{width:38px;height:38px}.open{font-size:8px;padding:6px}.etf-popup{position:relative;top:auto;right:auto;margin-bottom:12px;min-width:auto;width:100%}}
 </style></head><body><div class="shell">
 <section class="box"><div class="head"><div><div class="title">₿ BTC ETF Flows — Daily Net Inflows / Outflows</div><div class="sub">Aggregate U.S. spot Bitcoin ETF flows · green = net inflow · red = net outflow.</div></div><span class="live">LIVE DATA</span></div>
-<div class="chart-wrap"><div class="range"><button data-days="30" class="active">30D</button><button data-days="90">90D</button><button data-days="180">180D</button><span class="stat" id="stat">Last 6D <b>+$2.25B</b></span></div><div id="chartMount"></div></div>
+<div class="chart-wrap"><div class="range"><button data-days="30" class="active">30D</button><button data-days="90">90D</button><button data-days="180">180D</button><span class="stat" id="stat">Last 6D <b>+$2.25B</b></span></div><div id="etfPopup" class="etf-popup"><div class="p-date" id="popDate">—</div><div class="p-val" id="popVal">—</div><div class="p-badge" id="popBadge">—</div></div><div id="chartMount"></div></div>
 <div class="foot">Fast native chart — no iframe. Latest data is bundled for instant first paint, then replaced by the local 180-day Farside dataset when available. <a href="https://farside.co.uk/bitcoin-etf-flow-all-data/" target="_blank" rel="noopener">SOURCE →</a></div></section>
 <section class="box"><div class="head"><div><div class="title">⚡ Latest Crypto X — Newest First</div><div class="sub">Newest matching crypto posts first.</div></div><span class="live">LIVE · NEWEST FIRST</span></div><div class="xfeed">
 <a class="xitem" href="https://x.com/search?q=%28bitcoin%20OR%20btc%29%20min_faves%3A1000%20-filter%3Areplies&src=typed_query&f=live" target="_blank"><span class="avatar">₿</span><span><div class="name">⚡ BTC — Latest High-Impact</div><div class="handle">Bitcoin · market-moving posts</div><div class="topic">Price · whales · institutions · macro</div></span><span class="open hot">LATEST X →</span></a>
@@ -17,13 +17,86 @@
 <script>
 const seed=[['2026-08-03',170.1],['2026-08-04',211.5],['2026-08-05',244.4],['2026-08-06',137.6],['2026-08-07',101.7],['2026-08-10',-144.6],['2026-08-11',7.8],['2026-08-12',-61.1],['2026-08-13',-131.1],['2026-08-14',-56.2],['2026-08-17',297.5],['2026-08-18',189.3],['2026-08-19',517.2],['2026-08-20',606.3],['2026-08-21',307.5],['2026-08-24',337.6]];
 let all=seed;
-const fmt=n=>Math.abs(n)>=1000?'$'+(n/1000).toFixed(2)+'B':'$'+Math.round(Math.abs(n))+'M';
-function draw(days){const rows=all.slice(-days),w=1200,h=420,p={l:62,r:22,t:28,b:48},vals=rows.map(x=>Number(x[1])),max=Math.max(100,...vals.map(v=>Math.abs(v))),plotH=h-p.t-p.b,y0=p.t+plotH/2,scale=plotH/(2*max),slot=(w-p.l-p.r)/Math.max(rows.length,1),bw=Math.max(5,Math.min(28,slot*.62));let s=`<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#62e3a0" stop-opacity="1"/><stop offset="1" stop-color="#62e3a0" stop-opacity=".72"/></linearGradient><linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6262" stop-opacity=".72"/><stop offset="1" stop-color="#ff6262" stop-opacity="1"/></linearGradient></defs><rect width="100%" height="100%" rx="16" fill="#080d13"/>`;
-for(let k=0;k<5;k++){let y=p.t+k*plotH/4;let val=max-k*max/2;s+=`<line x1="${p.l}" y1="${y}" x2="${w-p.r}" y2="${y}" stroke="#ffffff" stroke-opacity=".055"/><text x="10" y="${y+4}" fill="#73808e" font-size="12">${val===0?'$0':(val<0?'-':'')+'$'+Math.round(Math.abs(val))+'M'}</text>`}
-s+=`<line x1="${p.l}" y1="${y0}" x2="${w-p.r}" y2="${y0}" stroke="#8b98a6" stroke-opacity=".55"/>`;
-const hiStart=Math.max(0,rows.length-6),hx=p.l+hiStart*slot-5,hw=Math.max(0,rows.length-hiStart)*slot+10;s+=`<rect x="${hx}" y="${p.t}" width="${hw}" height="${plotH}" rx="10" fill="#62e3a0" fill-opacity=".035" stroke="#62e3a0" stroke-opacity=".16"/>`;
-rows.forEach((r,i)=>{const v=Number(r[1]),x=p.l+(i+.5)*slot,bh=Math.max(2,Math.abs(v)*scale),y=v>=0?y0-bh:y0,fill=v>=0?'url(#g)':'url(#r)';s+=`<rect x="${x-bw/2}" y="${y}" width="${bw}" height="${bh}" rx="2.5" fill="${fill}"><title>${r[0]} · ${v>=0?'+':''}${v.toFixed(1)}M</title></rect>`;const step=Math.max(1,Math.ceil(rows.length/7));if(i===0||i===rows.length-1||i%step===0)s+=`<text x="${x}" y="${h-16}" text-anchor="middle" fill="#74808e" font-size="11">${r[0].slice(5)}</text>`});
-const recent=rows.slice(-6).reduce((a,r)=>a+Number(r[1]),0);s+=`<text x="${w-p.r-4}" y="${p.t+16}" text-anchor="end" fill="#62e3a0" font-size="13" font-weight="800">6D ${recent>=0?'+':''}${fmt(recent)}</text></svg>`;document.getElementById('chartMount').innerHTML=s;document.getElementById('stat').innerHTML=`Last 6D <b>${recent>=0?'+':''}${fmt(recent)}</b>`}
+let currentRows=[];
+let activeIndex=-1;
+
+const abs=n=>Math.abs(n);
+const fmt=n=>abs(n)>=1000?'$'+(abs(n)/1000).toFixed(2)+'B':'$'+abs(n).toFixed(1)+'M';
+const signed=n=>(n>=0?'+':'\u2212')+fmt(n);
+const asDate=s=>new Date(s+'T00:00:00Z');
+const longDate=s=>asDate(s).toLocaleDateString('en-GB',{timeZone:'UTC',weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+
+function showPopup(row, barEl){
+  const popup=document.getElementById('etfPopup');
+  const pDate=document.getElementById('popDate');
+  const pVal=document.getElementById('popVal');
+  const pBadge=document.getElementById('popBadge');
+  if(!popup||!row)return;
+
+  const v=+row[1];
+  pDate.textContent=longDate(row[0]);
+  pVal.textContent=signed(v);
+  pVal.className='p-val '+(v>=0?'pos':'neg');
+  pBadge.textContent=v>=0?'▲ NET INFLOW':'▼ NET OUTFLOW';
+  pBadge.className='p-badge '+(v>=0?'pos':'neg');
+  popup.classList.add('visible');
+
+  document.querySelectorAll('.bar').forEach(b=>b.classList.remove('active'));
+  if(barEl)barEl.classList.add('active');
+}
+
+function setupInteractions(){
+  const mount=document.getElementById('chartMount');
+  const chartWrap=document.querySelector('.chart-wrap');
+
+  const handleSelect=(idx)=>{
+    if(idx<0||idx>=currentRows.length)return;
+    activeIndex=idx;
+    const r=currentRows[idx];
+    const bar=mount.querySelector('.bar[data-idx="'+idx+'"]');
+    showPopup(r,bar);
+  };
+
+  mount.onmousemove=mount.ontouchstart=(e)=>{
+    const target=e.target.closest('.bar');
+    if(target){
+      const idx=+target.dataset.idx;
+      handleSelect(idx);
+    }
+  };
+
+  chartWrap.onwheel=(e)=>{
+    if(!currentRows.length)return;
+    e.preventDefault();
+    if(activeIndex===-1)activeIndex=currentRows.length-1;
+    if(e.deltaY>0){
+      activeIndex=Math.max(0,activeIndex-1);
+    }else{
+      activeIndex=Math.min(currentRows.length-1,activeIndex+1);
+    }
+    handleSelect(activeIndex);
+  };
+
+  if(currentRows.length){
+    activeIndex=currentRows.length-1;
+    handleSelect(activeIndex);
+  }
+}
+
+function draw(days){
+  currentRows=all.slice(-days);
+  const rows=currentRows,w=1200,h=420,p={l:62,r:22,t:28,b:48},vals=rows.map(x=>Number(x[1])),max=Math.max(100,...vals.map(v=>Math.abs(v))),plotH=h-p.t-p.b,y0=p.t+plotH/2,scale=plotH/(2*max),slot=(w-p.l-p.r)/Math.max(rows.length,1),bw=Math.max(5,Math.min(28,slot*.62));
+  let s=`<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#62e3a0" stop-opacity="1"/><stop offset="1" stop-color="#62e3a0" stop-opacity=".72"/></linearGradient><linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6262" stop-opacity=".72"/><stop offset="1" stop-color="#ff6262" stop-opacity="1"/></linearGradient></defs><rect width="100%" height="100%" rx="16" fill="#080d13"/>`;
+  for(let k=0;k<5;k++){let y=p.t+k*plotH/4;let val=max-k*max/2;s+=`<line x1="${p.l}" y1="${y}" x2="${w-p.r}" y2="${y}" stroke="#ffffff" stroke-opacity=".055"/><text x="10" y="${y+4}" fill="#73808e" font-size="12">${val===0?'$0':(val<0?'-':'')+'$'+Math.round(Math.abs(val))+'M'}</text>`}
+  s+=`<line x1="${p.l}" y1="${y0}" x2="${w-p.r}" y2="${y0}" stroke="#8b98a6" stroke-opacity=".55"/>`;
+  const hiStart=Math.max(0,rows.length-6),hx=p.l+hiStart*slot-5,hw=Math.max(0,rows.length-hiStart)*slot+10;s+=`<rect x="${hx}" y="${p.t}" width="${hw}" height="${plotH}" rx="10" fill="#62e3a0" fill-opacity=".035" stroke="#62e3a0" stroke-opacity=".16"/>`;
+  rows.forEach((r,i)=>{const v=Number(r[1]),x=p.l+(i+.5)*slot,bh=Math.max(2,Math.abs(v)*scale),y=v>=0?y0-bh:y0,fill=v>=0?'url(#g)':'url(#r)';s+=`<rect class="bar" data-idx="${i}" data-date="${r[0]}" data-val="${v}" x="${x-bw/2}" y="${y}" width="${bw}" height="${bh}" rx="2.5" fill="${fill}"><title>${r[0]} · ${v>=0?'+':''}${v.toFixed(1)}M</title></rect>`;const step=Math.max(1,Math.ceil(rows.length/7));if(i===0||i===rows.length-1||i%step===0)s+=`<text x="${x}" y="${h-16}" text-anchor="middle" fill="#74808e" font-size="11">${r[0].slice(5)}</text>`});
+  const recent=rows.slice(-6).reduce((a,r)=>a+Number(r[1]),0);s+=`<text x="${w-p.r-4}" y="${p.t+16}" text-anchor="end" fill="#62e3a0" font-size="13" font-weight="800">6D ${recent>=0?'+':''}${fmt(recent)}</text></svg>`;
+  document.getElementById('chartMount').innerHTML=s;
+  document.getElementById('stat').innerHTML=`Last 6D <b>${recent>=0?'+':''}${fmt(recent)}</b>`;
+  setupInteractions();
+}
+
 function boot(){draw(30);fetch('./etf-flows.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{if(j&&Array.isArray(j.data)&&j.data.length){all=j.data;draw(document.querySelector('.range .active').dataset.days)}}).catch(()=>{});}
 boot();document.querySelectorAll('.range button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.range button').forEach(x=>x.classList.remove('active'));b.classList.add('active');draw(Number(b.dataset.days))});
 </script><script src="site-nav.js?v=20260825f"></script>  <script src="site-nav.js?v=20260826-fix"></script>
