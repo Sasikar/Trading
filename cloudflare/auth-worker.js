@@ -55,10 +55,13 @@ async function validCookie(cookieHeader, secret) {
   }
 }
 
-function loginPage(error = '') {
+function loginPage(error = '', next = '/') {
   const err = error
     ? `<div class="err">${error.replace(/[<>&]/g, '')}</div>`
     : '';
+  let dest = next || '/';
+  if (!dest.startsWith('/') || dest.startsWith('//')) dest = '/';
+  const action = '/__login?next=' + encodeURIComponent(dest);
   return new Response(
     `<!doctype html>
 <html lang="en">
@@ -77,7 +80,7 @@ button{width:100%;margin-top:12px;padding:13px;border:0;border-radius:10px;backg
 </style>
 </head>
 <body>
-<form class="box" method="post" action="/__login">
+<form class="box" method="post" action="${action}">
 <h1>TRADING.</h1>
 <p>Private access</p>
 ${err}
@@ -130,14 +133,15 @@ export default {
     if (url.pathname === '/__login') {
       if (request.method === 'POST') {
         let password = '';
+        const nextParam = url.searchParams.get('next') || '/';
         try {
           const body = await request.formData();
           password = String(body.get('password') || '');
         } catch {
-          return loginPage('Incorrect password.');
+          return loginPage('Incorrect password.', nextParam);
         }
         if (!timingSafeEqual(password, String(secret))) {
-          return loginPage('Incorrect password.');
+          return loginPage('Incorrect password.', nextParam);
         }
         const payload = b64url(
           new TextEncoder().encode(
@@ -157,7 +161,8 @@ export default {
           },
         });
       }
-      return loginPage();
+      const nextGet = url.searchParams.get('next') || '/';
+      return loginPage('', nextGet);
     }
 
     // Authenticated → serve site assets

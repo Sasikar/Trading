@@ -2,6 +2,11 @@
   "name": "trading-site-worker",
   "private": true,
   "type": "module",
+  "scripts": {
+    "build": "node build-dist.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "preview": "npm run build && wrangler dev"
+  },
   "devDependencies": {
     "wrangler": "^4.28.0"
   }
