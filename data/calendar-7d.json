@@ -1,0 +1,13 @@
+{
+  "updated": "2026-08-29",
+  "events": [
+    {"date": "2026-08-29", "time": "All day", "type": "crypto", "title": "BTC / ETH weekend liquidity thin", "impact": "med"},
+    {"date": "2026-09-01", "time": "US open", "type": "macro", "title": "US markets open (Labor Day week context)", "impact": "low"},
+    {"date": "2026-09-03", "time": "~18:00 IST", "type": "macro", "title": "US ISM Manufacturing (watch if scheduled)", "impact": "med"},
+    {"date": "2026-09-05", "time": "US session", "type": "macro", "title": "Nonfarm Payrolls week window (confirm exact date)", "impact": "high"},
+    {"date": "2026-09-05", "time": "All day", "type": "crypto", "title": "Weekly options expiry (Deribit / CME window)", "impact": "med"},
+    {"date": "2026-09-10", "time": "US session", "type": "macro", "title": "CPI window (confirm official release)", "impact": "high"},
+    {"date": "2026-09-17", "time": "US session", "type": "macro", "title": "FOMC decision window (confirm official date)", "impact": "high"},
+    {"date": "2026-09-18", "time": "All day", "type": "crypto", "title": "Major monthly options expiry cluster", "impact": "high"}
+  ]
+}
