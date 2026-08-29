@@ -1,90 +1,47 @@
-name: Refresh Trump high-impact news
+name: Refresh market news and Truth posts
 on:
   schedule:
     - cron: '27 * * * *'
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/refresh-trump-news.yml'
+      - 'scripts/refresh_news.py'
+      - 'scripts/refresh_truths.py'
 permissions:
   contents: write
+concurrency:
+  group: refresh-news
+  cancel-in-progress: false
 jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch fresh high-impact news via Google News RSS
-        run: |
-          python - <<'PY'
-          import json, re, html, requests, xml.etree.ElementTree as ET
-          from datetime import datetime, timezone
-          from email.utils import parsedate_to_datetime
-          from urllib.parse import quote
-
-          queries = [
-            'Trump tariffs Canada markets when:2d',
-            'Trump Fed crypto markets when:2d',
-            'Trump China Iran immigration markets when:2d',
-          ]
-          allowed = {'Reuters','Associated Press','AP','Bloomberg','CNBC','Financial Times','The Wall Street Journal','Politico','BBC'}
-          items=[]
-          for q in queries:
-              url='https://news.google.com/rss/search?q='+quote(q)+'&hl=en-US&gl=US&ceid=US:en'
-              r=requests.get(url,headers={'User-Agent':'Mozilla/5.0'},timeout=30)
-              r.raise_for_status()
-              root=ET.fromstring(r.text)
-              for item in root.findall('./channel/item'):
-                  title=html.unescape(item.findtext('title') or '').strip()
-                  link=item.findtext('link') or ''
-                  source_el=item.find('source')
-                  source=(source_el.text if source_el is not None else '') or ''
-                  source=html.unescape(source).strip()
-                  if not any(s.lower() == source.lower() or s.lower() in source.lower() for s in allowed):
-                      continue
-                  low=title.lower()
-                  if not any(k in low for k in ('trump','white house','administration','tariff','canada','fed','crypto','iran','china')):
-                      continue
-                  pub=item.findtext('pubDate') or ''
-                  try:
-                      published_at=parsedate_to_datetime(pub).astimezone(timezone.utc)
-                  except Exception:
-                      continue
-                  items.append({'title':title,'source':source,'url':link,'time':pub,'_published_at':published_at})
-
-          seen=set(); out=[]
-          for x in sorted(items,key=lambda x:x['_published_at'],reverse=True):
-              key=re.sub(r'[^a-z0-9]','',x['title'].lower())
-              if key in seen: continue
-              seen.add(key)
-              x.pop('_published_at',None)
-              out.append(x)
-          out=out[:30]
-          if len(out)<3:
-              raise SystemExit(f'Only {len(out)} reputable items found; refusing to replace existing news')
-
-          data={
-              'updated':datetime.now(timezone.utc).isoformat(),
-              'source':'Reuters/AP + reputable news RSS',
-              'items':out
-          }
-          with open('trump-news.json','w',encoding='utf-8') as f:
-              json.dump(data,f,ensure_ascii=False,separators=(',',':'))
-          print('Saved',len(out),'fresh items. Newest:',out[0]['time'])
-          PY
+      - name: Install deps
+        run: python -m pip install --disable-pip-version-check requests
+      - name: Fetch market news
+        run: python scripts/refresh_news.py
+      - name: Fetch Truth Social posts
+        run: python scripts/refresh_truths.py
       - name: Verify freshness
         run: |
           python - <<'PY'
           import json
           from datetime import datetime, timezone
-          from email.utils import parsedate_to_datetime
-          data=json.load(open('trump-news.json',encoding='utf-8'))
-          items=data.get('items',[])
-          if len(items)<3: raise SystemExit('News payload is too small')
-          newest=parsedate_to_datetime(items[0]['time']).astimezone(timezone.utc)
-          age=(datetime.now(timezone.utc)-newest).total_seconds()/3600
-          print(f'Newest article: {items[0]["time"]}; age={age:.2f}h')
-          if age > 48: raise SystemExit('Newest article is older than 48 hours')
+          for path, key in (('trump-news.json','items'), ('trump-truths.json','items')):
+              data=json.load(open(path,encoding='utf-8'))
+              items=data.get(key,[])
+              print(path,'->',len(items),'items, updated',data.get('updated'))
+              if not items: continue
+              newest=datetime.fromisoformat(items[0]['time'])
+              age=(datetime.now(timezone.utc)-newest).total_seconds()/3600
+              print(f'  newest {items[0]["time"]} ({age:.1f}h old)')
+              if age > 72: raise SystemExit(f'{path} newest item is older than 72 hours')
           PY
       - name: Commit news data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add trump-news.json
-          if git diff --cached --quiet; then echo "No Trump news changes."; else git commit -m "Refresh Trump high-impact news"; git push; fi
+          git add trump-news.json trump-truths.json
+          if git diff --cached --quiet; then echo "No news changes."; else git commit -m "Refresh market news and Truth posts"; git pull --rebase; git push; fi
