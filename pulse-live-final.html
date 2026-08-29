@@ -1,10 +1,12 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070a0f"><title>TRADING — Crypto Pulse</title>
 <style>
-:root{--bg:#070a0f;--panel:#0d151e;--panel2:#0a1017;--line:#263341;--text:#f4f7fb;--muted:#7f8c9b;--green:#62e3a0;--red:#ff6262;--blue:#78a9ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}.shell{width:min(1100px,calc(100% - 28px));margin:auto}.box{margin:24px 0 34px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,#121b25,#090d13);overflow:hidden;box-shadow:0 18px 55px #0008}.head{padding:18px 20px 15px;border-bottom:1px solid #ffffff0d;display:flex;justify-content:space-between;align-items:center;gap:12px}.title{font-size:16px;font-weight:900}.sub{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5}.live{font-size:8px;font-weight:900;letter-spacing:.12em;color:var(--green);padding:7px 9px;border:1px solid #62e3a033;border-radius:999px;white-space:nowrap}.chart-wrap{position:relative;padding:14px}.range{display:flex;gap:7px;align-items:center;padding:0 0 11px}.range button{border:1px solid #ffffff14;background:#0b1118;color:#8793a1;border-radius:9px;padding:7px 10px;font-size:9px;font-weight:900}.range button.active{color:var(--green);border-color:#62e3a044;background:#10231d}.stat{margin-left:auto;font-size:9px;font-weight:900;color:#dfe8ef}.stat b{color:var(--green)}.chart{display:block;width:100%;height:420px;background:#080d13;border:1px solid #ffffff0b;border-radius:16px}.chart .bar{transition:opacity .15s, transform .15s;cursor:pointer}.chart .bar:hover,.chart .bar.active{opacity:.95;stroke:#ffffff;stroke-width:1.5px}.foot{padding:11px 16px 15px;border-top:1px solid #ffffff0d;color:#647181;font-size:8px;line-height:1.5}.foot a{color:var(--green);font-weight:800;text-decoration:none}.xfeed{height:520px;overflow-y:auto;padding:12px 14px 18px}.xitem{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:13px 10px;border:1px solid #ffffff0b;border-radius:14px;background:#0b1118;margin-bottom:9px;text-decoration:none;color:inherit}.avatar{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#182637,#0d141e);color:#a98cff;font-weight:950;font-size:12px}.name{font-size:12px;font-weight:850}.handle{font-size:9px;color:var(--muted);margin-top:3px}.topic{font-size:8px;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-top:6px}.open{font-size:9px;color:var(--green);font-weight:800;border:1px solid #62e3a033;border-radius:999px;padding:7px 8px;white-space:nowrap}.hot{color:#ff9b61;border-color:#ff9b6133;background:#ff9b6114}.etf-popup{display:none;position:absolute;top:55px;right:24px;z-index:90;background:rgba(10,16,24,0.96);border:1px solid rgba(255,255,255,0.22);backdrop-filter:blur(16px);border-radius:18px;padding:18px 24px;box-shadow:0 20px 50px rgba(0,0,0,0.9);min-width:280px;pointer-events:none;animation:popFade .15s ease-out}.etf-popup.visible{display:block}.etf-popup .p-date{font-size:16px;font-weight:800;color:#c0cbda;margin-bottom:6px;letter-spacing:.01em}.etf-popup .p-val{font-size:36px;font-weight:950;line-height:1.1;letter-spacing:-.02em}.etf-popup .p-val.pos{color:var(--green)}.etf-popup .p-val.neg{color:var(--red)}.etf-popup .p-badge{display:inline-block;margin-top:10px;font-size:11px;font-weight:900;letter-spacing:.12em;padding:6px 12px;border-radius:6px;text-transform:uppercase}.etf-popup .p-badge.pos{background:rgba(98,227,160,0.15);color:var(--green);border:1px solid rgba(98,227,160,0.3)}.etf-popup .p-badge.neg{background:rgba(255,98,98,0.15);color:var(--red);border:1px solid rgba(255,98,98,0.3)}@keyframes popFade{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}@media(max-width:650px){.shell{width:calc(100% - 28px)}.head{padding:16px}.chart{height:420px}.stat{font-size:8px}.xitem{grid-template-columns:38px 1fr auto;gap:10px}.avatar{width:38px;height:38px}.open{font-size:8px;padding:6px}.etf-popup{position:relative;top:auto;right:auto;margin-bottom:12px;min-width:auto;width:100%}}
+:root{--bg:#070a0f;--panel:#0d151e;--panel2:#0a1017;--line:#263341;--text:#f4f7fb;--muted:#7f8c9b;--green:#62e3a0;--red:#ff6262;--blue:#78a9ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}.shell{width:min(1100px,calc(100% - 28px));margin:auto}.box{margin:24px 0 34px;border:1px solid var(--line);border-radius:22px;background:linear-gradient(145deg,#121b25,#090d13);overflow:hidden;box-shadow:0 18px 55px #0008}.head{padding:18px 20px 15px;border-bottom:1px solid #ffffff0d;display:flex;justify-content:space-between;align-items:center;gap:12px}.title{font-size:16px;font-weight:900}.sub{font-size:10px;color:var(--muted);margin-top:5px;line-height:1.5}.live{font-size:8px;font-weight:900;letter-spacing:.12em;color:var(--green);padding:7px 9px;border:1px solid #62e3a033;border-radius:999px;white-space:nowrap}.chart-wrap{position:relative;padding:14px;cursor:pointer}.range{display:flex;gap:7px;align-items:center;padding:0 0 11px}.range button{border:1px solid #ffffff14;background:#0b1118;color:#8793a1;border-radius:9px;padding:7px 10px;font-size:9px;font-weight:900}.range button.active{color:var(--green);border-color:#62e3a044;background:#10231d}.stat{margin-left:auto;font-size:9px;font-weight:900;color:#dfe8ef}.stat b{color:var(--green)}.chart{display:block;width:100%;height:420px;background:#080d13;border:1px solid #ffffff0b;border-radius:16px}.chart .bar{transition:opacity .15s, transform .15s;cursor:pointer}.chart .bar:hover,.chart .bar.active{opacity:.95;stroke:#ffffff;stroke-width:1.5px}.foot{padding:11px 16px 15px;border-top:1px solid #ffffff0d;color:#647181;font-size:8px;line-height:1.5}.foot a{color:var(--green);font-weight:800;text-decoration:none}.xfeed{height:520px;overflow-y:auto;padding:12px 14px 18px}.xitem{display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;padding:13px 10px;border:1px solid #ffffff0b;border-radius:14px;background:#0b1118;margin-bottom:9px;text-decoration:none;color:inherit}.avatar{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#182637,#0d141e);color:#a98cff;font-weight:950;font-size:12px}.name{font-size:12px;font-weight:850}.handle{font-size:9px;color:var(--muted);margin-top:3px}.topic{font-size:8px;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;margin-top:6px}.open{font-size:9px;color:var(--green);font-weight:800;border:1px solid #62e3a033;border-radius:999px;padding:7px 8px;white-space:nowrap}.hot{color:#ff9b61;border-color:#ff9b6133;background:#ff9b6114}
+.etf-modal-backdrop{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(3,6,10,0.88);backdrop-filter:blur(20px);padding:24px;box-sizing:border-box;overflow-y:auto;align-items:center;justify-content:center}.etf-modal-backdrop.open{display:flex;animation:popFade .2s ease-out}.etf-modal{width:min(1180px,98vw);background:#090e15;border:1px solid rgba(255,255,255,0.18);border-radius:24px;box-shadow:0 30px 80px rgba(0,0,0,0.95);overflow:hidden;display:flex;flex-direction:column}.etf-modal-head{padding:20px 24px;border-bottom:1px solid rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:space-between;gap:16px;background:#0c131c}.etf-modal-title{font-size:20px;font-weight:900;color:#fff}.etf-modal-sub{font-size:12px;color:var(--muted);margin-top:4px}.etf-modal-close{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#fff;font-size:14px;font-weight:900;border-radius:50%;width:38px;height:38px;display:grid;place-items:center;cursor:pointer;transition:.15s}.etf-modal-close:hover{background:rgba(255,255,255,0.2);transform:scale(1.05)}.etf-modal-body{padding:24px;display:flex;flex-direction:column;gap:18px}.etf-modal-summary{display:flex;gap:20px;align-items:center;padding:16px 20px;background:#0e1723;border:1px solid rgba(255,255,255,0.08);border-radius:16px;flex-wrap:wrap}.etf-modal-stat-item{display:flex;flex-direction:column;gap:4px}.etf-modal-stat-label{font-size:11px;font-weight:800;letter-spacing:.08em;color:#7f8c9d;text-transform:uppercase}.etf-modal-stat-val{font-size:28px;font-weight:950;line-height:1.1}.etf-modal-stat-val.pos{color:var(--green)}.etf-modal-stat-val.neg{color:var(--red)}.etf-modal-chart{width:100%;height:560px;background:#060a0f;border:1px solid rgba(255,255,255,0.08);border-radius:18px;display:block}
+@keyframes popFade{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:scale(1)}}@media(max-width:650px){.shell{width:calc(100% - 28px)}.head{padding:16px}.chart{height:420px}.stat{font-size:8px}.xitem{grid-template-columns:38px 1fr auto;gap:10px}.avatar{width:38px;height:38px}.open{font-size:8px;padding:6px}.etf-modal-backdrop{padding:12px}.etf-modal-chart{height:480px}.etf-modal-stat-val{font-size:22px}}
 </style></head><body><div class="shell">
-<section class="box"><div class="head"><div><div class="title">₿ BTC ETF Flows — Daily Net Inflows / Outflows</div><div class="sub">Aggregate U.S. spot Bitcoin ETF flows · green = net inflow · red = net outflow.</div></div><span class="live">LIVE DATA</span></div>
-<div class="chart-wrap"><div class="range"><button data-days="30" class="active">30D</button><button data-days="90">90D</button><button data-days="180">180D</button><span class="stat" id="stat">Last 6D <b>+$2.25B</b></span></div><div id="etfPopup" class="etf-popup"><div class="p-date" id="popDate">—</div><div class="p-val" id="popVal">—</div><div class="p-badge" id="popBadge">—</div></div><div id="chartMount"></div></div>
+<section class="box"><div class="head"><div><div class="title">₿ BTC ETF Flows — Daily Net Inflows / Outflows</div><div class="sub">Aggregate U.S. spot Bitcoin ETF flows · green = net inflow · red = net outflow. (Click/Hover for expanded 30D popup view)</div></div><span class="live">LIVE DATA</span></div>
+<div class="chart-wrap" id="chartWrap"><div class="range"><button data-days="30" class="active">30D</button><button data-days="90">90D</button><button data-days="180">180D</button><span class="stat" id="stat">Last 6D <b>+$2.25B</b></span></div><div id="chartMount"></div></div>
 <div class="foot">Fast native chart — no iframe. Latest data is bundled for instant first paint, then replaced by the local 180-day Farside dataset when available. <a href="https://farside.co.uk/bitcoin-etf-flow-all-data/" target="_blank" rel="noopener">SOURCE →</a></div></section>
 <section class="box"><div class="head"><div><div class="title">⚡ Latest Crypto X — Newest First</div><div class="sub">Newest matching crypto posts first.</div></div><span class="live">LIVE · NEWEST FIRST</span></div><div class="xfeed">
 <a class="xitem" href="https://x.com/search?q=%28bitcoin%20OR%20btc%29%20min_faves%3A1000%20-filter%3Areplies&src=typed_query&f=live" target="_blank"><span class="avatar">₿</span><span><div class="name">⚡ BTC — Latest High-Impact</div><div class="handle">Bitcoin · market-moving posts</div><div class="topic">Price · whales · institutions · macro</div></span><span class="open hot">LATEST X →</span></a>
@@ -14,6 +16,37 @@
 <a class="xitem" href="https://x.com/search?q=%28crypto%20OR%20bitcoin%20OR%20ethereum%29%20%28SEC%20OR%20regulation%20OR%20Congress%20OR%20stablecoin%29%20min_faves%3A200&src=typed_query&f=live" target="_blank"><span class="avatar">REG</span><span><div class="name">Regulation & Policy</div><div class="handle">SEC · Congress · stablecoins</div><div class="topic">Policy · legal catalysts</div></span><span class="open">LATEST X →</span></a>
 <a class="xitem" href="https://x.com/search?q=%28bitcoin%20OR%20btc%20OR%20ethereum%29%20%28whale%20OR%20%22exchange%20inflow%22%20OR%20%22exchange%20outflow%22%20OR%20onchain%29%20min_faves%3A200&src=typed_query&f=live" target="_blank"><span class="avatar">🐋</span><span><div class="name">Whales & On-chain</div><div class="handle">Large transfers · exchange flows · smart money</div><div class="topic">On-chain · positioning</div></span><span class="open">LATEST X →</span></a>
 </div></section></div>
+
+<!-- Full Modal Popup for Entire Data -->
+<div id="etfModalBackdrop" class="etf-modal-backdrop">
+  <div class="etf-modal">
+    <div class="etf-modal-head">
+      <div>
+        <div class="etf-modal-title">₿ U.S. Spot Bitcoin ETF Flows — Full Expanded View</div>
+        <div class="etf-modal-sub">Complete historical dataset with enlarged dates & high-contrast visualization</div>
+      </div>
+      <button class="etf-modal-close" id="modalClose">✕</button>
+    </div>
+    <div class="etf-modal-body">
+      <div class="etf-modal-summary">
+        <div class="etf-modal-stat-item">
+          <div class="etf-modal-stat-label">Selected Date / Active Session</div>
+          <div class="etf-modal-stat-val" id="mSelectedDate" style="color:#fff">—</div>
+        </div>
+        <div class="etf-modal-stat-item">
+          <div class="etf-modal-stat-label">Single Day Net Flow</div>
+          <div class="etf-modal-stat-val pos" id="mSelectedVal">—</div>
+        </div>
+        <div class="etf-modal-stat-item">
+          <div class="etf-modal-stat-label">Recent Cumulative (6 Sessions)</div>
+          <div class="etf-modal-stat-val pos" id="mRecentVal">—</div>
+        </div>
+      </div>
+      <div id="modalChartMount"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 const seed=[['2026-08-03',170.1],['2026-08-04',211.5],['2026-08-05',244.4],['2026-08-06',137.6],['2026-08-07',101.7],['2026-08-10',-144.6],['2026-08-11',7.8],['2026-08-12',-61.1],['2026-08-13',-131.1],['2026-08-14',-56.2],['2026-08-17',297.5],['2026-08-18',189.3],['2026-08-19',517.2],['2026-08-20',606.3],['2026-08-21',307.5],['2026-08-24',337.6]];
 let all=seed;
@@ -24,64 +57,105 @@ const abs=n=>Math.abs(n);
 const fmt=n=>abs(n)>=1000?'$'+(abs(n)/1000).toFixed(2)+'B':'$'+abs(n).toFixed(1)+'M';
 const signed=n=>(n>=0?'+':'\u2212')+fmt(n);
 const asDate=s=>new Date(s+'T00:00:00Z');
+const shortDate=s=>asDate(s).toLocaleDateString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short'});
 const longDate=s=>asDate(s).toLocaleDateString('en-GB',{timeZone:'UTC',weekday:'short',day:'2-digit',month:'short',year:'numeric'});
 
-function showPopup(row, barEl){
-  const popup=document.getElementById('etfPopup');
-  const pDate=document.getElementById('popDate');
-  const pVal=document.getElementById('popVal');
-  const pBadge=document.getElementById('popBadge');
-  if(!popup||!row)return;
+const modalBackdrop=document.getElementById('etfModalBackdrop');
+const modalClose=document.getElementById('modalClose');
+const modalMount=document.getElementById('modalChartMount');
 
-  const v=+row[1];
-  pDate.textContent=longDate(row[0]);
-  pVal.textContent=signed(v);
-  pVal.className='p-val '+(v>=0?'pos':'neg');
-  pBadge.textContent=v>=0?'▲ NET INFLOW':'▼ NET OUTFLOW';
-  pBadge.className='p-badge '+(v>=0?'pos':'neg');
-  popup.classList.add('visible');
+function drawExpandedModalChart(rows){
+  const w=1400,h=650,p={l:90,r:30,t:40,b:150};
+  const vals=rows.map(x=>+x[1]),max=Math.max(100,...vals.map(abs)),ph=h-p.t-p.b,y0=p.t+ph/2,scale=ph/(2*max);
+  const slot=(w-p.l-p.r)/Math.max(rows.length,1),bw=Math.max(8,Math.min(32,slot*.68)),r=Math.min(4,bw/2);
+  let s='<svg class="etf-modal-chart" viewBox="0 0 '+w+' '+h+'"><defs>'
+    +'<linearGradient id="mgpos" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#35d98a"/><stop offset="1" stop-color="#14804c"/></linearGradient>'
+    +'<linearGradient id="mgneg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b82030"/><stop offset="1" stop-color="#ef3f4f"/></linearGradient>'
+    +'</defs><rect width="'+w+'" height="'+h+'" rx="18" fill="#060a0f"/>';
+  for(let k=0;k<5;k++){
+    const y=p.t+k*ph/4,val=max-k*max/2;
+    if(val!==0)s+='<line x1="'+p.l+'" y1="'+y+'" x2="'+(w-p.r)+'" y2="'+y+'" stroke="#ffffff" stroke-opacity=".08" stroke-dasharray="4 6"/>';
+    s+='<text x="'+(p.l-16)+'" y="'+(y+5)+'" fill="#9ba8b8" font-size="14" font-weight="700" text-anchor="end">'+(val===0?'$0':'$'+Math.round(abs(val))+'M')+'</text>';
+  }
+  s+='<line x1="'+p.l+'" y1="'+y0+'" x2="'+(w-p.r)+'" y2="'+y0+'" stroke="#cbd5e1" stroke-opacity=".55" stroke-width="1.5"/>';
+  const labelTop=h-p.b+22;
+  rows.forEach((row,i)=>{
+    const v=+row[1],x=p.l+(i+.5)*slot,bh=Math.max(3,abs(v)*scale),y=v>=0?y0-bh:y0;
+    const isSelected=(i===activeIndex);
+    s+='<rect class="bar '+(isSelected?'active':'')+'" data-idx="'+i+'" data-date="'+row[0]+'" data-val="'+v+'" x="'+(x-bw/2).toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="'+r.toFixed(1)+'" fill="url(#'+(v>=0?'mgpos':'mgneg')+')" '+(isSelected?'stroke="#ffffff" stroke-width="2.5"':'')+'><title>'+longDate(row[0])+': '+signed(v)+'</title></rect>';
+    s+='<text transform="translate('+x.toFixed(1)+' '+labelTop+') rotate(-60)" fill="'+(isSelected?'#ffffff':'#9aa8b8')+'" font-size="14" font-weight="'+(isSelected?'900':'700')+'" text-anchor="end">'+shortDate(row[0])+'</text>';
+  });
+  s+='</svg>';
+  modalMount.innerHTML=s;
+}
 
-  document.querySelectorAll('.bar').forEach(b=>b.classList.remove('active'));
-  if(barEl)barEl.classList.add('active');
+function updateModalSummary(idx){
+  if(idx<0||idx>=currentRows.length)return;
+  activeIndex=idx;
+  const r=currentRows[idx];
+  const v=+r[1];
+
+  document.getElementById('mSelectedDate').textContent=longDate(r[0]);
+  const mVal=document.getElementById('mSelectedVal');
+  mVal.textContent=signed(v);
+  mVal.className='etf-modal-stat-val '+(v>=0?'pos':'neg');
+
+  const recent=currentRows.slice(-6).reduce((a,row)=>a+(+row[1]),0);
+  const mRec=document.getElementById('mRecentVal');
+  mRec.textContent=signed(recent);
+  mRec.className='etf-modal-stat-val '+(recent>=0?'pos':'neg');
+
+  drawExpandedModalChart(currentRows);
+}
+
+function openModal(defaultIdx){
+  modalBackdrop.classList.add('open');
+  if(!currentRows.length)return;
+  const idx = (typeof defaultIdx==='number'&&defaultIdx>=0)?defaultIdx:currentRows.length-1;
+  updateModalSummary(idx);
+}
+
+function closeModal(){
+  modalBackdrop.classList.remove('open');
 }
 
 function setupInteractions(){
-  const mount=document.getElementById('chartMount');
-  const chartWrap=document.querySelector('.chart-wrap');
+  const chartWrap=document.getElementById('chartWrap');
 
-  const handleSelect=(idx)=>{
-    if(idx<0||idx>=currentRows.length)return;
-    activeIndex=idx;
-    const r=currentRows[idx];
-    const bar=mount.querySelector('.bar[data-idx="'+idx+'"]');
-    showPopup(r,bar);
-  };
-
-  mount.onmousemove=mount.ontouchstart=(e)=>{
-    const target=e.target.closest('.bar');
-    if(target){
-      const idx=+target.dataset.idx;
-      handleSelect(idx);
-    }
+  chartWrap.onclick=(e)=>{
+    const bar=e.target.closest('.bar');
+    const idx=bar?+bar.dataset.idx:currentRows.length-1;
+    openModal(idx);
   };
 
   chartWrap.onwheel=(e)=>{
+    e.preventDefault();
+    openModal(currentRows.length-1);
+  };
+
+  modalMount.onmousemove=modalMount.ontouchstart=(e)=>{
+    const bar=e.target.closest('.bar');
+    if(bar){
+      const idx=+bar.dataset.idx;
+      updateModalSummary(idx);
+    }
+  };
+
+  modalMount.onwheel=(e)=>{
     if(!currentRows.length)return;
     e.preventDefault();
-    if(activeIndex===-1)activeIndex=currentRows.length-1;
     if(e.deltaY>0){
       activeIndex=Math.max(0,activeIndex-1);
     }else{
       activeIndex=Math.min(currentRows.length-1,activeIndex+1);
     }
-    handleSelect(activeIndex);
+    updateModalSummary(activeIndex);
   };
-
-  if(currentRows.length){
-    activeIndex=currentRows.length-1;
-    handleSelect(activeIndex);
-  }
 }
+
+modalClose.onclick=closeModal;
+modalBackdrop.onclick=(e)=>{if(e.target===modalBackdrop)closeModal();};
+window.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 
 function draw(days){
   currentRows=all.slice(-days);
