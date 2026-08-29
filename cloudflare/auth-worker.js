@@ -129,7 +129,6 @@ export default {
 
     const url = new URL(request.url);
 
-    // Login endpoint (always public)
     if (url.pathname === '/__login') {
       if (request.method === 'POST') {
         let password = '';
@@ -150,7 +149,6 @@ export default {
         );
         const sig = await hmac(String(secret), payload);
         let dest = url.searchParams.get('next') || '/';
-        // Prevent open redirects
         if (!dest.startsWith('/') || dest.startsWith('//')) dest = '/';
         return new Response(null, {
           status: 302,
@@ -165,12 +163,63 @@ export default {
       return loginPage('', nextGet);
     }
 
-    // Authenticated → serve site assets
     if (await validCookie(request.headers.get('Cookie') || '', String(secret))) {
+      if (url.pathname === '/api/yf' || url.pathname === '/api/funding') {
+        try {
+          if (url.pathname === '/api/yf') {
+            const symbol = url.searchParams.get('symbol') || '^VIX';
+            const upstream =
+              'https://query1.finance.yahoo.com/v8/finance/chart/' +
+              encodeURIComponent(symbol) +
+              '?interval=1d&range=5d';
+            const res = await fetch(upstream, {
+              headers: { 'User-Agent': 'Mozilla/5.0 TradingPulse/1.0', Accept: '*/*' },
+            });
+            if (!res.ok) {
+              return new Response(JSON.stringify({ error: 'upstream ' + res.status }), {
+                status: 502,
+                headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+              });
+            }
+            const j = await res.json();
+            const meta = j.chart.result[0].meta;
+            const closes = (j.chart.result[0].indicators.quote[0].close || []).filter((x) => x != null);
+            const price = meta.regularMarketPrice;
+            let prev = meta.previousClose ?? meta.chartPreviousClose;
+            if (closes.length >= 2) prev = closes[closes.length - 2];
+            const chg = price - prev;
+            const pct = prev ? (chg / prev) * 100 : 0;
+            return new Response(JSON.stringify({ price, chg, pct, symbol }), {
+              headers: { 'content-type': 'application/json', 'cache-control': 'private, no-store' },
+            });
+          }
+          if (url.pathname === '/api/funding') {
+            const symbol = url.searchParams.get('symbol') || 'BTCUSDT';
+            const upstream =
+              'https://fapi.binance.com/fapi/v1/premiumIndex?symbol=' +
+              encodeURIComponent(symbol);
+            const res = await fetch(upstream, { headers: { Accept: 'application/json' } });
+            if (!res.ok) {
+              return new Response(JSON.stringify({ error: 'upstream ' + res.status }), {
+                status: 502,
+                headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+              });
+            }
+            const j = await res.json();
+            return new Response(JSON.stringify(j), {
+              headers: { 'content-type': 'application/json', 'cache-control': 'private, no-store' },
+            });
+          }
+        } catch (e) {
+          return new Response(JSON.stringify({ error: 'proxy failed' }), {
+            status: 502,
+            headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+          });
+        }
+      }
       return serveAssets(request, env);
     }
 
-    // Unauthenticated → login (preserve destination)
     const login = new URL('/__login', url.origin);
     login.searchParams.set('next', url.pathname + url.search);
     return new Response(null, {
