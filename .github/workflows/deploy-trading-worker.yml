@@ -1,0 +1,85 @@
+name: Deploy Trading Worker (auth + assets)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - "cloudflare/auth-worker.js"
+      - "cloudflare/trading-site/**"
+      - ".github/workflows/deploy-trading-worker.yml"
+      - "index.html"
+      - "pulse.html"
+      - "*.html"
+      - "*.js"
+      - "*.json"
+      - "data/**"
+      - "tools/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cloudflare/trading-site
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Wrangler
+        run: npm install --no-fund --no-audit
+
+      - name: Build static asset bundle
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euxo pipefail
+          rm -rf cloudflare/trading-site/dist
+          mkdir -p cloudflare/trading-site/dist
+          # Copy only public site files (never android / secrets / worker sources)
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'android' \
+            --exclude 'cloudflare' \
+            --exclude 'src' \
+            --exclude 'build' \
+            --exclude 'node_modules' \
+            --exclude '*.apk' \
+            --exclude '*.iml' \
+            --exclude '.gradle' \
+            ./ cloudflare/trading-site/dist/
+          # Ensure login is not shadowed by a static file
+          rm -f cloudflare/trading-site/dist/__login
+          find cloudflare/trading-site/dist -maxdepth 2 -type f | head -40
+
+      - name: Deploy Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euxo pipefail
+          npx wrangler deploy
+
+      - name: Verify unauthenticated access shows login redirect
+        run: |
+          set -euxo pipefail
+          # Should redirect to /__login (302) without cookie
+          code="$(curl -s -o /tmp/out.html -w '%{http_code}' -L --max-redirs 0 https://trading.sasipudi.workers.dev/ || true)"
+          # curl --max-redirs 0 still returns 302 body empty; check headers
+          loc="$(curl -sI https://trading.sasipudi.workers.dev/ | tr -d '\r' | awk -F': ' 'tolower($1)=="location"{print $2}')"
+          echo "Location: $loc"
+          echo "$loc" | grep -q '__login'
+          # Login page itself is public 200
+          curl -fsS https://trading.sasipudi.workers.dev/__login | grep -q 'Private access'
+          # Wrong password rejected
+          curl -s -o /tmp/bad.html -w '%{http_code}' -X POST -F 'password=not-the-real-password' https://trading.sasipudi.workers.dev/__login | grep -E '200'
+          grep -q 'Incorrect password' /tmp/bad.html
+          # Protected page without cookie must not leak Trading UI
+          body="$(curl -sL --max-redirs 2 https://trading.sasipudi.workers.dev/pulse.html)"
+          echo "$body" | grep -q 'Private access'
+          echo "Auth gate checks passed"

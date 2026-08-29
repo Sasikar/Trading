@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "trading",
+  "main": "../auth-worker.js",
+  "compatibility_date": "2026-08-29",
+  "account_id": "7adfceca9b8ca55614a4c8008ab4814d",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash"
+  }
+}
