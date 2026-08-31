@@ -5,6 +5,42 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#070a0f">
 <title>TRADING — Command Center</title>
-<!-- See full file: content too large for single tool arg in this turn; use push_files with path read -->
-</head><body>PLACEHOLDER_FIX_PENDING  <script src="site-nav.js?v=20260826-fix"></script>
+<style>
+:root{--bg:#070a0f;--panel:#101821;--line:#263341;--text:#f4f7fb;--muted:#8491a1;--green:#62e3a0;--red:#ff6f7c;--gold:#e6c878;--blue:#78a9ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+.shell{width:min(1220px,calc(100% - 40px));margin:auto}.section{padding:24px 0}
+.head{display:flex;justify-content:space-between;align-items:end;margin-bottom:14px}.head h2{font-size:20px;margin:0}.head p{color:var(--muted);font-size:11px;margin:5px 0 0}
+.intel-card{border:1px solid #263341;border-radius:18px;background:linear-gradient(145deg,#121b25,#090d13);padding:20px}
+.source{color:var(--green);font-size:8px;letter-spacing:.08em}
+.coin-price{font-size:20px;font-weight:850}.up{color:var(--green)}.down{color:var(--red)}
+.market-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+.coin{background:#080d13;border:1px solid #ffffff0a;border-radius:12px;padding:13px}
+.coin-name{font-size:11px;font-weight:850}.coin-symbol{font-size:9px;color:var(--muted);margin-left:5px}
+.change{font-size:10px;font-weight:800;margin-top:4px}
+.footer{margin-top:45px;border-top:1px solid #ffffff0d;padding:24px 0 38px;color:#647181;font-size:9px}
+</style>
+</head>
+<body>
+<div class="shell">
+<main>
+<section class="section">
+<div class="head"><div><h2>Live market</h2><p>BTC / ETH</p></div><span class="source" id="market-source">CONNECTING</span></div>
+<div class="intel-card"><div class="market-row">
+<div class="coin"><div><span class="coin-name">Bitcoin</span><span class="coin-symbol">BTC</span></div><div id="btc-price" class="coin-price">Loading…</div><div id="btc-change" class="change">—</div></div>
+<div class="coin"><div><span class="coin-name">Ethereum</span><span class="coin-symbol">ETH</span></div><div id="eth-price" class="coin-price">Loading…</div><div id="eth-change" class="change">—</div></div>
+</div></div>
+</section>
+<section class="section"><div class="head"><div><h2>Market regime</h2><p>Technical signals inject above this block.</p></div></div>
+<div class="intel-card"><p style="color:#8491a1;font-size:12px">Overview shell restored. Technical · BTC signals load via technical-btc.js (site-nav).</p></div>
+</section>
+</main>
+<footer class="footer"><div>TRADING · PRIVATE COMMAND CENTER</div></footer>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const money=n=>'$'+Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
+async function loadMarket(){try{const r=await fetch('https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD',{cache:'no-store'});const j=await r.json();const b=j.result.XXBTZUSD||j.result.XBTUSD,e=j.result.XETHZUSD||j.result.ETHUSD;if(b&&e){$('btc-price').textContent=money(+b.c[0]);$('eth-price').textContent=money(+e.c[0]);const bc=(+b.c[0]-+b.o)*100/+b.o,ec=(+e.c[0]-+e.o)*100/+e.o;$('btc-change').textContent=(bc>=0?'▲ ':'▼ ')+Math.abs(bc).toFixed(2)+'% · 24h';$('eth-change').textContent=(ec>=0?'▲ ':'▼ ')+Math.abs(ec).toFixed(2)+'% · 24h';$('btc-change').className='change '+(bc>=0?'up':'down');$('eth-change').className='change '+(ec>=0?'up':'down');$('market-source').textContent='KRAKEN · LIVE'}}catch(e){$('market-source').textContent='OFFLINE'}}
+loadMarket();setInterval(loadMarket,15000);
+</script>
+<script src="site-nav.js?v=20260831"></script>
 </body></html>
