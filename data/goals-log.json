@@ -1,0 +1,16 @@
+{
+  "days": {
+    "2026-08-31": {
+      "habits": {
+        "sleep": false,
+        "wake": false,
+        "walk-am": false,
+        "walk-pm": true,
+        "calories": true,
+        "sugar": false
+      },
+      "t": 1788149696432,
+      "score": 2
+    }
+  }
+}
