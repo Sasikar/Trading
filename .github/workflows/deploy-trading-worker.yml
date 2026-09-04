@@ -2,18 +2,9 @@ name: Deploy Trading Worker (auth + assets)
 
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - "cloudflare/auth-worker.js"
-      - "cloudflare/trading-site/**"
-      - ".github/workflows/deploy-trading-worker.yml"
-      - "index.html"
-      - "pulse.html"
-      - "*.html"
-      - "*.js"
-      - "data/**"
-      - "tools/**"
+  # AUTO PUSH DEPLOY DISABLED — failed runs were wiping live Worker (login/API 404).
+  # Deploy manually from Actions tab after verifying, or use wrangler locally.
+
 
 jobs:
   deploy:

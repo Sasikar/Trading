@@ -1,9 +1,8 @@
 name: Install universal trading navigation
 
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
+  # push disabled - was mutating HTML on every commit
 
 permissions:
   contents: write

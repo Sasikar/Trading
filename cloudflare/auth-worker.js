@@ -106,29 +106,39 @@ async function fetchOkx(path, params) {
     }
   }
 
-  // Coinbase candles fallback
+  // Gate.io candles fallback (OKX rate limits)
   if (path === 'candles') {
+    const instId = params.get('instId') || 'BTC-USDT';
     const bar = (params.get('bar') || '1D').toUpperCase();
-    const limit = Math.min(parseInt(params.get('limit') || '100', 10) || 100, 300);
-    const gran = { '1M': 2592000, '1W': 604800, '1D': 86400, '4H': 14400, '1H': 3600 }[bar] || 86400;
-    const end = Math.floor(Date.now() / 1000);
-    const start = end - gran * limit;
+    const limit = Math.min(parseInt(params.get('limit') || '100', 10) || 100, 200);
+    const pair = String(instId).replace('-', '_');
+    const intervalMap = { '1M': '30d', '1W': '7d', '1D': '1d', '4H': '4h', '1H': '1h', '15M': '15m' };
+    const interval = intervalMap[bar] || '1d';
     const url =
-      'https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=' +
-      gran +
-      '&start=' +
-      start +
-      '&end=' +
-      end;
+      'https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=' +
+      encodeURIComponent(pair) +
+      '&interval=' +
+      encodeURIComponent(interval) +
+      '&limit=' +
+      encodeURIComponent(String(limit));
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!res.ok) throw lastErr || new Error('coinbase ' + res.status);
-    const rows = await res.json(); // [time, low, high, open, close, volume] oldest first
+    if (!res.ok) throw lastErr || new Error('gate ' + res.status);
+    const rows = await res.json();
+    // Gate: [t, vol, close, high, low, open, ...] as strings, oldest first
     // OKX style newest first: [ts_ms, o, h, l, c, vol]
-    const data = rows
+    const data = (Array.isArray(rows) ? rows : [])
       .slice()
       .reverse()
-      .map((r) => [String(r[0] * 1000), String(r[3]), String(r[2]), String(r[1]), String(r[4]), String(r[5])]);
-    const out = { code: '0', data, source: 'coinbase-fallback' };
+      .map((r) => [
+        String(Number(r[0]) * 1000),
+        String(r[5]),
+        String(r[3]),
+        String(r[4]),
+        String(r[2]),
+        String(r[1]),
+      ]);
+    if (!data.length) throw lastErr || new Error('gate empty');
+    const out = { code: '0', data, source: 'gate-fallback' };
     cacheSet(cacheKey, out, 45000);
     return out;
   }
