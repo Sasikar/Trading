@@ -6,8 +6,12 @@ const TF={'4h':{interval:'4h',label:'4H',limit:100,swing:50,volAvg:20,fibBars:40
 let currentTF='1d',fibChart,fibSeries,fibVol,fibLines=[],macdChart,macdLineS,sigLineS,histS;
 async function jget(url){
   try{
-    const r=await fetch(url,{cache:'no-store',credentials:'omit'});
+    // same-origin (nasdaq.json, /api/*) needs cookies; external (Kraken etc) omit
+    const abs=/^https?:\/\//i.test(url);
+    const r=await fetch(url,{cache:'no-store',credentials:abs?'omit':'same-origin'});
     if(!r.ok) return null;
+    const ct=(r.headers.get('content-type')||'');
+    if(ct.includes('text/html')) return null;
     return await r.json();
   }catch(e){return null;}
 }
