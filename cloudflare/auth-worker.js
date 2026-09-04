@@ -101,8 +101,11 @@ ${err}
 
 function noStore(res) {
   const headers = new Headers(res.headers);
-  headers.set('Cache-Control', 'private, no-store');
+  headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0');
   headers.delete('ETag');
+  headers.delete('Content-Length');
+  headers.delete('Content-Encoding');
+  headers.delete('Last-Modified');
   return new Response(res.body, {
     status: res.status,
     statusText: res.statusText,
@@ -136,10 +139,17 @@ async function serveAssets(request, env) {
         'https://api.alternative.me/fng?',
         '/api/fng?'
       );
+      const headers = new Headers(res.headers);
+      headers.set('Cache-Control', 'private, no-store, no-cache, must-revalidate, max-age=0');
+      headers.set('Content-Type', 'application/javascript; charset=utf-8');
+      headers.delete('ETag');
+      headers.delete('Content-Length');
+      headers.delete('Content-Encoding');
+      headers.delete('Last-Modified');
       return new Response(js, {
         status: res.status,
         statusText: res.statusText,
-        headers: new Headers(res.headers),
+        headers,
       });
     }
   }
