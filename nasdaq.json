@@ -1,10 +1,9 @@
 {
   "symbol": "^IXIC",
   "name": "NASDAQ",
-  "price": 26505.79,
-  "chg": -78.27,
-  "pct": -0.29,
-  "updated": 1788541736364.5085,
-  "source": "nasdaq.com",
-  "live": true
+  "price": 26478.932,
+  "chg": -105.1285468749993,
+  "pct": -0.3954570698092897,
+  "updated": 1788546146430.5913,
+  "source": "yahoo"
 }
