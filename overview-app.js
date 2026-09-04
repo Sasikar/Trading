@@ -397,12 +397,15 @@ function swingStructure(kl, lookback, tf){
   let wickBelowHL=false, closeBelowHL=false, persistBelowHL=false;
   if(protectedHL!=null){
     wickBelowHL=lastLow<protectedHL*0.998;
+    // closeBelowHL: last FULLY CLOSED candle only (never the forming bar)
     closeBelowHL=closedClose<protectedHL*0.998;
-    // two closes below = stronger
-    if(closes.length>=3){
-      persistBelowHL=closes[closes.length-1]<protectedHL*0.998 && closes[closes.length-2]<protectedHL*0.998;
+    // hardBreakDown: TWO most recent COMPLETED closes below HL — never count the current incomplete candle
+    if(closes.length>=3 && closedIdx>=1){
+      const completed1=closes[closedIdx];
+      const completed0=closes[closedIdx-1];
+      persistBelowHL=completed1<protectedHL*0.998 && completed0<protectedHL*0.998;
     } else {
-      persistBelowHL=closeBelowHL;
+      persistBelowHL=false;
     }
   }
   let wickAboveLH=false, closeAboveLH=false;
