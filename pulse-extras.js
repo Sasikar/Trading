@@ -13,6 +13,32 @@
     return j;
   }
 
+  
+  function biasVix(price){
+    if(price==null||!isFinite(price)) return {label:'—', color:'#7f8791'};
+    if(price < 12) return {label:'EXTREME BULLISH', color:'#62e3a0'};
+    if(price < 15) return {label:'BULLISH', color:'#62e3a0'};
+    if(price < 20) return {label:'NEUTRAL', color:'#e6c878'};
+    if(price < 25) return {label:'CAUTION', color:'#e6a050'};
+    if(price < 30) return {label:'BEARISH', color:'#ff6f7c'};
+    return {label:'EXTREME BEARISH', color:'#ff6f7c'};
+  }
+  function biasDxy(pct){
+    if(pct==null||!isFinite(pct)) return {label:'—', color:'#7f8791'};
+    // rising DXY often risk-off for crypto
+    if(pct >= 0.4) return {label:'BEARISH (for crypto)', color:'#ff6f7c'};
+    if(pct >= 0.15) return {label:'MILD BEARISH', color:'#e6a050'};
+    if(pct <= -0.4) return {label:'BULLISH (for crypto)', color:'#62e3a0'};
+    if(pct <= -0.15) return {label:'MILD BULLISH', color:'#62e3a0'};
+    return {label:'NEUTRAL', color:'#e6c878'};
+  }
+  function biasTnx(pct){
+    if(pct==null||!isFinite(pct)) return {label:'—', color:'#7f8791'};
+    if(pct >= 0.05) return {label:'RISK-OFF lean', color:'#e6a050'};
+    if(pct <= -0.05) return {label:'RISK-ON lean', color:'#62e3a0'};
+    return {label:'NEUTRAL', color:'#e6c878'};
+  }
+
   async function loadRiskStrip() {
     const el = $('risk-strip-body');
     if (!el) return;
@@ -50,10 +76,12 @@
           const col = r.price == null ? '#7f8791' : up ? '#35d98a' : '#ef3f4f';
           const arrow = r.price == null ? '' : up ? '▲' : '▼';
           const tag = r.src === 'LIVE' ? 'LIVE' : r.src === 'SNAPSHOT' ? 'SNAP' : '';
+          const bias = r.id==='vix' ? biasVix(r.price) : r.id==='dxy' ? biasDxy(r.pct) : biasTnx(r.pct);
           return `<div class="risk-item">
             <div class="risk-label">${r.label}${tag ? ' · '+tag : ''}</div>
             <div class="risk-price" style="color:${col}">${r.price == null ? '—' : fmt(r.price, r.id === 'tnx' ? 3 : 2)}</div>
             <div class="risk-chg" style="color:${col}">${r.price == null ? '' : arrow + ' ' + Math.abs(r.pct || 0).toFixed(2) + '%'}</div>
+            <div class="risk-bias" style="color:${bias.color};font-size:11px;font-weight:900;margin-top:8px;letter-spacing:.04em">${bias.label}</div>
           </div>`;
         })
         .join('');

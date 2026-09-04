@@ -256,7 +256,15 @@ async function fetchOrderbook(instId, sz) {
   if (!res.ok) throw new Error('books ' + res.status);
   const j = await res.json();
   const row = (j.data && j.data[0]) || {};
-  return { bids: row.bids || [], asks: row.asks || [], ts: row.ts || Date.now(), source: 'OKX', instId };
+  // Always stamp server receive time so freshness is not skewed by exchange clock
+  return {
+    bids: row.bids || [],
+    asks: row.asks || [],
+    ts: Date.now(),
+    exchangeTs: row.ts || null,
+    source: 'OKX',
+    instId,
+  };
 }
 
 function json(data, status = 200, ttl = 'private, no-store') {

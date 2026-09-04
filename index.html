@@ -77,12 +77,12 @@
 </section>
 <div class="tabs" id="tf-tabs">
   <button type="button" class="tab" data-tf="4h">4H</button>
-  <button type="button" class="tab active" data-tf="1d">1D</button>
+  <button type="button" class="tab" data-tf="1d">1D</button>
+  <button type="button" class="tab active" data-tf="trend">Trend</button>
   <button type="button" class="tab" data-tf="1w">1W</button>
   <button type="button" class="tab" data-tf="1M">1M</button>
-  <button type="button" class="tab" data-tf="trend">Trend</button>
 </div>
-<div id="tf-panels">
+<div id="tf-panels" class="hidden" style="display:none">
 <section class="section">
   <div class="head"><div><h2>Fibonacci · <span id="tf-name">1D</span></h2><p id="fib-sub">swing</p></div><span class="source" id="fib-source">…</span></div>
   <div class="card">
@@ -110,7 +110,7 @@
   </div>
 </section>
 </div>
-<div id="trend-panel" class="trend-panel">
+<div id="trend-panel" class="trend-panel on">
 <section class="section">
   <div class="head"><div><h2>Trend Context</h2><p>1D+1W EMA · MACD · 4H</p></div><span class="source" id="trend-source">…</span></div>
   <div class="card">
@@ -158,6 +158,6 @@
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260904-nqlive2"></script>
+<script src="overview-app.js?v=20260904-trenddef"></script>
 <script src="site-nav.js?v=20260904-kraken"></script>
 </body></html>
