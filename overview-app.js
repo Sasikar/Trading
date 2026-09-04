@@ -1,3 +1,4 @@
+/* NASDAQ_STATIC_V2 */
 (function(){
 const $=id=>document.getElementById(id);
 const fmt=(n,d)=>n==null||!isFinite(n)?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d!=null?d:(n>=1000?0:2)});
