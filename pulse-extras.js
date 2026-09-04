@@ -72,11 +72,29 @@
       );
       el.innerHTML = results
         .map((r) => {
-          const up = (r.pct || 0) >= 0;
-          const col = r.price == null ? '#7f8791' : up ? '#35d98a' : '#ef3f4f';
-          const arrow = r.price == null ? '' : up ? '▲' : '▼';
-          const tag = r.src === 'LIVE' ? 'LIVE' : r.src === 'SNAPSHOT' ? 'SNAP' : '';
           const bias = r.id==='vix' ? biasVix(r.price) : r.id==='dxy' ? biasDxy(r.pct) : biasTnx(r.pct);
+          const rawUp = (r.pct || 0) >= 0;
+          // Color by crypto-market bias, NOT raw up/down of the instrument.
+          // VIX down = bullish for markets → green; VIX up = bearish → red.
+          let col = '#7f8791';
+          if (r.price != null) {
+            if (r.id === 'vix') {
+              // invert: falling VIX is good (green), rising VIX is bad (red)
+              col = rawUp ? '#ef3f4f' : '#35d98a';
+              // if level bias is stronger, prefer bias color for price
+              if (bias.label.includes('BULLISH')) col = '#35d98a';
+              else if (bias.label.includes('BEARISH') || bias.label === 'CAUTION') col = '#ef3f4f';
+              else if (bias.label === 'NEUTRAL') col = '#e6c878';
+            } else if (r.id === 'dxy') {
+              // rising DXY often risk-off for crypto → red-ish when up strong
+              col = bias.color || (rawUp ? '#e6a050' : '#35d98a');
+            } else {
+              // US10Y: use bias color
+              col = bias.color || (rawUp ? '#e6a050' : '#35d98a');
+            }
+          }
+          const arrow = r.price == null ? '' : rawUp ? '▲' : '▼';
+          const tag = r.src === 'LIVE' ? 'LIVE' : r.src === 'SNAPSHOT' ? 'SNAP' : '';
           return `<div class="risk-item">
             <div class="risk-label">${r.label}${tag ? ' · '+tag : ''}</div>
             <div class="risk-price" style="color:${col}">${r.price == null ? '—' : fmt(r.price, r.id === 'tnx' ? 3 : 2)}</div>
