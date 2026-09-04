@@ -184,24 +184,86 @@ async function fetchOkx(path, params) {
   for (const [key, value] of params) {
     if (key === 'instId' || key === 'bar' || key === 'limit') upstream.searchParams.set(key, value);
   }
-  const cacheKey = upstream.toString();
+  const cacheKey = 'okx:' + upstream.toString();
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
+
   let lastErr = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt) await new Promise((r) => setTimeout(r, 400 * attempt));
-    const res = await fetch(upstream.toString(), { headers: { Accept: 'application/json' } });
-    if (res.ok) {
-      const j = await res.json();
-      const ttl = path === 'candles' ? 30000 : 5000;
-      cacheSet(cacheKey, j, ttl);
-      return j;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 500 * attempt));
+    try {
+      const res = await fetch(upstream.toString(), { headers: { Accept: 'application/json' } });
+      if (res.ok) {
+        const j = await res.json();
+        const ttl = path === 'candles' ? 45000 : 5000;
+        cacheSet(cacheKey, j, ttl);
+        return j;
+      }
+      lastErr = new Error('okx ' + res.status);
+      if (res.status !== 429 && res.status !== 503) break;
+    } catch (e) {
+      lastErr = e;
     }
-    lastErr = new Error('okx ' + res.status);
-    if (res.status !== 429 && res.status !== 503) break;
   }
+
+  // Candles fallback: Bybit (same OHLCV shape mapped to OKX-style rows)
+  if (path === 'candles') {
+    const instId = params.get('instId') || 'BTC-USDT';
+    const bar = (params.get('bar') || '1D').toUpperCase();
+    const limit = params.get('limit') || '100';
+    const symbol = String(instId).replace('-', '');
+    const intervalMap = { '1M': 'M', '1W': 'W', '1D': 'D', '4H': '240', '1H': '60', '15M': '15' };
+    const interval = intervalMap[bar] || 'D';
+    const bybitUrl =
+      'https://api.bybit.com/v5/market/kline?category=spot&symbol=' +
+      encodeURIComponent(symbol) +
+      '&interval=' +
+      encodeURIComponent(interval) +
+      '&limit=' +
+      encodeURIComponent(limit);
+    const res = await fetch(bybitUrl, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw lastErr || new Error('bybit ' + res.status);
+    const j = await res.json();
+    const list = (j.result && j.result.list) || [];
+    // Bybit: [start, open, high, low, close, volume, turnover] newest first — same as OKX
+    const data = list.map((row) => [row[0], row[1], row[2], row[3], row[4], row[5]]);
+    const out = { code: '0', data, source: 'bybit-fallback' };
+    cacheSet(cacheKey, out, 45000);
+    return out;
+  }
+
+  // Ticker fallback via Bybit
+  if (path === 'ticker') {
+    const instId = params.get('instId') || 'BTC-USDT';
+    const symbol = String(instId).replace('-', '');
+    const bybitUrl =
+      'https://api.bybit.com/v5/market/tickers?category=spot&symbol=' + encodeURIComponent(symbol);
+    const res = await fetch(bybitUrl, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw lastErr || new Error('bybit ' + res.status);
+    const j = await res.json();
+    const row = (j.result && j.result.list && j.result.list[0]) || {};
+    const last = row.lastPrice;
+    const open24h = row.prevPrice24h || last;
+    const out = {
+      code: '0',
+      data: [
+        {
+          instId,
+          last,
+          open24h,
+          askPx: row.ask1Price,
+          bidPx: row.bid1Price,
+        },
+      ],
+      source: 'bybit-fallback',
+    };
+    cacheSet(cacheKey, out, 5000);
+    return out;
+  }
+
   throw lastErr || new Error('okx failed');
 }
+
 
 async function fetchFearGreed() {
   const res = await fetch('https://api.alternative.me/fng/?limit=1', {
