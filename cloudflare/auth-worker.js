@@ -293,7 +293,7 @@ export default {
     // Public market APIs — always available (no cookie). Fixes OFFLINE when session missing.
     
     // Public static market snapshots (no cookie) — NASDAQ must not depend on login
-    if (url.pathname === '/nasdaq.json' || url.pathname === '/etf-flows.json') {
+    if (url.pathname === '/nasdaq.json' || url.pathname === '/etf-flows.json' || url.pathname === '/macro-strip.json') {
       if (!env.ASSETS) return new Response('missing assets', { status: 500 });
       return noStore(await env.ASSETS.fetch(request));
     }

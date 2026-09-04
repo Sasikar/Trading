@@ -21,37 +21,44 @@
       { id: 'vix', label: 'VIX', symbol: '^VIX' },
       { id: 'tnx', label: 'US10Y', symbol: '^TNX' },
     ];
+    let snap = null;
+    try {
+      const r = await fetch('./macro-strip.json?v=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) snap = await r.json();
+    } catch (e) {}
     try {
       const results = await Promise.all(
         specs.map(async (s) => {
           try {
-            return { ...s, ...(await yahooMeta(s.symbol)) };
+            return { ...s, ...(await yahooMeta(s.symbol)), src: 'LIVE' };
           } catch (e) {
             if (s.alt) {
               try {
-                return { ...s, ...(await yahooMeta(s.alt)) };
-              } catch (_) {
-                return { ...s, price: null, pct: 0 };
-              }
+                return { ...s, ...(await yahooMeta(s.alt)), src: 'LIVE' };
+              } catch (_) {}
             }
-            return { ...s, price: null, pct: 0 };
+            if (snap && snap[s.id] && snap[s.id].price != null) {
+              return { ...s, price: snap[s.id].price, pct: snap[s.id].pct || 0, src: 'SNAPSHOT' };
+            }
+            return { ...s, price: null, pct: 0, src: '' };
           }
         })
       );
       el.innerHTML = results
         .map((r) => {
-          const up = r.pct >= 0;
+          const up = (r.pct || 0) >= 0;
           const col = r.price == null ? '#7f8791' : up ? '#35d98a' : '#ef3f4f';
           const arrow = r.price == null ? '' : up ? '▲' : '▼';
+          const tag = r.src === 'LIVE' ? 'LIVE' : r.src === 'SNAPSHOT' ? 'SNAP' : '';
           return `<div class="risk-item">
-            <div class="risk-label">${r.label}</div>
-            <div class="risk-price">${r.price == null ? '—' : fmt(r.price, r.id === 'tnx' ? 3 : 2)}</div>
-            <div class="risk-chg" style="color:${col}">${r.price == null ? '—' : arrow + ' ' + (r.pct >= 0 ? '+' : '') + fmt(r.pct, 2) + '%'}</div>
+            <div class="risk-label">${r.label}${tag ? ' · '+tag : ''}</div>
+            <div class="risk-price" style="color:${col}">${r.price == null ? '—' : fmt(r.price, r.id === 'tnx' ? 3 : 2)}</div>
+            <div class="risk-chg" style="color:${col}">${r.price == null ? '' : arrow + ' ' + Math.abs(r.pct || 0).toFixed(2) + '%'}</div>
           </div>`;
         })
         .join('');
     } catch (e) {
-      el.innerHTML = `<div class="risk-error">Risk data unavailable</div>`;
+      el.innerHTML = '<div class="risk-item"><div class="risk-label">Macro</div><div class="risk-price">—</div></div>';
     }
   }
 
