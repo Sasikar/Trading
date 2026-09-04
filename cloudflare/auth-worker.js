@@ -114,9 +114,37 @@ async function serveAssets(request, env) {
   if (!env.ASSETS) {
     return new Response('Static asset binding missing.', { status: 500 });
   }
-  return noStore(await env.ASSETS.fetch(request));
-}
+  const res = await env.ASSETS.fetch(request);
 
+  // Overview previously called OKX/Fear & Greed directly from the browser.
+  // Rewrite only that app's upstream URLs so authenticated pages use the
+  // same-origin proxy below; this avoids browser CORS/network restrictions
+  // without changing the existing UI bundle.
+  if (new URL(request.url).pathname === '/overview-app.js') {
+    const type = res.headers.get('content-type') || '';
+    if (type.includes('javascript') || type.includes('text/plain')) {
+      let js = await res.text();
+      js = js.replaceAll(
+        'https://www.okx.com/api/v5/market/ticker?',
+        '/api/okx/ticker?'
+      );
+      js = js.replaceAll(
+        'https://www.okx.com/api/v5/market/candles?',
+        '/api/okx/candles?'
+      );
+      js = js.replaceAll(
+        'https://api.alternative.me/fng?',
+        '/api/fng?'
+      );
+      return new Response(js, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: new Headers(res.headers),
+      });
+    }
+  }
+  return noStore(res);
+}
 
 async function fetchOrderbook(instId, sz) {
   const url = 'https://www.okx.com/api/v5/market/books?instId=' + encodeURIComponent(instId) + '&sz=' + encodeURIComponent(String(sz || 50));
@@ -125,6 +153,26 @@ async function fetchOrderbook(instId, sz) {
   const j = await res.json();
   const row = (j.data && j.data[0]) || {};
   return { bids: row.bids || [], asks: row.asks || [], ts: row.ts || Date.now(), source: 'OKX', instId };
+}
+
+async function fetchOkx(path, params) {
+  const allowed = path === 'ticker' || path === 'candles';
+  if (!allowed) throw new Error('invalid okx endpoint');
+  const upstream = new URL('https://www.okx.com/api/v5/market/' + path);
+  for (const [key, value] of params) {
+    if (key === 'instId' || key === 'bar' || key === 'limit') upstream.searchParams.set(key, value);
+  }
+  const res = await fetch(upstream.toString(), { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error('okx ' + res.status);
+  return await res.json();
+}
+
+async function fetchFearGreed() {
+  const res = await fetch('https://api.alternative.me/fng/?limit=1', {
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) throw new Error('fng ' + res.status);
+  return await res.json();
 }
 
 export default {
@@ -175,15 +223,41 @@ export default {
 
     if (await validCookie(request.headers.get('Cookie') || '', String(secret))) {
       if (url.pathname === '/api/orderbook') {
-      try {
-        const instId = url.searchParams.get('instId') || 'BTC-USDT';
-        const sz = url.searchParams.get('sz') || '50';
-        return new Response(JSON.stringify(await fetchOrderbook(instId, sz)), { headers: { 'content-type': 'application/json', 'cache-control': 'private, max-age=2' } });
-      } catch (e) {
-        return new Response(JSON.stringify({ error: String(e && e.message || e) }), { status: 502, headers: { 'content-type': 'application/json' } });
+        try {
+          const instId = url.searchParams.get('instId') || 'BTC-USDT';
+          const sz = url.searchParams.get('sz') || '50';
+          return new Response(JSON.stringify(await fetchOrderbook(instId, sz)), { headers: { 'content-type': 'application/json', 'cache-control': 'private, max-age=2' } });
+        } catch (e) {
+          return new Response(JSON.stringify({ error: String(e && e.message || e) }), { status: 502, headers: { 'content-type': 'application/json' } });
+        }
       }
-    }
-    if (url.pathname === '/api/yf' || url.pathname === '/api/funding') {
+      if (url.pathname === '/api/okx/ticker' || url.pathname === '/api/okx/candles') {
+        try {
+          const path = url.pathname.endsWith('/ticker') ? 'ticker' : 'candles';
+          const j = await fetchOkx(path, url.searchParams);
+          return new Response(JSON.stringify(j), {
+            headers: { 'content-type': 'application/json', 'cache-control': 'private, no-store' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ error: String(e && e.message || e) }), {
+            status: 502,
+            headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+          });
+        }
+      }
+      if (url.pathname === '/api/fng') {
+        try {
+          return new Response(JSON.stringify(await fetchFearGreed()), {
+            headers: { 'content-type': 'application/json', 'cache-control': 'private, no-store' },
+          });
+        } catch (e) {
+          return new Response(JSON.stringify({ error: String(e && e.message || e) }), {
+            status: 502,
+            headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+          });
+        }
+      }
+      if (url.pathname === '/api/yf' || url.pathname === '/api/funding') {
         try {
           if (url.pathname === '/api/yf') {
             const symbol = url.searchParams.get('symbol') || '^VIX';
