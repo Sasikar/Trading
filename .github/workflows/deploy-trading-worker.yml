@@ -2,8 +2,9 @@ name: Deploy Trading Worker (auth + assets)
 
 on:
   workflow_dispatch:
-  # AUTO PUSH DEPLOY DISABLED — failed runs were wiping live Worker (login/API 404).
-  # Deploy manually from Actions tab after verifying, or use wrangler locally.
+  # Auto-deploy on push DISABLED — was overwriting live Worker and causing OFFLINE/NASDAQ 404s.
+  # Run manually from Actions when you intentionally want to deploy.
+
 
 
 jobs:

@@ -182,23 +182,65 @@ async function fetchYf(symbol) {
   const cacheKey = 'yf:' + symbol;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
-  const url =
-    'https://query1.finance.yahoo.com/v8/finance/chart/' +
-    encodeURIComponent(symbol) +
-    '?interval=1d&range=5d';
-  const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: '*/*' } });
-  if (!res.ok) throw new Error('yf ' + res.status);
-  const j = await res.json();
-  const meta = j.chart.result[0].meta;
-  const closes = (j.chart.result[0].indicators.quote[0].close || []).filter((x) => x != null);
-  const price = meta.regularMarketPrice;
-  let prev = meta.previousClose ?? meta.chartPreviousClose;
-  if (closes.length >= 2) prev = closes[closes.length - 2];
-  const chg = price - prev;
-  const pct = prev ? (chg / prev) * 100 : 0;
-  const out = { price, chg, pct, symbol };
-  cacheSet(cacheKey, out, 30000);
-  return out;
+  const hosts = [
+    'https://query1.finance.yahoo.com',
+    'https://query2.finance.yahoo.com',
+  ];
+  let lastErr = null;
+  for (const host of hosts) {
+    try {
+      const url = host + '/v8/finance/chart/' + encodeURIComponent(symbol) + '?interval=1d&range=5d';
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 TradingApp/1.0', Accept: 'application/json,*/*' },
+      });
+      if (!res.ok) {
+        lastErr = new Error('yf ' + res.status);
+        continue;
+      }
+      const j = await res.json();
+      const meta = j.chart.result[0].meta;
+      const closes = (j.chart.result[0].indicators.quote[0].close || []).filter((x) => x != null);
+      const price = meta.regularMarketPrice;
+      let prev = meta.previousClose ?? meta.chartPreviousClose;
+      if (closes.length >= 2) prev = closes[closes.length - 2];
+      const chg = price - prev;
+      const pct = prev ? (chg / prev) * 100 : 0;
+      const out = { price, chg, pct, symbol, source: 'yahoo' };
+      cacheSet(cacheKey, out, 60000);
+      return out;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  // Stooq fallback for Nasdaq composite (^ndq)
+  try {
+    const s = String(symbol || '').toUpperCase();
+    const stooqSym = s.includes('IXIC') || s.includes('NDX') || s.includes('NASDAQ') ? '^ndq' : null;
+    if (stooqSym) {
+      const url = 'https://stooq.com/q/l/?s=' + encodeURIComponent(stooqSym) + '&f=sd2t2ohlcv&h&e=csv';
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'text/csv,*/*' } });
+      if (res.ok) {
+        const text = await res.text();
+        const lines = text.trim().split(/\r?\n/);
+        if (lines.length >= 2) {
+          const cols = lines[1].split(',');
+          // Symbol,Date,Time,Open,High,Low,Close,Volume
+          const price = parseFloat(cols[6]);
+          const open = parseFloat(cols[3]);
+          if (isFinite(price)) {
+            const chg = isFinite(open) ? price - open : 0;
+            const pct = open ? (chg / open) * 100 : 0;
+            const out = { price, chg, pct, symbol, source: 'stooq' };
+            cacheSet(cacheKey, out, 60000);
+            return out;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    lastErr = e;
+  }
+  throw lastErr || new Error('yf failed');
 }
 
 async function fetchOrderbook(instId, sz) {
