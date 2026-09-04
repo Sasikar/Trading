@@ -273,6 +273,7 @@ async function handleApi(url) {
       return json(await fetchOkx(path, url.searchParams));
     }
     if (url.pathname === '/api/fng') return json(await fetchFearGreed());
+    if (url.pathname === '/api/nasdaq') return json(await fetchYf('^IXIC'));
     if (url.pathname === '/api/yf') return json(await fetchYf(url.searchParams.get('symbol') || '^IXIC'));
     if (url.pathname === '/api/orderbook') {
       return json(

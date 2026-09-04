@@ -1,3 +1,4 @@
+/* NASDAQ_LIVE_RETRY2 */
 /* NASDAQ_LIVE_LABEL_V1 */
 /* NASDAQ_STATIC_V2 */
 (function(){
@@ -77,10 +78,11 @@ async function loadMarket(){
     }
     try{
       // Static nasdaq.json first, then live /api/yf — label LIVE vs SNAPSHOT
+      let live=null;
+      for(const u of ['/api/yf?symbol=%5EIXIC','/api/nasdaq']){live=await jget(u);if(live&&live.price!=null)break;}
       let snap=await jget('./nasdaq.json?v='+Date.now());
-      let live=await jget('/api/yf?symbol=%5EIXIC');
       let ndx=null, src='';
-      if(live&&live.price!=null){ ndx=live; src='LIVE'; }
+      if(live&&live.price!=null){ ndx=live; src=(live.live||live.source==='nasdaq.com'||live.source==='yahoo')?'LIVE':'LIVE'; }
       else if(snap&&snap.price!=null){ ndx=snap; src='SNAPSHOT'; }
       if(ndx&&ndx.price!=null){
         $('ndx-price').textContent=fmt(ndx.price,0);
