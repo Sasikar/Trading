@@ -319,40 +319,128 @@ const STRUCT_WEIGHTS={
 };
 const STRUCT_STATE_KEY='structural_trend_state_v1';
 
-function swingStructure(kl, lookback){
-  /* Returns {bias:'BULLISH'|'BEARISH'|'NEUTRAL', hh, hl, lh, ll, detail, support, resistance, broken} */
-  if(!kl||kl.length<lookback+5) return {bias:'NEUTRAL',detail:'insufficient data',available:false};
-  const slice=kl.slice(-lookback);
-  const closes=slice.map(k=>+k[4]), highs=slice.map(k=>+k[2]), lows=slice.map(k=>+k[3]);
-  // simple swing pivots
+function pivotsFromOHLC(highs, lows, left, right){
   const pivH=[], pivL=[];
-  for(let i=2;i<slice.length-2;i++){
-    if(highs[i]>=highs[i-1]&&highs[i]>=highs[i-2]&&highs[i]>=highs[i+1]&&highs[i]>=highs[i+2]) pivH.push({i,p:highs[i]});
-    if(lows[i]<=lows[i-1]&&lows[i]<=lows[i-2]&&lows[i]<=lows[i+1]&&lows[i]<=lows[i+2]) pivL.push({i,p:lows[i]});
+  for(let i=left;i<highs.length-right;i++){
+    let isH=true, isL=true;
+    for(let j=i-left;j<=i+right;j++){
+      if(j===i) continue;
+      if(highs[j]>highs[i]) isH=false;
+      if(lows[j]<lows[i]) isL=false;
+    }
+    if(isH) pivH.push({i,p:highs[i]});
+    if(isL) pivL.push({i,p:lows[i]});
   }
-  const lastH=pivH.slice(-2), lastL=pivL.slice(-2);
+  return {pivH, pivL};
+}
+
+function swingStructure(kl, lookback, tf){
+  /* Meaningful structure: wider pivots for HTF; close-based breaks not wicks.
+     Returns bias, protected HL/LH, confirmedCloseBreak (not wick-only). */
+  if(!kl||kl.length<Math.min(lookback, 20)){
+    return {bias:'NEUTRAL',detail:'insufficient data',available:false,
+      protectedHL:null,protectedLH:null,wickBelowHL:false,closeBelowHL:false,
+      wickAboveLH:false,closeAboveLH:false,hh:false,hl:false,lh:false,ll:false};
+  }
+  const slice=kl.slice(-lookback);
+  const opens=slice.map(k=>+k[1]), highs=slice.map(k=>+k[2]), lows=slice.map(k=>+k[3]), closes=slice.map(k=>+k[4]);
+  // Wider pivots on weekly = more "major"; daily medium; avoid 2-bar micro noise
+  const left=tf==='1w'?3:2, right=tf==='1w'?3:2;
+  const {pivH, pivL}=pivotsFromOHLC(highs, lows, left, right);
+
+  // Prefer older protected higher-low: last two significant lows
+  const lastL=pivL.slice(-3);
+  const lastH=pivH.slice(-3);
   let hh=false,hl=false,lh=false,ll=false;
-  if(lastH.length===2){ if(lastH[1].p>lastH[0].p) hh=true; if(lastH[1].p<lastH[0].p) lh=true; }
-  if(lastL.length===2){ if(lastL[1].p>lastL[0].p) hl=true; if(lastL[1].p<lastL[0].p) ll=true; }
-  const price=closes[closes.length-1];
-  const support=lastL.length?lastL[lastL.length-1].p:Math.min(...lows.slice(-10));
-  const resistance=lastH.length?lastH[lastH.length-1].p:Math.max(...highs.slice(-10));
+  if(lastH.length>=2){
+    const a=lastH[lastH.length-2].p, b=lastH[lastH.length-1].p;
+    if(b>a*1.001) hh=true;
+    if(b<a*0.999) lh=true;
+  }
+  if(lastL.length>=2){
+    const a=lastL[lastL.length-2].p, b=lastL[lastL.length-1].p;
+    if(b>a*1.001) hl=true;
+    if(b<a*0.999) ll=true;
+  }
+
+  // Protected structural low = prior confirmed swing low (not the forming tip)
+  // Prefer the second-to-last major low when last low is very recent (last 2 bars)
+  let protectedHL=null;
+  if(lastL.length>=2){
+    const newest=lastL[lastL.length-1], prev=lastL[lastL.length-2];
+    const nearEdge=newest.i>=slice.length-3;
+    protectedHL=nearEdge?prev.p:newest.p;
+    // If we have HL sequence, the higher of the two recent lows is the protected HL
+    if(hl) protectedHL=Math.max(prev.p, nearEdge?prev.p:newest.p);
+  } else if(lastL.length===1){
+    protectedHL=lastL[0].p;
+  }
+
+  let protectedLH=null;
+  if(lastH.length>=2){
+    const newest=lastH[lastH.length-1], prev=lastH[lastH.length-2];
+    const nearEdge=newest.i>=slice.length-3;
+    protectedLH=nearEdge?prev.p:newest.p;
+    if(lh) protectedLH=Math.min(prev.p, nearEdge?prev.p:newest.p);
+  } else if(lastH.length===1){
+    protectedLH=lastH[0].p;
+  }
+
+  const lastClose=closes[closes.length-1];
+  const lastLow=lows[closes.length-1];
+  const lastHigh=highs[closes.length-1];
+  // Prior closed bar for persistence (ignore pure wick on current incomplete bar when possible)
+  const closedIdx=closes.length>=2?closes.length-2:closes.length-1;
+  const closedClose=closes[closedIdx];
+  const closedLow=lows[closedIdx];
+
+  let wickBelowHL=false, closeBelowHL=false, persistBelowHL=false;
+  if(protectedHL!=null){
+    wickBelowHL=lastLow<protectedHL*0.998;
+    closeBelowHL=closedClose<protectedHL*0.998;
+    // two closes below = stronger
+    if(closes.length>=3){
+      persistBelowHL=closes[closes.length-1]<protectedHL*0.998 && closes[closes.length-2]<protectedHL*0.998;
+    } else {
+      persistBelowHL=closeBelowHL;
+    }
+  }
+  let wickAboveLH=false, closeAboveLH=false;
+  if(protectedLH!=null){
+    wickAboveLH=lastHigh>protectedLH*1.002;
+    closeAboveLH=closedClose>protectedLH*1.002;
+  }
+
   let bias='NEUTRAL';
   if(hh&&hl) bias='BULLISH';
   else if(lh&&ll) bias='BEARISH';
   else if(hl&&!ll) bias='BULLISH';
   else if(lh&&!hh) bias='BEARISH';
-  else if(price>support&&hh) bias='BULLISH';
-  else if(price<resistance&&ll) bias='BEARISH';
-  const brokenLow=lastL.length>=2&&price<lastL[lastL.length-1].p*0.995;
-  const brokenHigh=lastH.length>=2&&price>lastH[lastH.length-1].p*1.005;
+  else if(protectedHL!=null&&lastClose>protectedHL&&hh) bias='BULLISH';
+  else if(protectedLH!=null&&lastClose<protectedLH&&ll) bias='BEARISH';
+
+  // Confirmed structural break flags (close-based, not wick)
+  const confirmedBreakDown=closeBelowHL; // daily/weekly close below protected HL
+  const hardBreakDown=persistBelowHL;    // multiple closes
+
   let detail='';
   if(hh&&hl) detail='HH + HL intact';
   else if(lh&&ll) detail='LH + LL intact';
-  else if(hl) detail='HL forming';
+  else if(hl) detail='HL forming / holding';
   else if(lh) detail='LH forming';
   else detail='mixed pivots';
-  return {bias,hh,hl,lh,ll,detail,support,resistance,brokenLow,brokenHigh,available:true,price};
+  if(wickBelowHL&&!closeBelowHL) detail+=' · wick below HL (warning only)';
+  else if(hardBreakDown) detail+=' · confirmed closes below HL';
+  else if(closeBelowHL) detail+=' · close below HL';
+
+  return {
+    bias, hh, hl, lh, ll, detail, available:true,
+    protectedHL, protectedLH,
+    wickBelowHL, closeBelowHL, persistBelowHL,
+    wickAboveLH, closeAboveLH,
+    confirmedBreakDown, hardBreakDown,
+    price:lastClose, support:protectedHL, resistance:protectedLH
+  };
 }
 
 function scoreLeg(bias){
@@ -361,102 +449,152 @@ function scoreLeg(bias){
   return 0;
 }
 
+function volumeAsConfirmation(klD, dStruct){
+  /* Volume confirms price structure — never an independent direction by itself. */
+  if(!klD||klD.length<25) return {bias:'NEUTRAL', note:'n/a', available:false};
+  const vols=klD.map(k=>+k[5]), closes=klD.map(k=>+k[4]), opens=klD.map(k=>+k[1]);
+  const last=vols[vols.length-1], avg=vols.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+  const r=avg?last/avg:1;
+  const upCandle=closes[closes.length-1]>=opens[opens.length-1];
+  const note=r.toFixed(2)+'× vs 20D';
+  if(r<1.15) return {bias:'NEUTRAL', note:note+' · normal', available:true};
+  // elevated volume: confirm the candle/structure direction
+  if(dStruct&&dStruct.confirmedBreakDown&&!upCandle) return {bias:'BEARISH', note:note+' · sell breakdown', available:true};
+  if(dStruct&&dStruct.hl&&upCandle&&closes[closes.length-1]>(dStruct.protectedHL||0)) return {bias:'BULLISH', note:note+' · HL defense / reclaim', available:true};
+  if(upCandle&&r>=1.2) return {bias:'BULLISH', note:note+' · upside participation', available:true};
+  if(!upCandle&&r>=1.2) return {bias:'BEARISH', note:note+' · downside participation', available:true};
+  return {bias:'NEUTRAL', note:note+' · elevated but mixed', available:true};
+}
+
 function mapStructuralState(score, evidence, prevState){
-  /* score roughly -1..+1 weighted. Apply hysteresis vs prevState. */
-  const wOk=evidence.wStruct.bias==='BULLISH';
-  const dOk=evidence.dStruct.bias==='BULLISH';
-  const wBear=evidence.wStruct.bias==='BEARISH';
-  const dBear=evidence.dStruct.bias==='BEARISH';
+  const w=evidence.wStruct, d=evidence.dStruct;
+  const wOk=w.available&&w.bias==='BULLISH';
+  const dOk=d.available&&d.bias==='BULLISH';
+  const wBear=w.available&&w.bias==='BEARISH';
+  const dBear=d.available&&d.bias==='BEARISH';
   const wEmaB=evidence.wEma.dir==='BULLISH';
   const dEmaB=evidence.dEma.dir==='BULLISH';
   const wEmaR=evidence.wEma.dir==='BEARISH';
   const dEmaR=evidence.dEma.dir==='BEARISH';
   const momWeak=evidence.dMom.dir==='BEARISH'||evidence.dMom.dir==='FADING'||evidence.h4==='BEARISH';
   const momBull=evidence.dMom.dir==='BULLISH'||evidence.wMom.dir==='BULLISH';
-  const supportHold=!evidence.dStruct.brokenLow&&!evidence.wStruct.brokenLow;
-  const supportLost=evidence.dStruct.brokenLow||evidence.wStruct.brokenLow;
 
-  // Candidate without hysteresis
+  // HARD GATES from structure (close-based)
+  const dailyCloseBreak=!!d.closeBelowHL;
+  const dailyHardBreak=!!d.hardBreakDown;
+  const weeklyCloseBreak=!!w.closeBelowHL;
+  const weeklyHardBreak=!!w.hardBreakDown;
+  const wickOnlyWarn=(d.wickBelowHL&&!d.closeBelowHL)||(w.wickBelowHL&&!w.closeBelowHL);
+
+  // Support status for UI
+  let supportStatus='HOLDING';
+  if(!w.available&&!d.available) supportStatus='UNAVAILABLE';
+  else if(weeklyHardBreak||(weeklyCloseBreak&&dailyHardBreak)) supportStatus='HTF LOST';
+  else if(dailyHardBreak||dailyCloseBreak) supportStatus='DAILY BROKEN';
+  else if(wickOnlyWarn) supportStatus='WICK WARNING';
+  else supportStatus='HOLDING';
+
   let state='🟡 BULLISH — PULLBACK';
   let regime='BULLISH', phase='PULLBACK', conf='MEDIUM';
 
-  if(wOk&&dOk&&wEmaB&&dEmaB&&!supportLost&&score>=0.35){
-    state='🟢 BULLISH — STRONG TREND'; regime='BULLISH'; phase='STRONG TREND'; conf='HIGH';
-  } else if(score>=0.15&&(wOk||dOk)&&supportHold&&(evidence.dStruct.hl||momBull||dEmaB)){
-    // recovery path if previous was bearish-ish
-    if(prevState&&String(prevState).indexOf('BEARISH')>=0){
-      state='🟢 BULLISH — RECOVERY / ACCUMULATION'; regime='BULLISH'; phase='RECOVERY / ACCUMULATION'; conf='MEDIUM';
-    } else if(wOk&&dOk&&!momWeak){
+  // --- Hierarchy: weekly intact + daily intact → never TREND BROKEN ---
+  if(wOk&&dOk&&!dailyCloseBreak&&!weeklyCloseBreak){
+    if(wEmaB&&dEmaB&&!momWeak&&score>=0.35){
       state='🟢 BULLISH — STRONG TREND'; regime='BULLISH'; phase='STRONG TREND'; conf='HIGH';
-    } else if(wOk&&supportHold&&momWeak){
+    } else if(momWeak||evidence.h4==='BEARISH'||score<0.35){
       state='🟡 BULLISH — PULLBACK'; regime='BULLISH'; phase='PULLBACK'; conf='HIGH';
     } else {
-      state='🟢 BULLISH — RECOVERY / ACCUMULATION'; regime='BULLISH'; phase='RECOVERY / ACCUMULATION'; conf='MEDIUM';
+      state='🟢 BULLISH — STRONG TREND'; regime='BULLISH'; phase='STRONG TREND'; conf='HIGH';
     }
-  } else if(wOk&&supportHold&&(dBear||momWeak||score<0.15)){
-    if(evidence.dStruct.brokenLow||(dEmaR&&evidence.wMom.dir==='BEARISH')){
-      state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
-    } else {
-      state='🟡 BULLISH — PULLBACK'; regime='BULLISH'; phase='PULLBACK'; conf='HIGH';
-    }
-  } else if(!wOk&&dBear&&supportLost&&score<=-0.25){
-    if(wBear&&dBear&&wEmaR&&evidence.wStruct.brokenLow){
-      state='🔴 BEARISH — TREND BROKEN'; regime='BEARISH'; phase='TREND BROKEN'; conf='HIGH';
-    } else if(wBear||(dBear&&wEmaR)){
-      state='🟠 BEARISH — DOWNTREND'; regime='BEARISH'; phase='DOWNTREND'; conf='MEDIUM';
-    } else {
-      state='🟡 BEARISH — CORRECTION'; regime='BEARISH'; phase='CORRECTION'; conf='MEDIUM';
-    }
-  } else if(score<=-0.1||(dBear&&!wOk)){
+  } else if(wOk&&!weeklyCloseBreak&&(dailyCloseBreak||dailyHardBreak||dBear)){
+    // Weekly thesis intact, daily damaged
+    state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
+  } else if(wOk&&!weeklyCloseBreak&&supportStatus==='HOLDING'&&(momWeak||!dOk)){
+    state='🟡 BULLISH — PULLBACK'; regime='BULLISH'; phase='PULLBACK'; conf='HIGH';
+  } else if(weeklyHardBreak&&dailyHardBreak&&(wBear||wEmaR)&&(dBear||dEmaR)){
+    // Genuine HTF thesis break: weekly+daily confirmed closes + bearish alignment
+    state='🔴 BEARISH — TREND BROKEN'; regime='BEARISH'; phase='TREND BROKEN'; conf='HIGH';
+  } else if(weeklyCloseBreak||(dailyHardBreak&&wBear)){
+    state='🟠 BEARISH — DOWNTREND'; regime='BEARISH'; phase='DOWNTREND'; conf='MEDIUM';
+  } else if(dBear||dailyCloseBreak||score<=-0.15){
     state='🟡 BEARISH — CORRECTION'; regime='BEARISH'; phase='CORRECTION'; conf='MEDIUM';
+  } else if((prevState&&String(prevState).indexOf('BEARISH')>=0)&&(d.hl||dOk||momBull)){
+    state='🟢 BULLISH — RECOVERY / ACCUMULATION'; regime='BULLISH'; phase='RECOVERY / ACCUMULATION'; conf='MEDIUM';
   } else if(wOk){
     state='🟡 BULLISH — PULLBACK'; regime='BULLISH'; phase='PULLBACK'; conf='MEDIUM';
   }
 
-  // Hysteresis: hard to jump to TREND BROKEN; hard to jump to STRONG from BEARISH
+  // Recovery path when score improving from bearish prev
+  if(prevState&&String(prevState).indexOf('BEARISH')>=0&&(d.hl||dOk)&&!weeklyHardBreak&&score>=0){
+    state='🟢 BULLISH — RECOVERY / ACCUMULATION'; regime='BULLISH'; phase='RECOVERY / ACCUMULATION'; conf='MEDIUM';
+  }
+
+  // Hysteresis guards
   if(prevState){
     const prev=String(prevState);
-    if(state.indexOf('TREND BROKEN')>=0 && prev.indexOf('BULLISH')>=0){
-      // require weekly broken + daily broken
-      if(!(evidence.wStruct.brokenLow&&evidence.dStruct.brokenLow&&wBear)){
-        state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
+    // Never wick-only → TREND BROKEN
+    if(state.indexOf('TREND BROKEN')>=0){
+      if(!(weeklyHardBreak&&dailyHardBreak)){
+        if(weeklyCloseBreak||dailyHardBreak){
+          state='🟠 BEARISH — DOWNTREND'; regime='BEARISH'; phase='DOWNTREND'; conf='MEDIUM';
+        } else if(wOk){
+          state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
+        } else {
+          state='🟡 BEARISH — CORRECTION'; regime='BEARISH'; phase='CORRECTION'; conf='MEDIUM';
+        }
       }
     }
-    if(state.indexOf('STRONG TREND')>=0 && prev.indexOf('BEARISH')>=0){
+    // Bearish → not instantly STRONG
+    if(state.indexOf('STRONG TREND')>=0&&prev.indexOf('BEARISH')>=0){
       state='🟢 BULLISH — RECOVERY / ACCUMULATION'; regime='BULLISH'; phase='RECOVERY / ACCUMULATION'; conf='MEDIUM';
     }
-    if(state.indexOf('DOWNTREND')>=0 && prev.indexOf('STRONG TREND')>=0){
-      // must pass through risk/correction
-      if(!(evidence.dStruct.brokenLow||supportLost)){
-        state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
-      }
+    // STRONG → not jump to DOWNTREND without daily break
+    if(state.indexOf('DOWNTREND')>=0&&prev.indexOf('STRONG TREND')>=0&&!dailyHardBreak&&!weeklyCloseBreak){
+      state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
+    }
+    // Stay in PULLBACK on wick-only noise
+    if(wickOnlyWarn&&prev.indexOf('BULLISH')>=0&&state.indexOf('BEARISH')>=0&&!dailyCloseBreak){
+      state='🟡 BULLISH — PULLBACK'; regime='BULLISH'; phase='PULLBACK'; conf='HIGH';
     }
   }
 
-  // Missing data reduces confidence
   const missing=[];
-  if(!evidence.wStruct.available) missing.push('1W structure');
-  if(!evidence.dStruct.available) missing.push('1D structure');
-  if(missing.length){ conf=missing.length>=2?'LOW':'MEDIUM'; }
+  if(!w.available) missing.push('1W structure');
+  if(!d.available) missing.push('1D structure');
+  if(missing.length) conf=missing.length>=2?'LOW':'MEDIUM';
 
-  return {state,regime,phase,conf,missing};
+  return {state,regime,phase,conf,missing,supportStatus,wickOnlyWarn,dailyCloseBreak,weeklyCloseBreak,weeklyHardBreak,dailyHardBreak};
 }
 
 function explainStructural(r, evidence){
+  const w=evidence.wStruct, d=evidence.dStruct;
+  if(r.phase==='PULLBACK'){
+    return 'Weekly and major daily structure remain intact. Short-term momentum may be weak or 4H bearish, but no confirmed higher-timeframe structural break (close-based) has occurred. Temporary dumps/wicks do not flip the thesis.';
+  }
+  if(r.phase==='STRUCTURE AT RISK'){
+    return 'Important daily structure has weakened or closed below a protected higher-low, but the higher-timeframe weekly bullish thesis has not yet been decisively invalidated.';
+  }
+  if(r.phase==='TREND BROKEN'){
+    return 'Confirmed higher-timeframe structural failure (weekly and daily close-based breaks with bearish alignment) has invalidated the previous bullish thesis. This is not a single-wick or single-candle event.';
+  }
+  if(r.phase==='STRONG TREND'){
+    return 'Weekly and daily structure are bullish with HTF trend alignment. No confirmed structural breakdown. Short-term noise is subordinate to the intact thesis.';
+  }
+  if(r.phase==='RECOVERY / ACCUMULATION'){
+    return 'Stabilization after bearish pressure: higher-low formation and/or improving daily structure without requiring a finished strong bull trend yet.';
+  }
+  if(r.phase==='DOWNTREND'){
+    return 'Bearish structure is establishing with confirmed breaks and failing reclaims. Not necessarily full thesis death, but downside regime is active.';
+  }
+  if(r.phase==='CORRECTION'){
+    return 'Bearish pressure is present and daily structure is weakening, but a full long-term trend break is not fully confirmed yet.';
+  }
   const bits=[];
-  if(evidence.wStruct.available) bits.push('Weekly structure is '+evidence.wStruct.bias.toLowerCase()+' ('+evidence.wStruct.detail+')');
-  else bits.push('Weekly structure data unavailable');
-  if(evidence.dStruct.available) bits.push('daily structure is '+evidence.dStruct.bias.toLowerCase()+' ('+evidence.dStruct.detail+')');
-  if(evidence.wStruct.brokenLow||evidence.dStruct.brokenLow) bits.push('a key higher-low support zone has been pressured');
-  else if(evidence.wStruct.available) bits.push('major HTF support has not been confirmed lost');
-  if(evidence.dMom.dir==='BEARISH'||evidence.h4==='BEARISH') bits.push('short-term momentum is weak/bearish');
-  else if(evidence.dMom.dir==='BULLISH') bits.push('momentum is supportive');
-  if(r.phase==='PULLBACK') bits.push('this is treated as a pullback inside the larger thesis, not a trend flip');
-  if(r.phase==='STRUCTURE AT RISK') bits.push('daily deterioration is a warning while weekly thesis is still graded intact');
-  if(r.phase==='TREND BROKEN') bits.push('multiple HTF failures align — prior bullish structural thesis is invalidated');
-  if(r.phase==='RECOVERY / ACCUMULATION') bits.push('stabilization and improving structure suggest recovery rather than a finished bull trend');
+  if(w.available) bits.push('Weekly structure '+w.bias.toLowerCase()+' ('+w.detail+')');
+  if(d.available) bits.push('daily structure '+d.bias.toLowerCase()+' ('+d.detail+')');
+  if(r.wickOnlyWarn) bits.push('wick-only probe of support treated as warning, not a break');
   if(r.missing&&r.missing.length) bits.push('confidence reduced — missing: '+r.missing.join(', '));
-  return bits.join('. ')+(bits.length?'.':'');
+  return bits.join('. ')+(bits.length?'.':'Structural assessment complete.');
 }
 
 function badgeStruct(bias, okText, badText, midText){
@@ -472,8 +610,8 @@ async function loadStructural(){
       fetchKlines('1w',120),
       fetchKlines('4h',120)
     ]);
-    const wStruct=swingStructure(klW, 52);
-    const dStruct=swingStructure(klD, 90);
+    const wStruct=swingStructure(klW, 52, '1w');
+    const dStruct=swingStructure(klD, 90, '1d');
     const wEma=trendFromCloses((klW||[]).map(k=>+k[4]));
     const dEma=trendFromCloses((klD||[]).map(k=>+k[4]));
     const wMom=macdMomentum((klW||[]).map(k=>+k[4]),(klW||[]).map(k=>Math.floor(k[0]/1000)));
@@ -483,32 +621,22 @@ async function loadStructural(){
       const pack=calcMACDSeries(kl4.map(k=>+k[4]),kl4.map(k=>Math.floor(k[0]/1000)));
       if(pack.lastHist!=null) h4=pack.lastHist>0?'BULLISH':pack.lastHist<0?'BEARISH':'NEUTRAL';
     }
-    // volume participation daily
-    let volBias='NEUTRAL', volNote='n/a';
-    if(klD&&klD.length>25){
-      const vols=klD.map(k=>+k[5]);
-      const last=vols[vols.length-1];
-      const avg=vols.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
-      const r=avg?last/avg:1;
-      volNote=r.toFixed(2)+'× vs 20D';
-      if(r>=1.2) volBias='BULLISH';
-      else if(r<=0.6) volBias='BEARISH';
-    }
+    const volC=volumeAsConfirmation(klD, dStruct);
 
     const W=STRUCT_WEIGHTS;
     let score=
-      scoreLeg(wStruct.bias)*W.wStruct +
-      scoreLeg(dStruct.bias)*W.dStruct +
+      scoreLeg(wStruct.available?wStruct.bias:'NEUTRAL')*W.wStruct +
+      scoreLeg(dStruct.available?dStruct.bias:'NEUTRAL')*W.dStruct +
       scoreLeg(wEma.dir)*W.wEma +
       scoreLeg(dEma.dir)*W.dEma +
       scoreLeg(wMom.dir==='FADING'?'NEUTRAL':wMom.dir)*W.wMom +
       scoreLeg(dMom.dir==='FADING'?'NEUTRAL':dMom.dir)*W.dMom +
-      scoreLeg(volBias)*W.vol +
+      scoreLeg(volC.bias)*W.vol +
       scoreLeg(h4)*W.h4;
 
     let prev=null;
     try{prev=localStorage.getItem(STRUCT_STATE_KEY);}catch(e){}
-    const evidence={wStruct,dStruct,wEma,dEma,wMom,dMom,h4,volBias,volNote};
+    const evidence={wStruct,dStruct,wEma,dEma,wMom,dMom,h4,vol:volC};
     const result=mapStructuralState(score, evidence, prev);
     try{localStorage.setItem(STRUCT_STATE_KEY, result.state);}catch(e){}
 
@@ -522,26 +650,35 @@ async function loadStructural(){
     const wB=badgeStruct(wStruct.available?wStruct.bias:'NEUTRAL','INTACT','BROKEN','MIXED / N/A');
     const dB=badgeStruct(dStruct.available?dStruct.bias:'NEUTRAL','INTACT','BROKEN','MIXED / N/A');
     const htf=badgeStruct(wEma.dir);
-    const sup=(!wStruct.available&&!dStruct.available)?{t:'🟡 UNAVAILABLE',c:'#8491a1'}:
-      (wStruct.brokenLow||dStruct.brokenLow)?{t:'🔴 PRESSURED / LOST',c:'#ff6f7c'}:{t:'🟢 HOLDING',c:'#62e3a0'};
+    let sup;
+    if(result.supportStatus==='UNAVAILABLE') sup={t:'🟡 UNAVAILABLE',c:'#8491a1'};
+    else if(result.supportStatus==='HTF LOST') sup={t:'🔴 HTF LOST (close)',c:'#ff6f7c'};
+    else if(result.supportStatus==='DAILY BROKEN') sup={t:'🟠 DAILY CLOSE BREAK',c:'#e6a050'};
+    else if(result.supportStatus==='WICK WARNING') sup={t:'🟡 WICK WARNING ONLY',c:'#e6c878'};
+    else sup={t:'🟢 HOLDING',c:'#62e3a0'};
+    if(dStruct.protectedHL){sup.t+=' · HL '+Math.round(dStruct.protectedHL).toLocaleString('en-US');}
+
     const mom=badgeStruct(dMom.dir==='FADING'?'NEUTRAL':dMom.dir,'SUPPORTIVE','WEAKENING','FADING');
     if(dMom.dir==='BEARISH'){mom.t='🟡 WEAKENING';mom.c='#e6c878';}
     const h4b=badgeStruct(h4,'BULLISH','BEARISH','NEUTRAL');
+    const volBias=volC.bias;
+    const volColor=volBias==='BULLISH'?'#62e3a0':volBias==='BEARISH'?'#ff6f7c':'#e6c878';
+    const volIcon=volBias==='BULLISH'?'🟢':volBias==='BEARISH'?'🔴':'🟡';
 
     const rows=[
       ['1W STRUCTURE', wB.t+' · '+(wStruct.detail||''), wB.c],
       ['1D STRUCTURE', dB.t+' · '+(dStruct.detail||''), dB.c],
-      ['HTF TREND (EMA)', htf.t+' · '+(wEma.detail||''), htf.c],
       ['MAJOR SUPPORT', sup.t, sup.c],
+      ['HTF TREND (EMA)', htf.t+' · '+(wEma.detail||''), htf.c],
       ['MOMENTUM (1D)', mom.t+' · '+(dMom.detail||''), mom.c],
-      ['4H CONFIRMATION', h4b.t, h4b.c],
-      ['VOLUME / PARTICIPATION', (volBias==='BULLISH'?'🟢':volBias==='BEARISH'?'🔴':'🟡')+' '+volNote, volBias==='BULLISH'?'#62e3a0':volBias==='BEARISH'?'#ff6f7c':'#e6c878'],
+      ['4H CONFIRMATION', h4b.t+' · secondary only', h4b.c],
+      ['VOLUME (confirms price)', volIcon+' '+volC.note, volColor],
       ['WEIGHTED SCORE', (score>=0?'+':'')+score.toFixed(2)+' (−1…+1)', score>=0.2?'#62e3a0':score<=-0.2?'#ff6f7c':'#e6c878']
     ];
     if($('stt-evidence')){
       $('stt-evidence').innerHTML=rows.map(r=>'<div class="st-ev-row"><span class="k">'+r[0]+'</span><span class="v" style="color:'+r[2]+'">'+r[1]+'</span></div>').join('');
     }
-    if($('struct-source'))$('struct-source').textContent='LIVE · structural · hysteresis on';
+    if($('struct-source'))$('struct-source').textContent='LIVE · close-based breaks · hysteresis on';
   }catch(e){
     console.warn(e);
     if($('struct-source'))$('struct-source').textContent='OFFLINE';
@@ -560,7 +697,6 @@ function showStruct(on){
     if(sp){sp.classList.remove('on');sp.style.display='none';}
   }
 }
-
 
 function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}}
 document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showStruct(false);showTrend(true);loadTrend();}else if(tf==='struct'){showTrend(false);showStruct(true);loadStructural();}else{showStruct(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
