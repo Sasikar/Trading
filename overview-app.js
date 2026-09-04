@@ -164,10 +164,9 @@ async function loadMarketStructure(direction,klDaily){const statusEl=$('ms-statu
 function smaArr(arr,period){const out=[];for(let i=0;i<arr.length;i++){if(i<period-1){out.push(null);continue;}let s=0;for(let j=i-period+1;j<=i;j++)s+=arr[j];out.push(s/period);}return out;}
 function stdArr(arr,period){const out=[];for(let i=0;i<arr.length;i++){if(i<period-1){out.push(null);continue;}const slice=arr.slice(i-period+1,i+1);const m=slice.reduce((a,b)=>a+b,0)/period;const v=slice.reduce((a,b)=>a+(b-m)*(b-m),0)/period;out.push(Math.sqrt(v));}return out;}
 function calcStretchScore(klDaily){
-  /* Daily closed candles only. Score 0–11 informational. */
+  /* Daily closed candles. Score 0–8 + direction: BULLISH stretch (up-side) or BEARISH stretch (down-side). */
   const rows=Array.isArray(klDaily)?klDaily.slice():[];
-  // drop incomplete last candle if still forming? use all closed-like rows
-  if(rows.length<30) return {score:0,label:'Insufficient data',rows:[]};
+  if(rows.length<30) return {score:0,max:8,label:'Insufficient data',direction:'NEUTRAL',dirLabel:'—',items:[]};
   const closes=rows.map(k=>+k[4]), highs=rows.map(k=>+k[2]), lows=rows.map(k=>+k[3]), vols=rows.map(k=>+k[5]);
   const n=closes.length;
   const rsiSeries=[];
@@ -183,41 +182,30 @@ function calcStretchScore(klDaily){
   const upper=mid!=null&&band!=null?mid+2*band:null;
   const lower=mid!=null&&band!=null?mid-2*band:null;
   const price=closes[n-1];
-  // Fib of last 60 bars
   const swing=rows.slice(-60);
   let hi=-Infinity,lo=Infinity;
   for(const k of swing){hi=Math.max(hi,+k[2]);lo=Math.min(lo,+k[3]);}
   const range=hi-lo||1;
-  const fib786=lo+range*0.786, fib236=lo+range*0.236;
-  // consecutive candles
+  const fib786=lo+range*0.786, fib236=lo+range*0.236, fib50=lo+range*0.5;
   let cons=1;const up=closes[n-1]>=closes[n-2];
   for(let i=n-2;i>=1;i--){const u=closes[i]>=closes[i-1];if(u===up)cons++;else break;}
-  // volume trend last 5 vs prior 5
   const v5=vols.slice(-5).reduce((a,b)=>a+b,0)/5;
   const vPrev=vols.slice(-10,-5).reduce((a,b)=>a+b,0)/5;
   const volLower=v5<vPrev;
-  // pivot volume for extremes (last 3 swing idea: compare last vol to avg)
   const volAvg=vols.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
   const items=[];
-  // 1 RSI extreme
   const rsiExt=(rsi!=null&&(rsi>=70||rsi<=30))?1:0;
-  items.push({name:'RSI extreme (≥70 / ≤30)',pts:rsiExt,note:rsi!=null?('RSI '+rsi.toFixed(1)):'n/a'});
-  // 2 RSI vs price stretch near fib
+  items.push({name:'RSI extreme (≥70 / ≤30)',pts:rsiExt,note:rsi!=null?('RSI '+rsi.toFixed(1)):('n/a')});
   const nearExt=(price>=fib786||price<=fib236)?1:0;
-  items.push({name:'Price into Fib extreme zone',pts:nearExt,note:nearExt?'near 78.6/23.6':'mid fib'});
-  // 3 BB extension
+  items.push({name:'Price into Fib extreme zone',pts:nearExt,note:nearExt?(price>=fib786?'near 78.6% upper':'near 23.6% lower'):'mid fib'});
   const bbExt=(upper!=null&&lower!=null&&(price>=upper||price<=lower))?1:0;
-  items.push({name:'Bollinger Band extension',pts:bbExt,note:bbExt?'outside 2σ':'inside bands'});
-  // 4 consecutive candles ≥5
+  items.push({name:'Bollinger Band extension',pts:bbExt,note:bbExt?(price>=upper?'above upper band':'below lower band'):'inside bands'});
   const consPts=cons>=5?1:0;
   items.push({name:'Consecutive candles ≥5',pts:consPts,note:cons+' '+(up?'up':'down')});
-  // 5 volume into extremes (declining into move)
   const volPts=volLower?1:0;
   items.push({name:'Volume into extremes',pts:volPts,note:volLower?'pivot vol lower':'pivot vol higher'});
-  // 6 thin participation vs 20d
   const thin=volAvg&&vols[n-1]<0.5*volAvg?1:0;
   items.push({name:'Thin volume vs 20d avg',pts:thin,note:volAvg?(vols[n-1]/volAvg).toFixed(2)+'×':'n/a'});
-  // 7 RSI divergence soft (price higher high but RSI lower)
   let div=0;
   if(n>25&&rsiSeries[n-1]!=null&&rsiSeries[n-6]!=null){
     const priceHH=closes[n-1]>closes[n-6], rsiLH=rsiSeries[n-1]<rsiSeries[n-6];
@@ -225,27 +213,57 @@ function calcStretchScore(klDaily){
     if((priceHH&&rsiLH)||(priceLL&&rsiHL)) div=1;
   }
   items.push({name:'RSI divergence (soft)',pts:div,note:div?'diverging':'aligned'});
-  // 8 extension from mid BB in %
   const extPct=mid?(Math.abs(price-mid)/mid)*100:0;
   const extPts=extPct>=4?1:0;
-  items.push({name:'Distance from 20D mid ≥4%',pts:extPts,note:extPct.toFixed(1)+'%'});
-  // 9–11 OI / funding / liq — mark N/A without feed (0 pts, not counted against)
+  items.push({name:'Distance from 20D mid ≥4%',pts:extPts,note:extPct.toFixed(1)+'%'+(price>=mid?' above':' below')});
   items.push({name:'OI spike (feed)',pts:0,na:true,note:'Data Unavailable'});
   items.push({name:'Funding extreme (feed)',pts:0,na:true,note:'Data Unavailable'});
   items.push({name:'Liq cascade flag (feed)',pts:0,na:true,note:'Data Unavailable'});
   const score=items.filter(x=>!x.na).reduce((a,x)=>a+x.pts,0);
   const max=items.filter(x=>!x.na).length;
-  let label='Normal';
-  if(score>=7) label='High stretch';
-  else if(score>=4) label='Elevated stretch';
-  else if(score>=2) label='Mild stretch';
-  return {score,max,label,items};
+
+  // Direction: which side is stretched?
+  let bullVotes=0, bearVotes=0;
+  if(price>=fib50) bullVotes++; else bearVotes++;
+  if(mid!=null){ if(price>=mid) bullVotes++; else bearVotes++; }
+  if(rsi!=null){ if(rsi>=55) bullVotes++; else if(rsi<=45) bearVotes++; }
+  if(price>=fib786) bullVotes+=2;
+  if(price<=fib236) bearVotes+=2;
+  if(upper!=null&&price>=upper) bullVotes+=2;
+  if(lower!=null&&price<=lower) bearVotes+=2;
+  if(up) bullVotes++; else bearVotes++;
+  let direction='NEUTRAL';
+  if(bullVotes>bearVotes+1) direction='BULLISH';
+  else if(bearVotes>bullVotes+1) direction='BEARISH';
+  else if(bullVotes>bearVotes) direction='BULLISH';
+  else if(bearVotes>bullVotes) direction='BEARISH';
+
+  let intensity='Normal';
+  if(score>=7) intensity='High';
+  else if(score>=4) intensity='Elevated';
+  else if(score>=2) intensity='Mild';
+  const dirWord=direction==='BULLISH'?'bullish':direction==='BEARISH'?'bearish':'mixed';
+  const label=score===0?'No stretch · '+dirWord:intensity+' '+dirWord+' stretch';
+  const dirLabel=direction==='BULLISH'?'▲ BULLISH STRETCH':direction==='BEARISH'?'▼ BEARISH STRETCH':'◆ MIXED / MID';
+  return {score,max,label,direction,dirLabel,intensity,items,price,mid,rsi};
 }
 function renderStretch(result){
   if(!$('st-score'))return;
-  const r=result||{score:0,max:8,label:'—',items:[]};
+  const r=result||{score:0,max:8,label:'—',direction:'NEUTRAL',dirLabel:'—',items:[]};
+  const card=$('stretch-card')||document.querySelector('.stretch-card');
+  const dir=(r.direction||'NEUTRAL').toUpperCase();
+  if(card){
+    card.classList.remove('dir-bull','dir-bear','dir-neutral','lvl-high','lvl-elevated','lvl-mild','lvl-none');
+    card.classList.add(dir==='BULLISH'?'dir-bull':dir==='BEARISH'?'dir-bear':'dir-neutral');
+    const sc=r.score||0;
+    card.classList.add(sc>=7?'lvl-high':sc>=4?'lvl-elevated':sc>=2?'lvl-mild':'lvl-none');
+  }
   $('st-score').textContent=r.score+' / '+(r.max||8);
-  if($('st-label'))$('st-label').textContent=r.label;
+  if($('st-label'))$('st-label').textContent=r.label||'—';
+  if($('st-dir')){
+    $('st-dir').textContent=r.dirLabel||'—';
+    $('st-dir').className='st-dir '+(dir==='BULLISH'?'bull':dir==='BEARISH'?'bear':'neu');
+  }
   const list=$('st-list');
   if(!list)return;
   list.innerHTML=(r.items||[]).map(it=>{
