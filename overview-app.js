@@ -1,3 +1,4 @@
+/* NASDAQ_LIVE_LABEL_V1 */
 /* NASDAQ_STATIC_V2 */
 (function(){
 const $=id=>document.getElementById(id);
@@ -75,17 +76,28 @@ async function loadMarket(){
       if(any&&$('market-source'))$('market-source').textContent='PROXY · LIVE';
     }
     try{
-      // Static nasdaq.json first (works even if Worker APIs are down), then live /api/yf
-      let ndx=await jget('./nasdaq.json?v='+Date.now());
-      const live=await jget('/api/yf?symbol=%5EIXIC');
-      if(live&&live.price!=null) ndx=live;
+      // Static nasdaq.json first, then live /api/yf — label LIVE vs SNAPSHOT
+      let snap=await jget('./nasdaq.json?v='+Date.now());
+      let live=await jget('/api/yf?symbol=%5EIXIC');
+      let ndx=null, src='';
+      if(live&&live.price!=null){ ndx=live; src='LIVE'; }
+      else if(snap&&snap.price!=null){ ndx=snap; src='SNAPSHOT'; }
       if(ndx&&ndx.price!=null){
         $('ndx-price').textContent=fmt(ndx.price,0);
         const np=ndx.pct!=null?ndx.pct:(ndx.change_pct||0);
-        $('ndx-change').innerHTML='<span class="'+(np>=0?'up':'down')+'">'+(np>=0?'▲ ':'▼ ')+Math.abs(Number(np)).toFixed(2)+'% · day</span>';
+        let age='';
+        if(src==='SNAPSHOT'&&ndx.updated){
+          const mins=Math.max(0,Math.round((Date.now()-Number(ndx.updated))/60000));
+          if(mins<60) age=' · '+mins+'m ago';
+          else age=' · '+(Math.round(mins/60))+'h ago';
+        }
+        const tag=src==='LIVE'
+          ? '<span style="color:#62e3a0;font-weight:800"> · LIVE</span>'
+          : '<span style="color:#e6c878;font-weight:800"> · SNAPSHOT'+age+'</span>';
+        $('ndx-change').innerHTML='<span class="'+(np>=0?'up':'down')+'">'+(np>=0?'▲ ':'▼ ')+Math.abs(Number(np)).toFixed(2)+'% · day</span>'+tag;
       } else if($('ndx-price')){
         $('ndx-price').textContent='—';
-        if($('ndx-change'))$('ndx-change').textContent='unavailable';
+        if($('ndx-change'))$('ndx-change').innerHTML='unavailable';
       }
     }catch(e){}
     try{
