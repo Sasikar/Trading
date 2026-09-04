@@ -117,6 +117,16 @@ async function serveAssets(request, env) {
   return noStore(await env.ASSETS.fetch(request));
 }
 
+
+async function fetchOrderbook(instId, sz) {
+  const url = 'https://www.okx.com/api/v5/market/books?instId=' + encodeURIComponent(instId) + '&sz=' + encodeURIComponent(String(sz || 50));
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error('books ' + res.status);
+  const j = await res.json();
+  const row = (j.data && j.data[0]) || {};
+  return { bids: row.bids || [], asks: row.asks || [], ts: row.ts || Date.now(), source: 'OKX', instId };
+}
+
 export default {
   async fetch(request, env) {
     const secret = env.TRADING_PASSWORD;
@@ -164,7 +174,16 @@ export default {
     }
 
     if (await validCookie(request.headers.get('Cookie') || '', String(secret))) {
-      if (url.pathname === '/api/yf' || url.pathname === '/api/funding') {
+      if (url.pathname === '/api/orderbook') {
+      try {
+        const instId = url.searchParams.get('instId') || 'BTC-USDT';
+        const sz = url.searchParams.get('sz') || '50';
+        return new Response(JSON.stringify(await fetchOrderbook(instId, sz)), { headers: { 'content-type': 'application/json', 'cache-control': 'private, max-age=2' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: String(e && e.message || e) }), { status: 502, headers: { 'content-type': 'application/json' } });
+      }
+    }
+    if (url.pathname === '/api/yf' || url.pathname === '/api/funding') {
         try {
           if (url.pathname === '/api/yf') {
             const symbol = url.searchParams.get('symbol') || '^VIX';

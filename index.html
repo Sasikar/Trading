@@ -1,46 +1,163 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#070a0f">
-<title>TRADING — Command Center</title>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TRADING — Overview</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <style>
-:root{--bg:#070a0f;--panel:#101821;--line:#263341;--text:#f4f7fb;--muted:#8491a1;--green:#62e3a0;--red:#ff6f7c;--gold:#e6c878;--blue:#78a9ff}
+:root{--bg:#070a0f;--line:#263341;--text:#f4f7fb;--muted:#8491a1;--green:#62e3a0;--red:#ff6f7c;--gold:#e6c878;--blue:#6eb6ff}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
-.shell{width:min(1220px,calc(100% - 40px));margin:auto}.section{padding:24px 0}
-.head{display:flex;justify-content:space-between;align-items:end;margin-bottom:14px}.head h2{font-size:20px;margin:0}.head p{color:var(--muted);font-size:11px;margin:5px 0 0}
-.intel-card{border:1px solid #263341;border-radius:18px;background:linear-gradient(145deg,#121b25,#090d13);padding:20px}
-.source{color:var(--green);font-size:8px;letter-spacing:.08em}
-.coin-price{font-size:20px;font-weight:850}.up{color:var(--green)}.down{color:var(--red)}
-.market-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
-.coin{background:#080d13;border:1px solid #ffffff0a;border-radius:12px;padding:13px}
-.coin-name{font-size:11px;font-weight:850}.coin-symbol{font-size:9px;color:var(--muted);margin-left:5px}
-.change{font-size:10px;font-weight:800;margin-top:4px}
-.footer{margin-top:45px;border-top:1px solid #ffffff0d;padding:24px 0 38px;color:#647181;font-size:9px}
-</style>
-</head>
-<body>
-<div class="shell">
-<main>
+.shell{width:min(960px,calc(100% - 28px));margin:auto;padding-bottom:40px}
+.section{padding:16px 0}.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.head h2{font-size:18px;margin:0;font-weight:900}.head p{color:var(--muted);font-size:12px;margin:4px 0 0}
+.source{color:var(--green);font-size:10px;letter-spacing:.1em;font-weight:800}
+.card{border:1px solid var(--line);border-radius:18px;background:#0e151d;overflow:hidden}
+.market-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px}
+@media(max-width:800px){.market-row{grid-template-columns:1fr 1fr}}
+.coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
+.coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
+.change{font-size:11px;font-weight:800;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}
+.tabs{display:flex;gap:6px;padding:4px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 16px;overflow-x:auto}
+.tab{flex:1;min-width:56px;border:0;background:transparent;color:#9aa6b5;font:800 13px Inter,system-ui,sans-serif;padding:12px 8px;border-radius:11px;cursor:pointer}
+.tab.active{background:rgba(98,227,160,.16);color:#f4f7fb}
+.price-now{padding:14px 16px;border-bottom:1px solid #ffffff0c;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.price-now .big{font-size:24px;font-weight:900}.price-now .meta{font-size:12px;color:var(--muted);margin-top:4px}
+#fib-tv,#macd-tv{width:100%;height:260px;background:#080d13}#macd-tv{height:200px}
+.ladder{padding:6px 0}
+.lvl{display:grid;grid-template-columns:72px 1fr 90px;gap:10px;align-items:center;padding:9px 16px;border-bottom:1px solid #ffffff08;font-size:13px}
+.lvl .tag{font-size:11px;font-weight:900}.lvl.r .tag{color:var(--red)}.lvl.s .tag{color:var(--green)}.lvl.p .tag{color:var(--gold)}.lvl.fib .tag{color:var(--blue)}.lvl.fib-key .tag{color:var(--gold)}
+.lvl .price{font-weight:800}.lvl .dist{font-size:11px;font-weight:700;text-align:right;color:var(--muted)}
+.lvl .bar-wrap{height:4px;background:#0a1016;border-radius:99px;overflow:hidden}.lvl .bar{height:100%;border-radius:99px}
+.lvl.r .bar{background:var(--red)}.lvl.s .bar{background:var(--green)}.lvl.p .bar{background:var(--gold)}.lvl.fib .bar,.lvl.fib-key .bar{background:var(--blue)}
+.note{padding:12px 16px;font-size:12px;color:var(--muted);border-top:1px solid #ffffff0c}
+.tech-strip{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+.tech-card{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
+.tech-card .lab{font-size:11px;font-weight:800;color:#8491a1}.tech-card .val{font-size:22px;font-weight:900;margin-top:6px}.tech-card .sub{font-size:11px;margin-top:4px;color:#8491a1}
+.tag{display:inline-block;margin-top:8px;font-size:10px;font-weight:800;padding:3px 8px;border-radius:99px}
+.tag-bull{background:rgba(98,227,160,.15);color:#62e3a0}.tag-bear{background:rgba(255,111,124,.15);color:#ff6f7c}.tag-neut{background:rgba(230,200,120,.12);color:#e6c878}
+#tf-panels.hidden{display:none!important}.trend-panel{display:none}.trend-panel.on{display:block!important}
+.trend-badges{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}.trend-badges.row2{padding-top:0}
+.trend-badge{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px;text-align:center}
+.trend-badge .lab{font-size:10px;font-weight:800;color:#8491a1}.trend-badge .val{font-size:15px;font-weight:900;margin-top:8px}
+.score-box{padding:28px 16px;text-align:center;border-top:1px solid #ffffff0c}
+.score-box .big{font-size:22px;font-weight:900}.score-box .sub{font-size:12px;color:#8491a1;margin-top:10px;line-height:1.5;max-width:440px;margin:10px auto 0}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px;border-top:1px solid #ffffff0c}
+.detail-card{background:#080d13;border:1px solid #ffffff0a;border-radius:12px;padding:12px}
+.detail-card .k{font-size:10px;font-weight:800;color:#8491a1}.detail-card .v{font-size:13px;font-weight:800;margin-top:6px}
+.stretch-card{margin-top:12px;border:1px solid rgba(230,160,80,.35);border-radius:18px;background:#12100c;overflow:hidden}
+.stretch-head{padding:16px;border-bottom:1px solid rgba(230,160,80,.15)}
+.stretch-head .title{font-size:11px;font-weight:800;letter-spacing:.1em;color:#e6a050}
+.stretch-head .score{font-size:20px;font-weight:900;margin-top:8px;color:#f0c080}
+.stretch-head .label{font-size:13px;font-weight:800;margin-top:4px;color:#e6a050}
+.stretch-list{padding:8px 0}
+.stretch-row{display:flex;justify-content:space-between;gap:10px;padding:9px 16px;border-bottom:1px solid #ffffff08;font-size:12px}
+.stretch-row .name{color:#c9b8a0;font-weight:700}.stretch-row .pts{font-weight:900}
+.stretch-row.on .pts{color:#e6a050}.stretch-row.off .pts{color:#5a5348}.stretch-row.na .pts{color:#8491a1}
+.stretch-note{padding:12px 16px;font-size:11px;color:#8a7a68;line-height:1.45;border-top:1px solid rgba(230,160,80,.12)}
+.struct-card{margin-top:12px;border:1px solid #2a3544;border-radius:18px;background:#0c1218;overflow:hidden}
+.struct-head{padding:16px;border-bottom:1px solid #1c2633}
+.struct-head .title{font-size:11px;font-weight:800;letter-spacing:.1em;color:#8aa0b8}
+.struct-status{font-size:22px;font-weight:900;margin-top:10px}
+.struct-status.prot{color:#62e3a0}.struct-status.caut{color:#e6c878}.struct-status.vuln{color:#ff6f7c}.struct-status.unav{color:#8491a1}
+.struct-sub{font-size:12px;color:#8491a1;margin-top:6px;line-height:1.45}
+.struct-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+.struct-metric{background:#080d13;border:1px solid #ffffff0a;border-radius:12px;padding:12px}
+.struct-metric .k{font-size:10px;font-weight:800;color:#8491a1}.struct-metric .v{font-size:15px;font-weight:900;margin-top:6px}.struct-metric .h{font-size:11px;color:#8491a1;margin-top:4px}
+.struct-note{padding:12px 16px;font-size:11px;color:#6b7a8c;line-height:1.45;border-top:1px solid #1c2633}
+@media(max-width:560px){#fib-tv{height:220px}#macd-tv{height:180px}.tech-strip,.trend-badges,.detail-grid,.struct-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="shell"><main>
 <section class="section">
-<div class="head"><div><h2>Live market</h2><p>BTC / ETH</p></div><span class="source" id="market-source">CONNECTING</span></div>
-<div class="intel-card"><div class="market-row">
-<div class="coin"><div><span class="coin-name">Bitcoin</span><span class="coin-symbol">BTC</span></div><div id="btc-price" class="coin-price">Loading…</div><div id="btc-change" class="change">—</div></div>
-<div class="coin"><div><span class="coin-name">Ethereum</span><span class="coin-symbol">ETH</span></div><div id="eth-price" class="coin-price">Loading…</div><div id="eth-change" class="change">—</div></div>
-</div></div>
+  <div class="head"><div><h2>Live market</h2><p>BTC · ETH · NASDAQ · Fear &amp; Greed</p></div><span class="source" id="market-source">…</span></div>
+  <div class="card"><div class="market-row">
+    <div class="coin"><div class="lab">BITCOIN</div><div id="btc-price" class="coin-price">…</div><div id="btc-change" class="change">—</div></div>
+    <div class="coin"><div class="lab">ETHEREUM</div><div id="eth-price" class="coin-price">…</div><div id="eth-change" class="change">—</div></div>
+    <div class="coin"><div class="lab">NASDAQ</div><div id="ndx-price" class="coin-price">…</div><div id="ndx-change" class="change">—</div></div>
+    <div class="coin"><div class="lab">FEAR &amp; GREED</div><div id="fg-price" class="coin-price">…</div><div id="fg-change" class="change">—</div></div>
+  </div></div>
 </section>
-<section class="section"><div class="head"><div><h2>Market regime</h2><p>Technical signals inject above this block.</p></div></div>
-<div class="intel-card"><p style="color:#8491a1;font-size:12px">Overview shell restored. Technical · BTC signals load via technical-btc.js (site-nav).</p></div>
-</section>
-</main>
-<footer class="footer"><div>TRADING · PRIVATE COMMAND CENTER</div></footer>
+<div class="tabs" id="tf-tabs">
+  <button type="button" class="tab" data-tf="4h">4H</button>
+  <button type="button" class="tab active" data-tf="1d">1D</button>
+  <button type="button" class="tab" data-tf="1w">1W</button>
+  <button type="button" class="tab" data-tf="1M">1M</button>
+  <button type="button" class="tab" data-tf="trend">Trend</button>
 </div>
-<script>
-const $=id=>document.getElementById(id);
-const money=n=>'$'+Number(n).toLocaleString('en-US',{maximumFractionDigits:2});
-async function loadMarket(){try{const r=await fetch('https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD',{cache:'no-store'});const j=await r.json();const b=j.result.XXBTZUSD||j.result.XBTUSD,e=j.result.XETHZUSD||j.result.ETHUSD;if(b&&e){$('btc-price').textContent=money(+b.c[0]);$('eth-price').textContent=money(+e.c[0]);const bc=(+b.c[0]-+b.o)*100/+b.o,ec=(+e.c[0]-+e.o)*100/+e.o;$('btc-change').textContent=(bc>=0?'▲ ':'▼ ')+Math.abs(bc).toFixed(2)+'% · 24h';$('eth-change').textContent=(ec>=0?'▲ ':'▼ ')+Math.abs(ec).toFixed(2)+'% · 24h';$('btc-change').className='change '+(bc>=0?'up':'down');$('eth-change').className='change '+(ec>=0?'up':'down');$('market-source').textContent='KRAKEN · LIVE'}}catch(e){$('market-source').textContent='OFFLINE'}}
-loadMarket();setInterval(loadMarket,15000);
-</script>
-<script src="site-nav.js?v=20260831"></script>
+<div id="tf-panels">
+<section class="section">
+  <div class="head"><div><h2>Fibonacci · <span id="tf-name">1D</span></h2><p id="fib-sub">swing</p></div><span class="source" id="fib-source">…</span></div>
+  <div class="card">
+    <div class="price-now"><div><div class="big" id="fib-spot">—</div><div class="meta" id="fib-meta">BTC</div></div><div class="meta" id="fib-bias" style="font-weight:800;text-align:right">—</div></div>
+    <div id="fib-tv"></div><div class="ladder" id="fib-ladder"></div>
+    <div class="note">0% swing low · 100% swing high</div>
+  </div>
+</section>
+<section class="section">
+  <div class="head"><div><h2>MACD · <span id="macd-tf-name">1D</span></h2></div><span class="source" id="macd-source">…</span></div>
+  <div class="card">
+    <div id="macd-tv"></div>
+    <div class="tech-strip">
+      <div class="tech-card"><div class="lab">RSI (14)</div><div class="val" id="rsi-val">—</div><div class="sub" id="rsi-sub">—</div><div class="tag tag-neut" id="rsi-tag">…</div></div>
+      <div class="tech-card"><div class="lab">VOLUME</div><div class="val" id="vol-val">—</div><div class="sub" id="vol-sub">vs avg</div><div class="tag tag-neut" id="vol-tag">…</div></div>
+    </div>
+    <div class="note" id="macd-note">HIST = MACD − Signal</div>
+  </div>
+</section>
+<section class="section">
+  <div class="head"><div><h2>S/R · <span id="sr-tf-name">1D</span></h2></div><span class="source" id="sr-source">…</span></div>
+  <div class="card">
+    <div class="price-now"><div><div class="big" id="sr-spot">—</div><div class="meta" id="sr-meta">BTC</div></div><div class="meta" id="sr-bias" style="font-weight:800;text-align:right">—</div></div>
+    <div class="ladder" id="sr-ladder"></div>
+  </div>
+</section>
+</div>
+<div id="trend-panel" class="trend-panel">
+<section class="section">
+  <div class="head"><div><h2>Trend Context</h2><p>1D+1W EMA · MACD · 4H</p></div><span class="source" id="trend-source">…</span></div>
+  <div class="card">
+    <div class="trend-badges">
+      <div class="trend-badge"><div class="lab">1D TREND</div><div class="val" id="tr-1d">—</div></div>
+      <div class="trend-badge"><div class="lab">1W TREND</div><div class="val" id="tr-1w">—</div></div>
+      <div class="trend-badge"><div class="lab">4H SIGNAL</div><div class="val" id="tr-4h">—</div></div>
+    </div>
+    <div class="trend-badges row2">
+      <div class="trend-badge"><div class="lab">1D MOMENTUM</div><div class="val" id="tr-1d-mom">—</div></div>
+      <div class="trend-badge"><div class="lab">1W MOMENTUM</div><div class="val" id="tr-1w-mom">—</div></div>
+      <div class="trend-badge"><div class="lab">4H VOLUME</div><div class="val" id="tr-4h-vol">—</div></div>
+    </div>
+    <div class="score-box"><div class="big" id="tr-score">—</div><div class="sub" id="tr-score-sub">Confirmation</div></div>
+    <div class="detail-grid">
+      <div class="detail-card"><div class="k">1D CLOSE vs EMA</div><div class="v" id="tr-1d-det">—</div></div>
+      <div class="detail-card"><div class="k">1W CLOSE vs EMA</div><div class="v" id="tr-1w-det">—</div></div>
+      <div class="detail-card"><div class="k">1D MACD</div><div class="v" id="tr-1d-macd">—</div></div>
+      <div class="detail-card"><div class="k">1W MACD</div><div class="v" id="tr-1w-macd">—</div></div>
+      <div class="detail-card"><div class="k">4H MACD</div><div class="v" id="tr-macd-det">—</div></div>
+      <div class="detail-card"><div class="k">4H RSI · VOL</div><div class="v" id="tr-rsi-det">—</div></div>
+    </div>
+  </div>
+  <div class="stretch-card">
+    <div class="stretch-head"><div class="title">STRETCH SCORE</div><div class="score" id="st-score">—</div><div class="label" id="st-label">—</div></div>
+    <div class="stretch-list" id="st-list"></div>
+    <div class="stretch-note">Informational only — does not affect Confirmation Score.</div>
+  </div>
+  <div class="struct-card">
+    <div class="struct-head">
+      <div class="title">MARKET STRUCTURE · LIQUIDITY</div>
+      <div class="struct-status unav" id="ms-status">⚪ Unavailable</div>
+      <div class="struct-sub" id="ms-sub">Observable book only — not guaranteed support.</div>
+    </div>
+    <div class="struct-grid">
+      <div class="struct-metric"><div class="k">SPREAD</div><div class="v" id="ms-spread">—</div><div class="h" id="ms-spread-h">vs median</div></div>
+      <div class="struct-metric"><div class="k">SIDE DEPTH</div><div class="v" id="ms-bid">—</div><div class="h" id="ms-bid-h">±2% book</div></div>
+      <div class="struct-metric"><div class="k">NEAR-MARKET CONC.</div><div class="v" id="ms-conc">—</div><div class="h">±0.5% / ±2%</div></div>
+      <div class="struct-metric"><div class="k">REF ATR 1.5×</div><div class="v" id="ms-atr">—</div><div class="h" id="ms-atr-h">reference</div></div>
+      <div class="struct-metric"><div class="k">LIQ CLUSTERS</div><div class="v" id="ms-liq">—</div><div class="h" id="ms-liq-h">estimated only</div></div>
+      <div class="struct-metric"><div class="k">FRESHNESS</div><div class="v" id="ms-fresh">—</div><div class="h" id="ms-fresh-h">&lt;5s required</div></div>
+    </div>
+    <div class="struct-note">Does not modify Confirmation or Stretch. Liquidity can disappear rapidly.</div>
+  </div>
+</section>
+</div>
+</main></div>
+<script src="overview-app.js?v=20260904-rca"></script>
+<script src="site-nav.js?v=20260904-rca"></script>
 </body></html>
