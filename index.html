@@ -82,6 +82,17 @@
 .struct-metric .k{font-size:10px;font-weight:800;color:#8491a1}.struct-metric .v{font-size:15px;font-weight:900;margin-top:6px}.struct-metric .h{font-size:11px;color:#8491a1;margin-top:4px}
 .struct-note{padding:12px 16px;font-size:11px;color:#6b7a8c;line-height:1.45;border-top:1px solid #1c2633}
 @media(max-width:560px){#fib-tv{height:220px}#macd-tv{height:180px}.tech-strip,.trend-badges,.detail-grid,.struct-grid{grid-template-columns:1fr}}
+
+.stretch-card.side-up{border-color:rgba(230,160,80,.4);background:linear-gradient(165deg,#16120c 0%,#0e0c09 100%)}
+.stretch-card.side-down{border-color:rgba(120,169,255,.35);background:linear-gradient(165deg,#0c1218 0%,#090d12 100%)}
+.stretch-card.side-mid{border-color:rgba(132,145,161,.3);background:linear-gradient(165deg,#101418 0%,#0a0d10 100%)}
+.stretch-card.lvl-high{box-shadow:0 0 0 1px rgba(230,160,80,.25),0 10px 32px rgba(0,0,0,.4)}
+.stretch-card.lvl-elevated{box-shadow:0 0 0 1px rgba(230,160,80,.12)}
+.st-dir.up{color:#e6a050}.st-dir.down{color:#78a9ff}.st-dir.neu{color:#8491a1}
+.stretch-card .score{color:#f0d9a8}
+.stretch-card .label{color:#c9b8a0;font-size:12px;line-height:1.4}
+.stretch-note{color:#a89880!important}
+
 </style></head><body>
 <div class="shell"><main>
 <section class="section">
@@ -155,7 +166,7 @@
   <div class="stretch-card" id="stretch-card">
     <div class="stretch-head"><div class="title">STRETCH SCORE</div><div class="st-dir neu" id="st-dir">—</div><div class="score" id="st-score">—</div><div class="label" id="st-label">—</div></div>
     <div class="stretch-list" id="st-list"></div>
-    <div class="stretch-note">Informational only — does not affect Confirmation Score.</div>
+    <div class="stretch-note" id="st-interp">Stretch = extension risk on top of trend — does not flip Confirmation.</div>
   </div>
   <div class="struct-card">
     <div class="struct-head">
@@ -176,6 +187,6 @@
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260904-stretchdir"></script>
+<script src="overview-app.js?v=20260904-stretchrisk"></script>
 <script src="site-nav.js?v=20260904-kraken"></script>
 </body></html>
