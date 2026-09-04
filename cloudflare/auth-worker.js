@@ -182,10 +182,41 @@ async function fetchYf(symbol) {
   const cacheKey = 'yf:' + symbol;
   const cached = cacheGet(cacheKey);
   if (cached) return cached;
-  const hosts = [
-    'https://query1.finance.yahoo.com',
-    'https://query2.finance.yahoo.com',
-  ];
+  const s = String(symbol || '').toUpperCase();
+  const isNasdaq = s.includes('IXIC') || s.includes('NDX') || s.includes('NASDAQ') || s === 'COMP';
+
+  // 1) Nasdaq.com public quote (simple, reliable for COMP)
+  if (isNasdaq) {
+    try {
+      const res = await fetch('https://api.nasdaq.com/api/quote/COMP/info?assetclass=index', {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'Mozilla/5.0',
+          Origin: 'https://www.nasdaq.com',
+          Referer: 'https://www.nasdaq.com/',
+        },
+      });
+      if (res.ok) {
+        const j = await res.json();
+        const p = j && j.data && j.data.primaryData;
+        if (p && p.lastSalePrice) {
+          const price = parseFloat(String(p.lastSalePrice).replace(/,/g, ''));
+          const chg = parseFloat(String(p.netChange || '0').replace(/,/g, '')) || 0;
+          let pct = 0;
+          const pctStr = String(p.percentageChange || '').replace('%', '').replace(/,/g, '');
+          pct = parseFloat(pctStr) || 0;
+          if (isFinite(price)) {
+            const out = { price, chg, pct, symbol: '^IXIC', source: 'nasdaq.com', live: true };
+            cacheSet(cacheKey, out, 30000);
+            return out;
+          }
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 2) Yahoo query1/query2
+  const hosts = ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com'];
   let lastErr = null;
   for (const host of hosts) {
     try {
@@ -205,40 +236,12 @@ async function fetchYf(symbol) {
       if (closes.length >= 2) prev = closes[closes.length - 2];
       const chg = price - prev;
       const pct = prev ? (chg / prev) * 100 : 0;
-      const out = { price, chg, pct, symbol, source: 'yahoo' };
-      cacheSet(cacheKey, out, 60000);
+      const out = { price, chg, pct, symbol, source: 'yahoo', live: true };
+      cacheSet(cacheKey, out, 30000);
       return out;
     } catch (e) {
       lastErr = e;
     }
-  }
-  // Stooq fallback for Nasdaq composite (^ndq)
-  try {
-    const s = String(symbol || '').toUpperCase();
-    const stooqSym = s.includes('IXIC') || s.includes('NDX') || s.includes('NASDAQ') ? '^ndq' : null;
-    if (stooqSym) {
-      const url = 'https://stooq.com/q/l/?s=' + encodeURIComponent(stooqSym) + '&f=sd2t2ohlcv&h&e=csv';
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'text/csv,*/*' } });
-      if (res.ok) {
-        const text = await res.text();
-        const lines = text.trim().split(/\r?\n/);
-        if (lines.length >= 2) {
-          const cols = lines[1].split(',');
-          // Symbol,Date,Time,Open,High,Low,Close,Volume
-          const price = parseFloat(cols[6]);
-          const open = parseFloat(cols[3]);
-          if (isFinite(price)) {
-            const chg = isFinite(open) ? price - open : 0;
-            const pct = open ? (chg / open) * 100 : 0;
-            const out = { price, chg, pct, symbol, source: 'stooq' };
-            cacheSet(cacheKey, out, 60000);
-            return out;
-          }
-        }
-      }
-    }
-  } catch (e) {
-    lastErr = e;
   }
   throw lastErr || new Error('yf failed');
 }
