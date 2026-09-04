@@ -311,8 +311,259 @@ function renderStretch(result, trendCtx){
 }
 
 async function loadTrend(){try{const [klD,klW,kl4]=await Promise.all([fetchKlines('1d',220),fetchKlines('1w',220),fetchKlines('4h',120)]);const dT=trendFromCloses(klD.map(k=>+k[4])),wT=trendFromCloses(klW.map(k=>+k[4]));$('tr-1d').textContent=dT.dir;$('tr-1d').style.color=colorDir(dT.dir);$('tr-1w').textContent=wT.dir;$('tr-1w').style.color=colorDir(wT.dir);$('tr-1d-det').textContent=dT.detail;$('tr-1w-det').textContent=wT.detail;const dMom=macdMomentum(klD.map(k=>+k[4]),klD.map(k=>Math.floor(k[0]/1000)));const wMom=macdMomentum(klW.map(k=>+k[4]),klW.map(k=>Math.floor(k[0]/1000)));if($('tr-1d-mom')){$('tr-1d-mom').textContent=dMom.label;$('tr-1d-mom').style.color=colorDir(dMom.dir==='FADING'?'NEUTRAL':dMom.dir);}if($('tr-1w-mom')){$('tr-1w-mom').textContent=wMom.label;$('tr-1w-mom').style.color=colorDir(wMom.dir==='FADING'?'NEUTRAL':wMom.dir);}if($('tr-1d-macd'))$('tr-1d-macd').textContent=dMom.detail;if($('tr-1w-macd'))$('tr-1w-macd').textContent=wMom.detail;const closes=kl4.map(k=>+k[4]),times=kl4.map(k=>Math.floor(k[0]/1000)),vols=kl4.map(k=>+k[5]);const pack=calcMACDSeries(closes,times);const h=pack.lastHist,m=pack.lastMacd,s=pack.lastSig,ph=pack.prevHist;let macdDir='NONE';if(ph!=null&&ph<0&&h>=0)macdDir='BULLISH';else if(ph!=null&&ph>=0&&h<0)macdDir='BEARISH';else if(h>0)macdDir='BULLISH';else if(h<0)macdDir='BEARISH';const rsi=calcRSI(closes,14);const lastV=vols[vols.length-1];const avg=vols.slice(-31,-1).reduce((a,b)=>a+b,0)/Math.max(1,Math.min(30,vols.length-1));const vRatio=avg?lastV/avg:1;$('tr-4h').textContent=macdDir==='NONE'?'NO CROSS':macdDir;$('tr-4h').style.color=colorDir(macdDir==='NONE'?'NEUTRAL':macdDir);if($('tr-4h-vol')){$('tr-4h-vol').textContent=vRatio.toFixed(2)+'×';}$('tr-macd-det').textContent='HIST '+(h==null?'—':((h>=0?'+':'')+h.toFixed(0)));$('tr-rsi-det').textContent='RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · Vol '+vRatio.toFixed(2)+'×';let score='NO SIGNAL — WAIT',scoreColor='#8491a1',sub='Wait for clearer 4H bias.';const bull4=macdDir==='BULLISH',bear4=macdDir==='BEARISH';const dBullE=dT.dir==='BULLISH',wBullE=wT.dir==='BULLISH',dBearE=dT.dir==='BEARISH',wBearE=wT.dir==='BEARISH';const dBullM=dMom.dir==='BULLISH',wBullM=wMom.dir==='BULLISH';if(bull4){if(dBullE&&wBullE&&dBullM&&wBullM){score='STRONG CONFIRMATION';scoreColor='#62e3a0';sub='Full alignment.';}else if(dBullE&&wBullE){score='MODERATE CONFIRMATION';scoreColor='#e6c878';const soft=[];if(!dBullM)soft.push('1D MACD '+dMom.dir.toLowerCase());if(!wBullM)soft.push('1W MACD '+wMom.dir.toLowerCase());sub='HTF EMAs bullish, but '+(soft.join(' + ')||'MACD soft')+'.';}else if(dBearE||wBearE){score='WEAK — COUNTER-TREND BOUNCE';scoreColor='#ff6f7c';sub='Against HTF EMA.';}else{score='MODERATE CONFIRMATION';scoreColor='#e6c878';sub='HTF mixed.';}}else if(bear4){if(dBearE&&wBearE){score='MODERATE CONFIRMATION';scoreColor='#e6c878';sub='Bearish HTF.';}else if(dBullE||wBullE){score='WEAK — COUNTER-TREND BOUNCE';scoreColor='#62e3a0';sub='Against HTF EMA.';}else{score='MODERATE CONFIRMATION';scoreColor='#e6c878';sub='Mixed.';}}if(vRatio<0.3&&score.indexOf('STRONG')===0){score='MODERATE CONFIRMATION';scoreColor='#e6c878';sub+=' · thin volume.';}$('tr-score').textContent=score;$('tr-score').style.color=scoreColor;$('tr-score-sub').textContent=sub;try{renderStretch(calcStretchScore(klD),{dir:dT.dir,mom:dMom.dir});}catch(err){console.warn('stretch',err);renderStretch({score:0,max:8,label:'Error',items:[]},{dir:dT&&dT.dir,mom:dMom&&dMom.dir});}let stretchDir='NEUTRAL';if(dT.dir==='BULLISH'&&wT.dir==='BULLISH')stretchDir='BULLISH';else if(dT.dir==='BEARISH'&&wT.dir==='BEARISH')stretchDir='BEARISH';else if(dT.dir==='BULLISH'||wT.dir==='BULLISH')stretchDir='BULLISH';else if(dT.dir==='BEARISH'||wT.dir==='BEARISH')stretchDir='BEARISH';await loadMarketStructure(stretchDir,klD);$('trend-source').textContent='LIVE · 1D · 1W · 4H';}catch(e){console.warn(e);if($('trend-source'))$('trend-source').textContent='OFFLINE';if($('tr-score'))$('tr-score').textContent='DATA OFFLINE';if($('tr-score-sub'))$('tr-score-sub').textContent=String(e&&e.message||e);}}
-function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}}
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showTrend(true);loadTrend();}else{showTrend(false);currentTF=tf;loadTF(currentTF);}});});
+
+/* ===== Structural Trend engine (independent of Trend tab) ===== */
+const STRUCT_WEIGHTS={
+  wStruct:0.30, dStruct:0.25, wEma:0.15, dEma:0.10,
+  wMom:0.08, dMom:0.05, vol:0.04, h4:0.03
+};
+const STRUCT_STATE_KEY='structural_trend_state_v1';
+
+function swingStructure(kl, lookback){
+  /* Returns {bias:'BULLISH'|'BEARISH'|'NEUTRAL', hh, hl, lh, ll, detail, support, resistance, broken} */
+  if(!kl||kl.length<lookback+5) return {bias:'NEUTRAL',detail:'insufficient data',available:false};
+  const slice=kl.slice(-lookback);
+  const closes=slice.map(k=>+k[4]), highs=slice.map(k=>+k[2]), lows=slice.map(k=>+k[3]);
+  // simple swing pivots
+  const pivH=[], pivL=[];
+  for(let i=2;i<slice.length-2;i++){
+    if(highs[i]>=highs[i-1]&&highs[i]>=highs[i-2]&&highs[i]>=highs[i+1]&&highs[i]>=highs[i+2]) pivH.push({i,p:highs[i]});
+    if(lows[i]<=lows[i-1]&&lows[i]<=lows[i-2]&&lows[i]<=lows[i+1]&&lows[i]<=lows[i+2]) pivL.push({i,p:lows[i]});
+  }
+  const lastH=pivH.slice(-2), lastL=pivL.slice(-2);
+  let hh=false,hl=false,lh=false,ll=false;
+  if(lastH.length===2){ if(lastH[1].p>lastH[0].p) hh=true; if(lastH[1].p<lastH[0].p) lh=true; }
+  if(lastL.length===2){ if(lastL[1].p>lastL[0].p) hl=true; if(lastL[1].p<lastL[0].p) ll=true; }
+  const price=closes[closes.length-1];
+  const support=lastL.length?lastL[lastL.length-1].p:Math.min(...lows.slice(-10));
+  const resistance=lastH.length?lastH[lastH.length-1].p:Math.max(...highs.slice(-10));
+  let bias='NEUTRAL';
+  if(hh&&hl) bias='BULLISH';
+  else if(lh&&ll) bias='BEARISH';
+  else if(hl&&!ll) bias='BULLISH';
+  else if(lh&&!hh) bias='BEARISH';
+  else if(price>support&&hh) bias='BULLISH';
+  else if(price<resistance&&ll) bias='BEARISH';
+  const brokenLow=lastL.length>=2&&price<lastL[lastL.length-1].p*0.995;
+  const brokenHigh=lastH.length>=2&&price>lastH[lastH.length-1].p*1.005;
+  let detail='';
+  if(hh&&hl) detail='HH + HL intact';
+  else if(lh&&ll) detail='LH + LL intact';
+  else if(hl) detail='HL forming';
+  else if(lh) detail='LH forming';
+  else detail='mixed pivots';
+  return {bias,hh,hl,lh,ll,detail,support,resistance,brokenLow,brokenHigh,available:true,price};
+}
+
+function scoreLeg(bias){
+  if(bias==='BULLISH') return 1;
+  if(bias==='BEARISH') return -1;
+  return 0;
+}
+
+function mapStructuralState(score, evidence, prevState){
+  /* score roughly -1..+1 weighted. Apply hysteresis vs prevState. */
+  const wOk=evidence.wStruct.bias==='BULLISH';
+  const dOk=evidence.dStruct.bias==='BULLISH';
+  const wBear=evidence.wStruct.bias==='BEARISH';
+  const dBear=evidence.dStruct.bias==='BEARISH';
+  const wEmaB=evidence.wEma.dir==='BULLISH';
+  const dEmaB=evidence.dEma.dir==='BULLISH';
+  const wEmaR=evidence.wEma.dir==='BEARISH';
+  const dEmaR=evidence.dEma.dir==='BEARISH';
+  const momWeak=evidence.dMom.dir==='BEARISH'||evidence.dMom.dir==='FADING'||evidence.h4==='BEARISH';
+  const momBull=evidence.dMom.dir==='BULLISH'||evidence.wMom.dir==='BULLISH';
+  const supportHold=!evidence.dStruct.brokenLow&&!evidence.wStruct.brokenLow;
+  const supportLost=evidence.dStruct.brokenLow||evidence.wStruct.brokenLow;
+
+  // Candidate without hysteresis
+  let state='🟡 BULLISH — PULLBACK';
+  let regime='BULLISH', phase='PULLBACK', conf='MEDIUM';
+
+  if(wOk&&dOk&&wEmaB&&dEmaB&&!supportLost&&score>=0.35){
+    state='🟢 BULLISH — STRONG TREND'; regime='BULLISH'; phase='STRONG TREND'; conf='HIGH';
+  } else if(score>=0.15&&(wOk||dOk)&&supportHold&&(evidence.dStruct.hl||momBull||dEmaB)){
+    // recovery path if previous was bearish-ish
+    if(prevState&&String(prevState).indexOf('BEARISH')>=0){
+      state='🟢 BULLISH — RECOVERY / ACCUMULATION'; regime='BULLISH'; phase='RECOVERY / ACCUMULATION'; conf='MEDIUM';
+    } else if(wOk&&dOk&&!momWeak){
+      state='🟢 BULLISH — STRONG TREND'; regime='BULLISH'; phase='STRONG TREND'; conf='HIGH';
+    } else if(wOk&&supportHold&&momWeak){
+      state='🟡 BULLISH — PULLBACK'; regime='BULLISH'; phase='PULLBACK'; conf='HIGH';
+    } else {
+      state='🟢 BULLISH — RECOVERY / ACCUMULATION'; regime='BULLISH'; phase='RECOVERY / ACCUMULATION'; conf='MEDIUM';
+    }
+  } else if(wOk&&supportHold&&(dBear||momWeak||score<0.15)){
+    if(evidence.dStruct.brokenLow||(dEmaR&&evidence.wMom.dir==='BEARISH')){
+      state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
+    } else {
+      state='🟡 BULLISH — PULLBACK'; regime='BULLISH'; phase='PULLBACK'; conf='HIGH';
+    }
+  } else if(!wOk&&dBear&&supportLost&&score<=-0.25){
+    if(wBear&&dBear&&wEmaR&&evidence.wStruct.brokenLow){
+      state='🔴 BEARISH — TREND BROKEN'; regime='BEARISH'; phase='TREND BROKEN'; conf='HIGH';
+    } else if(wBear||(dBear&&wEmaR)){
+      state='🟠 BEARISH — DOWNTREND'; regime='BEARISH'; phase='DOWNTREND'; conf='MEDIUM';
+    } else {
+      state='🟡 BEARISH — CORRECTION'; regime='BEARISH'; phase='CORRECTION'; conf='MEDIUM';
+    }
+  } else if(score<=-0.1||(dBear&&!wOk)){
+    state='🟡 BEARISH — CORRECTION'; regime='BEARISH'; phase='CORRECTION'; conf='MEDIUM';
+  } else if(wOk){
+    state='🟡 BULLISH — PULLBACK'; regime='BULLISH'; phase='PULLBACK'; conf='MEDIUM';
+  }
+
+  // Hysteresis: hard to jump to TREND BROKEN; hard to jump to STRONG from BEARISH
+  if(prevState){
+    const prev=String(prevState);
+    if(state.indexOf('TREND BROKEN')>=0 && prev.indexOf('BULLISH')>=0){
+      // require weekly broken + daily broken
+      if(!(evidence.wStruct.brokenLow&&evidence.dStruct.brokenLow&&wBear)){
+        state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
+      }
+    }
+    if(state.indexOf('STRONG TREND')>=0 && prev.indexOf('BEARISH')>=0){
+      state='🟢 BULLISH — RECOVERY / ACCUMULATION'; regime='BULLISH'; phase='RECOVERY / ACCUMULATION'; conf='MEDIUM';
+    }
+    if(state.indexOf('DOWNTREND')>=0 && prev.indexOf('STRONG TREND')>=0){
+      // must pass through risk/correction
+      if(!(evidence.dStruct.brokenLow||supportLost)){
+        state='🟠 BULLISH — STRUCTURE AT RISK'; regime='BULLISH'; phase='STRUCTURE AT RISK'; conf='MEDIUM';
+      }
+    }
+  }
+
+  // Missing data reduces confidence
+  const missing=[];
+  if(!evidence.wStruct.available) missing.push('1W structure');
+  if(!evidence.dStruct.available) missing.push('1D structure');
+  if(missing.length){ conf=missing.length>=2?'LOW':'MEDIUM'; }
+
+  return {state,regime,phase,conf,missing};
+}
+
+function explainStructural(r, evidence){
+  const bits=[];
+  if(evidence.wStruct.available) bits.push('Weekly structure is '+evidence.wStruct.bias.toLowerCase()+' ('+evidence.wStruct.detail+')');
+  else bits.push('Weekly structure data unavailable');
+  if(evidence.dStruct.available) bits.push('daily structure is '+evidence.dStruct.bias.toLowerCase()+' ('+evidence.dStruct.detail+')');
+  if(evidence.wStruct.brokenLow||evidence.dStruct.brokenLow) bits.push('a key higher-low support zone has been pressured');
+  else if(evidence.wStruct.available) bits.push('major HTF support has not been confirmed lost');
+  if(evidence.dMom.dir==='BEARISH'||evidence.h4==='BEARISH') bits.push('short-term momentum is weak/bearish');
+  else if(evidence.dMom.dir==='BULLISH') bits.push('momentum is supportive');
+  if(r.phase==='PULLBACK') bits.push('this is treated as a pullback inside the larger thesis, not a trend flip');
+  if(r.phase==='STRUCTURE AT RISK') bits.push('daily deterioration is a warning while weekly thesis is still graded intact');
+  if(r.phase==='TREND BROKEN') bits.push('multiple HTF failures align — prior bullish structural thesis is invalidated');
+  if(r.phase==='RECOVERY / ACCUMULATION') bits.push('stabilization and improving structure suggest recovery rather than a finished bull trend');
+  if(r.missing&&r.missing.length) bits.push('confidence reduced — missing: '+r.missing.join(', '));
+  return bits.join('. ')+(bits.length?'.':'');
+}
+
+function badgeStruct(bias, okText, badText, midText){
+  if(bias==='BULLISH') return {t:'🟢 '+(okText||'INTACT'), c:'#62e3a0'};
+  if(bias==='BEARISH') return {t:'🔴 '+(badText||'BROKEN'), c:'#ff6f7c'};
+  return {t:'🟡 '+(midText||'MIXED'), c:'#e6c878'};
+}
+
+async function loadStructural(){
+  try{
+    const [klD,klW,kl4]=await Promise.all([
+      fetchKlines('1d',220),
+      fetchKlines('1w',120),
+      fetchKlines('4h',120)
+    ]);
+    const wStruct=swingStructure(klW, 52);
+    const dStruct=swingStructure(klD, 90);
+    const wEma=trendFromCloses((klW||[]).map(k=>+k[4]));
+    const dEma=trendFromCloses((klD||[]).map(k=>+k[4]));
+    const wMom=macdMomentum((klW||[]).map(k=>+k[4]),(klW||[]).map(k=>Math.floor(k[0]/1000)));
+    const dMom=macdMomentum((klD||[]).map(k=>+k[4]),(klD||[]).map(k=>Math.floor(k[0]/1000)));
+    let h4='NEUTRAL';
+    if(kl4&&kl4.length>30){
+      const pack=calcMACDSeries(kl4.map(k=>+k[4]),kl4.map(k=>Math.floor(k[0]/1000)));
+      if(pack.lastHist!=null) h4=pack.lastHist>0?'BULLISH':pack.lastHist<0?'BEARISH':'NEUTRAL';
+    }
+    // volume participation daily
+    let volBias='NEUTRAL', volNote='n/a';
+    if(klD&&klD.length>25){
+      const vols=klD.map(k=>+k[5]);
+      const last=vols[vols.length-1];
+      const avg=vols.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+      const r=avg?last/avg:1;
+      volNote=r.toFixed(2)+'× vs 20D';
+      if(r>=1.2) volBias='BULLISH';
+      else if(r<=0.6) volBias='BEARISH';
+    }
+
+    const W=STRUCT_WEIGHTS;
+    let score=
+      scoreLeg(wStruct.bias)*W.wStruct +
+      scoreLeg(dStruct.bias)*W.dStruct +
+      scoreLeg(wEma.dir)*W.wEma +
+      scoreLeg(dEma.dir)*W.dEma +
+      scoreLeg(wMom.dir==='FADING'?'NEUTRAL':wMom.dir)*W.wMom +
+      scoreLeg(dMom.dir==='FADING'?'NEUTRAL':dMom.dir)*W.dMom +
+      scoreLeg(volBias)*W.vol +
+      scoreLeg(h4)*W.h4;
+
+    let prev=null;
+    try{prev=localStorage.getItem(STRUCT_STATE_KEY);}catch(e){}
+    const evidence={wStruct,dStruct,wEma,dEma,wMom,dMom,h4,volBias,volNote};
+    const result=mapStructuralState(score, evidence, prev);
+    try{localStorage.setItem(STRUCT_STATE_KEY, result.state);}catch(e){}
+
+    const color=result.regime==='BULLISH'?(result.phase.indexOf('RISK')>=0?'#e6a050':'#62e3a0'):result.phase.indexOf('BROKEN')>=0?'#ff6f7c':'#e6c878';
+    if($('stt-state')){$('stt-state').textContent=result.state;$('stt-state').style.color=color;}
+    if($('stt-regime'))$('stt-regime').textContent=result.regime;
+    if($('stt-phase'))$('stt-phase').textContent=result.phase;
+    if($('stt-conf'))$('stt-conf').textContent=result.conf;
+    if($('stt-explain'))$('stt-explain').textContent=explainStructural(result, evidence);
+
+    const wB=badgeStruct(wStruct.available?wStruct.bias:'NEUTRAL','INTACT','BROKEN','MIXED / N/A');
+    const dB=badgeStruct(dStruct.available?dStruct.bias:'NEUTRAL','INTACT','BROKEN','MIXED / N/A');
+    const htf=badgeStruct(wEma.dir);
+    const sup=(!wStruct.available&&!dStruct.available)?{t:'🟡 UNAVAILABLE',c:'#8491a1'}:
+      (wStruct.brokenLow||dStruct.brokenLow)?{t:'🔴 PRESSURED / LOST',c:'#ff6f7c'}:{t:'🟢 HOLDING',c:'#62e3a0'};
+    const mom=badgeStruct(dMom.dir==='FADING'?'NEUTRAL':dMom.dir,'SUPPORTIVE','WEAKENING','FADING');
+    if(dMom.dir==='BEARISH'){mom.t='🟡 WEAKENING';mom.c='#e6c878';}
+    const h4b=badgeStruct(h4,'BULLISH','BEARISH','NEUTRAL');
+
+    const rows=[
+      ['1W STRUCTURE', wB.t+' · '+(wStruct.detail||''), wB.c],
+      ['1D STRUCTURE', dB.t+' · '+(dStruct.detail||''), dB.c],
+      ['HTF TREND (EMA)', htf.t+' · '+(wEma.detail||''), htf.c],
+      ['MAJOR SUPPORT', sup.t, sup.c],
+      ['MOMENTUM (1D)', mom.t+' · '+(dMom.detail||''), mom.c],
+      ['4H CONFIRMATION', h4b.t, h4b.c],
+      ['VOLUME / PARTICIPATION', (volBias==='BULLISH'?'🟢':volBias==='BEARISH'?'🔴':'🟡')+' '+volNote, volBias==='BULLISH'?'#62e3a0':volBias==='BEARISH'?'#ff6f7c':'#e6c878'],
+      ['WEIGHTED SCORE', (score>=0?'+':'')+score.toFixed(2)+' (−1…+1)', score>=0.2?'#62e3a0':score<=-0.2?'#ff6f7c':'#e6c878']
+    ];
+    if($('stt-evidence')){
+      $('stt-evidence').innerHTML=rows.map(r=>'<div class="st-ev-row"><span class="k">'+r[0]+'</span><span class="v" style="color:'+r[2]+'">'+r[1]+'</span></div>').join('');
+    }
+    if($('struct-source'))$('struct-source').textContent='LIVE · structural · hysteresis on';
+  }catch(e){
+    console.warn(e);
+    if($('struct-source'))$('struct-source').textContent='OFFLINE';
+    if($('stt-state'))$('stt-state').textContent='DATA UNAVAILABLE';
+    if($('stt-explain'))$('stt-explain').textContent='Could not load structural inputs: '+String(e&&e.message||e)+'. Missing data is not treated as bullish or bearish.';
+  }
+}
+
+function showStruct(on){
+  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel');
+  if(on){
+    if(panels){panels.classList.add('hidden');panels.style.display='none';}
+    if(trend){trend.classList.remove('on');trend.style.display='none';}
+    if(sp){sp.classList.add('on');sp.style.display='block';}
+  } else {
+    if(sp){sp.classList.remove('on');sp.style.display='none';}
+  }
+}
+
+
+function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}}
+document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showStruct(false);showTrend(true);loadTrend();}else if(tf==='struct'){showTrend(false);showStruct(true);loadStructural();}else{showStruct(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
 window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}});
-async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{if(document.querySelector('#tf-tabs .tab.active[data-tf="trend"]'))loadTrend();else loadTF(currentTF);},60000);
+async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else loadTF(currentTF);},60000);
 })();
