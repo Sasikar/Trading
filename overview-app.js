@@ -70,11 +70,17 @@ async function loadMarket(){
       if(any&&$('market-source'))$('market-source').textContent='PROXY · LIVE';
     }
     try{
-      const ndx=await jget('/api/yf?symbol=%5EIXIC');
+      // Static nasdaq.json first (works even if Worker APIs are down), then live /api/yf
+      let ndx=await jget('./nasdaq.json?v='+Date.now());
+      const live=await jget('/api/yf?symbol=%5EIXIC');
+      if(live&&live.price!=null) ndx=live;
       if(ndx&&ndx.price!=null){
         $('ndx-price').textContent=fmt(ndx.price,0);
-        const np=ndx.pct||0;
-        $('ndx-change').innerHTML='<span class="'+(np>=0?'up':'down')+'">'+(np>=0?'▲ ':'▼ ')+Math.abs(np).toFixed(2)+'% · day</span>';
+        const np=ndx.pct!=null?ndx.pct:(ndx.change_pct||0);
+        $('ndx-change').innerHTML='<span class="'+(np>=0?'up':'down')+'">'+(np>=0?'▲ ':'▼ ')+Math.abs(Number(np)).toFixed(2)+'% · day</span>';
+      } else if($('ndx-price')){
+        $('ndx-price').textContent='—';
+        if($('ndx-change'))$('ndx-change').textContent='unavailable';
       }
     }catch(e){}
     try{
