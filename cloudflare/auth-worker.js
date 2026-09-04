@@ -165,6 +165,18 @@ async function fetchOrderbook(instId, sz) {
   return { bids: row.bids || [], asks: row.asks || [], ts: row.ts || Date.now(), source: 'OKX', instId };
 }
 
+
+const okxCache = new Map();
+function cacheGet(key) {
+  const hit = okxCache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.exp) { okxCache.delete(key); return null; }
+  return hit.data;
+}
+function cacheSet(key, data, ttlMs) {
+  okxCache.set(key, { data, exp: Date.now() + ttlMs });
+}
+
 async function fetchOkx(path, params) {
   const allowed = path === 'ticker' || path === 'candles';
   if (!allowed) throw new Error('invalid okx endpoint');
@@ -172,9 +184,23 @@ async function fetchOkx(path, params) {
   for (const [key, value] of params) {
     if (key === 'instId' || key === 'bar' || key === 'limit') upstream.searchParams.set(key, value);
   }
-  const res = await fetch(upstream.toString(), { headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error('okx ' + res.status);
-  return await res.json();
+  const cacheKey = upstream.toString();
+  const cached = cacheGet(cacheKey);
+  if (cached) return cached;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 400 * attempt));
+    const res = await fetch(upstream.toString(), { headers: { Accept: 'application/json' } });
+    if (res.ok) {
+      const j = await res.json();
+      const ttl = path === 'candles' ? 30000 : 5000;
+      cacheSet(cacheKey, j, ttl);
+      return j;
+    }
+    lastErr = new Error('okx ' + res.status);
+    if (res.status !== 429 && res.status !== 503) break;
+  }
+  throw lastErr || new Error('okx failed');
 }
 
 async function fetchFearGreed() {
