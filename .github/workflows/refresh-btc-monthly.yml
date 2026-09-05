@@ -1,0 +1,49 @@
+name: Refresh BTC monthly (Pages static data)
+on:
+  schedule:
+    - cron: '30 1 * * *'  # daily is enough; monthly candle only changes monthly
+  workflow_dispatch:
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch OKX 1M and write data/btc-monthly.json
+        run: |
+          python3 << 'PY'
+          import json, os, urllib.request
+          from datetime import datetime, timezone
+          url='https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1M&limit=100'
+          with urllib.request.urlopen(url, timeout=30) as r:
+              j=json.load(r)
+          rows=list(reversed(j.get('data') or []))
+          now=datetime.now(timezone.utc)
+          out=[]; seen=set()
+          for row in rows:
+              ts=int(row[0])
+              d=datetime.fromtimestamp(ts/1000, timezone.utc)
+              key=f'{d.year}-{d.month:02d}'
+              if d.year==now.year and d.month==now.month: continue
+              if key in seen: continue
+              seen.add(key)
+              out.append({'time':key,'ts':ts,'open':float(row[1]),'high':float(row[2]),'low':float(row[3]),'close':float(row[4]),'volume':float(row[5])})
+          out.sort(key=lambda x:x['ts'])
+          os.makedirs('data', exist_ok=True)
+          path='data/btc-monthly.json'
+          new=json.dumps(out, indent=2)+'\n'
+          old=open(path).read() if os.path.exists(path) else ''
+          if new!=old:
+              open(path,'w').write(new)
+              print('updated', len(out), 'months')
+          else:
+              print('unchanged', len(out))
+          PY
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/btc-monthly.json
+          git diff --staged --quiet || git commit -m "chore: refresh data/btc-monthly.json"
+          git push
