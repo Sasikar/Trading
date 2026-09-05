@@ -1202,10 +1202,12 @@ function mapMacroState(ev, prev, opts){
   } else if(earlyDeterioration){
     state='🟠 TRANSITION — BEARISH BIAS';
     regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+  } else if(accel&&m6Intact&&m3Up&&htfAlive&&!seqDeterioration){
+    // Parabolic qualifies even if 1M swing still lagging "DAMAGED" after a huge run
+    state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
   } else if(m6Intact&&m3Up&&m1Repaired&&!m1Persist&&htfAlive){
-    if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
-    else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
-  } else if(recoverySustained&&htfAlive){
+    state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+  } else if((recoverySustained||(m6Intact&&m3Up&&seqUp))&&htfAlive&&!seqDeterioration){
     state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
   } else if(htfStrong&&!m1Persist){
     if(m1Repaired||m3Up||!seqDn){ state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='MEDIUM'; cycle='EXPANSION'; }
@@ -1227,7 +1229,9 @@ function mapMacroState(ev, prev, opts){
 
     // Escalation from EXP
     if(inExp){
-      if(!m1Persist&&htfStrong&&!m3Damaged){
+      if(accel&&m6Intact&&m3Up&&!m1Persist&&!seqDeterioration){
+        state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
+      } else if(!m1Persist&&htfStrong&&!m3Damaged){
         state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
       }
       if(m1Persist&&(m3Mixed||m3Dn||m3Damaged)&&htfAlive){
@@ -1254,24 +1258,26 @@ function mapMacroState(ev, prev, opts){
     }
 
     // CONTRACTION — stepwise de-escalation only
+    // Exception: when 6M is clearly INTACT + 3M bullish + multi-month higher closes,
+    // 1M swing "DAMAGED" from stale pivots must NOT lock CON for years (2020-21 bug).
     if(inContraction){
       if(m6Broken||yBroken){
         state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
-      } else if(recoverySustained&&m3Repaired&&m1Repaired){
-        // Step 1: Contraction → Transition (bearish bias or bullish bias depending on HTF)
-        // Never jump Contraction → Expansion on one rally
-        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-        // If recovery is clearly rebuilding HH/HL on 1M+3M and HTF alive, allow bullish bias
-        if(m1Repaired&&m3Repaired&&recoveryPersist&&htfAlive&&!offPeak){
-          state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      } else if(m6Intact&&m3Up&&seqUp&&!seqDeterioration&&histUp>=1){
+        // HTF-confirmed bull recovery from contraction
+        if(accel){
+          state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
+        } else if(m6Intact&&m3Up&&(m1Repaired||seqUp)){
+          state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
         }
-      } else if(recoveryProbe&&!recoverySustained){
-        // Counter-trend rally only: STAY in CONTRACTION (do not flip bullish)
+      } else if(recoverySustained&&m3Repaired){
+        state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      } else if(recoveryProbe&&!recoverySustained&&!m6Intact){
+        // Counter-trend only when HTF not confirmed intact
         state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
-      } else if(state.indexOf('EXPANSION')>=0||state.indexOf('PARABOLIC')>=0||state.indexOf('RECOVERY')>=0){
-        // hard block: never EXP/RECOVERY directly from contraction without sustained path
-        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
-      } else if(!recoverySustained&&(m1Dn||m1Persist||m3Dn||m3Damaged)){
+      } else if(m6Intact&&m3Up&&!seqDeterioration&&seqHigher>=1){
+        state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      } else if(!m6Intact&&(m1Dn||m1Persist||m3Dn||m3Damaged)){
         state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
       }
     }
@@ -1283,11 +1289,13 @@ function mapMacroState(ev, prev, opts){
       }
     }
 
-    // RECOVERY → EXPANSION only after sustained repair + HTF intact
+    // RECOVERY → EXPANSION / PARABOLIC
     if(inRec){
-      if(m1Persist&&(m3Dn||m3Damaged)){
+      if(m1Persist&&(m3Dn||m3Damaged)&&!m6Intact){
         state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-      } else if(m6Intact&&m3Repaired&&m1Repaired&&recoveryPersist&&!m1Persist){
+      } else if(accel&&m6Intact&&m3Up){
+        state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
+      } else if(m6Intact&&m3Up&&(m1Repaired||seqUp)&&!m1Persist){
         if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
         else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
       } else {
@@ -1337,24 +1345,30 @@ function mapMacroState(ev, prev, opts){
 }
 
 function detectParabolicAccel(m1kl){
-  /* Price acceleration across multiple COMPLETED monthly candles — rare. */
+  /* Rare multi-month melt-up on COMPLETED candles.
+     Two paths (either qualifies):
+     A) Relative acceleration: recent 3m >> prior 3m (onset of parabolic)
+     B) Absolute strength: extreme 3m gain while near highs (sustained parabolic leg)
+     Path B exists so 2020-21 style continued melt-ups still qualify after g0 is already large.
+  */
   if(!m1kl||m1kl.length<8) return false;
   const closes=m1kl.map(k=>+k[4]);
   const n=closes.length;
-  // last 3 completed months vs prior 3 — strong multi-month advance
   const r=function(a,b){return b===0?0:(a-b)/Math.abs(b);};
-  const g1=r(closes[n-1],closes[n-4]); // ~3m change ending last complete
-  const g0=r(closes[n-4],closes[n-7]); // prior ~3m
-  // New highs persistence: last close near max of last 12
+  const g1=r(closes[n-1],closes[n-4]);
+  const g0=r(closes[n-4],closes[n-7]);
   const win=closes.slice(-12);
   const mx=Math.max.apply(null,win);
   const nearHigh=closes[n-1]>=mx*0.97;
-  // Acceleration: recent 3m gain clearly stronger than prior 3m and elevated
-  const accel=g1>0.25&&g1>g0+0.12&&nearHigh;
-  // Also require not a single spike: at least 2 of last 3 months green
   let up=0;
   for(let i=n-3;i<n;i++){ if(closes[i]>closes[i-1]) up++; }
-  return !!(accel&&up>=2);
+  if(up<2||!nearHigh) return false;
+  const relativeAccel=g1>0.25&&g1>g0+0.12; // onset
+  const absoluteParabolic=g1>0.45; // sustained extreme leg (~45%+ in ~3 months)
+  // 6m strength also supports sustained parabolic (covers long 2020-21 runs)
+  const g6=r(closes[n-1], closes[Math.max(0,n-7)]);
+  const sustainedRun=g6>0.80&&g1>0.20; // >80% in ~6m with still-positive recent 3m
+  return !!(relativeAccel||absoluteParabolic||sustainedRun);
 }
 
 function explainMacro(r, ev){
