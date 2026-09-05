@@ -27,7 +27,7 @@
     rows.sort((a,b)=>a[0]-b[0]);
     const first=rows[0], last=rows[rows.length-1];
     const expected=monthsPerBar;
-    if(rows.length!==expected) continue; // never create partial higher-TF candles
+    if(rows.length!==expected) continue;
     const firstDate=new Date(first[0]);
     const lastDate=new Date(last[0]);
     const expectedLastMonth=firstDate.getUTCMonth()+expected-1;
@@ -41,7 +41,7 @@
 }
 
 async function fetchMacroSeries(){
-  /* Native 1M history + calendar-aligned 3M/6M/1Y. Completed higher-TF candles only. */
+  /* Native 1M history + calendar-aligned 3M/6M/1Y. Completed candles only. */
   const m1=await fetchKlines('1M', 240);
   const completedM1=m1.filter(k=>{
     const d=new Date(+k[0]);
@@ -54,7 +54,10 @@ async function fetchMacroSeries(){
   return {m1:completedM1,m3,m6,y1};
 }`;
     if(!re.test(src)) throw new Error('MACRO fetchMacroSeries block not found');
-    return src.replace(re,replacement);
+    let out=src.replace(re,replacement);
+    // All Macro series passed to the patched engine are completed-only, so the final bar is the latest valid bar.
+    out=out.replace("const closedIdx=closes.length>=2?closes.length-2:closes.length-1;", "const closedIdx=closes.length-1;");
+    return out;
   }
 
   fetch(ORIGINAL,{cache:'no-store',credentials:'same-origin'})
