@@ -108,6 +108,9 @@
 .st-ev-row .v{font-weight:900;text-align:right}
 .st-weights{margin-top:10px;font-size:10px;color:#66717d;text-align:center}
 
+
+.macro-panel{display:none}.macro-panel.on{display:block!important}
+
 </style></head><body>
 <div class="shell"><main>
 <section class="section">
@@ -124,6 +127,7 @@
   <button type="button" class="tab" data-tf="1d">1D</button>
   <button type="button" class="tab active" data-tf="trend">Trend</button>
   <button type="button" class="tab" data-tf="struct">Struct</button>
+  <button type="button" class="tab" data-tf="macro">Macro</button>
   <button type="button" class="tab" data-tf="1w">1W</button>
   <button type="button" class="tab" data-tf="1M">1M</button>
 </div>
@@ -221,7 +225,26 @@
 </section>
 </div>
 
+<div id="macro-panel" class="macro-panel">
+<section class="section">
+  <div class="head"><div><h2>Macro</h2><p>Giant BTC cycle · slow · transition-aware</p></div><span class="source" id="macro-source">…</span></div>
+  <div class="st-primary">
+    <div class="st-title">MACRO</div>
+    <div class="st-state" id="mac-state">—</div>
+    <div class="st-meta">
+      <span>BIAS <b id="mac-regime">—</b></span>
+      <span>CYCLE <b id="mac-phase">—</b></span>
+      <span>CONFIDENCE <b id="mac-conf">—</b></span>
+    </div>
+    <div class="st-explain" id="mac-explain">Loading macro cycle assessment…</div>
+  </div>
+  <div class="st-ev" id="mac-evidence"></div>
+  <div class="st-weights">Hierarchy: 1Y context · 6M cycle · 3M developing · 1M early transition — not a vote tally</div>
+</section>
+</div>
+
+
 </main></div>
-<script src="overview-app.js?v=20260905-structlabel"></script>
+<script src="overview-app.js?v=20260905-macro1"></script>
 <script src="site-nav.js?v=20260904-kraken"></script>
 </body></html>

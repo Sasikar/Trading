@@ -126,20 +126,44 @@ function ema(arr,n){const o=[],k=2/(n+1);let prev=null;for(let i=0;i<arr.length;
 function calcRSI(closes,period=14){if(closes.length<period+1)return null;let gains=0,losses=0;for(let i=closes.length-period;i<closes.length;i++){const d=closes[i]-closes[i-1];if(d>=0)gains+=d;else losses-=d;}const ag=gains/period,al=losses/period;if(al===0)return 100;return 100-(100/(1+ag/al));}
 function calcMACDSeries(closes,times){const e12=ema(closes,12),e26=ema(closes,26);const macdLine=closes.map((_,i)=>(e12[i]!=null&&e26[i]!=null)?e12[i]-e26[i]:null);const signal=ema(macdLine.map(v=>v==null?0:v),9);const hist=[],ml=[],sl=[];for(let i=0;i<closes.length;i++){if(macdLine[i]==null||signal[i]==null||times[i]==null)continue;const h=macdLine[i]-signal[i];hist.push({time:times[i],value:h,color:h>=0?'rgba(98,227,160,.55)':'rgba(255,111,124,.55)'});ml.push({time:times[i],value:macdLine[i]});sl.push({time:times[i],value:signal[i]});}const last=hist.length?hist[hist.length-1]:null,prev=hist.length>1?hist[hist.length-2]:null;return{hist,ml,sl,lastHist:last?last.value:null,prevHist:prev?prev.value:null,lastMacd:ml.length?ml[ml.length-1].value:null,lastSig:sl.length?sl[sl.length-1].value:null};}
 async function fetchKlines(interval,limit){
-  const bar={ '4h':'4H','1d':'1D','1w':'1W','1M':'1M'}[interval]||interval;
-  try{
-    const iv={ '4h':240,'1d':1440,'1w':10080,'1M':21600,'1h':60 }[interval]||1440;
-    const j=await jget('https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval='+iv);
-    const rows=(j&&j.result&&(j.result.XXBTZUSD||j.result.XBTUSD))||[];
-    if(rows.length){
-      const slice=rows.slice(-Math.min(limit,rows.length));
-      return slice.map(k=>[k[0]*1000,+k[1],+k[2],+k[3],+k[4],+k[6]]);
-    }
-  }catch(e){}
+  const bar={ '4h':'4H','1d':'1D','1w':'1W','1M':'1M','3M':'3M'}[interval]||interval;
+  // Kraken has no 3M; skip for 3M
+  if(interval!=='3M'&&interval!=='6M'&&interval!=='1Y'){
+    try{
+      const iv={ '4h':240,'1d':1440,'1w':10080,'1M':21600,'1h':60 }[interval]||1440;
+      const j=await jget('https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval='+iv);
+      const rows=(j&&j.result&&(j.result.XXBTZUSD||j.result.XBTUSD))||[];
+      if(rows.length){
+        const slice=rows.slice(-Math.min(limit,rows.length));
+        return slice.map(k=>[k[0]*1000,+k[1],+k[2],+k[3],+k[4],+k[6]]);
+      }
+    }catch(e){}
+  }
   const r=await fetch('/api/okx/candles?instId=BTC-USDT&bar='+bar+'&limit='+limit,{cache:'no-store'});
   if(!r.ok)throw new Error('candles '+r.status);
   const j=await r.json();
   return (j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
+}
+function aggregateCandles(kl, group){
+  if(!kl||!kl.length||group<2) return kl||[];
+  const out=[];
+  for(let i=0;i<kl.length;i+=group){
+    const chunk=kl.slice(i, Math.min(i+group, kl.length));
+    if(chunk.length<1) continue;
+    let h=-Infinity,l=Infinity,v=0;
+    for(const k of chunk){h=Math.max(h,+k[2]);l=Math.min(l,+k[3]);v+=(+k[5]||0);}
+    out.push([chunk[0][0], +chunk[0][1], h, l, +chunk[chunk.length-1][4], v]);
+  }
+  return out;
+}
+async function fetchMacroSeries(){
+  /* 1M native, 3M native, 6M=2x1M, 1Y=4x1M (approx). Oldest-first. */
+  const m1=await fetchKlines('1M', 48);
+  let m3=[];
+  try{ m3=await fetchKlines('3M', 24); }catch(e){ m3=aggregateCandles(m1,3); }
+  const m6=aggregateCandles(m1,2);
+  const y1=aggregateCandles(m1,4);
+  return {m1,m3,m6,y1};
 }
 async function fetchPrice(){
   try{
@@ -704,19 +728,271 @@ async function loadStructural(){
   }
 }
 
-function showStruct(on){
-  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel');
+
+/* ===== MACRO cycle engine (independent of Trend + Structural Trend) ===== */
+const MACRO_STATE_KEY='macro_cycle_state_v1';
+
+function macroSwing(kl, lookback, label){
+  if(!kl||kl.length<8){
+    return {available:false,label,bias:'NEUTRAL',detail:'insufficient data',
+      protectedHL:null,protectedLH:null,wickWarn:false,closeBreak:false,hardBreak:false,
+      hh:false,hl:false,lh:false,ll:false,price:null};
+  }
+  const slice=kl.slice(-Math.min(lookback, kl.length));
+  const highs=slice.map(k=>+k[2]), lows=slice.map(k=>+k[3]), closes=slice.map(k=>+k[4]);
+  const left=2,right=2;
+  const pivH=[],pivL=[];
+  for(let i=left;i<highs.length-right;i++){
+    let isH=true,isL=true;
+    for(let j=i-left;j<=i+right;j++){ if(j===i)continue; if(highs[j]>highs[i])isH=false; if(lows[j]<lows[i])isL=false; }
+    if(isH)pivH.push({i,p:highs[i]});
+    if(isL)pivL.push({i,p:lows[i]});
+  }
+  const lastL=pivL.slice(-3), lastH=pivH.slice(-3);
+  let hh=false,hl=false,lh=false,ll=false;
+  if(lastH.length>=2){const a=lastH[lastH.length-2].p,b=lastH[lastH.length-1].p; if(b>a*1.002)hh=true; if(b<a*0.998)lh=true;}
+  if(lastL.length>=2){const a=lastL[lastL.length-2].p,b=lastL[lastL.length-1].p; if(b>a*1.002)hl=true; if(b<a*0.998)ll=true;}
+  let protectedHL=null,protectedLH=null;
+  if(lastL.length>=2){
+    const newest=lastL[lastL.length-1], prev=lastL[lastL.length-2];
+    protectedHL=(newest.i>=slice.length-2)?prev.p:newest.p;
+    if(hl) protectedHL=Math.max(prev.p, protectedHL);
+  } else if(lastL.length===1) protectedHL=lastL[0].p;
+  if(lastH.length>=2){
+    const newest=lastH[lastH.length-1], prev=lastH[lastH.length-2];
+    protectedLH=(newest.i>=slice.length-2)?prev.p:newest.p;
+    if(lh) protectedLH=Math.min(prev.p, protectedLH);
+  } else if(lastH.length===1) protectedLH=lastH[0].p;
+
+  // Completed candles only for breaks (never forming bar = last index)
+  const closedIdx=closes.length>=2?closes.length-2:closes.length-1;
+  const closedClose=closes[closedIdx];
+  const lastLow=lows[lows.length-1];
+  let wickWarn=false, closeBreak=false, hardBreak=false;
+  if(protectedHL!=null){
+    wickWarn=lastLow<protectedHL*0.995;
+    closeBreak=closedClose<protectedHL*0.995;
+    if(closes.length>=3&&closedIdx>=1){
+      hardBreak=closes[closedIdx]<protectedHL*0.995 && closes[closedIdx-1]<protectedHL*0.995;
+    }
+  }
+  let bias='NEUTRAL';
+  if(hh&&hl) bias='BULLISH';
+  else if(lh&&ll) bias='BEARISH';
+  else if(hl&&!ll) bias='BULLISH';
+  else if(lh&&!hh) bias='BEARISH';
+  let detail='mixed';
+  if(hh&&hl) detail='HH + HL';
+  else if(lh&&ll) detail='LH + LL';
+  else if(hl) detail='HL forming';
+  else if(lh) detail='LH forming';
+  if(hardBreak) detail+=' · persistent close break';
+  else if(closeBreak) detail+=' · close break';
+  else if(wickWarn) detail+=' · wick warning';
+  // UI grade
+  let grade='MIXED';
+  if(hardBreak) grade='BROKEN';
+  else if(lh&&ll) grade='DAMAGED';
+  else if(hh&&hl) grade='INTACT';
+  else if(hl||bias==='BULLISH') grade='IMPROVING';
+  else if(lh||bias==='BEARISH') grade='WEAKENING';
+  if(wickWarn&&!closeBreak&&grade==='INTACT') grade='WARNING';
+  return {available:true,label,bias,detail,grade,protectedHL,protectedLH,wickWarn,closeBreak,hardBreak,hh,hl,lh,ll,price:closes[closes.length-1]};
+}
+
+function mapMacroState(ev, prev){
+  const y=ev.y1, m6=ev.m6, m3=ev.m3, m1=ev.m1;
+  const yOk=y.available&&(y.bias==='BULLISH'||y.grade==='INTACT'||y.grade==='IMPROVING')&&!y.hardBreak;
+  const yBroken=y.available&&y.hardBreak;
+  const m6Bear=m6.available&&(m6.bias==='BEARISH'||m6.grade==='DAMAGED'||m6.grade==='BROKEN'||m6.lh);
+  const m6Bull=m6.available&&(m6.bias==='BULLISH'||m6.grade==='INTACT'||(m6.hh&&m6.hl));
+  const m3Up=m3.available&&(m3.bias==='BULLISH'||m3.hl||m3.grade==='IMPROVING'||m3.grade==='INTACT');
+  const m3Dn=m3.available&&(m3.bias==='BEARISH'||m3.lh||m3.grade==='DAMAGED'||m3.grade==='WEAKENING');
+  const m1Up=m1.available&&(m1.bias==='BULLISH'||m1.hl||m1.grade==='IMPROVING'||m1.grade==='INTACT');
+  const m1Dn=m1.available&&(m1.bias==='BEARISH'||m1.lh||m1.grade==='DAMAGED'||m1.grade==='WEAKENING');
+  const recoverySeq=m1Up&&m3Up;
+  const deteriorateSeq=m1Dn&&m3Dn;
+
+  let state='🟡 TRANSITION — NEUTRAL';
+  let regime='NEUTRAL', phase='NEUTRAL', conf='MEDIUM', cycle='UNRESOLVED';
+
+  // Strong expansion: 1Y intact, 6M not broken, 3M/1M bullish aligned
+  if(yOk&&m6Bull&&m3Up&&m1Up&&!m6.hardBreak&&!y.hardBreak){
+    state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+  }
+  // 6M lag edge case: 6M still damaged/bearish but 1M/3M improving and 1Y intact
+  else if(yOk&&m6Bear&&recoverySeq){
+    state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='HIGH'; cycle='TRANSITION';
+  }
+  // Recovery: 1Y ok, improving shorter, 6M mixed
+  else if(yOk&&recoverySeq&&!m6.hardBreak){
+    if(m6Bull||(m3.hh&&m3.hl)){
+      state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
+    } else {
+      state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+    }
+  }
+  // Bearish transition while 6M still looks ok
+  else if(m6Bull&&deteriorateSeq&&!yBroken){
+    state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+  }
+  // Contraction
+  else if((m6Bear||m6.hardBreak)&&(m3Dn||m1Dn)&&!yBroken){
+    state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
+  }
+  // Cycle broken — very hard
+  else if(yBroken&&(m6.hardBreak||m6Bear)&&(m3Dn||m1Dn)){
+    state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+  }
+  else if(yOk&&(m1Up||m3Up)){
+    state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+  }
+  else if(deteriorateSeq){
+    state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+  }
+
+  // Hysteresis vs previous
+  if(prev){
+    const p=String(prev);
+    // Expansion + normal stress stays expansion unless hard damage
+    if(p.indexOf('EXPANSION')>=0&&state.indexOf('BEARISH')>=0&&!m6.hardBreak&&!yBroken&&yOk){
+      state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+    }
+    if(p.indexOf('EXPANSION')>=0&&(m1Dn||m3Dn)&&yOk&&!m6.hardBreak){
+      // mild: stay expansion; persistent both m1+m3: bearish bias transition
+      if(deteriorateSeq){ state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION'; }
+      else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
+    }
+    // Broken regime: no instant expansion
+    if(p.indexOf('CYCLE BROKEN')>=0&&state.indexOf('EXPANSION')>=0){
+      state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+    }
+    if(p.indexOf('CONTRACTION')>=0&&state.indexOf('EXPANSION')>=0){
+      state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
+    }
+    if(p.indexOf('CONTRACTION')>=0&&state.indexOf('BULLISH BIAS')>=0){
+      // ok
+    }
+    // Single-month noise: if prev expansion and only m1 weak
+    if(p.indexOf('EXPANSION')>=0&&m1Dn&&!m3Dn&&yOk){
+      state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+    }
+  }
+
+  const missing=[];
+  if(!y.available) missing.push('1Y');
+  if(!m6.available) missing.push('6M');
+  if(!m3.available) missing.push('3M');
+  if(!m1.available) missing.push('1M');
+  if(missing.length>=3){ conf='LOW'; state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='INSUFFICIENT DATA'; }
+  else if(missing.length) conf=conf==='HIGH'?'MEDIUM':'LOW';
+
+  return {state,regime,phase,conf,cycle,missing};
+}
+
+function explainMacro(r, ev){
+  if(r.phase==='INSUFFICIENT DATA') return 'Not enough completed macro candles to assess the giant cycle. Missing data is not treated as bullish or bearish.';
+  if(r.phase==='EXPANSION') return 'Long-term structure supports an expanding cycle. Protected macro lows are holding and shorter macro structure aligns bullish. Normal corrections do not flip this regime.';
+  if(r.phase==='RECOVERY') return 'Long-term structure remains intact. Shorter macro structure has improved after damage; full expansion is not yet confirmed.';
+  if(r.phase.indexOf('BULLISH BIAS')>=0) return 'A bullish macro transition is developing: 1M/3M structure is improving while slower context (e.g. 6M) may still look damaged. This is early cycle recognition, not a lagging 6M wait.';
+  if(r.phase.indexOf('BEARISH BIAS')>=0) return 'A bearish macro transition is developing: recent lower highs / weakening 1M–3M structure while the largest cycle is not fully invalidated yet.';
+  if(r.phase==='CONTRACTION') return 'Macro cycle is contracting with persistent lower structure on intermediate horizons. Not necessarily full 1Y cycle death.';
+  if(r.phase.indexOf('CYCLE BROKEN')>=0) return 'Confirmed higher-timeframe macro failure across completed candles. A single crash or wick is not enough for this state.';
+  return 'Macro evidence is mixed; treating regime as unresolved transition.';
+}
+
+function macroGradeBadge(g){
+  if(g==='INTACT'||g==='IMPROVING') return {t:'🟢 '+g, c:'#62e3a0'};
+  if(g==='BROKEN') return {t:'🔴 '+g, c:'#ff6f7c'};
+  if(g==='DAMAGED'||g==='WEAKENING') return {t:'🟠 '+g, c:'#e6a050'};
+  if(g==='WARNING') return {t:'🟡 WICK WARNING', c:'#e6c878'};
+  return {t:'🟡 '+(g||'MIXED'), c:'#e6c878'};
+}
+
+async function loadMacro(){
+  try{
+    const series=await fetchMacroSeries();
+    const y1=macroSwing(series.y1, 16, '1Y');
+    const m6=macroSwing(series.m6, 20, '6M');
+    const m3=macroSwing(series.m3, 24, '3M');
+    const m1=macroSwing(series.m1, 30, '1M');
+    let prev=null; try{prev=localStorage.getItem(MACRO_STATE_KEY);}catch(e){}
+    const result=mapMacroState({y1,m6,m3,m1}, prev);
+    try{localStorage.setItem(MACRO_STATE_KEY, result.state);}catch(e){}
+
+    const color=result.regime==='BULLISH'?'#62e3a0':result.regime==='BEARISH'?(result.phase.indexOf('BROKEN')>=0?'#ff6f7c':'#e6a050'):'#e6c878';
+    if($('mac-state')){$('mac-state').textContent=result.state;$('mac-state').style.color=color;}
+    if($('mac-regime'))$('mac-regime').textContent=result.regime;
+    if($('mac-phase'))$('mac-phase').textContent=result.cycle;
+    if($('mac-conf'))$('mac-conf').textContent=result.conf;
+    if($('mac-explain'))$('mac-explain').textContent=explainMacro(result,{y1,m6,m3,m1});
+
+    // Support / resistance from 6M/1Y protected levels
+    const support=m6.protectedHL||y1.protectedHL||m3.protectedHL;
+    const resist=m6.protectedLH||y1.protectedLH||m3.protectedLH;
+    let supT='🟡 UNAVAILABLE', supC='#8491a1';
+    if(support!=null){
+      if(y1.hardBreak||m6.hardBreak){supT='🔴 LOST · '+Math.round(support).toLocaleString('en-US');supC='#ff6f7c';}
+      else if(m6.wickWarn&&!m6.closeBreak){supT='🟡 WICK WARN · '+Math.round(support).toLocaleString('en-US');supC='#e6c878';}
+      else {supT='🟢 HOLDING · '+Math.round(support).toLocaleString('en-US');supC='#62e3a0';}
+    }
+    let resT='🟡 UNAVAILABLE', resC='#8491a1';
+    if(resist!=null){
+      const px=m1.price||m3.price||m6.price;
+      if(px!=null&&px>resist){resT='🟢 RECLAIMED · '+Math.round(resist).toLocaleString('en-US');resC='#62e3a0';}
+      else {resT='🟡 OVERHEAD · '+Math.round(resist).toLocaleString('en-US');resC='#e6c878';}
+    }
+
+    const rows=[
+      ['1Y STRUCTURE', macroGradeBadge(y1.grade).t+' · '+(y1.detail||''), macroGradeBadge(y1.grade).c],
+      ['6M STRUCTURE', macroGradeBadge(m6.grade).t+' · '+(m6.detail||''), macroGradeBadge(m6.grade).c],
+      ['3M STRUCTURE', macroGradeBadge(m3.grade).t+' · '+(m3.detail||''), macroGradeBadge(m3.grade).c],
+      ['1M STRUCTURE', macroGradeBadge(m1.grade).t+' · '+(m1.detail||''), macroGradeBadge(m1.grade).c],
+      ['MACRO SUPPORT', supT, supC],
+      ['MACRO RESISTANCE', resT, resC],
+      ['CYCLE PHASE', result.cycle, color],
+      ['BIAS', result.regime, color],
+      ['CONFIDENCE', result.conf, '#8491a1']
+    ];
+    if($('mac-evidence')){
+      $('mac-evidence').innerHTML=rows.map(r=>'<div class="st-ev-row"><span class="k">'+r[0]+'</span><span class="v" style="color:'+r[2]+'">'+r[1]+'</span></div>').join('');
+    }
+    if($('macro-source'))$('macro-source').textContent='LIVE · 1M/3M/6M/1Y · closed candles';
+  }catch(e){
+    console.warn(e);
+    if($('macro-source'))$('macro-source').textContent='OFFLINE';
+    if($('mac-state'))$('mac-state').textContent='DATA UNAVAILABLE';
+    if($('mac-explain'))$('mac-explain').textContent='Could not load macro inputs: '+String(e&&e.message||e);
+  }
+}
+
+function showMacro(on){
+  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel');
   if(on){
     if(panels){panels.classList.add('hidden');panels.style.display='none';}
     if(trend){trend.classList.remove('on');trend.style.display='none';}
+    if(sp){sp.classList.remove('on');sp.style.display='none';}
+    if(mp){mp.classList.add('on');mp.style.display='block';}
+  } else {
+    if(mp){mp.classList.remove('on');mp.style.display='none';}
+  }
+}
+
+
+function showStruct(on){
+  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel');
+  if(on){
+    if(panels){panels.classList.add('hidden');panels.style.display='none';}
+    if(trend){trend.classList.remove('on');trend.style.display='none';}
+    if(mp){mp.classList.remove('on');mp.style.display='none';}
     if(sp){sp.classList.add('on');sp.style.display='block';}
   } else {
     if(sp){sp.classList.remove('on');sp.style.display='none';}
   }
 }
 
-function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}}
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showStruct(false);showTrend(true);loadTrend();}else if(tf==='struct'){showTrend(false);showStruct(true);loadStructural();}else{showStruct(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
+function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}if(mp&&on){mp.classList.remove('on');mp.style.display='none';}}
+document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showMacro(true);loadMacro();}else{showMacro(false);showStruct(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
 window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}});
-async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else loadTF(currentTF);},60000);
+async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else loadTF(currentTF);},60000);
 })();
