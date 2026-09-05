@@ -1408,8 +1408,8 @@ function monthsUpTo(m1all, y, m){
   });
 }
 function buildMacroHistory(m1all, displayN){
-  /* Walk completed months; no look-ahead. Same engine as live Macro. */
-  displayN=displayN||24;
+  /* Walk completed months from 2018+; no look-ahead. Same engine as live Macro. */
+  displayN=displayN||120;
   if(!m1all||m1all.length<8) return [];
   // ensure sorted oldest-first
   const all=m1all.slice().sort((a,b)=>a[0]-b[0]);
@@ -1427,7 +1427,13 @@ function buildMacroHistory(m1all, displayN){
   let prev=null;
   const m1DnHist=[]; // sequential, no lookahead
   const m1UpHist=[];
-  const startIdx=Math.max(12, completed.length-displayN-6);
+  // Prefer full history from 2018; keep small warmup so swings have context
+  let startIdx=12;
+  for(let i=0;i<completed.length;i++){
+    const ym=ymFromTs(completed[i][0]);
+    if(ym.y>=2018){ startIdx=Math.max(12, i); break; }
+  }
+  if(completed.length-startIdx>displayN) startIdx=completed.length-displayN;
   for(let i=startIdx;i<completed.length;i++){
     const k=completed[i];
     const ym=ymFromTs(k[0]);
@@ -1555,7 +1561,7 @@ async function loadMacro(){
       }
     }catch(e){}
     try{
-      const histRows=buildMacroHistory(series.m1, 24);
+      const histRows=buildMacroHistory(series.m1, 120);
       renderMacroHistory(histRows);
       try{ window.__macroHistory=histRows; }catch(e){}
     }catch(he){ console.warn('macro history', he); }
