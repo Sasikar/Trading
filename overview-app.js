@@ -1116,146 +1116,172 @@ function macroSwing(kl, lookback, label){
 }
 
 function mapMacroState(ev, prev, opts){
-  /* opts: {m1DnHist:[bool,bool,bool]} last 3 completed months' m1Dn at the time (oldest→newest) */
+  /* FINAL REGIME LOGIC
+     6M+1Y = HTF guardrail (cap severity; only they confirm CYCLE BREAK)
+     1M+3M = early deterioration detector (may go BEARISH BIAS / CONTRACTION while 6M intact)
+     Persistence required — single-month crash alone is NOT a bear regime.
+  */
   opts=opts||{};
   const m1DnHist=Array.isArray(opts.m1DnHist)?opts.m1DnHist.slice(-3):[];
-  const y=ev.y1, m6=ev.m6, m3=ev.m3, m1=ev.m1;
-  const yAvailable=!!(y&&y.available);
-  const yBroken=yAvailable&&y.hardBreak;
-  const yOk=yAvailable&&(y.bias==='BULLISH'||y.grade==='INTACT'||y.grade==='IMPROVING')&&!y.hardBreak;
-  const m6Bear=m6.available&&(m6.bias==='BEARISH'||m6.grade==='DAMAGED'||m6.grade==='BROKEN'||m6.lh);
-  const m6Bull=m6.available&&(m6.bias==='BULLISH'||m6.grade==='INTACT'||(m6.hh&&m6.hl));
-  const m6Damaged=m6.available&&(m6.hardBreak||m6.grade==='BROKEN');
-  const m6Soft=m6.available&&(m6.grade==='WEAKENING'||m6.grade==='DAMAGED'||m6.grade==='BROKEN'||m6.hardBreak);
-  const m3Up=m3.available&&(m3.bias==='BULLISH'||m3.hl||m3.grade==='IMPROVING'||m3.grade==='INTACT');
-  const m3Dn=m3.available&&(m3.bias==='BEARISH'||m3.lh||m3.grade==='DAMAGED'||m3.grade==='WEAKENING');
-  const m1Up=m1.available&&(m1.bias==='BULLISH'||m1.hl||m1.grade==='IMPROVING'||m1.grade==='INTACT');
-  const m1Dn=m1.available&&(m1.bias==='BEARISH'||m1.lh||m1.grade==='DAMAGED'||m1.grade==='WEAKENING');
-  const recoverySeq=m1Up&&m3Up;
-  const deteriorateSeq=m1Dn&&m3Dn;
-  const accel=!!ev.parabolic;
-  const m1DnCount=m1DnHist.filter(Boolean).length;
-  const m1DnPersist=m1DnCount>=2; // 2 of last 3 completed months
+  const y=ev.y1||{}, m6=ev.m6||{}, m3=ev.m3||{}, m1=ev.m1||{};
+  const yAvail=!!y.available, m6Avail=!!m6.available, m3Avail=!!m3.available, m1Avail=!!m1.available;
+  const closes=Array.isArray(opts.m1Closes)?opts.m1Closes:null;
 
-  // Trailing 12M decline from completed monthly closes only (no lookahead)
-  let severeDecline=false;
-  const closes=opts.m1Closes;
-  if(Array.isArray(closes)&&closes.length>=13){
+  // Sequence deterioration from COMPLETED monthly closes only (no lookahead)
+  let seqLower=0, seqDn=false, offPeak=false, seqDeterioration=false;
+  if(closes&&closes.length>=4){
     const n=closes.length;
-    const last=closes[n-1], ago=closes[n-13];
-    const dd=ago>0?((last-ago)/ago):0;
-    let lower=0;
-    for(let i=n-3;i<n;i++){ if(closes[i]<closes[i-1]) lower++; }
-    if(dd<=-0.40&&lower>=2) severeDecline=true;
+    for(let i=n-3;i<n;i++){ if(closes[i]<closes[i-1]*0.998) seqLower++; }
+    seqDn=seqLower>=2; // 2 of last 3 months closed lower
+    const peak=Math.max.apply(null, closes.slice(-12));
+    const last=closes[n-1];
+    offPeak=peak>0&&((last-peak)/peak)<=-0.12; // ≥12% off 12m peak
+    seqDeterioration=seqDn&&offPeak;
   }
 
+  const yBroken=yAvail&&(y.hardBreak||y.grade==='BROKEN');
+  const yIntact=yAvail&&!yBroken&&(y.grade==='INTACT'||y.grade==='IMPROVING'||y.bias==='BULLISH'||(y.hh&&y.hl));
+  const m6Broken=m6Avail&&(m6.hardBreak||m6.grade==='BROKEN');
+  const m6Intact=m6Avail&&!m6Broken&&(m6.grade==='INTACT'||(m6.hh&&m6.hl)||m6.bias==='BULLISH');
+  const m6Soft=m6Avail&&(m6.grade==='WEAKENING'||m6.grade==='DAMAGED'||m6Broken);
+  const htfAlive=!m6Broken&&!yBroken;
+  const htfStrong=m6Intact&&(yIntact||!yAvail);
+
+  const m1SwingDn=m1Avail&&(m1.bias==='BEARISH'||m1.lh||m1.ll||m1.grade==='DAMAGED'||m1.grade==='BROKEN'||m1.grade==='WEAKENING');
+  const m1Damaged=m1Avail&&(m1.grade==='DAMAGED'||m1.grade==='BROKEN'||(m1.lh&&m1.ll)||m1.hardBreak);
+  const m1Bull=m1Avail&&(m1.bias==='BULLISH'||m1.hl||m1.grade==='INTACT'||m1.grade==='IMPROVING')&&!m1Damaged;
+  // Combined 1M bearish signal: swing OR sequence deterioration
+  const m1Dn=m1SwingDn||seqDeterioration;
+
+  const m3Up=m3Avail&&(m3.bias==='BULLISH'||m3.hl||m3.grade==='INTACT'||m3.grade==='IMPROVING');
+  const m3Dn=m3Avail&&(m3.bias==='BEARISH'||m3.lh||m3.grade==='DAMAGED'||m3.grade==='WEAKENING'||m3.grade==='BROKEN');
+  const m3Mixed=m3Avail&&(m3.grade==='MIXED'||(!m3Up&&!m3Dn));
+  const m3Damaged=m3Avail&&(m3.grade==='DAMAGED'||m3.grade==='BROKEN'||(m3.lh&&m3.ll));
+
+  // Persistence: hist from prior months + current
+  const histCount=m1DnHist.filter(Boolean).length;
+  const m1Persist=(histCount+(m1Dn?1:0))>=2 || (seqDn&&offPeak&&histCount>=1);
+
+  const recoverySeq=m1Bull&&m3Up&&!seqDeterioration;
+  const earlyDeterioration=m1Persist&&(m3Mixed||m3Dn||m3Damaged)&&htfAlive;
+  const deepDeterioration=m1Persist&&(m3Damaged||m3Dn)&&(m1Damaged||seqDeterioration||offPeak);
+
+  // 40% trailing 12M decline = severity → CONTRACTION only
+  let severeDecline=false;
+  if(closes&&closes.length>=13){
+    const n=closes.length;
+    const dd=closes[n-13]>0?((closes[n-1]-closes[n-13])/closes[n-13]):0;
+    if(dd<=-0.40&&seqLower>=2) severeDecline=true;
+  }
+
+  const accel=!!ev.parabolic;
   let state='🟡 TRANSITION — NEUTRAL';
   let regime='NEUTRAL', phase='NEUTRAL', conf='MEDIUM', cycle='UNRESOLVED';
 
-  // Base directional read (no sticky expansion yet)
-  if(yBroken&&(m6Damaged||m6Bear)&&(m3Dn||m1Dn)){
-    state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
-  } else if(m6Bull&&m3Up&&m1Up&&!m6Damaged&&!yBroken){
+  // --- Base classification ---
+  if((m6Broken||yBroken)&&(m1Dn||m3Dn||deepDeterioration)){
+    state='🔴 BEARISH — REGIME / CYCLE BROKEN';
+    regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+  } else if(deepDeterioration||(severeDecline&&m1Persist&&(m3Dn||m3Damaged||m3Mixed))){
+    state='🟠 BEARISH — CONTRACTION';
+    regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+  } else if(earlyDeterioration){
+    state='🟠 TRANSITION — BEARISH BIAS';
+    regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+  } else if(m6Intact&&m3Up&&m1Bull&&!m1Persist&&htfAlive){
     if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
     else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
-  } else if(recoverySeq&&!m6Damaged&&!yBroken&&(m6Bull||m6.grade==='IMPROVING'||m6.grade==='MIXED'||!m6.available)){
-    if(m6Bull&&m3Up&&m1Up){ state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY'; }
-    else { state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION'; }
-  } else if(m6Bear&&recoverySeq&&!yBroken){
-    state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='HIGH'; cycle='TRANSITION';
-  } else if(m6Bull&&deteriorateSeq&&!yBroken){
-    state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-  } else if((m6Bear||m6Damaged||m6Soft)&&(m3Dn||m1Dn)&&!yBroken){
-    state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
-  } else if(recoverySeq&&!yBroken){
+  } else if(recoverySeq&&htfAlive){
+    state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
+  } else if(htfStrong&&!m1Persist){
+    // Normal pullback: temporary weakness, HTF intact → EXP or NEUTRAL, not bear
+    if(m1Bull||m3Up||!seqDn){ state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='MEDIUM'; cycle='EXPANSION'; }
+    else { state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='NEUTRAL'; conf='MEDIUM'; cycle='TRANSITION'; }
+  } else if(m1Bull&&m3Up&&htfAlive){
     state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-  } else if(deteriorateSeq||m1DnPersist){
-    state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-  } else if(m6Bull&&(m1Up||m3Up)&&!yBroken){
-    state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf=yAvailable?'HIGH':'MEDIUM'; cycle='EXPANSION';
-  } else if(m6Bear&&(m1Dn||m3Dn)){
-    state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
   }
 
-  // === EXPANSION EXIT LADDER (replaces sticky hysteresis) ===
+  // --- Hysteresis / ladder with prev ---
   if(prev){
     const p=String(prev);
-    const inExpansion=p.indexOf('EXPANSION')>=0||p.indexOf('PARABOLIC')>=0;
+    const inExp=p.indexOf('EXPANSION')>=0||p.indexOf('PARABOLIC')>=0;
     const inBearBias=p.indexOf('BEARISH BIAS')>=0;
     const inContraction=p.indexOf('CONTRACTION')>=0;
     const inBroken=p.indexOf('CYCLE BROKEN')>=0;
+    const inRec=p.indexOf('RECOVERY')>=0||p.indexOf('BULLISH BIAS')>=0;
 
-    if(inExpansion){
-      // Step 1: EXPANSION → BEARISH BIAS when 1M bearish persists 2/3 months
-      if(m1DnPersist||(m1Dn&&m1DnHist.length>=2&&m1DnHist.slice(-2).every(Boolean))){
-        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-      } else if(m1Dn&&!m3Dn&&!m6Damaged){
-        // single weak month: stay expansion (noise)
+    if(inExp){
+      // Noise: 1 weak month, HTF strong → stay EXP
+      if(!m1Persist&&htfStrong&&!m3Damaged){
         state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
       }
-      // Step 2 can also fire same month if 3M confirms
-      if((state.indexOf('BEARISH BIAS')>=0||m1DnPersist)&&(m3Dn||m6Soft)){
-        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
+      // Persistent 1M/3M deterioration → BEARISH BIAS even if 6M intact
+      if(m1Persist&&(m3Mixed||m3Dn||m3Damaged)&&htfAlive){
+        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
       }
-    }
-    if(inBearBias||state.indexOf('BEARISH BIAS')>=0){
-      // BEARISH BIAS → CONTRACTION
-      if((m3Dn&&(m1Dn||m1DnPersist))||m6Soft||m6Damaged){
-        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
-      }
-    }
-    // CONTRACTION → BROKEN only on hard structural failure
-    if(inContraction||state.indexOf('CONTRACTION')>=0){
-      if(yBroken||(m6Damaged&&m6.hardBreak)||(m6.hardBreak&&yBroken)){
-        if(yBroken||m6.hardBreak){
-          if(yBroken&&(m6Damaged||m6Bear)){
-            state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
-          }
-        }
-      }
-    }
-    // Severity valve: ≥40% trailing 12M decline + 2/3 lower closes → at least CONTRACTION (never BROKEN alone)
-    if(severeDecline&&!yBroken&&!(m6.hardBreak&&yBroken)){
-      if(state.indexOf('EXPANSION')>=0||state.indexOf('PARABOLIC')>=0||state.indexOf('BULLISH BIAS')>=0||state.indexOf('NEUTRAL')>=0||state.indexOf('BEARISH BIAS')>=0){
+      if(deepDeterioration||(severeDecline&&m1Persist)){
         state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
       }
     }
-    // Upward recovery hysteresis (unchanged intent)
-    if(inBroken&&(state.indexOf('EXPANSION')>=0||state.indexOf('PARABOLIC')>=0)){
-      state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+
+    if(inBearBias){
+      if(deepDeterioration||m6Soft||severeDecline||(m1Persist&&(m3Damaged||m3Dn))){
+        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+      }
+      if(recoverySeq&&!m1Persist){
+        state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      }
+      // stay in bias while persistence continues
+      if(m1Persist&&(m3Mixed||m3Dn)&&!recoverySeq&&state.indexOf('NEUTRAL')>=0){
+        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      }
     }
-    if(inContraction&&state.indexOf('EXPANSION')>=0){
-      state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
+
+    if(inContraction){
+      if(m6Broken||yBroken){
+        state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+      } else if(recoverySeq&&m1Bull&&m3Up&&!m1Persist){
+        state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
+      } else if(recoverySeq){
+        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      } else if(state.indexOf('NEUTRAL')>=0||state.indexOf('EXPANSION')>=0){
+        // do not bounce to EXP/NEUTRAL while still damaged
+        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
+      }
     }
-    if(inContraction&&state.indexOf('PARABOLIC')>=0){
-      state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
+
+    if(inBroken){
+      if(m6Broken||yBroken){
+        state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+      } else if(recoverySeq){
+        state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      } else {
+        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+      }
     }
-    // Stay in CONTRACTION until recovery sequence or structural broken — no bounce to NEUTRAL
-    if(inContraction&&state.indexOf('NEUTRAL')>=0&&!recoverySeq){
-      state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
-    }
-    if(inBearBias&&state.indexOf('NEUTRAL')>=0&&(m1Dn||m1DnPersist||m3Dn)){
-      state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-    }
-    // Parabolic persistence
-    if(p.indexOf('PARABOLIC')>=0&&m6Bull&&m3Up&&m1Up&&!m6Damaged&&!yBroken){
+
+    if(inRec&&m6Intact&&m3Up&&m1Bull&&!m1Persist&&!seqDeterioration){
       if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
-      else if(!m1DnPersist){ state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
+      else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
     }
-  } else if(severeDecline&&!yBroken){
-    state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+
+    if(p.indexOf('PARABOLIC')>=0&&m6Intact&&m3Up&&m1Bull&&!m1Persist){
+      if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
+      else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
+    }
   }
 
   const missing=[];
-  if(!m6.available) missing.push('6M');
-  if(!m3.available) missing.push('3M');
-  if(!m1.available) missing.push('1M');
-  if(!yAvailable) missing.push('1Y');
+  if(!m6Avail) missing.push('6M');
+  if(!m3Avail) missing.push('3M');
+  if(!m1Avail) missing.push('1M');
+  if(!yAvail) missing.push('1Y');
   if(missing.indexOf('6M')>=0&&missing.indexOf('3M')>=0) conf='LOW';
-  else if(!yAvailable) conf=conf==='HIGH'?'MEDIUM':conf;
+  else if(!yAvail) conf=conf==='HIGH'?'MEDIUM':conf;
   if(missing.indexOf('1M')>=0&&missing.indexOf('3M')>=0&&missing.indexOf('6M')>=0){
     state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='INSUFFICIENT DATA'; conf='LOW';
   }
+
   return {state,regime,phase,conf,cycle,missing,m1Dn:!!m1Dn,severeDecline:!!severeDecline};
 }
 
