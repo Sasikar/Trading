@@ -1379,16 +1379,21 @@ function macroGradeBadge(g){
 
 
 function macroStateStyle(state){
-  /* History UI: green / gray / red only — no yellow/orange. */
+  /* Calendar short labels MUST match detailed regime severity.
+     TRANS ≠ CON ≠ BEAR. Never label BEARISH BIAS as BEAR. */
   const s=String(state||'');
   if(s.indexOf('PARABOLIC')>=0) return {bg:'#0d3d28', fg:'#7dffb5', short:'PAR', band:'#2ee67a'};
   if(s.indexOf('EXPANSION')>=0) return {bg:'#0c2f22', fg:'#62e3a0', short:'EXP', band:'#3bcf86'};
   if(s.indexOf('RECOVERY')>=0) return {bg:'#0a2820', fg:'#4fcf96', short:'REC', band:'#3aa876'};
   if(s.indexOf('BULLISH BIAS')>=0) return {bg:'#0a221c', fg:'#8fd4b0', short:'BULL', band:'#6bc49a'};
   if(s.indexOf('NEUTRAL')>=0||s.indexOf('INSUFFICIENT')>=0) return {bg:'#1a1f24', fg:'#9aa3ad', short:'NEU', band:'#6b7280'};
-  if(s.indexOf('BEARISH BIAS')>=0) return {bg:'#2a1418', fg:'#f0a0a8', short:'BEAR', band:'#e07a84'};
+  /* mildest bearish: TRANSITION — BEARISH BIAS → TRANS (light red) */
+  if(s.indexOf('BEARISH BIAS')>=0) return {bg:'#2a181c', fg:'#f0b0b6', short:'TRANS', band:'#d48a92'};
+  /* mid: CONTRACTION → CON (stronger red) */
   if(s.indexOf('CONTRACTION')>=0) return {bg:'#2c1014', fg:'#ff6f7c', short:'CON', band:'#e23d4c'};
-  if(s.indexOf('CYCLE BROKEN')>=0||s.indexOf('BROKEN')>=0) return {bg:'#3a0c12', fg:'#ff4d5e', short:'BROKE', band:'#c41e2e'};
+  /* strongest: CYCLE BROKEN only → BEAR (deep red) */
+  if(s.indexOf('CYCLE BROKEN')>=0||(s.indexOf('REGIME')>=0&&s.indexOf('BROKEN')>=0)) return {bg:'#3a0c12', fg:'#ff4d5e', short:'BEAR', band:'#c41e2e'};
+  if(s.indexOf('BROKEN')>=0) return {bg:'#3a0c12', fg:'#ff4d5e', short:'BEAR', band:'#c41e2e'};
   return {bg:'#1a1f24', fg:'#9aa3ad', short:'—', band:'#6b7280'};
 }
 function ymFromTs(ts){
