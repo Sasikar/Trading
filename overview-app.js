@@ -1189,71 +1189,72 @@ function mapMacroState(ev, prev, opts){
   }
 
   const accel=!!ev.parabolic;
-  let state='🟡 TRANSITION — NEUTRAL';
-  let regime='NEUTRAL', phase='NEUTRAL', conf='MEDIUM', cycle='UNRESOLVED';
+  let state='⚪ Chop / Unclear';
+  let regime='NEUTRAL', phase='CHOP', conf='MEDIUM', cycle='UNRESOLVED';
 
   // --- Base classification ---
   if((m6Broken||yBroken)&&(m1Dn||m3Dn||deepDeterioration)){
-    state='🔴 BEARISH — REGIME / CYCLE BROKEN';
-    regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+    state='🔴 Bear market';
+    regime='BEARISH'; phase='BEAR MARKET'; conf='HIGH'; cycle='BROKEN';
   } else if(deepDeterioration||(severeDecline&&m1Persist&&(m3Dn||m3Damaged||m3Mixed))){
-    state='🟠 BEARISH — CONTRACTION';
-    regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+    state='🟠 Bear pressure';
+    regime='BEARISH'; phase='BEAR PRESSURE'; conf='HIGH'; cycle='CONTRACTION';
   } else if(earlyDeterioration){
-    state='🟠 TRANSITION — BEARISH BIAS';
-    regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+    state='🟠 Caution';
+    regime='BEARISH'; phase='CAUTION'; conf='MEDIUM'; cycle='TRANSITION';
   } else if(accel&&m6Intact&&m3Up&&htfAlive&&!seqDeterioration){
     // Parabolic qualifies even if 1M swing still lagging "DAMAGED" after a huge run
-    state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
+    state='🟢 Overextended'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
   } else if(m6Intact&&m3Up&&m1Repaired&&!m1Persist&&htfAlive){
-    state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+    state='🟢 Bull market'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
   } else if((recoverySustained||(m6Intact&&m3Up&&seqUp))&&htfAlive&&!seqDeterioration){
-    state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
+    state='🟢 Recovering'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
   } else if(htfStrong&&!m1Persist){
-    if(m1Repaired||m3Up||!seqDn){ state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='MEDIUM'; cycle='EXPANSION'; }
-    else { state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='NEUTRAL'; conf='MEDIUM'; cycle='TRANSITION'; }
+    if(m1Repaired||m3Up||!seqDn){ state='🟢 Bull market'; regime='BULLISH'; phase='EXPANSION'; conf='MEDIUM'; cycle='EXPANSION'; }
+    else { state='⚪ Chop / Unclear'; regime='NEUTRAL'; phase='CHOP'; conf='MEDIUM'; cycle='TRANSITION'; }
   } else if(m1Repaired&&m3Up&&htfAlive){
-    state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+    state='🟡 Turning up'; regime='BULLISH'; phase='TURNING UP'; conf='MEDIUM'; cycle='TRANSITION';
   }
 
   // --- Hysteresis / ladder ---
   if(prev){
     const p=String(prev);
-    const inExp=p.indexOf('EXPANSION')>=0||p.indexOf('PARABOLIC')>=0;
-    const inBearBias=p.indexOf('BEARISH BIAS')>=0;
-    const inContraction=p.indexOf('CONTRACTION')>=0;
-    const inBroken=p.indexOf('CYCLE BROKEN')>=0;
-    const inRec=p.indexOf('RECOVERY')>=0;
-    const inBullBias=p.indexOf('BULLISH BIAS')>=0;
-    const inNeutral=p.indexOf('NEUTRAL')>=0;
+    const has=function(){for(let i=0;i<arguments.length;i++){if(p.indexOf(arguments[i])>=0)return true;}return false;};
+    const inExp=has('EXPANSION','Bull market','PARABOLIC','Overextended','HOT');
+    const inBearBias=has('BEARISH BIAS','Caution','WARN');
+    const inContraction=has('CONTRACTION','Bear pressure','PRESS');
+    const inBroken=has('CYCLE BROKEN','Bear market')&&!has('Bear pressure'); // full bear only
+    const inRec=has('RECOVERY','Recovering')&&!has('ACCUMULATION'); // macro only
+    const inBullBias=has('BULLISH BIAS','Turning up','UP');
+    const inNeutral=has('NEUTRAL','Chop','Unclear','MIX');
 
     // Escalation from EXP
     if(inExp){
       if(accel&&m6Intact&&m3Up&&!m1Persist&&!seqDeterioration){
-        state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
+        state='🟢 Overextended'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
       } else if(!m1Persist&&htfStrong&&!m3Damaged){
-        state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+        state='🟢 Bull market'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
       }
       if(m1Persist&&(m3Mixed||m3Dn||m3Damaged)&&htfAlive){
-        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+        state='🟠 Caution'; regime='BEARISH'; phase='CAUTION'; conf='MEDIUM'; cycle='TRANSITION';
       }
       if(deepDeterioration||(severeDecline&&m1Persist)){
-        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+        state='🟠 Bear pressure'; regime='BEARISH'; phase='BEAR PRESSURE'; conf='HIGH'; cycle='CONTRACTION';
       }
     }
 
     // BEARISH BIAS
     if(inBearBias){
       if(deepDeterioration||m6Soft||severeDecline||(m1Persist&&(m3Damaged||m3Dn))){
-        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+        state='🟠 Bear pressure'; regime='BEARISH'; phase='BEAR PRESSURE'; conf='HIGH'; cycle='CONTRACTION';
       } else if(recoverySustained){
         // sustained repair → bullish bias / neutral, not instant EXP
-        state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+        state='🟡 Turning up'; regime='BULLISH'; phase='TURNING UP'; conf='MEDIUM'; cycle='TRANSITION';
       } else if(recoveryProbe&&!m1Persist){
         // one good month: ease to NEUTRAL only, still defensive
-        state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='NEUTRAL'; conf='MEDIUM'; cycle='TRANSITION';
+        state='⚪ Chop / Unclear'; regime='NEUTRAL'; phase='CHOP'; conf='MEDIUM'; cycle='TRANSITION';
       } else if(m1Persist&&(m3Mixed||m3Dn)&&!recoverySustained){
-        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+        state='🟠 Caution'; regime='BEARISH'; phase='CAUTION'; conf='MEDIUM'; cycle='TRANSITION';
       }
     }
 
@@ -1262,64 +1263,64 @@ function mapMacroState(ev, prev, opts){
     // 1M swing "DAMAGED" from stale pivots must NOT lock CON for years (2020-21 bug).
     if(inContraction){
       if(m6Broken||yBroken){
-        state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+        state='🔴 Bear market'; regime='BEARISH'; phase='BEAR MARKET'; conf='HIGH'; cycle='BROKEN';
       } else if(m6Intact&&m3Up&&seqUp&&!seqDeterioration&&histUp>=1){
         // HTF-confirmed bull recovery from contraction
         if(accel){
-          state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
+          state='🟢 Overextended'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
         } else if(m6Intact&&m3Up&&(m1Repaired||seqUp)){
-          state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
+          state='🟢 Recovering'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
         }
       } else if(recoverySustained&&m3Repaired){
-        state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+        state='🟡 Turning up'; regime='BULLISH'; phase='TURNING UP'; conf='MEDIUM'; cycle='TRANSITION';
       } else if(recoveryProbe&&!recoverySustained&&!m6Intact){
         // Counter-trend only when HTF not confirmed intact
-        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
+        state='🟠 Bear pressure'; regime='BEARISH'; phase='BEAR PRESSURE'; conf='MEDIUM'; cycle='CONTRACTION';
       } else if(m6Intact&&m3Up&&!seqDeterioration&&seqHigher>=1){
-        state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+        state='🟡 Turning up'; regime='BULLISH'; phase='TURNING UP'; conf='MEDIUM'; cycle='TRANSITION';
       } else if(!m6Intact&&(m1Dn||m1Persist||m3Dn||m3Damaged)){
-        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
+        state='🟠 Bear pressure'; regime='BEARISH'; phase='BEAR PRESSURE'; conf='MEDIUM'; cycle='CONTRACTION';
       }
     }
 
     // From BEARISH BIAS after leaving contraction: next step to RECOVERY/EXP needs more persistence
     if(inBullBias||(inBearBias&&recoverySustained)){
       if(recoverySustained&&m6Intact&&m3Repaired&&m1Repaired&&recoveryPersist){
-        state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
+        state='🟢 Recovering'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
       }
     }
 
     // RECOVERY → EXPANSION / PARABOLIC
     if(inRec){
       if(m1Persist&&(m3Dn||m3Damaged)&&!m6Intact){
-        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+        state='🟠 Caution'; regime='BEARISH'; phase='CAUTION'; conf='MEDIUM'; cycle='TRANSITION';
       } else if(accel&&m6Intact&&m3Up){
-        state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
+        state='🟢 Overextended'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
       } else if(m6Intact&&m3Up&&(m1Repaired||seqUp)&&!m1Persist){
-        if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
-        else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
+        if(accel){ state='🟢 Overextended'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
+        else { state='🟢 Bull market'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
       } else {
-        state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
+        state='🟢 Recovering'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
       }
     }
 
     if(inBroken){
       if(m6Broken||yBroken){
-        state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+        state='🔴 Bear market'; regime='BEARISH'; phase='BEAR MARKET'; conf='HIGH'; cycle='BROKEN';
       } else if(recoverySustained){
-        state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+        state='🟡 Turning up'; regime='BULLISH'; phase='TURNING UP'; conf='MEDIUM'; cycle='TRANSITION';
       } else {
-        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+        state='🟠 Bear pressure'; regime='BEARISH'; phase='BEAR PRESSURE'; conf='HIGH'; cycle='CONTRACTION';
       }
     }
 
     if(inNeutral&&recoverySustained&&htfAlive){
-      state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      state='🟡 Turning up'; regime='BULLISH'; phase='TURNING UP'; conf='MEDIUM'; cycle='TRANSITION';
     }
 
     if(p.indexOf('PARABOLIC')>=0&&m6Intact&&m3Repaired&&m1Repaired&&!m1Persist){
-      if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
-      else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
+      if(accel){ state='🟢 Overextended'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
+      else { state='🟢 Bull market'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
     }
   }
 
@@ -1331,7 +1332,7 @@ function mapMacroState(ev, prev, opts){
   if(missing.indexOf('6M')>=0&&missing.indexOf('3M')>=0) conf='LOW';
   else if(!yAvail) conf=conf==='HIGH'?'MEDIUM':conf;
   if(missing.indexOf('1M')>=0&&missing.indexOf('3M')>=0&&missing.indexOf('6M')>=0){
-    state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='INSUFFICIENT DATA'; conf='LOW';
+    state='⚪ Chop / Unclear'; regime='NEUTRAL'; phase='INSUFFICIENT DATA'; conf='LOW';
   }
 
   return {
@@ -1372,15 +1373,17 @@ function detectParabolicAccel(m1kl){
 }
 
 function explainMacro(r, ev){
-  if(r.phase==='INSUFFICIENT DATA') return 'Not enough completed macro candles to assess the giant cycle. Missing data is not treated as bullish or bearish.';
-  if(r.phase==='PARABOLIC') return 'Bullish expansion has entered an accelerated phase across multiple completed months. Structure remains intact; this is rare and not a short-term trade signal.';
-  if(r.phase==='EXPANSION') return 'Broader BTC macro cycle is structurally advancing. Protected macro lows hold; normal monthly corrections do not flip this regime.';
-  if(r.phase==='RECOVERY') return 'Macro cycle is repairing after damage. Multi-timeframe improvement is present; full expansion is not yet confirmed.';
-  if(r.phase.indexOf('BULLISH BIAS')>=0) return 'Bullish macro transition developing: 1M/3M improving while slower context (e.g. 6M) may still look damaged. Does not wait for 6M to formally flip.';
-  if(r.phase.indexOf('BEARISH BIAS')>=0) return 'Bearish macro transition developing: recent lower highs / weakening 1M–3M while the largest regime is not fully invalidated.';
-  if(r.phase==='CONTRACTION') return 'Macro cycle contracting with persistent weaker structure on intermediate horizons. Not necessarily full 1Y cycle death.';
-  if(r.phase.indexOf('CYCLE BROKEN')>=0) return 'Confirmed higher-timeframe macro failure on completed candles. A single crash or wick is not enough for this state.';
-  return 'Macro evidence is mixed; treating regime as unresolved transition.';
+  const ph=String(r.phase||''), st=String(r.state||'');
+  if(ph==='INSUFFICIENT DATA') return 'Not enough completed macro candles yet. Missing data is not bullish or bearish.';
+  if(ph==='PARABOLIC'||st.indexOf('Overextended')>=0) return 'Overextended: rare multi-month melt-up while structure still holds. Not a short-term trade signal by itself.';
+  if(ph==='EXPANSION'||st.indexOf('Bull market')>=0) return 'Bull market: broader cycle is advancing. Normal monthly pullbacks usually stay inside this regime.';
+  if(ph==='RECOVERY'||st.indexOf('Recovering')>=0) return 'Recovering: structure is repairing after damage. Full bull market not fully confirmed yet.';
+  if(ph.indexOf('BULLISH BIAS')>=0||ph==='TURNING UP'||st.indexOf('Turning up')>=0) return 'Turning up: early improvement on faster horizons. Still a transition, not a full bull label.';
+  if(ph.indexOf('BEARISH BIAS')>=0||ph==='CAUTION'||st.indexOf('Caution')>=0) return 'Caution: early defensive warning from 1M/3M deterioration. Not a confirmed bear market.';
+  if(ph==='CONTRACTION'||ph==='BEAR PRESSURE'||st.indexOf('Bear pressure')>=0) return 'Bear pressure: deeper, persistent weakness. Stronger than Caution; still not automatic full cycle death.';
+  if(ph.indexOf('CYCLE BROKEN')>=0||ph==='BEAR MARKET'||st.indexOf('Bear market')>=0) return 'Bear market: higher-timeframe structure has failed on completed candles. Strongest bearish regime.';
+  if(ph==='CHOP'||st.indexOf('Chop')>=0) return 'Chop / unclear: mixed evidence; no strong bull or bear regime.';
+  return 'Mixed macro evidence; treating regime as unresolved.';
 }
 
 function macroGradeBadge(g){
@@ -1393,21 +1396,24 @@ function macroGradeBadge(g){
 
 
 function macroStateStyle(state){
-  /* Calendar short labels MUST match detailed regime severity.
-     TRANS ≠ CON ≠ BEAR. Never label BEARISH BIAS as BEAR. */
+  /* Clear labels: HOT > BULL > REC > UP > MIX > WARN > PRESS > BEAR */
   const s=String(state||'');
-  if(s.indexOf('PARABOLIC')>=0) return {bg:'#0d3d28', fg:'#7dffb5', short:'PAR', band:'#2ee67a'};
-  if(s.indexOf('EXPANSION')>=0) return {bg:'#0c2f22', fg:'#62e3a0', short:'EXP', band:'#3bcf86'};
-  if(s.indexOf('RECOVERY')>=0) return {bg:'#0a2820', fg:'#4fcf96', short:'REC', band:'#3aa876'};
-  if(s.indexOf('BULLISH BIAS')>=0) return {bg:'#0a221c', fg:'#8fd4b0', short:'BULL', band:'#6bc49a'};
-  if(s.indexOf('NEUTRAL')>=0||s.indexOf('INSUFFICIENT')>=0) return {bg:'#1a1f24', fg:'#9aa3ad', short:'NEU', band:'#6b7280'};
-  /* mildest bearish: TRANSITION — BEARISH BIAS → TRANS (light red) */
-  if(s.indexOf('BEARISH BIAS')>=0) return {bg:'#2a181c', fg:'#f0b0b6', short:'TRANS', band:'#d48a92'};
-  /* mid: CONTRACTION → CON (stronger red) */
-  if(s.indexOf('CONTRACTION')>=0) return {bg:'#2c1014', fg:'#ff6f7c', short:'CON', band:'#e23d4c'};
-  /* strongest: CYCLE BROKEN only → BEAR (deep red) */
-  if(s.indexOf('CYCLE BROKEN')>=0||(s.indexOf('REGIME')>=0&&s.indexOf('BROKEN')>=0)) return {bg:'#3a0c12', fg:'#ff4d5e', short:'BEAR', band:'#c41e2e'};
-  if(s.indexOf('BROKEN')>=0) return {bg:'#3a0c12', fg:'#ff4d5e', short:'BEAR', band:'#c41e2e'};
+  if(s.indexOf('Overextended')>=0||s.indexOf('PARABOLIC')>=0||s.indexOf('HOT')>=0)
+    return {bg:'#0d3d28', fg:'#7dffb5', short:'HOT', band:'#2ee67a'};
+  if(s.indexOf('Bull market')>=0||s.indexOf('EXPANSION')>=0)
+    return {bg:'#0c2f22', fg:'#62e3a0', short:'BULL', band:'#3bcf86'};
+  if(s.indexOf('Recovering')>=0||s.indexOf('RECOVERY')>=0)
+    return {bg:'#0a2820', fg:'#4fcf96', short:'REC', band:'#3aa876'};
+  if(s.indexOf('Turning up')>=0||s.indexOf('BULLISH BIAS')>=0)
+    return {bg:'#0a221c', fg:'#8fd4b0', short:'UP', band:'#6bc49a'};
+  if(s.indexOf('Chop')>=0||s.indexOf('Unclear')>=0||s.indexOf('NEUTRAL')>=0||s.indexOf('INSUFFICIENT')>=0)
+    return {bg:'#1a1f24', fg:'#9aa3ad', short:'MIX', band:'#6b7280'};
+  if(s.indexOf('Caution')>=0||s.indexOf('BEARISH BIAS')>=0||s.indexOf('WARN')>=0)
+    return {bg:'#2a181c', fg:'#f0b0b6', short:'WARN', band:'#d48a92'};
+  if(s.indexOf('Bear pressure')>=0||s.indexOf('CONTRACTION')>=0||s.indexOf('PRESS')>=0)
+    return {bg:'#2c1014', fg:'#ff6f7c', short:'PRESS', band:'#e23d4c'};
+  if(s.indexOf('Bear market')>=0||s.indexOf('CYCLE BROKEN')>=0||(s.indexOf('REGIME')>=0&&s.indexOf('BROKEN')>=0))
+    return {bg:'#3a0c12', fg:'#ff4d5e', short:'BEAR', band:'#c41e2e'};
   return {bg:'#1a1f24', fg:'#9aa3ad', short:'—', band:'#6b7280'};
 }
 function ymFromTs(ts){
@@ -1516,7 +1522,7 @@ function renderMacroHistory(rows){
     grid+='</div>';
   }
   root.innerHTML=
-    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">24 MONTHS · ENGINE OUTPUT</div></div>'
+    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">2018+ · ENGINE OUTPUT</div></div>'
     +'<div class="mac-band" aria-hidden="true">'+band+'</div>'
     +grid
     +'<div class="mac-hist-detail" id="mac-hist-detail"><div class="mac-hist-detail-placeholder">Tap a month for engine snapshot</div></div>';
