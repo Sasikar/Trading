@@ -89,9 +89,11 @@ async function fetchKlines(interval,limit){
   /* Browser-direct: Kraken for 4h/1d/1w. True 1M from static data/btc-monthly.json — never 21600. */
   if(interval==='1M'){
     let raw=null;
-    for(const u of ['./data/btc-monthly.json','data/btc-monthly.json']){
-      raw=await jget(u); if(raw&&raw.length) break;
-    }
+    const bases=[];
+    try{ bases.push(new URL('data/btc-monthly.json', location.href).href); }catch(e){}
+    bases.push('./data/btc-monthly.json','data/btc-monthly.json');
+    for(const u of bases){ raw=await jget(u); if(raw&&raw.length) break; }
+
     if(!raw||!raw.length) throw new Error('btc-monthly.json empty');
     const rows=raw.map(r=>[r.ts||Date.parse(r.time+'-01T00:00:00Z'),+r.open,+r.high,+r.low,+r.close,+(r.volume||0)])
       .filter(k=>Number.isFinite(k[0])).sort((a,b)=>a[0]-b[0]);
@@ -191,7 +193,10 @@ function calendar1Y(m1){
 async function fetchMacroSeries(){
   /* Pages-only: true monthly from data/btc-monthly.json — never Worker, never Kraken 21600. */
   let raw=[];
-  for(const u of ['./data/btc-monthly.json','/data/btc-monthly.json','data/btc-monthly.json']){
+  const bases=[];
+  try{ bases.push(new URL('data/btc-monthly.json', location.href).href); }catch(e){}
+  bases.push('./data/btc-monthly.json','data/btc-monthly.json');
+  for(const u of bases){
     try{
       const r=await fetch(u,{cache:'no-store'});
       if(!r.ok) continue;
@@ -395,25 +400,7 @@ function ensureMacd(){const el=$('macd-tv');if(!el||typeof LightweightCharts==='
 function ema(arr,n){const o=[],k=2/(n+1);let prev=null;for(let i=0;i<arr.length;i++){if(arr[i]==null){o.push(null);continue;}if(prev==null){let s=0,c=0;for(let j=0;j<=i;j++)if(arr[j]!=null){s+=arr[j];c++;}if(c<n){o.push(null);continue;}prev=s/c;o.push(prev);continue;}prev=arr[i]*k+prev*(1-k);o.push(prev);}return o;}
 function calcRSI(closes,period=14){if(closes.length<period+1)return null;let gains=0,losses=0;for(let i=closes.length-period;i<closes.length;i++){const d=closes[i]-closes[i-1];if(d>=0)gains+=d;else losses-=d;}const ag=gains/period,al=losses/period;if(al===0)return 100;return 100-(100/(1+ag/al));}
 function calcMACDSeries(closes,times){const e12=ema(closes,12),e26=ema(closes,26);const macdLine=closes.map((_,i)=>(e12[i]!=null&&e26[i]!=null)?e12[i]-e26[i]:null);const signal=ema(macdLine.map(v=>v==null?0:v),9);const hist=[],ml=[],sl=[];for(let i=0;i<closes.length;i++){if(macdLine[i]==null||signal[i]==null||times[i]==null)continue;const h=macdLine[i]-signal[i];hist.push({time:times[i],value:h,color:h>=0?'rgba(98,227,160,.55)':'rgba(255,111,124,.55)'});ml.push({time:times[i],value:macdLine[i]});sl.push({time:times[i],value:signal[i]});}const last=hist.length?hist[hist.length-1]:null,prev=hist.length>1?hist[hist.length-2]:null;return{hist,ml,sl,lastHist:last?last.value:null,prevHist:prev?prev.value:null,lastMacd:ml.length?ml[ml.length-1].value:null,lastSig:sl.length?sl[sl.length-1].value:null};}
-async function fetchKlines(interval,limit){
-  const bar={ '4h':'4H','1d':'1D','1w':'1W','1M':'1M','3M':'3M'}[interval]||interval;
-  // Kraken has no 3M; skip for 3M
-  if(interval!=='3M'&&interval!=='6M'&&interval!=='1Y'){
-    try{
-      const iv={ '4h':240,'1d':1440,'1w':10080,'1M':21600,'1h':60 }[interval]||1440;
-      const j=await jget('https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval='+iv);
-      const rows=(j&&j.result&&(j.result.XXBTZUSD||j.result.XBTUSD))||[];
-      if(rows.length){
-        const slice=rows.slice(-Math.min(limit,rows.length));
-        return slice.map(k=>[k[0]*1000,+k[1],+k[2],+k[3],+k[4],+k[6]]);
-      }
-    }catch(e){}
-  }
-  const r=await fetch('/api/okx/candles?instId=BTC-USDT&bar='+bar+'&limit='+limit,{cache:'no-store'});
-  if(!r.ok)throw new Error('candles '+r.status);
-  const j=await r.json();
-  return (j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
-}
+
 function ymUTC(ts){
   const d=new Date(+ts);
   return {y:d.getUTCFullYear(), m:d.getUTCMonth()+1}; // m=1..12
@@ -494,62 +481,8 @@ function calendar1Y(m1){
   }
   return out;
 }
-async function fetchMacroSeries(){
-  /* True calendar 3M/6M/1Y from completed MONTHLY candles only.
-     Never use Kraken 21600 (15-day) — that caused duplicate months in history. */
-  let m1raw=[];
-  try{
-    const r=await fetch('/api/okx/candles?instId=BTC-USDT&bar=1M&limit=100',{cache:'no-store',credentials:'same-origin'});
-    if(r.ok){
-      const j=await r.json();
-      m1raw=(j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
-    }
-  }catch(e){}
-  if(!m1raw.length){
-    try{
-      // public OKX direct (may fail CORS in browser — worker path preferred)
-      const r2=await fetch('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1M&limit=100',{cache:'no-store'});
-      if(r2.ok){
-        const j=await r2.json();
-        m1raw=(j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
-      }
-    }catch(e){}
-  }
-  // Deduplicate one candle per calendar month (keep last)
-  const by={};
-  for(const k of m1raw){
-    const {y,m}=ymUTC(k[0]);
-    by[y+'-'+m]=k;
-  }
-  m1raw=Object.keys(by).sort().map(k=>by[k]);
-  const m1=completedMonthlyOnly(m1raw);
-  const m3=calendar3M(m1);
-  const m6=calendar6M(m1);
-  const y1=calendar1Y(m1);
-  // Debug proof of buckets (once per load)
-  try{
-    if(typeof console!=='undefined'&&console.debug){
-      console.debug('[macro TF] completed 1M last', m1.length?ymUTC(m1[m1.length-1][0]):null);
-      console.debug('[macro TF] 6M count', m6.length, m6.slice(-3).map(k=>{const d=new Date(k[0]); return d.getUTCFullYear()+'-H'+(d.getUTCMonth()<6?1:2)+' O'+k[1]+' C'+k[4];}));
-      console.debug('[macro TF] 1Y count', y1.length, y1.slice(-3).map(k=>{const d=new Date(k[0]); return d.getUTCFullYear()+' O'+k[1]+' C'+k[4];}));
-      console.debug('[macro TF] 3M count', m3.length);
-    }
-  }catch(e){}
-  return {m1,m3,m6,y1};
-}
-async function fetchPrice(){
-  try{
-    const j=await jget('https://api.kraken.com/0/public/Ticker?pair=XBTUSD');
-    const b=j&&j.result&&(j.result.XXBTZUSD||j.result.XBTUSD);
-    if(b) return +b.c[0];
-  }catch(e){}
-  try{
-    const r=await fetch('/api/okx/ticker?instId=BTC-USDT',{cache:'no-store'});
-    if(!r.ok)return null;
-    const j=await r.json();
-    return j.data&&j.data[0]?+j.data[0].last:null;
-  }catch(e){return null;}
-}
+
+
 async function loadTF(tfKey){const cfg=TF[tfKey]||TF['1d'];['tf-name','macd-tf-name','sr-tf-name'].forEach(id=>{if($(id))$(id).textContent=cfg.label;});try{const [kl,spot]=await Promise.all([fetchKlines(cfg.interval,cfg.limit),fetchPrice()]);if(!kl||!kl.length||spot==null)throw new Error('nodata');const swing=kl.slice(-cfg.swing);let hi=-Infinity,lo=Infinity;for(const k of swing){hi=Math.max(hi,+k[2]);lo=Math.min(lo,+k[3]);}const range=hi-lo||1;const levels=FIB.map(({r,label})=>({key:label,price:lo+range*r,kind:(r===0.382||r===0.5||r===0.618)?'fib-key':'fib',r})).sort((a,b)=>b.price-a.price);$('fib-spot').textContent=money(spot);$('fib-meta').textContent='BTC · '+cfg.label;let nearest=levels[0],nd=Math.abs(spot-levels[0].price);levels.forEach(l=>{const d=Math.abs(spot-l.price);if(d<nd){nd=d;nearest=l;}});$('fib-bias').textContent='Near '+nearest.key;renderLadder(spot,levels,'fib-ladder');destroyFib();ensureFib();const slice=kl.slice(-cfg.fibBars);const candles=slice.map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4]}));fibSeries.setData(candles);fibVol.setData(slice.map(k=>({time:Math.floor(k[0]/1000),value:+k[5],color:(+k[4]>=+k[1])?'rgba(98,227,160,.35)':'rgba(255,111,124,.35)'})));levels.forEach(l=>{const k=l.kind==='fib-key';fibLines.push(fibSeries.createPriceLine({price:l.price,color:k?'#e6c878':'#6eb6ff',lineWidth:k?2:1,lineStyle:k?0:2,axisLabelVisible:true,title:l.key}));});const pad=range*0.06;fibSeries.applyOptions({autoscaleInfoProvider:()=>({priceRange:{minValue:lo-pad,maxValue:hi+pad}})});const n=candles.length;fibChart.timeScale().applyOptions({rightOffset:cfg.rightOff,barSpacing:cfg.barSp,fixLeftEdge:false,fixRightEdge:false});fibChart.timeScale().setVisibleLogicalRange({from:Math.max(-0.5,n-35),to:n-1+cfg.rightOff});$('fib-source').textContent='LIVE · '+cfg.label;const closes=kl.map(k=>+k[4]),times=kl.map(k=>Math.floor(k[0]/1000)),vols=kl.map(k=>+k[5]);const pack=calcMACDSeries(closes,times);destroyMacd();ensureMacd();const ms=Math.min(pack.hist.length,cfg.macdBars);histS.setData(pack.hist.slice(-ms));macdLineS.setData(pack.ml.slice(-ms));sigLineS.setData(pack.sl.slice(-ms));const h=pack.lastHist,m=pack.lastMacd,s=pack.lastSig;const f=v=>(v==null?'—':((v>=0?'+':'')+v.toFixed(0)));$('macd-note').textContent='HIST '+f(h)+' · LINE '+f(m)+' · SIG '+f(s);$('macd-source').textContent='LIVE · '+cfg.label;const rsi=calcRSI(closes,14);if(rsi!=null){$('rsi-val').textContent=rsi.toFixed(1);$('rsi-sub').textContent=rsi>=70?'OB':rsi<=30?'OS':'Mid';$('rsi-tag').textContent=rsi>=70?'OVERBOUGHT':rsi<=30?'OVERSOLD':'NEUTRAL';$('rsi-tag').className='tag '+(rsi>=70?'tag-bear':rsi<=30?'tag-bull':'tag-neut');}const lastV=vols[vols.length-1],avgN=Math.min(cfg.volAvg,vols.length-1),avg=vols.slice(-(avgN+1),-1).reduce((a,b)=>a+b,0)/Math.max(1,avgN),vRatio=avg?lastV/avg:1;$('vol-val').textContent=vRatio.toFixed(2)+'×';$('vol-sub').textContent='vs avg';$('vol-tag').textContent=vRatio>=1.4?'HIGH':vRatio<=0.7?'THIN':'OK';$('vol-tag').className='tag '+(vRatio>=1.4?'tag-bull':vRatio<=0.7?'tag-bear':'tag-neut');if(kl.length>=2){const prev=kl[kl.length-2];const piv=pivots(+prev[2],+prev[3],+prev[4]);renderLadder(spot,[{key:'R3',price:piv.R3,kind:'r'},{key:'R2',price:piv.R2,kind:'r'},{key:'R1',price:piv.R1,kind:'r'},{key:'P',price:piv.P,kind:'p'},{key:'S1',price:piv.S1,kind:'s'},{key:'S2',price:piv.S2,kind:'s'},{key:'S3',price:piv.S3,kind:'s'}],'sr-ladder');$('sr-spot').textContent=money(spot);$('sr-meta').textContent='BTC · '+cfg.label;$('sr-bias').textContent=spot>piv.P?'ABOVE P':'BELOW P';$('sr-source').textContent='OKX · '+cfg.label;}}catch(e){console.warn(e);$('fib-source').textContent='OFFLINE';}}
 function emaArr(closes,n){const o=[],k=2/(n+1);let prev=null;for(let i=0;i<closes.length;i++){if(prev==null){if(i<n-1){o.push(null);continue;}let s=0;for(let j=i-n+1;j<=i;j++)s+=closes[j];prev=s/n;o.push(prev);continue;}prev=closes[i]*k+prev*(1-k);o.push(prev);}return o;}
 function trendFromCloses(closes){if(closes.length<200)return{dir:'NEUTRAL',detail:'need 200'};const e50=emaArr(closes,50),e200=emaArr(closes,200);const c=closes[closes.length-1],a=e50[e50.length-1],b=e200[e200.length-1];if(a==null||b==null)return{dir:'NEUTRAL',detail:'EMA'};let dir='NEUTRAL';if(c>a&&c>b)dir='BULLISH';else if(c<a&&c<b)dir='BEARISH';const f=x=>Math.round(x).toLocaleString('en-US');return{dir,detail:'C '+f(c)+' · 50 '+f(a)+' · 200 '+f(b)};}
