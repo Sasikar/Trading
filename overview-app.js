@@ -750,7 +750,7 @@ async function loadStructural(){
   try{
     const [klD,klW,kl4]=await Promise.all([
       fetchKlines('1d',220),
-      fetchKlines('1w',120),
+      fetchKlines('1w',220),
       fetchKlines('4h',120)
     ]);
     const wStruct=swingStructure(klW, 52, '1w');
@@ -833,6 +833,8 @@ async function loadStructural(){
 
 /* ===== MACRO cycle engine (independent of Trend + Structural Trend) ===== */
 const MACRO_STATE_KEY='macro_cycle_state_v1';
+const MACRO_M1DN_KEY='macro_m1dn_hist_v1';
+const MACRO_LAST_MONTH_KEY='macro_last_completed_month_v1';
 
 function macroSwing(kl, lookback, label){
   /* Sparse HTF (6M/1Y) needs min 5 bars + adaptive pivots so structure can form. */
@@ -867,7 +869,7 @@ function macroSwing(kl, lookback, label){
     if(lh) protectedLH=Math.min(prev.p, protectedLH);
   } else if(lastH.length===1) protectedLH=lastH[0].p;
 
-  const closedIdx=closes.length>=2?closes.length-2:closes.length-1;
+  const closedIdx=closes.length-1; // completed-only macro series
   const closedClose=closes[closedIdx];
   const lastLow=lows[lows.length-1];
   let wickWarn=false, closeBreak=false, hardBreak=false;
@@ -909,8 +911,10 @@ function macroSwing(kl, lookback, label){
   return {available:true,label,bias,detail,grade,protectedHL,protectedLH,wickWarn,closeBreak,hardBreak,hh,hl,lh,ll,price:closes[closes.length-1]};
 }
 
-function mapMacroState(ev, prev){
-  /* 1Y = regime guardrail only — insufficient 1Y pivots must NOT force NEUTRAL. */
+function mapMacroState(ev, prev, opts){
+  /* opts: {m1DnHist:[bool,bool,bool]} last 3 completed months' m1Dn at the time (oldest→newest) */
+  opts=opts||{};
+  const m1DnHist=Array.isArray(opts.m1DnHist)?opts.m1DnHist.slice(-3):[];
   const y=ev.y1, m6=ev.m6, m3=ev.m3, m1=ev.m1;
   const yAvailable=!!(y&&y.available);
   const yBroken=yAvailable&&y.hardBreak;
@@ -918,6 +922,7 @@ function mapMacroState(ev, prev){
   const m6Bear=m6.available&&(m6.bias==='BEARISH'||m6.grade==='DAMAGED'||m6.grade==='BROKEN'||m6.lh);
   const m6Bull=m6.available&&(m6.bias==='BULLISH'||m6.grade==='INTACT'||(m6.hh&&m6.hl));
   const m6Damaged=m6.available&&(m6.hardBreak||m6.grade==='BROKEN');
+  const m6Soft=m6.available&&(m6.grade==='WEAKENING'||m6.grade==='DAMAGED'||m6.grade==='BROKEN'||m6.hardBreak);
   const m3Up=m3.available&&(m3.bias==='BULLISH'||m3.hl||m3.grade==='IMPROVING'||m3.grade==='INTACT');
   const m3Dn=m3.available&&(m3.bias==='BEARISH'||m3.lh||m3.grade==='DAMAGED'||m3.grade==='WEAKENING');
   const m1Up=m1.available&&(m1.bias==='BULLISH'||m1.hl||m1.grade==='IMPROVING'||m1.grade==='INTACT');
@@ -925,36 +930,42 @@ function mapMacroState(ev, prev){
   const recoverySeq=m1Up&&m3Up;
   const deteriorateSeq=m1Dn&&m3Dn;
   const accel=!!ev.parabolic;
+  const m1DnCount=m1DnHist.filter(Boolean).length;
+  const m1DnPersist=m1DnCount>=2; // 2 of last 3 completed months
+
+  // Trailing 12M decline from completed monthly closes only (no lookahead)
+  let severeDecline=false;
+  const closes=opts.m1Closes;
+  if(Array.isArray(closes)&&closes.length>=13){
+    const n=closes.length;
+    const last=closes[n-1], ago=closes[n-13];
+    const dd=ago>0?((last-ago)/ago):0;
+    let lower=0;
+    for(let i=n-3;i<n;i++){ if(closes[i]<closes[i-1]) lower++; }
+    if(dd<=-0.40&&lower>=2) severeDecline=true;
+  }
 
   let state='🟡 TRANSITION — NEUTRAL';
   let regime='NEUTRAL', phase='NEUTRAL', conf='MEDIUM', cycle='UNRESOLVED';
 
-  // Direction from 6M+3M+1M; 1Y only blocks/breaks, does not force neutral when thin
+  // Base directional read (no sticky expansion yet)
   if(yBroken&&(m6Damaged||m6Bear)&&(m3Dn||m1Dn)){
     state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
   } else if(m6Bull&&m3Up&&m1Up&&!m6Damaged&&!yBroken){
-    if(accel){
-      state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
-    } else {
-      state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
-    }
+    if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
+    else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
   } else if(recoverySeq&&!m6Damaged&&!yBroken&&(m6Bull||m6.grade==='IMPROVING'||m6.grade==='MIXED'||!m6.available)){
-    // repairing after damage — not full expansion yet
-    if(m6Bull&&m3Up&&m1Up){
-      state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
-    } else {
-      state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-    }
+    if(m6Bull&&m3Up&&m1Up){ state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY'; }
+    else { state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION'; }
   } else if(m6Bear&&recoverySeq&&!yBroken){
-    // classic 6M lag: still damaged 6M but 1M/3M improving
     state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='HIGH'; cycle='TRANSITION';
   } else if(m6Bull&&deteriorateSeq&&!yBroken){
     state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-  } else if((m6Bear||m6Damaged)&&(m3Dn||m1Dn)&&!yBroken){
+  } else if((m6Bear||m6Damaged||m6Soft)&&(m3Dn||m1Dn)&&!yBroken){
     state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
   } else if(recoverySeq&&!yBroken){
     state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-  } else if(deteriorateSeq){
+  } else if(deteriorateSeq||m1DnPersist){
     state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
   } else if(m6Bull&&(m1Up||m3Up)&&!yBroken){
     state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf=yAvailable?'HIGH':'MEDIUM'; cycle='EXPANSION';
@@ -962,33 +973,73 @@ function mapMacroState(ev, prev){
     state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
   }
 
-  // Hysteresis
+  // === EXPANSION EXIT LADDER (replaces sticky hysteresis) ===
   if(prev){
     const p=String(prev);
-    // Expansion holds through single-month noise
-    if(p.indexOf('EXPANSION')>=0&&state.indexOf('BEARISH')>=0&&!m6Damaged&&!yBroken){
-      if(deteriorateSeq){ state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION'; }
-      else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
-    }
-    if(p.indexOf('EXPANSION')>=0&&m1Dn&&!m3Dn&&!m6Damaged){
-      state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
-    }
-    // Parabolic ↔ Expansion with persistence (no flicker)
-    if(p.indexOf('PARABOLIC')>=0){
-      if(m6Bull&&m3Up&&m1Up&&!m6Damaged&&!yBroken){
-        if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
-        else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
+    const inExpansion=p.indexOf('EXPANSION')>=0||p.indexOf('PARABOLIC')>=0;
+    const inBearBias=p.indexOf('BEARISH BIAS')>=0;
+    const inContraction=p.indexOf('CONTRACTION')>=0;
+    const inBroken=p.indexOf('CYCLE BROKEN')>=0;
+
+    if(inExpansion){
+      // Step 1: EXPANSION → BEARISH BIAS when 1M bearish persists 2/3 months
+      if(m1DnPersist||(m1Dn&&m1DnHist.length>=2&&m1DnHist.slice(-2).every(Boolean))){
+        state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+      } else if(m1Dn&&!m3Dn&&!m6Damaged){
+        // single weak month: stay expansion (noise)
+        state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+      }
+      // Step 2 can also fire same month if 3M confirms
+      if((state.indexOf('BEARISH BIAS')>=0||m1DnPersist)&&(m3Dn||m6Soft)){
+        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
       }
     }
-    if(p.indexOf('CYCLE BROKEN')>=0&&(state.indexOf('EXPANSION')>=0||state.indexOf('PARABOLIC')>=0)){
+    if(inBearBias||state.indexOf('BEARISH BIAS')>=0){
+      // BEARISH BIAS → CONTRACTION
+      if((m3Dn&&(m1Dn||m1DnPersist))||m6Soft||m6Damaged){
+        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
+      }
+    }
+    // CONTRACTION → BROKEN only on hard structural failure
+    if(inContraction||state.indexOf('CONTRACTION')>=0){
+      if(yBroken||(m6Damaged&&m6.hardBreak)||(m6.hardBreak&&yBroken)){
+        if(yBroken||m6.hardBreak){
+          if(yBroken&&(m6Damaged||m6Bear)){
+            state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+          }
+        }
+      }
+    }
+    // Severity valve: ≥40% trailing 12M decline + 2/3 lower closes → at least CONTRACTION (never BROKEN alone)
+    if(severeDecline&&!yBroken&&!(m6.hardBreak&&yBroken)){
+      if(state.indexOf('EXPANSION')>=0||state.indexOf('PARABOLIC')>=0||state.indexOf('BULLISH BIAS')>=0||state.indexOf('NEUTRAL')>=0||state.indexOf('BEARISH BIAS')>=0){
+        state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
+      }
+    }
+    // Upward recovery hysteresis (unchanged intent)
+    if(inBroken&&(state.indexOf('EXPANSION')>=0||state.indexOf('PARABOLIC')>=0)){
       state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
     }
-    if(p.indexOf('CONTRACTION')>=0&&state.indexOf('EXPANSION')>=0){
+    if(inContraction&&state.indexOf('EXPANSION')>=0){
       state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
     }
-    if(p.indexOf('CONTRACTION')>=0&&state.indexOf('PARABOLIC')>=0){
+    if(inContraction&&state.indexOf('PARABOLIC')>=0){
       state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
     }
+    // Stay in CONTRACTION until recovery sequence or structural broken — no bounce to NEUTRAL
+    if(inContraction&&state.indexOf('NEUTRAL')>=0&&!recoverySeq){
+      state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
+    }
+    if(inBearBias&&state.indexOf('NEUTRAL')>=0&&(m1Dn||m1DnPersist||m3Dn)){
+      state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+    }
+    // Parabolic persistence
+    if(p.indexOf('PARABOLIC')>=0&&m6Bull&&m3Up&&m1Up&&!m6Damaged&&!yBroken){
+      if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
+      else if(!m1DnPersist){ state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
+    }
+  } else if(severeDecline&&!yBroken){
+    state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='HIGH'; cycle='CONTRACTION';
   }
 
   const missing=[];
@@ -996,12 +1047,12 @@ function mapMacroState(ev, prev){
   if(!m3.available) missing.push('3M');
   if(!m1.available) missing.push('1M');
   if(!yAvailable) missing.push('1Y');
-  if(missing.indexOf('6M')>=0&&missing.indexOf('3M')>=0){ conf='LOW'; }
+  if(missing.indexOf('6M')>=0&&missing.indexOf('3M')>=0) conf='LOW';
   else if(!yAvailable) conf=conf==='HIGH'?'MEDIUM':conf;
   if(missing.indexOf('1M')>=0&&missing.indexOf('3M')>=0&&missing.indexOf('6M')>=0){
     state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='INSUFFICIENT DATA'; conf='LOW';
   }
-  return {state,regime,phase,conf,cycle,missing};
+  return {state,regime,phase,conf,cycle,missing,m1Dn:!!m1Dn,severeDecline:!!severeDecline};
 }
 
 function detectParabolicAccel(m1kl){
@@ -1088,7 +1139,7 @@ function buildMacroHistory(m1all, displayN){
 
   const results=[];
   let prev=null;
-  // start after enough warm-up months so 6M/1Y can form
+  const m1DnHist=[]; // sequential, no lookahead
   const startIdx=Math.max(12, completed.length-displayN-6);
   for(let i=startIdx;i<completed.length;i++){
     const k=completed[i];
@@ -1104,7 +1155,10 @@ function buildMacroHistory(m1all, displayN){
     const s3=macroSwing(m3, 24, '3M');
     const s1=macroSwing(m1, 30, '1M');
     const parabolic=detectParabolicAccel(m1);
-    const result=mapMacroState({y1:sY,m6:s6,m3:s3,m1:s1,parabolic}, prev);
+    const m1Closes=m1.map(x=>+x[4]);
+    const result=mapMacroState({y1:sY,m6:s6,m3:s3,m1:s1,parabolic}, prev, {m1DnHist:m1DnHist.slice(), m1Closes});
+    m1DnHist.push(!!result.m1Dn);
+    if(m1DnHist.length>3) m1DnHist.shift();
     prev=result.state;
     results.push({
       y:ym.y, m:ym.m, key:ym.key,
@@ -1189,9 +1243,26 @@ async function loadMacro(){
     const m3=macroSwing(series.m3, 24, '3M');
     const m1=macroSwing(series.m1, 30, '1M');
     const parabolic=detectParabolicAccel(series.m1);
-    let prev=null; try{prev=localStorage.getItem(MACRO_STATE_KEY);}catch(e){}
-    const result=mapMacroState({y1,m6,m3,m1,parabolic}, prev);
-    // Additive history view — does not alter live result
+    let prev=null, m1DnHist=[];
+    try{prev=localStorage.getItem(MACRO_STATE_KEY);}catch(e){}
+    try{m1DnHist=JSON.parse(localStorage.getItem(MACRO_M1DN_KEY)||'[]'); if(!Array.isArray(m1DnHist)) m1DnHist=[];}catch(e){m1DnHist=[];}
+    const m1Closes=(series.m1||[]).map(x=>+x[4]);
+    const result=mapMacroState({y1,m6,m3,m1,parabolic}, prev, {m1DnHist:m1DnHist.slice(), m1Closes});
+    // Update m1Dn history only when a new completed month appears
+    try{
+      const lastM=series.m1&&series.m1.length?ymUTC(series.m1[series.m1.length-1][0]):null;
+      const key=lastM?(lastM.y+'-'+lastM.m):'';
+      const prevKey=localStorage.getItem(MACRO_LAST_MONTH_KEY)||'';
+      if(key&&key!==prevKey){
+        m1DnHist.push(!!result.m1Dn);
+        while(m1DnHist.length>3) m1DnHist.shift();
+        localStorage.setItem(MACRO_M1DN_KEY, JSON.stringify(m1DnHist));
+        localStorage.setItem(MACRO_LAST_MONTH_KEY, key);
+        // re-evaluate with updated hist for this new month
+        const result2=mapMacroState({y1,m6,m3,m1,parabolic}, prev, {m1DnHist:m1DnHist.slice(), m1Closes});
+        Object.assign(result, result2);
+      }
+    }catch(e){}
     try{
       const histRows=buildMacroHistory(series.m1, 24);
       renderMacroHistory(histRows);
