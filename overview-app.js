@@ -144,25 +144,106 @@ async function fetchKlines(interval,limit){
   const j=await r.json();
   return (j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
 }
-function aggregateCandles(kl, group){
-  if(!kl||!kl.length||group<2) return kl||[];
+function ymUTC(ts){
+  const d=new Date(+ts);
+  return {y:d.getUTCFullYear(), m:d.getUTCMonth()+1}; // m=1..12
+}
+function completedMonthlyOnly(kl){
+  /* Drop the currently forming calendar month (UTC). */
+  if(!kl||!kl.length) return [];
+  const now=new Date();
+  const cy=now.getUTCFullYear(), cm=now.getUTCMonth()+1;
+  return kl.filter(k=>{
+    const {y,m}=ymUTC(k[0]);
+    return !(y===cy && m===cm);
+  });
+}
+function bucketOHLC(months){
+  /* months: array of [ts,o,h,l,c,v] sorted oldest-first, all complete */
+  if(!months||!months.length) return null;
+  let h=-Infinity,l=Infinity,v=0;
+  for(const k of months){h=Math.max(h,+k[2]);l=Math.min(l,+k[3]);v+=(+k[5]||0);}
+  return [months[0][0], +months[0][1], h, l, +months[months.length-1][4], v];
+}
+function calendar3M(m1){
+  /* Complete quarters only: Jan-Mar, Apr-Jun, Jul-Sep, Oct-Dec */
+  const by={};
+  for(const k of m1){
+    const {y,m}=ymUTC(k[0]);
+    const q=Math.floor((m-1)/3); // 0..3
+    const key=y+'-Q'+q;
+    if(!by[key]) by[key]={y,q,months:[]};
+    by[key].months.push(k);
+  }
   const out=[];
-  for(let i=0;i<kl.length;i+=group){
-    const chunk=kl.slice(i, Math.min(i+group, kl.length));
-    if(chunk.length<1) continue;
-    let h=-Infinity,l=Infinity,v=0;
-    for(const k of chunk){h=Math.max(h,+k[2]);l=Math.min(l,+k[3]);v+=(+k[5]||0);}
-    out.push([chunk[0][0], +chunk[0][1], h, l, +chunk[chunk.length-1][4], v]);
+  const keys=Object.keys(by).sort();
+  for(const key of keys){
+    const b=by[key];
+    if(b.months.length!==3) continue; // incomplete quarter excluded
+    b.months.sort((a,c)=>a[0]-c[0]);
+    const c=bucketOHLC(b.months);
+    if(c) out.push(c);
+  }
+  return out;
+}
+function calendar6M(m1){
+  /* Complete halves only: H1 Jan-Jun, H2 Jul-Dec */
+  const by={};
+  for(const k of m1){
+    const {y,m}=ymUTC(k[0]);
+    const h=m<=6?1:2;
+    const key=y+'-H'+h;
+    if(!by[key]) by[key]={y,h,months:[]};
+    by[key].months.push(k);
+  }
+  const out=[];
+  for(const key of Object.keys(by).sort()){
+    const b=by[key];
+    if(b.months.length!==6) continue; // incomplete half excluded
+    b.months.sort((a,c)=>a[0]-c[0]);
+    const c=bucketOHLC(b.months);
+    if(c) out.push(c);
+  }
+  return out;
+}
+function calendar1Y(m1){
+  /* Complete calendar years only: Jan-Dec */
+  const by={};
+  for(const k of m1){
+    const {y,m}=ymUTC(k[0]);
+    if(!by[y]) by[y]={months:[]};
+    by[y].months.push(k);
+  }
+  const out=[];
+  for(const y of Object.keys(by).map(Number).sort((a,b)=>a-b)){
+    const months=by[y].months;
+    if(months.length!==12) continue; // incomplete year excluded
+    months.sort((a,c)=>a[0]-c[0]);
+    const c=bucketOHLC(months);
+    if(c) out.push(c);
   }
   return out;
 }
 async function fetchMacroSeries(){
-  /* 1M native, 3M native, 6M=2x1M, 1Y=4x1M (approx). Oldest-first. */
-  const m1=await fetchKlines('1M', 48);
-  let m3=[];
-  try{ m3=await fetchKlines('3M', 24); }catch(e){ m3=aggregateCandles(m1,3); }
-  const m6=aggregateCandles(m1,2);
-  const y1=aggregateCandles(m1,4);
+  /* True calendar 3M/6M/1Y from completed monthly candles only. */
+  let m1raw=await fetchKlines('1M', 120);
+  if(!m1raw||m1raw.length<12){
+    // try OKX path with higher limit via repeated — already 120
+    m1raw=m1raw||[];
+  }
+  const m1=completedMonthlyOnly(m1raw);
+  const m3=calendar3M(m1);
+  const m6=calendar6M(m1);
+  const y1=calendar1Y(m1);
+  // Debug proof of buckets (once per load)
+  try{
+    if(typeof console!=='undefined'&&console.debug){
+      console.debug('[macro TF] completed 1M last', m1.length?ymUTC(m1[m1.length-1][0]):null);
+      console.debug('[macro TF] 6M count', m6.length, m6.slice(-3).map(k=>{const d=new Date(k[0]); return d.getUTCFullYear()+'-H'+(d.getUTCMonth()<6?1:2)+' O'+k[1]+' C'+k[4];}));
+      console.debug('[macro TF] 1Y count', y1.length, y1.slice(-3).map(k=>{const d=new Date(k[0]); return d.getUTCFullYear()+' O'+k[1]+' C'+k[4];}));
+      console.debug('[macro TF] 3M count', m3.length);
+    }
+  }catch(e){}
   return {m1,m3,m6,y1};
 }
 async function fetchPrice(){
@@ -801,103 +882,130 @@ function macroSwing(kl, lookback, label){
 }
 
 function mapMacroState(ev, prev){
+  /* 1Y = regime guardrail only — insufficient 1Y pivots must NOT force NEUTRAL. */
   const y=ev.y1, m6=ev.m6, m3=ev.m3, m1=ev.m1;
-  const yOk=y.available&&(y.bias==='BULLISH'||y.grade==='INTACT'||y.grade==='IMPROVING')&&!y.hardBreak;
-  const yBroken=y.available&&y.hardBreak;
+  const yAvailable=!!(y&&y.available);
+  const yBroken=yAvailable&&y.hardBreak;
+  const yOk=yAvailable&&(y.bias==='BULLISH'||y.grade==='INTACT'||y.grade==='IMPROVING')&&!y.hardBreak;
   const m6Bear=m6.available&&(m6.bias==='BEARISH'||m6.grade==='DAMAGED'||m6.grade==='BROKEN'||m6.lh);
   const m6Bull=m6.available&&(m6.bias==='BULLISH'||m6.grade==='INTACT'||(m6.hh&&m6.hl));
+  const m6Damaged=m6.available&&(m6.hardBreak||m6.grade==='BROKEN');
   const m3Up=m3.available&&(m3.bias==='BULLISH'||m3.hl||m3.grade==='IMPROVING'||m3.grade==='INTACT');
   const m3Dn=m3.available&&(m3.bias==='BEARISH'||m3.lh||m3.grade==='DAMAGED'||m3.grade==='WEAKENING');
   const m1Up=m1.available&&(m1.bias==='BULLISH'||m1.hl||m1.grade==='IMPROVING'||m1.grade==='INTACT');
   const m1Dn=m1.available&&(m1.bias==='BEARISH'||m1.lh||m1.grade==='DAMAGED'||m1.grade==='WEAKENING');
   const recoverySeq=m1Up&&m3Up;
   const deteriorateSeq=m1Dn&&m3Dn;
+  const accel=!!ev.parabolic;
 
   let state='🟡 TRANSITION — NEUTRAL';
   let regime='NEUTRAL', phase='NEUTRAL', conf='MEDIUM', cycle='UNRESOLVED';
 
-  // Strong expansion: 1Y intact, 6M not broken, 3M/1M bullish aligned
-  if(yOk&&m6Bull&&m3Up&&m1Up&&!m6.hardBreak&&!y.hardBreak){
-    state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
-  }
-  // 6M lag edge case: 6M still damaged/bearish but 1M/3M improving and 1Y intact
-  else if(yOk&&m6Bear&&recoverySeq){
-    state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='HIGH'; cycle='TRANSITION';
-  }
-  // Recovery: 1Y ok, improving shorter, 6M mixed
-  else if(yOk&&recoverySeq&&!m6.hardBreak){
-    if(m6Bull||(m3.hh&&m3.hl)){
+  // Direction from 6M+3M+1M; 1Y only blocks/breaks, does not force neutral when thin
+  if(yBroken&&(m6Damaged||m6Bear)&&(m3Dn||m1Dn)){
+    state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
+  } else if(m6Bull&&m3Up&&m1Up&&!m6Damaged&&!yBroken){
+    if(accel){
+      state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC';
+    } else {
+      state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+    }
+  } else if(recoverySeq&&!m6Damaged&&!yBroken&&(m6Bull||m6.grade==='IMPROVING'||m6.grade==='MIXED'||!m6.available)){
+    // repairing after damage — not full expansion yet
+    if(m6Bull&&m3Up&&m1Up){
       state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='HIGH'; cycle='RECOVERY';
     } else {
       state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
     }
-  }
-  // Bearish transition while 6M still looks ok
-  else if(m6Bull&&deteriorateSeq&&!yBroken){
+  } else if(m6Bear&&recoverySeq&&!yBroken){
+    // classic 6M lag: still damaged 6M but 1M/3M improving
+    state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='HIGH'; cycle='TRANSITION';
+  } else if(m6Bull&&deteriorateSeq&&!yBroken){
     state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-  }
-  // Contraction
-  else if((m6Bear||m6.hardBreak)&&(m3Dn||m1Dn)&&!yBroken){
+  } else if((m6Bear||m6Damaged)&&(m3Dn||m1Dn)&&!yBroken){
+    state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
+  } else if(recoverySeq&&!yBroken){
+    state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+  } else if(deteriorateSeq){
+    state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
+  } else if(m6Bull&&(m1Up||m3Up)&&!yBroken){
+    state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf=yAvailable?'HIGH':'MEDIUM'; cycle='EXPANSION';
+  } else if(m6Bear&&(m1Dn||m3Dn)){
     state='🟠 BEARISH — CONTRACTION'; regime='BEARISH'; phase='CONTRACTION'; conf='MEDIUM'; cycle='CONTRACTION';
   }
-  // Cycle broken — very hard
-  else if(yBroken&&(m6.hardBreak||m6Bear)&&(m3Dn||m1Dn)){
-    state='🔴 BEARISH — REGIME / CYCLE BROKEN'; regime='BEARISH'; phase='REGIME / CYCLE BROKEN'; conf='HIGH'; cycle='BROKEN';
-  }
-  else if(yOk&&(m1Up||m3Up)){
-    state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-  }
-  else if(deteriorateSeq){
-    state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
-  }
 
-  // Hysteresis vs previous
+  // Hysteresis
   if(prev){
     const p=String(prev);
-    // Expansion + normal stress stays expansion unless hard damage
-    if(p.indexOf('EXPANSION')>=0&&state.indexOf('BEARISH')>=0&&!m6.hardBreak&&!yBroken&&yOk){
-      state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
-    }
-    if(p.indexOf('EXPANSION')>=0&&(m1Dn||m3Dn)&&yOk&&!m6.hardBreak){
-      // mild: stay expansion; persistent both m1+m3: bearish bias transition
+    // Expansion holds through single-month noise
+    if(p.indexOf('EXPANSION')>=0&&state.indexOf('BEARISH')>=0&&!m6Damaged&&!yBroken){
       if(deteriorateSeq){ state='🟠 TRANSITION — BEARISH BIAS'; regime='BEARISH'; phase='TRANSITION — BEARISH BIAS'; conf='MEDIUM'; cycle='TRANSITION'; }
       else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
     }
-    // Broken regime: no instant expansion
-    if(p.indexOf('CYCLE BROKEN')>=0&&state.indexOf('EXPANSION')>=0){
+    if(p.indexOf('EXPANSION')>=0&&m1Dn&&!m3Dn&&!m6Damaged){
+      state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+    }
+    // Parabolic ↔ Expansion with persistence (no flicker)
+    if(p.indexOf('PARABOLIC')>=0){
+      if(m6Bull&&m3Up&&m1Up&&!m6Damaged&&!yBroken){
+        if(accel){ state='🟢 BULLISH — PARABOLIC'; regime='BULLISH'; phase='PARABOLIC'; conf='HIGH'; cycle='PARABOLIC'; }
+        else { state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION'; }
+      }
+    }
+    if(p.indexOf('CYCLE BROKEN')>=0&&(state.indexOf('EXPANSION')>=0||state.indexOf('PARABOLIC')>=0)){
       state='🟡 TRANSITION — BULLISH BIAS'; regime='BULLISH'; phase='TRANSITION — BULLISH BIAS'; conf='MEDIUM'; cycle='TRANSITION';
     }
     if(p.indexOf('CONTRACTION')>=0&&state.indexOf('EXPANSION')>=0){
       state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
     }
-    if(p.indexOf('CONTRACTION')>=0&&state.indexOf('BULLISH BIAS')>=0){
-      // ok
-    }
-    // Single-month noise: if prev expansion and only m1 weak
-    if(p.indexOf('EXPANSION')>=0&&m1Dn&&!m3Dn&&yOk){
-      state='🟢 BULLISH — EXPANSION'; regime='BULLISH'; phase='EXPANSION'; conf='HIGH'; cycle='EXPANSION';
+    if(p.indexOf('CONTRACTION')>=0&&state.indexOf('PARABOLIC')>=0){
+      state='🟢 BULLISH — RECOVERY'; regime='BULLISH'; phase='RECOVERY'; conf='MEDIUM'; cycle='RECOVERY';
     }
   }
 
   const missing=[];
-  if(!y.available) missing.push('1Y');
   if(!m6.available) missing.push('6M');
   if(!m3.available) missing.push('3M');
   if(!m1.available) missing.push('1M');
-  if(missing.length>=3){ conf='LOW'; state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='INSUFFICIENT DATA'; }
-  else if(missing.length) conf=conf==='HIGH'?'MEDIUM':'LOW';
-
+  if(!yAvailable) missing.push('1Y');
+  if(missing.indexOf('6M')>=0&&missing.indexOf('3M')>=0){ conf='LOW'; }
+  else if(!yAvailable) conf=conf==='HIGH'?'MEDIUM':conf;
+  if(missing.indexOf('1M')>=0&&missing.indexOf('3M')>=0&&missing.indexOf('6M')>=0){
+    state='🟡 TRANSITION — NEUTRAL'; regime='NEUTRAL'; phase='INSUFFICIENT DATA'; conf='LOW';
+  }
   return {state,regime,phase,conf,cycle,missing};
+}
+
+function detectParabolicAccel(m1kl){
+  /* Price acceleration across multiple COMPLETED monthly candles — rare. */
+  if(!m1kl||m1kl.length<8) return false;
+  const closes=m1kl.map(k=>+k[4]);
+  const n=closes.length;
+  // last 3 completed months vs prior 3 — strong multi-month advance
+  const r=function(a,b){return b===0?0:(a-b)/Math.abs(b);};
+  const g1=r(closes[n-1],closes[n-4]); // ~3m change ending last complete
+  const g0=r(closes[n-4],closes[n-7]); // prior ~3m
+  // New highs persistence: last close near max of last 12
+  const win=closes.slice(-12);
+  const mx=Math.max.apply(null,win);
+  const nearHigh=closes[n-1]>=mx*0.97;
+  // Acceleration: recent 3m gain clearly stronger than prior 3m and elevated
+  const accel=g1>0.25&&g1>g0+0.12&&nearHigh;
+  // Also require not a single spike: at least 2 of last 3 months green
+  let up=0;
+  for(let i=n-3;i<n;i++){ if(closes[i]>closes[i-1]) up++; }
+  return !!(accel&&up>=2);
 }
 
 function explainMacro(r, ev){
   if(r.phase==='INSUFFICIENT DATA') return 'Not enough completed macro candles to assess the giant cycle. Missing data is not treated as bullish or bearish.';
-  if(r.phase==='EXPANSION') return 'Long-term structure supports an expanding cycle. Protected macro lows are holding and shorter macro structure aligns bullish. Normal corrections do not flip this regime.';
-  if(r.phase==='RECOVERY') return 'Long-term structure remains intact. Shorter macro structure has improved after damage; full expansion is not yet confirmed.';
-  if(r.phase.indexOf('BULLISH BIAS')>=0) return 'A bullish macro transition is developing: 1M/3M structure is improving while slower context (e.g. 6M) may still look damaged. This is early cycle recognition, not a lagging 6M wait.';
-  if(r.phase.indexOf('BEARISH BIAS')>=0) return 'A bearish macro transition is developing: recent lower highs / weakening 1M–3M structure while the largest cycle is not fully invalidated yet.';
-  if(r.phase==='CONTRACTION') return 'Macro cycle is contracting with persistent lower structure on intermediate horizons. Not necessarily full 1Y cycle death.';
-  if(r.phase.indexOf('CYCLE BROKEN')>=0) return 'Confirmed higher-timeframe macro failure across completed candles. A single crash or wick is not enough for this state.';
+  if(r.phase==='PARABOLIC') return 'Bullish expansion has entered an accelerated phase across multiple completed months. Structure remains intact; this is rare and not a short-term trade signal.';
+  if(r.phase==='EXPANSION') return 'Broader BTC macro cycle is structurally advancing. Protected macro lows hold; normal monthly corrections do not flip this regime.';
+  if(r.phase==='RECOVERY') return 'Macro cycle is repairing after damage. Multi-timeframe improvement is present; full expansion is not yet confirmed.';
+  if(r.phase.indexOf('BULLISH BIAS')>=0) return 'Bullish macro transition developing: 1M/3M improving while slower context (e.g. 6M) may still look damaged. Does not wait for 6M to formally flip.';
+  if(r.phase.indexOf('BEARISH BIAS')>=0) return 'Bearish macro transition developing: recent lower highs / weakening 1M–3M while the largest regime is not fully invalidated.';
+  if(r.phase==='CONTRACTION') return 'Macro cycle contracting with persistent weaker structure on intermediate horizons. Not necessarily full 1Y cycle death.';
+  if(r.phase.indexOf('CYCLE BROKEN')>=0) return 'Confirmed higher-timeframe macro failure on completed candles. A single crash or wick is not enough for this state.';
   return 'Macro evidence is mixed; treating regime as unresolved transition.';
 }
 
@@ -916,11 +1024,12 @@ async function loadMacro(){
     const m6=macroSwing(series.m6, 20, '6M');
     const m3=macroSwing(series.m3, 24, '3M');
     const m1=macroSwing(series.m1, 30, '1M');
+    const parabolic=detectParabolicAccel(series.m1);
     let prev=null; try{prev=localStorage.getItem(MACRO_STATE_KEY);}catch(e){}
-    const result=mapMacroState({y1,m6,m3,m1}, prev);
+    const result=mapMacroState({y1,m6,m3,m1,parabolic}, prev);
     try{localStorage.setItem(MACRO_STATE_KEY, result.state);}catch(e){}
 
-    const color=result.regime==='BULLISH'?'#62e3a0':result.regime==='BEARISH'?(result.phase.indexOf('BROKEN')>=0?'#ff6f7c':'#e6a050'):'#e6c878';
+    const color=result.phase==='PARABOLIC'?'#9af0c4':result.regime==='BULLISH'?'#62e3a0':result.regime==='BEARISH'?(result.phase.indexOf('BROKEN')>=0?'#ff6f7c':'#e6a050'):'#e6c878';
     if($('mac-state')){$('mac-state').textContent=result.state;$('mac-state').style.color=color;}
     if($('mac-regime'))$('mac-regime').textContent=result.regime;
     if($('mac-phase'))$('mac-phase').textContent=result.cycle;
