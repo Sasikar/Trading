@@ -225,12 +225,33 @@ function calendar1Y(m1){
   return out;
 }
 async function fetchMacroSeries(){
-  /* True calendar 3M/6M/1Y from completed monthly candles only. */
-  let m1raw=await fetchKlines('1M', 100);
-  if(!m1raw||m1raw.length<12){
-    // try OKX path with higher limit via repeated — already 120
-    m1raw=m1raw||[];
+  /* True calendar 3M/6M/1Y from completed MONTHLY candles only.
+     Never use Kraken 21600 (15-day) — that caused duplicate months in history. */
+  let m1raw=[];
+  try{
+    const r=await fetch('/api/okx/candles?instId=BTC-USDT&bar=1M&limit=100',{cache:'no-store',credentials:'same-origin'});
+    if(r.ok){
+      const j=await r.json();
+      m1raw=(j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
+    }
+  }catch(e){}
+  if(!m1raw.length){
+    try{
+      // public OKX direct (may fail CORS in browser — worker path preferred)
+      const r2=await fetch('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1M&limit=100',{cache:'no-store'});
+      if(r2.ok){
+        const j=await r2.json();
+        m1raw=(j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
+      }
+    }catch(e){}
   }
+  // Deduplicate one candle per calendar month (keep last)
+  const by={};
+  for(const k of m1raw){
+    const {y,m}=ymUTC(k[0]);
+    by[y+'-'+m]=k;
+  }
+  m1raw=Object.keys(by).sort().map(k=>by[k]);
   const m1=completedMonthlyOnly(m1raw);
   const m3=calendar3M(m1);
   const m6=calendar6M(m1);
@@ -1051,7 +1072,11 @@ function buildMacroHistory(m1all, displayN){
   // drop any incomplete current calendar month
   const now=new Date();
   const cy=now.getUTCFullYear(), cm=now.getUTCMonth()+1;
-  const completed=all.filter(k=>{const ym=ymFromTs(k[0]); return !(ym.y===cy&&ym.m===cm);});
+  let completed=all.filter(k=>{const ym=ymFromTs(k[0]); return !(ym.y===cy&&ym.m===cm);});
+  // one row per calendar month
+  const dedup={};
+  for(const k of completed){ const ym=ymFromTs(k[0]); dedup[ym.key]=k; }
+  completed=Object.keys(dedup).sort().map(k=>dedup[k]);
   if(completed.length<8) return [];
 
   const results=[];
