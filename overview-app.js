@@ -600,6 +600,20 @@ function explainStructural(r, evidence){
   return bits.join('. ')+(bits.length?'.':'Structural assessment complete.');
 }
 
+
+function structureRowLabel(s){
+  /* UI only: BROKEN iff confirmed hardBreakDown; LH+LL alone is DETERIORATING. */
+  if(!s||!s.available) return {t:'🟡 MIXED / N/A', c:'#8491a1'};
+  const det=s.detail||'';
+  if(s.hardBreakDown) return {t:'🔴 BROKEN · '+det, c:'#ff6f7c'};
+  if(s.wickBelowHL&&!s.closeBelowHL) return {t:'🟡 WARNING · WICK ONLY · '+det, c:'#e6c878'};
+  if(s.lh&&s.ll) return {t:'🟠 DETERIORATING · LH + LL', c:'#e6a050'};
+  if(s.bias==='BEARISH'||s.lh||s.closeBelowHL) return {t:'🟡 WEAKENING · '+det, c:'#e6c878'};
+  if(s.hh&&s.hl) return {t:'🟢 INTACT · HH + HL', c:'#62e3a0'};
+  if(s.bias==='BULLISH'||s.hl) return {t:'🟢 INTACT · '+det, c:'#62e3a0'};
+  return {t:'🟡 MIXED · '+det, c:'#e6c878'};
+}
+
 function badgeStruct(bias, okText, badText, midText){
   if(bias==='BULLISH') return {t:'🟢 '+(okText||'INTACT'), c:'#62e3a0'};
   if(bias==='BEARISH') return {t:'🔴 '+(badText||'BROKEN'), c:'#ff6f7c'};
@@ -650,8 +664,8 @@ async function loadStructural(){
     if($('stt-conf'))$('stt-conf').textContent=result.conf;
     if($('stt-explain'))$('stt-explain').textContent=explainStructural(result, evidence);
 
-    const wB=badgeStruct(wStruct.available?wStruct.bias:'NEUTRAL','INTACT','BROKEN','MIXED / N/A');
-    const dB=badgeStruct(dStruct.available?dStruct.bias:'NEUTRAL','INTACT','BROKEN','MIXED / N/A');
+    const wB=structureRowLabel(wStruct);
+    const dB=structureRowLabel(dStruct);
     const htf=badgeStruct(wEma.dir);
     let sup;
     if(result.supportStatus==='UNAVAILABLE') sup={t:'🟡 UNAVAILABLE',c:'#8491a1'};
