@@ -127,10 +127,11 @@ function calcRSI(closes,period=14){if(closes.length<period+1)return null;let gai
 function calcMACDSeries(closes,times){const e12=ema(closes,12),e26=ema(closes,26);const macdLine=closes.map((_,i)=>(e12[i]!=null&&e26[i]!=null)?e12[i]-e26[i]:null);const signal=ema(macdLine.map(v=>v==null?0:v),9);const hist=[],ml=[],sl=[];for(let i=0;i<closes.length;i++){if(macdLine[i]==null||signal[i]==null||times[i]==null)continue;const h=macdLine[i]-signal[i];hist.push({time:times[i],value:h,color:h>=0?'rgba(98,227,160,.55)':'rgba(255,111,124,.55)'});ml.push({time:times[i],value:macdLine[i]});sl.push({time:times[i],value:signal[i]});}const last=hist.length?hist[hist.length-1]:null,prev=hist.length>1?hist[hist.length-2]:null;return{hist,ml,sl,lastHist:last?last.value:null,prevHist:prev?prev.value:null,lastMacd:ml.length?ml[ml.length-1].value:null,lastSig:sl.length?sl[sl.length-1].value:null};}
 async function fetchKlines(interval,limit){
   const bar={ '4h':'4H','1d':'1D','1w':'1W','1M':'1M','3M':'3M'}[interval]||interval;
-  // Kraken has no 3M; skip for 3M
-  if(interval!=='3M'&&interval!=='6M'&&interval!=='1Y'){
+  /* Kraken 21600 is NOT monthly — never use Kraken for 1M/3M/6M/1Y */
+  const noKraken=interval==='1M'||interval==='3M'||interval==='6M'||interval==='1Y';
+  if(!noKraken){
     try{
-      const iv={ '4h':240,'1d':1440,'1w':10080,'1M':21600,'1h':60 }[interval]||1440;
+      const iv={ '4h':240,'1d':1440,'1w':10080,'1h':60 }[interval]||1440;
       const j=await jget('https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval='+iv);
       const rows=(j&&j.result&&(j.result.XXBTZUSD||j.result.XBTUSD))||[];
       if(rows.length){
@@ -139,10 +140,13 @@ async function fetchKlines(interval,limit){
       }
     }catch(e){}
   }
-  const r=await fetch('/api/okx/candles?instId=BTC-USDT&bar='+bar+'&limit='+limit,{cache:'no-store'});
+  const r=await fetch('/api/okx/candles?instId=BTC-USDT&bar='+bar+'&limit='+limit,{cache:'no-store',credentials:'same-origin'});
   if(!r.ok)throw new Error('candles '+r.status);
   const j=await r.json();
-  return (j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
+  if(j&&j.code!=null&&String(j.code)!=='0') throw new Error('okx code '+j.code);
+  const data=j&&j.data;
+  if(!Array.isArray(data)||!data.length) throw new Error('candles empty');
+  return data.slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
 }
 function ymUTC(ts){
   const d=new Date(+ts);
@@ -225,46 +229,48 @@ function calendar1Y(m1){
   return out;
 }
 async function fetchMacroSeries(){
-  /* True calendar 3M/6M/1Y from completed MONTHLY candles only.
-     Never use Kraken 21600 (15-day) — that caused duplicate months in history. */
-  let m1raw=[];
-  try{
-    const r=await fetch('/api/okx/candles?instId=BTC-USDT&bar=1M&limit=100',{cache:'no-store',credentials:'same-origin'});
-    if(r.ok){
-      const j=await r.json();
-      m1raw=(j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
-    }
-  }catch(e){}
-  if(!m1raw.length){
+  /* True calendar 3M/6M/1Y from completed MONTHLY candles only. Never Kraken 21600. */
+  async function pullMonthly(limit){
+    // Worker proxy first
     try{
-      // public OKX direct (may fail CORS in browser — worker path preferred)
-      const r2=await fetch('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1M&limit=100',{cache:'no-store'});
-      if(r2.ok){
-        const j=await r2.json();
-        m1raw=(j.data||[]).slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
+      const r=await fetch('/api/okx/candles?instId=BTC-USDT&bar=1M&limit='+limit,{cache:'no-store',credentials:'same-origin'});
+      if(r.ok){
+        const j=await r.json();
+        if(j&&(j.code==null||String(j.code)==='0')&&Array.isArray(j.data)&&j.data.length){
+          return j.data.slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
+        }
       }
     }catch(e){}
+    // Direct OKX (may CORS-fail in browser)
+    try{
+      const r2=await fetch('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1M&limit='+limit,{cache:'no-store'});
+      if(r2.ok){
+        const j=await r2.json();
+        if(j&&(j.code==null||String(j.code)==='0')&&Array.isArray(j.data)&&j.data.length){
+          return j.data.slice().reverse().map(k=>[+k[0],+k[1],+k[2],+k[3],+k[4],+k[5]]);
+        }
+      }
+    }catch(e){}
+    return [];
   }
-  // Deduplicate one candle per calendar month (keep last)
+  let m1raw=await pullMonthly(100);
+  if(m1raw.length<24){
+    const more=await pullMonthly(100);
+    if(more.length>m1raw.length) m1raw=more;
+  }
+  // Deduplicate one candle per UTC calendar month (keep last)
   const by={};
   for(const k of m1raw){
+    if(!k||!Number.isFinite(+k[0])) continue;
     const {y,m}=ymUTC(k[0]);
-    by[y+'-'+m]=k;
+    by[y+'-'+String(m).padStart(2,'0')]=k;
   }
   m1raw=Object.keys(by).sort().map(k=>by[k]);
   const m1=completedMonthlyOnly(m1raw);
+  if(m1.length<5) throw new Error('macro 1M need ≥5 completed months, got '+m1.length);
   const m3=calendar3M(m1);
   const m6=calendar6M(m1);
   const y1=calendar1Y(m1);
-  // Debug proof of buckets (once per load)
-  try{
-    if(typeof console!=='undefined'&&console.debug){
-      console.debug('[macro TF] completed 1M last', m1.length?ymUTC(m1[m1.length-1][0]):null);
-      console.debug('[macro TF] 6M count', m6.length, m6.slice(-3).map(k=>{const d=new Date(k[0]); return d.getUTCFullYear()+'-H'+(d.getUTCMonth()<6?1:2)+' O'+k[1]+' C'+k[4];}));
-      console.debug('[macro TF] 1Y count', y1.length, y1.slice(-3).map(k=>{const d=new Date(k[0]); return d.getUTCFullYear()+' O'+k[1]+' C'+k[4];}));
-      console.debug('[macro TF] 3M count', m3.length);
-    }
-  }catch(e){}
   return {m1,m3,m6,y1};
 }
 async function fetchPrice(){
@@ -285,7 +291,17 @@ function emaArr(closes,n){const o=[],k=2/(n+1);let prev=null;for(let i=0;i<close
 function trendFromCloses(closes){if(closes.length<200)return{dir:'NEUTRAL',detail:'need 200'};const e50=emaArr(closes,50),e200=emaArr(closes,200);const c=closes[closes.length-1],a=e50[e50.length-1],b=e200[e200.length-1];if(a==null||b==null)return{dir:'NEUTRAL',detail:'EMA'};let dir='NEUTRAL';if(c>a&&c>b)dir='BULLISH';else if(c<a&&c<b)dir='BEARISH';const f=x=>Math.round(x).toLocaleString('en-US');return{dir,detail:'C '+f(c)+' · 50 '+f(a)+' · 200 '+f(b)};}
 function colorDir(dir){return dir==='BULLISH'?'#62e3a0':dir==='BEARISH'?'#ff6f7c':'#e6c878';}
 function macdMomentum(closes,times){const pack=calcMACDSeries(closes,times);const h=pack.lastHist,m=pack.lastMacd,s=pack.lastSig,ph=pack.prevHist;let dir='FADING';if(m!=null&&s!=null&&h!=null){if(m>s&&h>0)dir='BULLISH';else if(m<s&&h<0)dir='BEARISH';}const fresh=ph!=null&&h!=null&&((ph<0&&h>=0)||(ph>=0&&h<0));const f=v=>(v==null?'—':((v>=0?'+':'')+Number(v).toFixed(0)));return{dir,label:dir+(fresh?' (fresh cross)':''),detail:'HIST '+f(h)+' · LINE '+f(m)+' · SIG '+f(s)};}
-async function loadMarketStructure(direction,klDaily){const statusEl=$('ms-status'),subEl=$('ms-sub');const set=(id,v,h)=>{if($(id))$(id).textContent=v;if(h&&$(id+'-h'))$(id+'-h').textContent=h;};try{const rows=Array.isArray(klDaily)&&klDaily.length>16?klDaily.slice(0,-1):[];if(rows.length>=15){const trs=[];for(let i=1;i<rows.length;i++){const h=+rows[i][2],l=+rows[i][3],pc=+rows[i-1][4];trs.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));}const atr=trs.slice(-14).reduce((a,b)=>a+b,0)/14;const mark=+rows[rows.length-1][4];const bull=direction==='BULLISH';const inv=bull?mark-1.5*atr:mark+1.5*atr;const pct=Math.abs(inv-mark)/mark*100;set('ms-atr',money(inv)+' · '+pct.toFixed(1)+'%',(bull?'below':'above')+' mark');}else set('ms-atr','Data Unavailable');}catch(e){set('ms-atr','Data Unavailable');}set('ms-liq','Data Unavailable','no estimated levels');let book=null,fetchedAt=null;try{const res=await fetch('/api/orderbook?instId=BTC-USDT&sz=50',{cache:'no-store',credentials:'same-origin'});if(res.ok){book=await res.json();fetchedAt=Date.now();}}catch(e){}if(!book||!book.bids||!book.asks||!book.bids.length){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';subEl.textContent='Orderbook missing.';set('ms-spread','Data Unavailable');set('ms-bid','Data Unavailable');set('ms-conc','Data Unavailable');set('ms-fresh','Data Unavailable');return;}const ageMs=Date.now()-(fetchedAt||(book.ts?+book.ts:Date.now()));if(ageMs>60000){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';subEl.textContent='Book stale >60s.';set('ms-fresh',(ageMs/1000).toFixed(1)+'s','stale');set('ms-spread','Data Unavailable');set('ms-bid','Data Unavailable');set('ms-conc','Data Unavailable');return;}set('ms-fresh',(ageMs/1000).toFixed(2)+'s',ageMs>5000?'ok':'fresh');const bestBid=+book.bids[0][0],bestAsk=+book.asks[0][0],mid=(bestBid+bestAsk)/2,spreadBps=((bestAsk-bestBid)/mid)*10000;const key='ms_spread_samples_v1';let samples=[];try{samples=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}samples.push({t:Date.now(),bps:spreadBps});while(samples.length>40)samples.shift();try{localStorage.setItem(key,JSON.stringify(samples));}catch(e){}const nums=samples.map(x=>x.bps).filter(x=>isFinite(x)).sort((a,b)=>a-b);const med=nums.length>=5?nums[Math.floor(nums.length/2)]:null;const wide=med!=null?spreadBps>3*med:spreadBps>5;set('ms-spread',spreadBps.toFixed(2)+' bps',(wide?'Wide':'Normal')+(med!=null?' vs med '+med.toFixed(2):''));let bid2=0,ask2=0,bid05=0,ask05=0;for(const [p,sz] of book.bids){const price=+p,n=price*+sz,pct=(mid-price)/mid*100;if(pct<=2)bid2+=n;if(pct<=0.5)bid05+=n;}for(const [p,sz] of book.asks){const price=+p,n=price*+sz,pct=(price-mid)/mid*100;if(pct<=2)ask2+=n;if(pct<=0.5)ask05+=n;}const total2=bid2+ask2,bull=direction==='BULLISH',side=total2>0?((bull?bid2:ask2)/total2)*100:null;if(side==null)set('ms-bid','Data Unavailable');else set('ms-bid',side.toFixed(1)+'%',(bull?'Bid':'Ask')+(side<40?' · thin':''));const conc=total2>0?((bid05+ask05)/total2)*100:null;if(conc==null)set('ms-conc','Data Unavailable');else set('ms-conc',conc.toFixed(1)+'%','not support guarantee');const warnings=[];if(wide)warnings.push('wide spread');if(side!=null&&side<40)warnings.push(bull?'thin bid':'thin ask');let status='Protected',cls='prot',icon='🟢';if(warnings.length>=2||(side!=null&&side<40&&wide)){status='Vulnerable';cls='vuln';icon='🔴';}else if(warnings.length===1){status='Caution';cls='caut';icon='🟡';}statusEl.className='struct-status '+cls;statusEl.textContent=icon+' '+status;subEl.textContent=(warnings.length?'Warnings: '+warnings.join(', ')+'. ':'No book warnings. ')+'Observable only.';}
+async function loadMarketStructure(direction,klDaily){const statusEl=$('ms-status'),subEl=$('ms-sub');const set=(id,v,h)=>{if($(id))$(id).textContent=v;if(h&&$(id+'-h'))$(id+'-h').textContent=h;};try{const rows=Array.isArray(klDaily)&&klDaily.length>16?klDaily.slice(0,-1):[];if(rows.length>=15){const trs=[];for(let i=1;i<rows.length;i++){const h=+rows[i][2],l=+rows[i][3],pc=+rows[i-1][4];trs.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));}const atr=trs.slice(-14).reduce((a,b)=>a+b,0)/14;const mark=+rows[rows.length-1][4];const bull=direction==='BULLISH';const inv=bull?mark-1.5*atr:mark+1.5*atr;const pct=Math.abs(inv-mark)/mark*100;set('ms-atr',money(inv)+' · '+pct.toFixed(1)+'%',(bull?'below':'above')+' mark');}else set('ms-atr','Data Unavailable');}catch(e){set('ms-atr','Data Unavailable');}set('ms-liq','Data Unavailable','no estimated levels');let book=null,fetchedAt=null;
+try{const res=await fetch('/api/orderbook?instId=BTC-USDT&sz=50',{cache:'no-store',credentials:'same-origin'});if(res.ok){book=await res.json();fetchedAt=Date.now();}}catch(e){}
+if(!book||!book.bids||!book.asks||!book.bids.length){
+  try{
+    const r2=await fetch('https://www.okx.com/api/v5/market/books?instId=BTC-USDT&sz=50',{cache:'no-store'});
+    if(r2.ok){const j=await r2.json(); if(j&&j.data&&j.data[0]){book=j.data[0];fetchedAt=Date.now();}}
+  }catch(e){}
+}
+if(!book||!book.bids||!book.asks||!book.bids.length){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';subEl.textContent='Orderbook missing.';set('ms-spread','Data Unavailable');set('ms-bid','Data Unavailable');set('ms-conc','Data Unavailable');set('ms-fresh','Data Unavailable');return;}
+const ageMs=Date.now()-(fetchedAt||(book.ts?+book.ts:Date.now()));
+if(ageMs>300000){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';subEl.textContent='Book stale >5m.';set('ms-fresh',(ageMs/1000).toFixed(1)+'s','stale');set('ms-spread','Data Unavailable');set('ms-bid','Data Unavailable');set('ms-conc','Data Unavailable');return;}set('ms-fresh',(ageMs/1000).toFixed(2)+'s',ageMs>5000?'ok':'fresh');const bestBid=+book.bids[0][0],bestAsk=+book.asks[0][0],mid=(bestBid+bestAsk)/2,spreadBps=((bestAsk-bestBid)/mid)*10000;const key='ms_spread_samples_v1';let samples=[];try{samples=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}samples.push({t:Date.now(),bps:spreadBps});while(samples.length>40)samples.shift();try{localStorage.setItem(key,JSON.stringify(samples));}catch(e){}const nums=samples.map(x=>x.bps).filter(x=>isFinite(x)).sort((a,b)=>a-b);const med=nums.length>=5?nums[Math.floor(nums.length/2)]:null;const wide=med!=null?spreadBps>3*med:spreadBps>5;set('ms-spread',spreadBps.toFixed(2)+' bps',(wide?'Wide':'Normal')+(med!=null?' vs med '+med.toFixed(2):''));let bid2=0,ask2=0,bid05=0,ask05=0;for(const [p,sz] of book.bids){const price=+p,n=price*+sz,pct=(mid-price)/mid*100;if(pct<=2)bid2+=n;if(pct<=0.5)bid05+=n;}for(const [p,sz] of book.asks){const price=+p,n=price*+sz,pct=(price-mid)/mid*100;if(pct<=2)ask2+=n;if(pct<=0.5)ask05+=n;}const total2=bid2+ask2,bull=direction==='BULLISH',side=total2>0?((bull?bid2:ask2)/total2)*100:null;if(side==null)set('ms-bid','Data Unavailable');else set('ms-bid',side.toFixed(1)+'%',(bull?'Bid':'Ask')+(side<40?' · thin':''));const conc=total2>0?((bid05+ask05)/total2)*100:null;if(conc==null)set('ms-conc','Data Unavailable');else set('ms-conc',conc.toFixed(1)+'%','not support guarantee');const warnings=[];if(wide)warnings.push('wide spread');if(side!=null&&side<40)warnings.push(bull?'thin bid':'thin ask');let status='Protected',cls='prot',icon='🟢';if(warnings.length>=2||(side!=null&&side<40&&wide)){status='Vulnerable';cls='vuln';icon='🔴';}else if(warnings.length===1){status='Caution';cls='caut';icon='🟡';}statusEl.className='struct-status '+cls;statusEl.textContent=icon+' '+status;subEl.textContent=(warnings.length?'Warnings: '+warnings.join(', ')+'. ':'No book warnings. ')+'Observable only.';}
 
 function smaArr(arr,period){const out=[];for(let i=0;i<arr.length;i++){if(i<period-1){out.push(null);continue;}let s=0;for(let j=i-period+1;j<=i;j++)s+=arr[j];out.push(s/period);}return out;}
 function stdArr(arr,period){const out=[];for(let i=0;i<arr.length;i++){if(i<period-1){out.push(null);continue;}const slice=arr.slice(i-period+1,i+1);const m=slice.reduce((a,b)=>a+b,0)/period;const v=slice.reduce((a,b)=>a+(b-m)*(b-m),0)/period;out.push(Math.sqrt(v));}return out;}
