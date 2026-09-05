@@ -226,7 +226,7 @@ function calendar1Y(m1){
 }
 async function fetchMacroSeries(){
   /* True calendar 3M/6M/1Y from completed monthly candles only. */
-  let m1raw=await fetchKlines('1M', 120);
+  let m1raw=await fetchKlines('1M', 100);
   if(!m1raw||m1raw.length<12){
     // try OKX path with higher limit via repeated — already 120
     m1raw=m1raw||[];
@@ -1017,6 +1017,138 @@ function macroGradeBadge(g){
   return {t:'🟡 '+(g||'MIXED'), c:'#e6c878'};
 }
 
+
+function macroStateStyle(state){
+  /* History UI: green / gray / red only — no yellow/orange. */
+  const s=String(state||'');
+  if(s.indexOf('PARABOLIC')>=0) return {bg:'#0d3d28', fg:'#7dffb5', short:'PAR', band:'#2ee67a'};
+  if(s.indexOf('EXPANSION')>=0) return {bg:'#0c2f22', fg:'#62e3a0', short:'EXP', band:'#3bcf86'};
+  if(s.indexOf('RECOVERY')>=0) return {bg:'#0a2820', fg:'#4fcf96', short:'REC', band:'#3aa876'};
+  if(s.indexOf('BULLISH BIAS')>=0) return {bg:'#0a221c', fg:'#8fd4b0', short:'BULL', band:'#6bc49a'};
+  if(s.indexOf('NEUTRAL')>=0||s.indexOf('INSUFFICIENT')>=0) return {bg:'#1a1f24', fg:'#9aa3ad', short:'NEU', band:'#6b7280'};
+  if(s.indexOf('BEARISH BIAS')>=0) return {bg:'#2a1418', fg:'#f0a0a8', short:'BEAR', band:'#e07a84'};
+  if(s.indexOf('CONTRACTION')>=0) return {bg:'#2c1014', fg:'#ff6f7c', short:'CON', band:'#e23d4c'};
+  if(s.indexOf('CYCLE BROKEN')>=0||s.indexOf('BROKEN')>=0) return {bg:'#3a0c12', fg:'#ff4d5e', short:'BROKE', band:'#c41e2e'};
+  return {bg:'#1a1f24', fg:'#9aa3ad', short:'—', band:'#6b7280'};
+}
+function ymFromTs(ts){
+  const d=new Date(+ts);
+  return {y:d.getUTCFullYear(), m:d.getUTCMonth()+1, key:d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')};
+}
+function monthsUpTo(m1all, y, m){
+  /* Completed months with (year,month) <= (y,m) inclusive. */
+  return (m1all||[]).filter(k=>{
+    const ym=ymFromTs(k[0]);
+    return ym.y<y || (ym.y===y && ym.m<=m);
+  });
+}
+function buildMacroHistory(m1all, displayN){
+  /* Walk completed months; no look-ahead. Same engine as live Macro. */
+  displayN=displayN||24;
+  if(!m1all||m1all.length<8) return [];
+  // ensure sorted oldest-first
+  const all=m1all.slice().sort((a,b)=>a[0]-b[0]);
+  // drop any incomplete current calendar month
+  const now=new Date();
+  const cy=now.getUTCFullYear(), cm=now.getUTCMonth()+1;
+  const completed=all.filter(k=>{const ym=ymFromTs(k[0]); return !(ym.y===cy&&ym.m===cm);});
+  if(completed.length<8) return [];
+
+  const results=[];
+  let prev=null;
+  // start after enough warm-up months so 6M/1Y can form
+  const startIdx=Math.max(12, completed.length-displayN-6);
+  for(let i=startIdx;i<completed.length;i++){
+    const k=completed[i];
+    const ym=ymFromTs(k[0]);
+    const snap=monthsUpTo(completed, ym.y, ym.m);
+    if(snap.length<6) continue;
+    const m1=snap;
+    const m3=calendar3M(m1);
+    const m6=calendar6M(m1);
+    const y1=calendar1Y(m1);
+    const sY=macroSwing(y1, 16, '1Y');
+    const s6=macroSwing(m6, 20, '6M');
+    const s3=macroSwing(m3, 24, '3M');
+    const s1=macroSwing(m1, 30, '1M');
+    const parabolic=detectParabolicAccel(m1);
+    const result=mapMacroState({y1:sY,m6:s6,m3:s3,m1:s1,parabolic}, prev);
+    prev=result.state;
+    results.push({
+      y:ym.y, m:ym.m, key:ym.key,
+      label:['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][ym.m-1],
+      state:result.state, regime:result.regime, phase:result.phase, conf:result.conf, cycle:result.cycle,
+      y1:sY, m6:s6, m3:s3, m1:s1,
+      explain:explainMacro(result,{y1:sY,m6:s6,m3:s3,m1:s1}),
+      style:macroStateStyle(result.state)
+    });
+  }
+  // keep last displayN
+  return results.slice(-displayN);
+}
+function renderMacroHistory(rows){
+  const root=$('mac-history');
+  if(!root) return;
+  if(!rows||!rows.length){
+    root.innerHTML='<div class="mac-hist-empty">Not enough completed monthly history.</div>';
+    return;
+  }
+  // band
+  const band=rows.map(r=>'<span class="mac-band-cell" style="background:'+r.style.band+'" title="'+r.key+' '+r.state+'"></span>').join('');
+  // group by year
+  const byYear={};
+  for(const r of rows){
+    if(!byYear[r.y]) byYear[r.y]=[];
+    byYear[r.y].push(r);
+  }
+  let grid='';
+  for(const y of Object.keys(byYear).map(Number).sort((a,b)=>a-b)){
+    grid+='<div class="mac-hist-year">'+y+'</div><div class="mac-hist-grid">';
+    for(const r of byYear[y]){
+      grid+='<button type="button" class="mac-hist-cell" data-key="'+r.key+'" style="background:'+r.style.bg+';border-color:'+r.style.band+'33">'
+        +'<div class="mac-hist-mon">'+r.label+'</div>'
+        +'<div class="mac-hist-dot" style="color:'+r.style.fg+'">●</div>'
+        +'<div class="mac-hist-short" style="color:'+r.style.fg+'">'+r.style.short+'</div>'
+        +'</button>';
+    }
+    grid+='</div>';
+  }
+  root.innerHTML=
+    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">24 MONTHS · ENGINE OUTPUT</div></div>'
+    +'<div class="mac-band" aria-hidden="true">'+band+'</div>'
+    +grid
+    +'<div class="mac-hist-detail" id="mac-hist-detail"><div class="mac-hist-detail-placeholder">Tap a month for engine snapshot</div></div>';
+
+  // detail on tap
+  const detail=$('mac-hist-detail');
+  const map={};
+  for(const r of rows) map[r.key]=r;
+  root.querySelectorAll('.mac-hist-cell').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      root.querySelectorAll('.mac-hist-cell').forEach(b=>b.classList.remove('on'));
+      btn.classList.add('on');
+      const r=map[btn.getAttribute('data-key')];
+      if(!r||!detail) return;
+      const g=function(s){
+        if(!s||!s.available) return 'N/A';
+        return (s.grade||s.bias||'—')+' · '+(s.detail||'');
+      };
+      detail.innerHTML=
+        '<div class="mac-det-title">'+r.label+' '+r.y+'</div>'
+        +'<div class="mac-det-state" style="color:'+r.style.fg+'">'+r.state+'</div>'
+        +'<div class="mac-det-rows">'
+        +'<div><span>1Y</span><b>'+g(r.y1)+'</b></div>'
+        +'<div><span>6M</span><b>'+g(r.m6)+'</b></div>'
+        +'<div><span>3M</span><b>'+g(r.m3)+'</b></div>'
+        +'<div><span>1M</span><b>'+g(r.m1)+'</b></div>'
+        +'<div><span>CONFIDENCE</span><b>'+r.conf+'</b></div>'
+        +'</div>'
+        +'<div class="mac-det-explain">'+r.explain+'</div>';
+    });
+  });
+}
+
+
 async function loadMacro(){
   try{
     const series=await fetchMacroSeries();
@@ -1027,6 +1159,12 @@ async function loadMacro(){
     const parabolic=detectParabolicAccel(series.m1);
     let prev=null; try{prev=localStorage.getItem(MACRO_STATE_KEY);}catch(e){}
     const result=mapMacroState({y1,m6,m3,m1,parabolic}, prev);
+    // Additive history view — does not alter live result
+    try{
+      const histRows=buildMacroHistory(series.m1, 24);
+      renderMacroHistory(histRows);
+      try{ window.__macroHistory=histRows; }catch(e){}
+    }catch(he){ console.warn('macro history', he); }
     try{localStorage.setItem(MACRO_STATE_KEY, result.state);}catch(e){}
 
     const color=result.phase==='PARABOLIC'?'#9af0c4':result.regime==='BULLISH'?'#62e3a0':result.regime==='BEARISH'?(result.phase.indexOf('BROKEN')>=0?'#ff6f7c':'#e6a050'):'#e6c878';
