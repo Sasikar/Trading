@@ -1427,18 +1427,25 @@ function buildMacroHistory(m1all, displayN){
   let prev=null;
   const m1DnHist=[]; // sequential, no lookahead
   const m1UpHist=[];
-  // Prefer full history from 2018; keep small warmup so swings have context
-  let startIdx=12;
+  // From 2018 onward (data starts ~2018-05). Light warmup only.
+  let startIdx=0;
   for(let i=0;i<completed.length;i++){
     const ym=ymFromTs(completed[i][0]);
-    if(ym.y>=2018){ startIdx=Math.max(12, i); break; }
+    if(ym.y>=2018){ startIdx=Math.max(0, i); break; }
+  }
+  // need a few bars for swings; if series begins mid-2018, start after 4 months if available
+  startIdx=Math.min(startIdx+4, Math.max(0, completed.length-8));
+  // but never skip past 2018-01 target — re-anchor to first 2018 month if we overshot
+  for(let i=0;i<completed.length;i++){
+    const ym=ymFromTs(completed[i][0]);
+    if(ym.y>=2018){ startIdx=Math.min(startIdx, Math.max(0,i)); break; }
   }
   if(completed.length-startIdx>displayN) startIdx=completed.length-displayN;
   for(let i=startIdx;i<completed.length;i++){
     const k=completed[i];
     const ym=ymFromTs(k[0]);
     const snap=monthsUpTo(completed, ym.y, ym.m);
-    if(snap.length<6) continue;
+    if(snap.length<4) continue;
     const m1=snap;
     const m3=calendar3M(m1);
     const m6=calendar6M(m1);
