@@ -835,14 +835,15 @@ async function loadStructural(){
 const MACRO_STATE_KEY='macro_cycle_state_v1';
 
 function macroSwing(kl, lookback, label){
-  if(!kl||kl.length<8){
+  /* Sparse HTF (6M/1Y) needs min 5 bars + adaptive pivots so structure can form. */
+  if(!kl||kl.length<5){
     return {available:false,label,bias:'NEUTRAL',detail:'insufficient data',
       protectedHL:null,protectedLH:null,wickWarn:false,closeBreak:false,hardBreak:false,
       hh:false,hl:false,lh:false,ll:false,price:null};
   }
   const slice=kl.slice(-Math.min(lookback, kl.length));
   const highs=slice.map(k=>+k[2]), lows=slice.map(k=>+k[3]), closes=slice.map(k=>+k[4]);
-  const left=2,right=2;
+  const left=slice.length<18?1:2, right=left;
   const pivH=[],pivL=[];
   for(let i=left;i<highs.length-right;i++){
     let isH=true,isL=true;
@@ -866,7 +867,6 @@ function macroSwing(kl, lookback, label){
     if(lh) protectedLH=Math.min(prev.p, protectedLH);
   } else if(lastH.length===1) protectedLH=lastH[0].p;
 
-  // Completed candles only for breaks (never forming bar = last index)
   const closedIdx=closes.length>=2?closes.length-2:closes.length-1;
   const closedClose=closes[closedIdx];
   const lastLow=lows[lows.length-1];
@@ -877,6 +877,14 @@ function macroSwing(kl, lookback, label){
     if(closes.length>=3&&closedIdx>=1){
       hardBreak=closes[closedIdx]<protectedHL*0.995 && closes[closedIdx-1]<protectedHL*0.995;
     }
+  }
+  // Sparse HTF: if pivots lacked pairs, use last 3 COMPLETED closes
+  if(!hh&&!hl&&!lh&&!ll&&closes.length>=4&&closedIdx>=2){
+    const c2=closes[closedIdx], c1=closes[closedIdx-1], c0=closes[closedIdx-2];
+    if(c2>c1*1.001&&c1>c0*1.001){ hl=true; hh=true; }
+    else if(c2<c1*0.999&&c1<c0*0.999){ lh=true; ll=true; }
+    else if(c2>c1*1.001){ hl=true; }
+    else if(c2<c1*0.999){ lh=true; }
   }
   let bias='NEUTRAL';
   if(hh&&hl) bias='BULLISH';
@@ -891,7 +899,6 @@ function macroSwing(kl, lookback, label){
   if(hardBreak) detail+=' · persistent close break';
   else if(closeBreak) detail+=' · close break';
   else if(wickWarn) detail+=' · wick warning';
-  // UI grade
   let grade='MIXED';
   if(hardBreak) grade='BROKEN';
   else if(lh&&ll) grade='DAMAGED';
