@@ -1396,25 +1396,25 @@ function macroGradeBadge(g){
 
 
 function macroStateStyle(state){
-  /* One title everywhere (header + calendar). Color carries severity. */
+  /* Calendar tiles: HOT BULL REC UP MIX CAUTION PRESS BEAR only */
   const s=String(state||'');
   if(s.indexOf('Overextended')>=0||s.indexOf('PARABOLIC')>=0)
-    return {bg:'#0d3d28', fg:'#7dffb5', short:'Overextended', band:'#2ee67a'};
+    return {bg:'#0d3d28', fg:'#7dffb5', short:'HOT', band:'#2ee67a'};
   if(s.indexOf('Bull market')>=0||s.indexOf('EXPANSION')>=0)
-    return {bg:'#0c2f22', fg:'#62e3a0', short:'Bull market', band:'#3bcf86'};
+    return {bg:'#0c2f22', fg:'#62e3a0', short:'BULL', band:'#3bcf86'};
   if(s.indexOf('Recovering')>=0||s.indexOf('RECOVERY')>=0)
-    return {bg:'#0a2820', fg:'#4fcf96', short:'Recovering', band:'#3aa876'};
+    return {bg:'#0a2820', fg:'#4fcf96', short:'REC', band:'#3aa876'};
   if(s.indexOf('Turning up')>=0||s.indexOf('BULLISH BIAS')>=0)
-    return {bg:'#0a221c', fg:'#8fd4b0', short:'Turning up', band:'#6bc49a'};
+    return {bg:'#0a221c', fg:'#8fd4b0', short:'UP', band:'#6bc49a'};
   if(s.indexOf('Chop')>=0||s.indexOf('Unclear')>=0||s.indexOf('NEUTRAL')>=0||s.indexOf('INSUFFICIENT')>=0)
-    return {bg:'#1a1f24', fg:'#9aa3ad', short:'Chop / Unclear', band:'#6b7280'};
+    return {bg:'#1a1f24', fg:'#9aa3ad', short:'MIX', band:'#6b7280'};
   if(s.indexOf('Caution')>=0||s.indexOf('BEARISH BIAS')>=0)
-    return {bg:'#2a181c', fg:'#f0b0b6', short:'Caution', band:'#d48a92'};
+    return {bg:'#2a181c', fg:'#f0b0b6', short:'CAUTION', band:'#d48a92'};
   if(s.indexOf('Bear pressure')>=0||s.indexOf('CONTRACTION')>=0)
-    return {bg:'#2c1014', fg:'#ff6f7c', short:'Bear pressure', band:'#e23d4c'};
+    return {bg:'#2c1014', fg:'#ff6f7c', short:'PRESS', band:'#e23d4c'};
   if(s.indexOf('Bear market')>=0||s.indexOf('CYCLE BROKEN')>=0||(s.indexOf('REGIME')>=0&&s.indexOf('BROKEN')>=0))
-    return {bg:'#3a0c12', fg:'#ff4d5e', short:'Bear market', band:'#c41e2e'};
-  return {bg:'#1a1f24', fg:'#9aa3ad', short:s||'—', band:'#6b7280'};
+    return {bg:'#3a0c12', fg:'#ff4d5e', short:'BEAR', band:'#c41e2e'};
+  return {bg:'#1a1f24', fg:'#9aa3ad', short:'—', band:'#6b7280'};
 }
 function ymFromTs(ts){
   const d=new Date(+ts);
@@ -1543,7 +1543,7 @@ function renderMacroHistory(rows){
       };
       detail.innerHTML=
         '<div class="mac-det-title">'+r.label+' '+r.y+'</div>'
-        +'<div class="mac-det-state" style="color:'+r.style.fg+'">'+r.state+'</div>'
+        +'<div class="mac-det-state" style="color:'+r.style.fg+'">'+r.style.short+'</div>'
         +'<div class="mac-det-rows">'
         +'<div><span>1Y</span><b>'+g(r.y1)+'</b></div>'
         +'<div><span>6M</span><b>'+g(r.m6)+'</b></div>'
@@ -1595,9 +1595,10 @@ async function loadMacro(){
     try{localStorage.setItem(MACRO_STATE_KEY, result.state);}catch(e){}
 
     const color=result.phase==='PARABOLIC'?'#9af0c4':result.regime==='BULLISH'?'#62e3a0':result.regime==='BEARISH'?(result.phase.indexOf('BROKEN')>=0?'#ff6f7c':'#e6a050'):'#e6c878';
-    if($('mac-state')){$('mac-state').textContent=result.state;$('mac-state').style.color=color;}
-    if($('mac-regime'))$('mac-regime').textContent=result.state;
-    if($('mac-phase'))$('mac-phase').textContent=result.state;
+    const tile=macroStateStyle(result.state);
+    if($('mac-state')){$('mac-state').textContent=tile.short;$('mac-state').style.color=tile.fg||color;}
+    if($('mac-regime'))$('mac-regime').textContent=tile.short;
+    if($('mac-phase'))$('mac-phase').textContent=tile.short;
     if($('mac-conf'))$('mac-conf').textContent=result.conf;
     if($('mac-explain'))$('mac-explain').textContent=explainMacro(result,{y1,m6,m3,m1});
 
