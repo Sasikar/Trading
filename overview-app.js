@@ -1514,6 +1514,20 @@ function buildMacroHistory(m1all, displayN){
 }
 
 /* ========== TWO-SCORE MACRO (Regime + Risk) — replaces ladder engine display ========== */
+
+function regimeLabelFromScore(v){
+  if(v==null||!isFinite(v)) return 'INSUFFICIENT';
+  if(v>0.20) return 'BULLISH';
+  if(v<-0.20) return 'BEARISH';
+  return 'NEUTRAL';
+}
+function riskLabelFromScore(v){
+  if(v==null||!isFinite(v)) return 'INSUFFICIENT';
+  if(v>=0.70) return 'PARABOLIC';
+  if(v>=0.40) return 'EXTENDED';
+  return 'NORMAL';
+}
+
 function twoScoreStyle(regimeLabel, riskLabel){
   const r=String(regimeLabel||'');
   if(r==='BULLISH') return {bg:'#0c2f22', fg:'#62e3a0', short:'BULL', band:'#3bcf86'};
@@ -1532,9 +1546,9 @@ function explainTwoScore(row){
   const R=row.regime_label, K=row.risk_label;
   const rs=row.regime_score, ks=row.risk_score;
   let t='';
-  if(R==='BULLISH') t='Regime BULLISH: overall trend constructive (score ≥ +0.30). ';
-  else if(R==='BEARISH') t='Regime BEARISH: overall trend defensive (score ≤ −0.30). ';
-  else if(R==='NEUTRAL') t='Regime NEUTRAL: no clear trend bias (|score| < 0.30). ';
+  if(R==='BULLISH') t='Regime BULLISH: overall trend constructive (score > +0.20). ';
+  else if(R==='BEARISH') t='Regime BEARISH: overall trend defensive (score < −0.20). ';
+  else if(R==='NEUTRAL') t='Regime NEUTRAL: no clear trend bias (|score| ≤ 0.20). ';
   else t='Insufficient history for regime. ';
   if(K==='PARABOLIC') t+='Risk PARABOLIC: blow-off / extension risk elevated (≥0.70).';
   else if(K==='EXTENDED') t+='Risk EXTENDED: stretched vs history (0.40–0.69).';
@@ -1628,9 +1642,16 @@ async function loadMacro(){
     if(!res.ok) throw new Error('two-score fetch '+res.status);
     const all=await res.json();
     // display history from 2018+ for grid density; keep full in detail
-    const rows=all.filter(r=>r.month>='2018-01' && r.regime_score!=null);
-    const latest=all.filter(r=>r.regime_score!=null).slice(-1)[0]||rows[rows.length-1];
-    renderMacroHistory(rows.length?rows:all.filter(r=>r.regime_score!=null));
+    const norm=function(r){
+      const o=Object.assign({},r);
+      if(o.regime_score!=null) o.regime_label=regimeLabelFromScore(o.regime_score);
+      if(o.risk_score!=null) o.risk_label=riskLabelFromScore(o.risk_score);
+      return o;
+    };
+    const allN=all.map(norm);
+    const rows=allN.filter(r=>r.month>='2018-01' && r.regime_score!=null);
+    const latest=allN.filter(r=>r.regime_score!=null).slice(-1)[0]||rows[rows.length-1];
+    renderMacroHistory(rows.length?rows:allN.filter(r=>r.regime_score!=null));
 
     if(latest){
       const st=twoScoreStyle(latest.regime_label, latest.risk_label);
@@ -1644,7 +1665,7 @@ async function loadMacro(){
     // evidence strip: simple legend
     if($('mac-evidence')){
       $('mac-evidence').innerHTML=
-        '<div class="mac-two-line">Regime: BULLISH ≥+0.30 · NEUTRAL |score|<0.30 · BEARISH ≤−0.30</div>'
+        '<div class="mac-two-line">Regime: BULLISH >+0.20 · NEUTRAL |score|≤0.20 · BEARISH <−0.20</div>'
         +'<div class="mac-two-line">Risk: NORMAL 0–0.39 · EXTENDED 0.40–0.69 · PARABOLIC ≥0.70</div>';
     }
   }catch(e){
