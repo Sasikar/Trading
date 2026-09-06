@@ -1,0 +1,1345 @@
+[
+  {
+    "month": "2012-01",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-02",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-03",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-04",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-05",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-06",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-07",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-08",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-09",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-10",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-11",
+    "regime_score": null,
+    "risk_score": null,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "INSUFFICIENT"
+  },
+  {
+    "month": "2012-12",
+    "regime_score": null,
+    "risk_score": 0.25,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2013-01",
+    "regime_score": null,
+    "risk_score": 0.739,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "PARABOLIC"
+  },
+  {
+    "month": "2013-02",
+    "regime_score": null,
+    "risk_score": 0.598,
+    "regime_label": "INSUFFICIENT",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2013-03",
+    "regime_score": 0.627,
+    "risk_score": 0.881,
+    "regime_label": "BULLISH",
+    "risk_label": "PARABOLIC"
+  },
+  {
+    "month": "2013-04",
+    "regime_score": -0.182,
+    "risk_score": 0.525,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2013-05",
+    "regime_score": -0.301,
+    "risk_score": 0.779,
+    "regime_label": "BEARISH",
+    "risk_label": "PARABOLIC"
+  },
+  {
+    "month": "2013-06",
+    "regime_score": -0.374,
+    "risk_score": 0.368,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2013-07",
+    "regime_score": -0.427,
+    "risk_score": 0.58,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2013-08",
+    "regime_score": -0.337,
+    "risk_score": 0.262,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2013-09",
+    "regime_score": -0.619,
+    "risk_score": 0.252,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2013-10",
+    "regime_score": -0.038,
+    "risk_score": 0.641,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2013-11",
+    "regime_score": 0.22,
+    "risk_score": 0.867,
+    "regime_label": "NEUTRAL",
+    "risk_label": "PARABOLIC"
+  },
+  {
+    "month": "2013-12",
+    "regime_score": 0.082,
+    "risk_score": 0.49,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2014-01",
+    "regime_score": 0.094,
+    "risk_score": 0.409,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2014-02",
+    "regime_score": -0.49,
+    "risk_score": 0.306,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2014-03",
+    "regime_score": -0.59,
+    "risk_score": 0.29,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2014-04",
+    "regime_score": -0.646,
+    "risk_score": 0.509,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2014-05",
+    "regime_score": -0.806,
+    "risk_score": 0.567,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2014-06",
+    "regime_score": -0.832,
+    "risk_score": 0.25,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2014-07",
+    "regime_score": -0.879,
+    "risk_score": 0.283,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2014-08",
+    "regime_score": -1.0,
+    "risk_score": 0.281,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2014-09",
+    "regime_score": -1.0,
+    "risk_score": 0.282,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2014-10",
+    "regime_score": -1.0,
+    "risk_score": 0.194,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2014-11",
+    "regime_score": -0.944,
+    "risk_score": 0.201,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2014-12",
+    "regime_score": -0.967,
+    "risk_score": 0.101,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-01",
+    "regime_score": -1.0,
+    "risk_score": 0.134,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-02",
+    "regime_score": -0.925,
+    "risk_score": 0.391,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-03",
+    "regime_score": -0.858,
+    "risk_score": 0.131,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-04",
+    "regime_score": -0.852,
+    "risk_score": 0.108,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-05",
+    "regime_score": -0.82,
+    "risk_score": 0.102,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-06",
+    "regime_score": -0.663,
+    "risk_score": 0.237,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-07",
+    "regime_score": -0.531,
+    "risk_score": 0.085,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-08",
+    "regime_score": -0.745,
+    "risk_score": 0.096,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-09",
+    "regime_score": -0.687,
+    "risk_score": 0.209,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-10",
+    "regime_score": -0.379,
+    "risk_score": 0.315,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-11",
+    "regime_score": -0.309,
+    "risk_score": 0.145,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2015-12",
+    "regime_score": -0.303,
+    "risk_score": 0.418,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2016-01",
+    "regime_score": -0.454,
+    "risk_score": 0.236,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-02",
+    "regime_score": -0.354,
+    "risk_score": 0.472,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2016-03",
+    "regime_score": -0.398,
+    "risk_score": 0.176,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-04",
+    "regime_score": -0.365,
+    "risk_score": 0.244,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-05",
+    "regime_score": -0.328,
+    "risk_score": 0.391,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-06",
+    "regime_score": 0.042,
+    "risk_score": 0.436,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2016-07",
+    "regime_score": -0.147,
+    "risk_score": 0.319,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-08",
+    "regime_score": -0.391,
+    "risk_score": 0.394,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-09",
+    "regime_score": -0.359,
+    "risk_score": 0.315,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-10",
+    "regime_score": -0.168,
+    "risk_score": 0.344,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-11",
+    "regime_score": -0.098,
+    "risk_score": 0.221,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2016-12",
+    "regime_score": 0.194,
+    "risk_score": 0.512,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2017-01",
+    "regime_score": 0.11,
+    "risk_score": 0.367,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2017-02",
+    "regime_score": 0.261,
+    "risk_score": 0.673,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2017-03",
+    "regime_score": 0.012,
+    "risk_score": 0.352,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL"
+  },
+  {
+    "month": "2017-04",
+    "regime_score": 0.248,
+    "risk_score": 0.678,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2017-05",
+    "regime_score": 0.426,
+    "risk_score": 0.641,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2017-06",
+    "regime_score": 0.424,
+    "risk_score": 0.456,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2017-07",
+    "regime_score": 0.482,
+    "risk_score": 0.645,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2017-08",
+    "regime_score": 0.537,
+    "risk_score": 0.834,
+    "regime_label": "BULLISH",
+    "risk_label": "PARABOLIC"
+  },
+  {
+    "month": "2017-09",
+    "regime_score": 0.49,
+    "risk_score": 0.478,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2017-10",
+    "regime_score": 0.558,
+    "risk_score": 0.775,
+    "regime_label": "BULLISH",
+    "risk_label": "PARABOLIC"
+  },
+  {
+    "month": "2017-11",
+    "regime_score": 0.569,
+    "risk_score": 0.487,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2017-12",
+    "regime_score": 0.435,
+    "risk_score": 0.475,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED"
+  },
+  {
+    "month": "2018-01",
+    "regime_score": -0.398,
+    "risk_score": 0.36,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 10149.0
+  },
+  {
+    "month": "2018-02",
+    "regime_score": -0.426,
+    "risk_score": 0.526,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 10314.9
+  },
+  {
+    "month": "2018-03",
+    "regime_score": -0.494,
+    "risk_score": 0.313,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 6928.62
+  },
+  {
+    "month": "2018-04",
+    "regime_score": -0.427,
+    "risk_score": 0.595,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 9242.17
+  },
+  {
+    "month": "2018-05",
+    "regime_score": -0.531,
+    "risk_score": 0.293,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 7492.28
+  },
+  {
+    "month": "2018-06",
+    "regime_score": -0.767,
+    "risk_score": 0.292,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 6385.71
+  },
+  {
+    "month": "2018-07",
+    "regime_score": -0.762,
+    "risk_score": 0.52,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 7725.43
+  },
+  {
+    "month": "2018-08",
+    "regime_score": -0.784,
+    "risk_score": 0.114,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 7017.35
+  },
+  {
+    "month": "2018-09",
+    "regime_score": -0.8,
+    "risk_score": 0.132,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 6597.81
+  },
+  {
+    "month": "2018-10",
+    "regime_score": -0.833,
+    "risk_score": 0.089,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 6303.27
+  },
+  {
+    "month": "2018-11",
+    "regime_score": -1.0,
+    "risk_score": 0.088,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 3971.06
+  },
+  {
+    "month": "2018-12",
+    "regime_score": -1.0,
+    "risk_score": 0.222,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 3693.3
+  },
+  {
+    "month": "2019-01",
+    "regime_score": -0.972,
+    "risk_score": 0.105,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 3413.11
+  },
+  {
+    "month": "2019-02",
+    "regime_score": -0.902,
+    "risk_score": 0.267,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 3791.36
+  },
+  {
+    "month": "2019-03",
+    "regime_score": -0.739,
+    "risk_score": 0.09,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 4096.08
+  },
+  {
+    "month": "2019-04",
+    "regime_score": -0.347,
+    "risk_score": 0.145,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 5269.0
+  },
+  {
+    "month": "2019-05",
+    "regime_score": -0.307,
+    "risk_score": 0.584,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 8547.2
+  },
+  {
+    "month": "2019-06",
+    "regime_score": -0.021,
+    "risk_score": 0.407,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED",
+    "close": 10760.1
+  },
+  {
+    "month": "2019-07",
+    "regime_score": -0.306,
+    "risk_score": 0.322,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 10085.34
+  },
+  {
+    "month": "2019-08",
+    "regime_score": -0.329,
+    "risk_score": 0.219,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 9594.15
+  },
+  {
+    "month": "2019-09",
+    "regime_score": -0.382,
+    "risk_score": 0.126,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 8298.45
+  },
+  {
+    "month": "2019-10",
+    "regime_score": -0.428,
+    "risk_score": 0.374,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 9150.07
+  },
+  {
+    "month": "2019-11",
+    "regime_score": -0.457,
+    "risk_score": 0.238,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 7550.67
+  },
+  {
+    "month": "2019-12",
+    "regime_score": -0.535,
+    "risk_score": 0.317,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 7168.36
+  },
+  {
+    "month": "2020-01",
+    "regime_score": -0.397,
+    "risk_score": 0.502,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 9327.85
+  },
+  {
+    "month": "2020-02",
+    "regime_score": -0.568,
+    "risk_score": 0.267,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 8527.74
+  },
+  {
+    "month": "2020-03",
+    "regime_score": -0.844,
+    "risk_score": 0.183,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 6421.14
+  },
+  {
+    "month": "2020-04",
+    "regime_score": -0.555,
+    "risk_score": 0.477,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 8627.32
+  },
+  {
+    "month": "2020-05",
+    "regime_score": -0.424,
+    "risk_score": 0.11,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 9446.19
+  },
+  {
+    "month": "2020-06",
+    "regime_score": -0.536,
+    "risk_score": 0.103,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 9132.96
+  },
+  {
+    "month": "2020-07",
+    "regime_score": -0.17,
+    "risk_score": 0.398,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 11356.74
+  },
+  {
+    "month": "2020-08",
+    "regime_score": -0.142,
+    "risk_score": 0.128,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 11655.0
+  },
+  {
+    "month": "2020-09",
+    "regime_score": -0.372,
+    "risk_score": 0.111,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 10778.22
+  },
+  {
+    "month": "2020-10",
+    "regime_score": 0.112,
+    "risk_score": 0.405,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED",
+    "close": 13816.08
+  },
+  {
+    "month": "2020-11",
+    "regime_score": 0.342,
+    "risk_score": 0.588,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED",
+    "close": 19700.19
+  },
+  {
+    "month": "2020-12",
+    "regime_score": 0.452,
+    "risk_score": 0.683,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED",
+    "close": 28992.79
+  },
+  {
+    "month": "2021-01",
+    "regime_score": 0.502,
+    "risk_score": 0.471,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED",
+    "close": 33141.38
+  },
+  {
+    "month": "2021-02",
+    "regime_score": 0.505,
+    "risk_score": 0.771,
+    "regime_label": "BULLISH",
+    "risk_label": "PARABOLIC",
+    "close": 45240.96
+  },
+  {
+    "month": "2021-03",
+    "regime_score": 0.599,
+    "risk_score": 0.498,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED",
+    "close": 58782.58
+  },
+  {
+    "month": "2021-04",
+    "regime_score": 0.489,
+    "risk_score": 0.424,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED",
+    "close": 57775.27
+  },
+  {
+    "month": "2021-05",
+    "regime_score": -0.432,
+    "risk_score": 0.318,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 37341.41
+  },
+  {
+    "month": "2021-06",
+    "regime_score": -0.55,
+    "risk_score": 0.366,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 35037.23
+  },
+  {
+    "month": "2021-07",
+    "regime_score": -0.396,
+    "risk_score": 0.472,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 41490.13
+  },
+  {
+    "month": "2021-08",
+    "regime_score": -0.193,
+    "risk_score": 0.382,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 47156.09
+  },
+  {
+    "month": "2021-09",
+    "regime_score": -0.41,
+    "risk_score": 0.29,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 43834.43
+  },
+  {
+    "month": "2021-10",
+    "regime_score": 0.019,
+    "risk_score": 0.594,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED",
+    "close": 61359.44
+  },
+  {
+    "month": "2021-11",
+    "regime_score": -0.151,
+    "risk_score": 0.304,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 56974.12
+  },
+  {
+    "month": "2021-12",
+    "regime_score": -0.575,
+    "risk_score": 0.16,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 46214.37
+  },
+  {
+    "month": "2022-01",
+    "regime_score": -0.89,
+    "risk_score": 0.1,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 38491.92
+  },
+  {
+    "month": "2022-02",
+    "regime_score": -0.737,
+    "risk_score": 0.32,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 43178.98
+  },
+  {
+    "month": "2022-03",
+    "regime_score": -0.59,
+    "risk_score": 0.094,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 45517.27
+  },
+  {
+    "month": "2022-04",
+    "regime_score": -0.772,
+    "risk_score": 0.114,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 37639.8
+  },
+  {
+    "month": "2022-05",
+    "regime_score": -0.964,
+    "risk_score": 0.107,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 31762.76
+  },
+  {
+    "month": "2022-06",
+    "regime_score": -1.0,
+    "risk_score": 0.105,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 19924.89
+  },
+  {
+    "month": "2022-07",
+    "regime_score": -0.947,
+    "risk_score": 0.402,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 23322.53
+  },
+  {
+    "month": "2022-08",
+    "regime_score": -0.924,
+    "risk_score": 0.105,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 20059.0
+  },
+  {
+    "month": "2022-09",
+    "regime_score": -0.93,
+    "risk_score": 0.146,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 19425.0
+  },
+  {
+    "month": "2022-10",
+    "regime_score": -0.795,
+    "risk_score": 0.125,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 20498.0
+  },
+  {
+    "month": "2022-11",
+    "regime_score": -0.927,
+    "risk_score": 0.111,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 17170.0
+  },
+  {
+    "month": "2022-12",
+    "regime_score": -0.801,
+    "risk_score": 0.157,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 16528.0
+  },
+  {
+    "month": "2023-01",
+    "regime_score": -0.353,
+    "risk_score": 0.458,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 23127.0
+  },
+  {
+    "month": "2023-02",
+    "regime_score": -0.329,
+    "risk_score": 0.167,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 23136.0
+  },
+  {
+    "month": "2023-03",
+    "regime_score": -0.333,
+    "risk_score": 0.511,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 28476.0
+  },
+  {
+    "month": "2023-04",
+    "regime_score": -0.313,
+    "risk_score": 0.226,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 29235.0
+  },
+  {
+    "month": "2023-05",
+    "regime_score": -0.384,
+    "risk_score": 0.198,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 27219.0
+  },
+  {
+    "month": "2023-06",
+    "regime_score": -0.397,
+    "risk_score": 0.389,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 30469.0
+  },
+  {
+    "month": "2023-07",
+    "regime_score": -0.34,
+    "risk_score": 0.129,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 29231.0
+  },
+  {
+    "month": "2023-08",
+    "regime_score": -0.347,
+    "risk_score": 0.116,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 25932.0
+  },
+  {
+    "month": "2023-09",
+    "regime_score": -0.364,
+    "risk_score": 0.195,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 26966.0
+  },
+  {
+    "month": "2023-10",
+    "regime_score": -0.335,
+    "risk_score": 0.419,
+    "regime_label": "BEARISH",
+    "risk_label": "EXTENDED",
+    "close": 34661.0
+  },
+  {
+    "month": "2023-11",
+    "regime_score": 0.154,
+    "risk_score": 0.367,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 37719.0
+  },
+  {
+    "month": "2023-12",
+    "regime_score": 0.254,
+    "risk_score": 0.42,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED",
+    "close": 42258.0
+  },
+  {
+    "month": "2024-01",
+    "regime_score": 0.187,
+    "risk_score": 0.335,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 42558.0
+  },
+  {
+    "month": "2024-02",
+    "regime_score": 0.478,
+    "risk_score": 0.772,
+    "regime_label": "BULLISH",
+    "risk_label": "PARABOLIC",
+    "close": 61161.0
+  },
+  {
+    "month": "2024-03",
+    "regime_score": 0.546,
+    "risk_score": 0.474,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED",
+    "close": 71285.0
+  },
+  {
+    "month": "2024-04",
+    "regime_score": 0.285,
+    "risk_score": 0.374,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 60632.0
+  },
+  {
+    "month": "2024-05",
+    "regime_score": 0.346,
+    "risk_score": 0.486,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED",
+    "close": 67477.0
+  },
+  {
+    "month": "2024-06",
+    "regime_score": 0.107,
+    "risk_score": 0.263,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 62676.0
+  },
+  {
+    "month": "2024-07",
+    "regime_score": 0.085,
+    "risk_score": 0.441,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED",
+    "close": 64612.0
+  },
+  {
+    "month": "2024-08",
+    "regime_score": -0.128,
+    "risk_score": 0.288,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 58967.0
+  },
+  {
+    "month": "2024-09",
+    "regime_score": -0.064,
+    "risk_score": 0.294,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 63302.0
+  },
+  {
+    "month": "2024-10",
+    "regime_score": 0.041,
+    "risk_score": 0.325,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 70231.0
+  },
+  {
+    "month": "2024-11",
+    "regime_score": 0.331,
+    "risk_score": 0.656,
+    "regime_label": "BULLISH",
+    "risk_label": "EXTENDED",
+    "close": 96441.0
+  },
+  {
+    "month": "2024-12",
+    "regime_score": 0.242,
+    "risk_score": 0.362,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 93381.0
+  },
+  {
+    "month": "2025-01",
+    "regime_score": 0.295,
+    "risk_score": 0.454,
+    "regime_label": "NEUTRAL",
+    "risk_label": "EXTENDED",
+    "close": 102412.0
+  },
+  {
+    "month": "2025-02",
+    "regime_score": -0.231,
+    "risk_score": 0.122,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 84321.0
+  },
+  {
+    "month": "2025-03",
+    "regime_score": -0.354,
+    "risk_score": 0.143,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 82538.0
+  },
+  {
+    "month": "2025-04",
+    "regime_score": -0.084,
+    "risk_score": 0.335,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 94181.0
+  },
+  {
+    "month": "2025-05",
+    "regime_score": 0.051,
+    "risk_score": 0.16,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 104646.0
+  },
+  {
+    "month": "2025-06",
+    "regime_score": 0.007,
+    "risk_score": 0.176,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 107179.0
+  },
+  {
+    "month": "2025-07",
+    "regime_score": 0.04,
+    "risk_score": 0.227,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 115750.0
+  },
+  {
+    "month": "2025-08",
+    "regime_score": -0.233,
+    "risk_score": 0.205,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 108269.0
+  },
+  {
+    "month": "2025-09",
+    "regime_score": -0.218,
+    "risk_score": 0.224,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 114065.0
+  },
+  {
+    "month": "2025-10",
+    "regime_score": -0.368,
+    "risk_score": 0.141,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 109554.0
+  },
+  {
+    "month": "2025-11",
+    "regime_score": -0.774,
+    "risk_score": 0.103,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 90382.0
+  },
+  {
+    "month": "2025-12",
+    "regime_score": -0.77,
+    "risk_score": 0.112,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 87496.0
+  },
+  {
+    "month": "2026-01",
+    "regime_score": -0.85,
+    "risk_score": 0.102,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 78635.0
+  },
+  {
+    "month": "2026-02",
+    "regime_score": -0.968,
+    "risk_score": 0.129,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 66985.0
+  },
+  {
+    "month": "2026-03",
+    "regime_score": -0.9,
+    "risk_score": 0.173,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 68215.0
+  },
+  {
+    "month": "2026-04",
+    "regime_score": -0.712,
+    "risk_score": 0.29,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 76310.0
+  },
+  {
+    "month": "2026-05",
+    "regime_score": -0.677,
+    "risk_score": 0.104,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 73567.99
+  },
+  {
+    "month": "2026-06",
+    "regime_score": -0.932,
+    "risk_score": 0.109,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 58526.17
+  },
+  {
+    "month": "2026-07",
+    "regime_score": -0.806,
+    "risk_score": 0.095,
+    "regime_label": "BEARISH",
+    "risk_label": "NORMAL",
+    "close": 62817.96
+  },
+  {
+    "month": "2026-08",
+    "regime_score": -0.299,
+    "risk_score": 0.357,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL",
+    "close": 78571.17
+  },
+  {
+    "month": "2026-09",
+    "regime_score": -0.257,
+    "risk_score": 0.342,
+    "regime_label": "NEUTRAL",
+    "risk_label": "NORMAL"
+  }
+]
