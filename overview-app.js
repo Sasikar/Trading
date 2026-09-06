@@ -1633,11 +1633,13 @@ function renderMacroHistory(rows){
     for(const r of byYear[y]){
       const m=parseInt(r.month.slice(5),10);
       const st=twoScoreStyle(r.regime_label, r.risk_label);
+      const raw=r.raw_regime!=null?r.raw_regime:r.regime_score;
       const adj=r.adj_regime!=null?r.adj_regime:r.regime_score;
-      const rs=adj==null?'—':(adj>=0?'+':'')+adj.toFixed(2);
-      const ks=r.risk_score==null?'—':r.risk_score.toFixed(2);
+      const rs=raw==null?'—':(raw>=0?'+':'')+Number(raw).toFixed(2);
+      const ks=r.risk_score==null?'—':Number(r.risk_score).toFixed(2);
       const riskL=r.risk_label==='INSUFFICIENT'?'—':(r.risk_label||'—').slice(0,4);
-      const gateMark=r.gated?'*':'';
+      const isOverrideActive=(raw!=null&&adj!=null&&Math.abs(Number(raw)-Number(adj))>1e-9)||!!r.gated;
+      const gateMark=isOverrideActive?'*':'';
       grid+='<button type="button" class="mac-hist-cell" data-key="'+r.month+'" style="background:'+st.bg+';border-color:'+st.band+'33">'
         +'<div class="mac-hist-mon">'+mon[m-1]+'</div>'
         +'<div class="mac-hist-dot" style="color:'+st.fg+'">●</div>'
@@ -1671,7 +1673,7 @@ function renderMacroHistory(rows){
     +'<span class="mac-ref-chip norm">NORM 0–0.39</span>'
     +'<span class="mac-ref-chip exte">EXTE 0.40–0.69</span>'
     +'<span class="mac-ref-chip para">PARA ≥ 0.70</span></div>'
-    +'<div class="mac-ref-hint">Post-process: max +0.15/mo if prior Adj&lt;−0.70 · leave BEAR only if Adj&gt;−0.20 and 2 rising months · * = gate held BEAR · Risk independent.</div>'
+    +'<div class="mac-ref-hint">Card face = RAW R / K. State uses Adj under the hood. * = rate-limit or BEAR-exit active · tap card for Raw vs Adj.</div>'
     +'</div>';
 
   root.innerHTML=
