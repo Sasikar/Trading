@@ -1677,7 +1677,7 @@ function renderMacroHistory(rows){
     +'</div>';
 
   root.innerHTML=
-    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">TWO-SCORE · REGIME + RISK · 2013+</div></div>'
+    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">TWO-SCORE · REGIME + RISK · 2012+</div></div>'
     +refBar
     +'<div class="mac-hist-streak">'+streakLine+'</div>'
     +'<div class="mac-band" aria-hidden="true">'+band+'</div>'
@@ -1725,7 +1725,7 @@ async function loadMacro(){
     // chronological post-process on full series (Adj + BEAR-exit gate)
     const sorted=all.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
     const allN=applyMacroPostProcess(sorted);
-    const rows=allN.filter(r=>r.month>='2018-01' && r.adj_regime!=null);
+    const rows=allN.filter(r=>r.month>='2012-01' && r.adj_regime!=null);
     const latest=allN.filter(r=>r.adj_regime!=null).slice(-1)[0]||rows[rows.length-1];
     renderMacroHistory(rows.length?rows:allN.filter(r=>r.adj_regime!=null));
 
