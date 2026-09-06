@@ -1482,11 +1482,19 @@ function buildMacroHistory(m1all, displayN){
     m1UpHist.push(!!result.m1Up);
     if(m1UpHist.length>3) m1UpHist.shift();
     prev=result.state;
+    const closePx=+k[4];
+    let momPct=null;
+    if(i>0){
+      const prevClose=+completed[i-1][4];
+      if(prevClose>0) momPct=((closePx-prevClose)/prevClose)*100;
+    }
     results.push({
       y:ym.y, m:ym.m, key:ym.key,
       label:['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][ym.m-1],
       state:result.state, regime:result.regime, phase:result.phase, conf:result.conf, cycle:result.cycle,
       y1:sY, m6:s6, m3:s3, m1:s1,
+      close:closePx,
+      momPct:momPct,
       explain:explainMacro(result,{y1:sY,m6:s6,m3:s3,m1:s1}),
       style:macroStateStyle(result.state)
     });
@@ -1501,8 +1509,47 @@ function renderMacroHistory(rows){
     root.innerHTML='<div class="mac-hist-empty">Not enough completed monthly history.</div>';
     return;
   }
+  const fmtMom=function(p){
+    if(p==null||!isFinite(p)) return '—';
+    const s=(p>=0?'+':'')+p.toFixed(1)+'%';
+    return s;
+  };
+  const momColor=function(p){
+    if(p==null||!isFinite(p)) return '#66717d';
+    return p>=0?'#62e3a0':'#ff6f7c';
+  };
+  // Streak summary for latest live state
+  const last=rows[rows.length-1];
+  const lastTile=last.style&&last.style.short?last.style.short:String(last.state||'');
+  let streak=1;
+  for(let i=rows.length-2;i>=0;i--){
+    const t=rows[i].style&&rows[i].style.short?rows[i].style.short:String(rows[i].state||'');
+    if(t===lastTile) streak++;
+    else break;
+  }
+  const streakStart=rows[rows.length-streak];
+  let streakPct=null;
+  if(streakStart&&last&&streakStart.close>0&&last.close!=null){
+    streakPct=((last.close-streakStart.close)/streakStart.close)*100;
+  }
+  // If streak>1, cumulative from first month of streak vs last; include that first month's move from prior if available
+  // Spec: cumulative % since streak began = last close vs close of month BEFORE streak start (price when state started)
+  if(streak>=1){
+    const idx=rows.length-streak;
+    const baseClose=idx>0?rows[idx-1].close:streakStart.close;
+    if(baseClose>0&&last.close!=null) streakPct=((last.close-baseClose)/baseClose)*100;
+  }
+  const last3=[];
+  for(let i=Math.max(0,rows.length-3);i<rows.length;i++){
+    last3.push(fmtMom(rows[i].momPct));
+  }
+  const streakLine=
+    lastTile+' · '+streak+' month'+(streak===1?'':'s')+' running'
+    +(streakPct!=null?' · '+(streakPct>=0?'+':'')+streakPct.toFixed(0)+'% since start':'')
+    +(last3.length?(' · last '+last3.length+': '+last3.join(', ')):'');
+
   // band
-  const band=rows.map(r=>'<span class="mac-band-cell" style="background:'+r.style.band+'" title="'+r.key+' '+r.state+'"></span>').join('');
+  const band=rows.map(r=>'<span class="mac-band-cell" style="background:'+r.style.band+'" title="'+r.key+' '+r.style.short+(r.momPct!=null?(' '+fmtMom(r.momPct)):'')+'"></span>').join('');
   // group by year
   const byYear={};
   for(const r of rows){
@@ -1517,12 +1564,14 @@ function renderMacroHistory(rows){
         +'<div class="mac-hist-mon">'+r.label+'</div>'
         +'<div class="mac-hist-dot" style="color:'+r.style.fg+'">●</div>'
         +'<div class="mac-hist-short" style="color:'+r.style.fg+'">'+r.style.short+'</div>'
+        +'<div class="mac-hist-mom" style="color:'+momColor(r.momPct)+'">'+fmtMom(r.momPct)+'</div>'
         +'</button>';
     }
     grid+='</div>';
   }
   root.innerHTML=
     '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">2018+ · ENGINE OUTPUT</div></div>'
+    +'<div class="mac-hist-streak">'+streakLine+'</div>'
     +'<div class="mac-band" aria-hidden="true">'+band+'</div>'
     +grid
     +'<div class="mac-hist-detail" id="mac-hist-detail"><div class="mac-hist-detail-placeholder">Tap a month for engine snapshot</div></div>';
@@ -1543,7 +1592,7 @@ function renderMacroHistory(rows){
       };
       detail.innerHTML=
         '<div class="mac-det-title">'+r.label+' '+r.y+'</div>'
-        +'<div class="mac-det-state" style="color:'+r.style.fg+'">'+r.style.short+'</div>'
+        +'<div class="mac-det-state" style="color:'+r.style.fg+'">'+r.style.short+'</div>'+'<div class="mac-det-mom" style="color:'+(r.momPct!=null&&r.momPct>=0?'#62e3a0':(r.momPct!=null?'#ff6f7c':'#8491a1'))+'">'+(r.momPct==null?'—':((r.momPct>=0?'+':'')+r.momPct.toFixed(1)+'% MoM'))+'</div>'
         +'<div class="mac-det-rows">'
         +'<div><span>1Y</span><b>'+g(r.y1)+'</b></div>'
         +'<div><span>6M</span><b>'+g(r.m6)+'</b></div>'
