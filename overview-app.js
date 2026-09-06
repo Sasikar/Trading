@@ -1512,221 +1512,148 @@ function buildMacroHistory(m1all, displayN){
   // keep last displayN
   return results.slice(-displayN);
 }
+
+/* ========== TWO-SCORE MACRO (Regime + Risk) — replaces ladder engine display ========== */
+function twoScoreStyle(regimeLabel, riskLabel){
+  const r=String(regimeLabel||'');
+  if(r==='BULLISH') return {bg:'#0c2f22', fg:'#62e3a0', short:'BULL', band:'#3bcf86'};
+  if(r==='BEARISH') return {bg:'#2c1014', fg:'#ff6f7c', short:'BEAR', band:'#e23d4c'};
+  if(r==='NEUTRAL') return {bg:'#1a1f24', fg:'#9aa3ad', short:'NEU', band:'#6b7280'};
+  return {bg:'#1a1f24', fg:'#66717d', short:'—', band:'#6b7280'};
+}
+function riskFg(riskLabel){
+  const k=String(riskLabel||'');
+  if(k==='PARABOLIC') return '#ffb84d';
+  if(k==='EXTENDED') return '#e6c878';
+  if(k==='NORMAL') return '#8491a1';
+  return '#66717d';
+}
+function explainTwoScore(row){
+  const R=row.regime_label, K=row.risk_label;
+  const rs=row.regime_score, ks=row.risk_score;
+  let t='';
+  if(R==='BULLISH') t='Regime BULLISH: overall trend constructive (score ≥ +0.30). ';
+  else if(R==='BEARISH') t='Regime BEARISH: overall trend defensive (score ≤ −0.30). ';
+  else if(R==='NEUTRAL') t='Regime NEUTRAL: no clear trend bias (|score| < 0.30). ';
+  else t='Insufficient history for regime. ';
+  if(K==='PARABOLIC') t+='Risk PARABOLIC: blow-off / extension risk elevated (≥0.70).';
+  else if(K==='EXTENDED') t+='Risk EXTENDED: stretched vs history (0.40–0.69).';
+  else if(K==='NORMAL') t+='Risk NORMAL: extension risk low (0–0.39).';
+  if(rs!=null&&ks!=null) t+=' Scores: regime '+rs.toFixed(2)+', risk '+ks.toFixed(2)+'.';
+  return t;
+}
 function renderMacroHistory(rows){
   const root=$('mac-history');
   if(!root) return;
   if(!rows||!rows.length){
-    root.innerHTML='<div class="mac-hist-empty">Not enough completed monthly history.</div>';
+    root.innerHTML='<div class="mac-hist-empty">No two-score history loaded.</div>';
     return;
   }
-  const fmtMom=function(p){
-    if(p==null||!isFinite(p)) return '—';
-    const s=(p>=0?'+':'')+p.toFixed(1)+'%';
-    return s;
-  };
-  const momColor=function(p){
-    if(p==null||!isFinite(p)) return '#66717d';
-    return p>=0?'#62e3a0':'#ff6f7c';
-  };
-  // Streak summary for latest live state
-  const last=rows[rows.length-1];
-  const lastTile=last.style&&last.style.short?last.style.short:String(last.state||'');
-  let streak=1;
-  for(let i=rows.length-2;i>=0;i--){
-    const t=rows[i].style&&rows[i].style.short?rows[i].style.short:String(rows[i].state||'');
-    if(t===lastTile) streak++;
-    else break;
-  }
-  const streakStart=rows[rows.length-streak];
-  let streakPct=null;
-  if(streakStart&&last&&streakStart.close>0&&last.close!=null){
-    streakPct=((last.close-streakStart.close)/streakStart.close)*100;
-  }
-  // If streak>1, cumulative from first month of streak vs last; include that first month's move from prior if available
-  // Spec: cumulative % since streak began = last close vs close of month BEFORE streak start (price when state started)
-  if(streak>=1){
-    const idx=rows.length-streak;
-    const baseClose=idx>0?rows[idx-1].close:streakStart.close;
-    if(baseClose>0&&last.close!=null) streakPct=((last.close-baseClose)/baseClose)*100;
-  }
-  const last3=[];
-  for(let i=Math.max(0,rows.length-3);i<rows.length;i++){
-    last3.push(fmtMom(rows[i].momPct));
-  }
-  const streakLine=
-    lastTile+' · '+streak+' month'+(streak===1?'':'s')+' running'
-    +(streakPct!=null?' · '+(streakPct>=0?'+':'')+streakPct.toFixed(0)+'% since start':'')
-    +(last3.length?(' · last '+last3.length+': '+last3.join(', ')):'');
-
-  // band
-  const band=rows.map(r=>'<span class="mac-band-cell" style="background:'+r.style.band+'" title="'+r.key+' '+r.style.short+(r.momPct!=null?(' '+fmtMom(r.momPct)):'')+'"></span>').join('');
-  // group by year
+  const band=rows.map(r=>{
+    const st=twoScoreStyle(r.regime_label, r.risk_label);
+    return '<span class="mac-band-cell" style="background:'+st.band+'" title="'+r.month+' '+r.regime_label+' · '+r.risk_label+'"></span>';
+  }).join('');
   const byYear={};
   for(const r of rows){
-    if(!byYear[r.y]) byYear[r.y]=[];
-    byYear[r.y].push(r);
+    const y=parseInt(r.month.slice(0,4),10);
+    if(!byYear[y]) byYear[y]=[];
+    byYear[y].push(r);
   }
   let grid='';
+  const mon=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   for(const y of Object.keys(byYear).map(Number).sort((a,b)=>a-b)){
     grid+='<div class="mac-hist-year">'+y+'</div><div class="mac-hist-grid">';
     for(const r of byYear[y]){
-      grid+='<button type="button" class="mac-hist-cell" data-key="'+r.key+'" style="background:'+r.style.bg+';border-color:'+r.style.band+'33">'
-        +'<div class="mac-hist-mon">'+r.label+'</div>'
-        +'<div class="mac-hist-dot" style="color:'+r.style.fg+'">●</div>'
-        +'<div class="mac-hist-short" style="color:'+r.style.fg+'">'+macroTileLabel(r).label+'</div>'
-        +'<div class="mac-hist-mom" style="color:'+momColor(r.momPct)+'">'+fmtMom(r.momPct)+'</div>'
+      const m=parseInt(r.month.slice(5),10);
+      const st=twoScoreStyle(r.regime_label, r.risk_label);
+      const rs=r.regime_score==null?'—':(r.regime_score>=0?'+':'')+r.regime_score.toFixed(2);
+      const ks=r.risk_score==null?'—':r.risk_score.toFixed(2);
+      const riskL=r.risk_label==='INSUFFICIENT'?'—':(r.risk_label||'—').slice(0,4);
+      grid+='<button type="button" class="mac-hist-cell" data-key="'+r.month+'" style="background:'+st.bg+';border-color:'+st.band+'33">'
+        +'<div class="mac-hist-mon">'+mon[m-1]+'</div>'
+        +'<div class="mac-hist-dot" style="color:'+st.fg+'">●</div>'
+        +'<div class="mac-hist-short" style="color:'+st.fg+'">'+st.short+'</div>'
+        +'<div class="mac-hist-risk" style="color:'+riskFg(r.risk_label)+'">'+riskL+'</div>'
+        +'<div class="mac-hist-scores">'+rs+' / '+ks+'</div>'
         +'</button>';
     }
     grid+='</div>';
   }
+  // streak of current regime label
+  const last=rows[rows.length-1];
+  let streak=1;
+  for(let i=rows.length-2;i>=0;i--){
+    if(rows[i].regime_label===last.regime_label) streak++;
+    else break;
+  }
+  const streakLine=(last.regime_label||'—')+' · '+(last.risk_label||'—')+' · '+streak+' mo'
+    +(last.regime_score!=null?' · R '+(last.regime_score>=0?'+':'')+last.regime_score.toFixed(2):'')
+    +(last.risk_score!=null?' · K '+last.risk_score.toFixed(2):'');
+
   root.innerHTML=
-    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">2018+ · ENGINE OUTPUT</div></div>'
+    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">TWO-SCORE · REGIME + RISK · 2013+</div></div>'
     +'<div class="mac-hist-streak">'+streakLine+'</div>'
     +'<div class="mac-band" aria-hidden="true">'+band+'</div>'
     +grid
-    +'<div class="mac-hist-detail" id="mac-hist-detail"><div class="mac-hist-detail-placeholder">Tap a month for engine snapshot</div></div>';
+    +'<div class="mac-hist-detail" id="mac-hist-detail"><div class="mac-hist-detail-placeholder">Tap a month for scores</div></div>';
 
-  // detail on tap
   const detail=$('mac-hist-detail');
   const map={};
-  for(const r of rows) map[r.key]=r;
+  for(const r of rows) map[r.month]=r;
   root.querySelectorAll('.mac-hist-cell').forEach(btn=>{
     btn.addEventListener('click',()=>{
       root.querySelectorAll('.mac-hist-cell').forEach(b=>b.classList.remove('on'));
       btn.classList.add('on');
       const r=map[btn.getAttribute('data-key')];
       if(!r||!detail) return;
-      const g=function(s){
-        if(!s||!s.available) return 'N/A';
-        return (s.grade||s.bias||'—')+' · '+(s.detail||'');
-      };
+      const st=twoScoreStyle(r.regime_label, r.risk_label);
+      const rs=r.regime_score==null?'—':(r.regime_score>=0?'+':'')+r.regime_score.toFixed(3);
+      const ks=r.risk_score==null?'—':r.risk_score.toFixed(3);
       detail.innerHTML=
-        '<div class="mac-det-title">'+r.label+' '+r.y+'</div>'
-        +'<div class="mac-det-state" style="color:'+r.style.fg+'">'+macroTileLabel(r).label+'</div>'+(macroTileLabel(r).bounce?'<div class="mac-det-note">Counter-trend bounce: month return strong, HTF structure not yet repaired</div>':'')+'<div class="mac-det-mom" style="color:'+(r.momPct!=null&&r.momPct>=0?'#62e3a0':(r.momPct!=null?'#ff6f7c':'#8491a1'))+'">'+(r.momPct==null?'—':((r.momPct>=0?'+':'')+r.momPct.toFixed(1)+'% MoM'))+'</div>'
+        '<div class="mac-det-title">'+r.month+(r.close!=null?' · $'+Math.round(r.close).toLocaleString('en-US'):'')+'</div>'
+        +'<div class="mac-det-state" style="color:'+st.fg+'">'+r.regime_label+' · '+r.risk_label+'</div>'
         +'<div class="mac-det-rows">'
-        +'<div><span>1Y</span><b>'+g(r.y1)+'</b></div>'
-        +'<div><span>6M</span><b>'+g(r.m6)+'</b></div>'
-        +'<div><span>3M</span><b>'+g(r.m3)+'</b></div>'
-        +'<div><span>1M</span><b>'+g(r.m1)+'</b></div>'
-        +'<div><span>CONFIDENCE</span><b>'+r.conf+'</b></div>'
+        +'<div><span>REGIME SCORE</span><b>'+rs+'</b></div>'
+        +'<div><span>RISK SCORE</span><b>'+ks+'</b></div>'
         +'</div>'
-        +'<div class="mac-det-explain">'+r.explain+'</div>';
+        +'<div class="mac-det-explain">'+explainTwoScore(r)+'</div>';
     });
   });
 }
 
-
 async function loadMacro(){
   try{
-    const series=await fetchMacroSeries();
-    const y1=macroSwing(series.y1, 16, '1Y');
-    const m6=macroSwing(series.m6, 20, '6M');
-    const m3=macroSwing(series.m3, 24, '3M');
-    const m1=macroSwing(series.m1, 30, '1M');
-    const parabolic=detectParabolicAccel(series.m1);
-    let prev=null, m1DnHist=[], m1UpHist=[];
-    try{prev=localStorage.getItem(MACRO_STATE_KEY);}catch(e){}
-    try{m1DnHist=JSON.parse(localStorage.getItem(MACRO_M1DN_KEY)||'[]'); if(!Array.isArray(m1DnHist)) m1DnHist=[];}catch(e){m1DnHist=[];}
-    try{m1UpHist=JSON.parse(localStorage.getItem(MACRO_M1UP_KEY)||'[]'); if(!Array.isArray(m1UpHist)) m1UpHist=[];}catch(e){m1UpHist=[];}
-    const m1Closes=(series.m1||[]).map(x=>+x[4]);
-    const result=mapMacroState({y1,m6,m3,m1,parabolic}, prev, {m1DnHist:m1DnHist.slice(), m1UpHist:m1UpHist.slice(), m1Closes});
-    try{
-      const lastM=series.m1&&series.m1.length?ymUTC(series.m1[series.m1.length-1][0]):null;
-      const key=lastM?(lastM.y+'-'+lastM.m):'';
-      const prevKey=localStorage.getItem(MACRO_LAST_MONTH_KEY)||'';
-      if(key&&key!==prevKey){
-        m1DnHist.push(!!result.m1Dn);
-        while(m1DnHist.length>3) m1DnHist.shift();
-        m1UpHist.push(!!result.m1Up);
-        while(m1UpHist.length>3) m1UpHist.shift();
-        localStorage.setItem(MACRO_M1DN_KEY, JSON.stringify(m1DnHist));
-        localStorage.setItem(MACRO_M1UP_KEY, JSON.stringify(m1UpHist));
-        localStorage.setItem(MACRO_LAST_MONTH_KEY, key);
-        const result2=mapMacroState({y1,m6,m3,m1,parabolic}, prev, {m1DnHist:m1DnHist.slice(), m1UpHist:m1UpHist.slice(), m1Closes});
-        Object.assign(result, result2);
-      }
-    }catch(e){}
-    try{
-      const histRows=buildMacroHistory(series.m1, 120);
-      renderMacroHistory(histRows);
-      try{ window.__macroHistory=histRows; }catch(e){}
-    }catch(he){ console.warn('macro history', he); }
-    try{localStorage.setItem(MACRO_STATE_KEY, result.state);}catch(e){}
+    const url='data/macro-two-score-monthly.json?v=20260906';
+    const res=await fetch(url,{cache:'no-store'});
+    if(!res.ok) throw new Error('two-score fetch '+res.status);
+    const all=await res.json();
+    // display history from 2018+ for grid density; keep full in detail
+    const rows=all.filter(r=>r.month>='2018-01' && r.regime_score!=null);
+    const latest=all.filter(r=>r.regime_score!=null).slice(-1)[0]||rows[rows.length-1];
+    renderMacroHistory(rows.length?rows:all.filter(r=>r.regime_score!=null));
 
-    const color=result.phase==='PARABOLIC'?'#9af0c4':result.regime==='BULLISH'?'#62e3a0':result.regime==='BEARISH'?(result.phase.indexOf('BROKEN')>=0?'#ff6f7c':'#e6a050'):'#e6c878';
-    const tile=macroStateStyle(result.state);
-    if($('mac-state')){$('mac-state').textContent=tile.short;$('mac-state').style.color=tile.fg||color;}
-    if($('mac-regime'))$('mac-regime').textContent=tile.short;
-    if($('mac-phase'))$('mac-phase').textContent=tile.short;
-    if($('mac-conf'))$('mac-conf').textContent=result.conf;
-    if($('mac-explain'))$('mac-explain').textContent=explainMacro(result,{y1,m6,m3,m1});
-
-    // Support / resistance from 6M/1Y protected levels
-    const support=m6.protectedHL||y1.protectedHL||m3.protectedHL;
-    const resist=m6.protectedLH||y1.protectedLH||m3.protectedLH;
-    let supT='🟡 UNAVAILABLE', supC='#8491a1';
-    if(support!=null){
-      if(y1.hardBreak||m6.hardBreak){supT='🔴 LOST · '+Math.round(support).toLocaleString('en-US');supC='#ff6f7c';}
-      else if(m6.wickWarn&&!m6.closeBreak){supT='🟡 WICK WARN · '+Math.round(support).toLocaleString('en-US');supC='#e6c878';}
-      else {supT='🟢 HOLDING · '+Math.round(support).toLocaleString('en-US');supC='#62e3a0';}
+    if(latest){
+      const st=twoScoreStyle(latest.regime_label, latest.risk_label);
+      const combo=latest.regime_label+' · '+latest.risk_label;
+      if($('mac-state')){$('mac-state').textContent=combo;$('mac-state').style.color=st.fg;}
+      if($('mac-regime'))$('mac-regime').textContent=latest.regime_label+(latest.regime_score!=null?' ('+(latest.regime_score>=0?'+':'')+latest.regime_score.toFixed(2)+')':'');
+      if($('mac-phase'))$('mac-phase').textContent=latest.risk_label+(latest.risk_score!=null?' ('+latest.risk_score.toFixed(2)+')':'');
+      if($('mac-conf'))$('mac-conf').textContent=(latest.regime_score!=null?(latest.regime_score>=0?'+':'')+latest.regime_score.toFixed(2):'—')+' / '+(latest.risk_score!=null?latest.risk_score.toFixed(2):'—');
+      if($('mac-explain'))$('mac-explain').textContent=explainTwoScore(latest);
     }
-    let resT='🟡 UNAVAILABLE', resC='#8491a1';
-    if(resist!=null){
-      const px=m1.price||m3.price||m6.price;
-      if(px!=null&&px>resist){resT='🟢 RECLAIMED · '+Math.round(resist).toLocaleString('en-US');resC='#62e3a0';}
-      else {resT='🟡 OVERHEAD · '+Math.round(resist).toLocaleString('en-US');resC='#e6c878';}
-    }
-
-    const rows=[
-      ['1Y STRUCTURE', macroGradeBadge(y1.grade).t+' · '+(y1.detail||''), macroGradeBadge(y1.grade).c],
-      ['6M STRUCTURE', macroGradeBadge(m6.grade).t+' · '+(m6.detail||''), macroGradeBadge(m6.grade).c],
-      ['3M STRUCTURE', macroGradeBadge(m3.grade).t+' · '+(m3.detail||''), macroGradeBadge(m3.grade).c],
-      ['1M STRUCTURE', macroGradeBadge(m1.grade).t+' · '+(m1.detail||''), macroGradeBadge(m1.grade).c],
-      ['MACRO SUPPORT', supT, supC],
-      ['MACRO RESISTANCE', resT, resC],
-      ['CYCLE PHASE', result.cycle, color],
-      ['BIAS', result.regime, color],
-      ['CONFIDENCE', result.conf, '#8491a1']
-    ];
+    // evidence strip: simple legend
     if($('mac-evidence')){
-      $('mac-evidence').innerHTML=rows.map(r=>'<div class="st-ev-row"><span class="k">'+r[0]+'</span><span class="v" style="color:'+r[2]+'">'+r[1]+'</span></div>').join('');
+      $('mac-evidence').innerHTML=
+        '<div class="mac-two-line">Regime: BULLISH ≥+0.30 · NEUTRAL |score|<0.30 · BEARISH ≤−0.30</div>'
+        +'<div class="mac-two-line">Risk: NORMAL 0–0.39 · EXTENDED 0.40–0.69 · PARABOLIC ≥0.70</div>';
     }
-    if($('macro-source'))$('macro-source').textContent='LIVE · 1M/3M/6M/1Y · closed candles';
   }catch(e){
-    console.warn(e);
-    if($('macro-source'))$('macro-source').textContent='OFFLINE';
+    console.warn('loadMacro two-score', e);
     if($('mac-state'))$('mac-state').textContent='DATA UNAVAILABLE';
-    if($('mac-explain'))$('mac-explain').textContent='Could not load macro inputs: '+String(e&&e.message||e);
-  }
-}
-
-function showMacro(on){
-  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel');
-  if(on){
-    if(panels){panels.classList.add('hidden');panels.style.display='none';}
-    if(trend){trend.classList.remove('on');trend.style.display='none';}
-    if(sp){sp.classList.remove('on');sp.style.display='none';}
-    if(mp){mp.classList.add('on');mp.style.display='block';}
-  } else {
-    if(mp){mp.classList.remove('on');mp.style.display='none';}
+    if($('mac-explain'))$('mac-explain').textContent='Could not load two-score macro history.';
   }
 }
 
 
-function showStruct(on){
-  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel');
-  if(on){
-    if(panels){panels.classList.add('hidden');panels.style.display='none';}
-    if(trend){trend.classList.remove('on');trend.style.display='none';}
-    if(mp){mp.classList.remove('on');mp.style.display='none';}
-    if(sp){sp.classList.add('on');sp.style.display='block';}
-  } else {
-    if(sp){sp.classList.remove('on');sp.style.display='none';}
-  }
-}
-
-function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}if(mp&&on){mp.classList.remove('on');mp.style.display='none';}}
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showMacro(true);loadMacro();}else{showMacro(false);showStruct(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
-window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}});
 async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else loadTF(currentTF);},60000);
 })();
