@@ -1416,6 +1416,16 @@ function macroStateStyle(state){
     return {bg:'#3a0c12', fg:'#ff4d5e', short:'BEAR', band:'#c41e2e'};
   return {bg:'#1a1f24', fg:'#9aa3ad', short:'—', band:'#6b7280'};
 }
+function macroTileLabel(r){
+  /* Display-only: strong green month inside defensive HTF state = counter-trend bounce */
+  const short=(r.style&&r.style.short)||String(r.state||'');
+  const mom=r.momPct;
+  const defensive=short==='PRESS'||short==='CAUTION'||short==='BEAR';
+  if(defensive&&mom!=null&&isFinite(mom)&&mom>15){
+    return {label:short+' · bounce', bounce:true};
+  }
+  return {label:short, bounce:false};
+}
 function ymFromTs(ts){
   const d=new Date(+ts);
   return {y:d.getUTCFullYear(), m:d.getUTCMonth()+1, key:d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')};
@@ -1563,7 +1573,7 @@ function renderMacroHistory(rows){
       grid+='<button type="button" class="mac-hist-cell" data-key="'+r.key+'" style="background:'+r.style.bg+';border-color:'+r.style.band+'33">'
         +'<div class="mac-hist-mon">'+r.label+'</div>'
         +'<div class="mac-hist-dot" style="color:'+r.style.fg+'">●</div>'
-        +'<div class="mac-hist-short" style="color:'+r.style.fg+'">'+r.style.short+'</div>'
+        +'<div class="mac-hist-short" style="color:'+r.style.fg+'">'+macroTileLabel(r).label+'</div>'
         +'<div class="mac-hist-mom" style="color:'+momColor(r.momPct)+'">'+fmtMom(r.momPct)+'</div>'
         +'</button>';
     }
@@ -1592,7 +1602,7 @@ function renderMacroHistory(rows){
       };
       detail.innerHTML=
         '<div class="mac-det-title">'+r.label+' '+r.y+'</div>'
-        +'<div class="mac-det-state" style="color:'+r.style.fg+'">'+r.style.short+'</div>'+'<div class="mac-det-mom" style="color:'+(r.momPct!=null&&r.momPct>=0?'#62e3a0':(r.momPct!=null?'#ff6f7c':'#8491a1'))+'">'+(r.momPct==null?'—':((r.momPct>=0?'+':'')+r.momPct.toFixed(1)+'% MoM'))+'</div>'
+        +'<div class="mac-det-state" style="color:'+r.style.fg+'">'+macroTileLabel(r).label+'</div>'+(macroTileLabel(r).bounce?'<div class="mac-det-note">Counter-trend bounce: month return strong, HTF structure not yet repaired</div>':'')+'<div class="mac-det-mom" style="color:'+(r.momPct!=null&&r.momPct>=0?'#62e3a0':(r.momPct!=null?'#ff6f7c':'#8491a1'))+'">'+(r.momPct==null?'—':((r.momPct>=0?'+':'')+r.momPct.toFixed(1)+'% MoM'))+'</div>'
         +'<div class="mac-det-rows">'
         +'<div><span>1Y</span><b>'+g(r.y1)+'</b></div>'
         +'<div><span>6M</span><b>'+g(r.m6)+'</b></div>'
