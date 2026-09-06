@@ -147,6 +147,30 @@
 .mac-hist-scores{font-size:8px;font-weight:700;color:#8491a1;margin-top:2px;line-height:1.2}
 .mac-hist-risk{font-size:8px;font-weight:800;margin-top:1px}
 .mac-two-line{font-size:11px;color:#8491a1;margin-top:4px}
+
+.mac-ref-sticky{
+  position:sticky;top:52px;z-index:45;
+  margin:0 0 12px;padding:10px 12px;
+  border-radius:12px;border:1px solid #2a3644;
+  background:rgba(8,13,19,.94);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.mac-ref-title{font-size:10px;font-weight:900;letter-spacing:.08em;color:#8491a1;margin-bottom:6px}
+.mac-ref-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
+.mac-ref-lab{font-size:10px;font-weight:800;color:#c5d0dc;min-width:48px}
+.mac-ref-chip{
+  font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;
+  border:1px solid #263341;white-space:nowrap
+}
+.mac-ref-chip.bull{color:#62e3a0;background:#0c2f22;border-color:#1a5c40}
+.mac-ref-chip.neu{color:#9aa3ad;background:#1a1f24;border-color:#2a333c}
+.mac-ref-chip.bear{color:#ff6f7c;background:#2c1014;border-color:#5c1a22}
+.mac-ref-chip.norm{color:#8491a1;background:#141a20;border-color:#263341}
+.mac-ref-chip.exte{color:#e6c878;background:#2a2410;border-color:#5c4a18}
+.mac-ref-chip.para{color:#ffb84d;background:#2a1c08;border-color:#6b4a10}
+.mac-ref-hint{font-size:9px;color:#66717d;margin-top:6px;line-height:1.35}
+
 </style></head><body>
 <div class="shell"><main>
 <section class="section">
@@ -282,6 +306,6 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260906-bound20"></script>
+<script src="overview-app.js?v=20260906-refbar"></script>
 <script src="site-nav.js?v=20260904-kraken"></script>
 </body></html>
