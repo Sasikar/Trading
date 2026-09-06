@@ -1640,8 +1640,12 @@ function renderMacroHistory(rows){
       const riskL=r.risk_label==='INSUFFICIENT'?'—':(r.risk_label||'—').slice(0,4);
       const isOverrideActive=(raw!=null&&adj!=null&&Math.abs(Number(raw)-Number(adj))>1e-9)||!!r.gated;
       const gateMark=isOverrideActive?'*':'';
-      grid+='<button type="button" class="mac-hist-cell" data-key="'+r.month+'" style="background:'+st.bg+';border-color:'+st.band+'33">'
+      const isProj=!!r.projected;
+      const cellCls='mac-hist-cell'+(isProj?' mac-hist-proj':'');
+      const projTag=isProj?'<div class="mac-hist-proj-tag">PROJ</div>':'';
+      grid+='<button type="button" class="'+cellCls+'" data-key="'+r.month+'" style="background:'+st.bg+';border-color:'+st.band+'33'+(isProj?';opacity:.85;border-style:dashed':'')+'">'
         +'<div class="mac-hist-mon">'+mon[m-1]+'</div>'
+        +projTag
         +'<div class="mac-hist-dot" style="color:'+st.fg+'">●</div>'
         +'<div class="mac-hist-short" style="color:'+st.fg+'">'+st.short+gateMark+'</div>'
         +'<div class="mac-hist-risk" style="color:'+riskFg(r.risk_label)+'">'+riskL+'</div>'
@@ -1677,7 +1681,7 @@ function renderMacroHistory(rows){
     +'</div>';
 
   root.innerHTML=
-    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">TWO-SCORE · REGIME + RISK · 2012+</div></div>'
+    '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">TWO-SCORE · 2012+ history · dashed PROJ = pattern-only next ~3y</div></div>'
     +refBar
     +'<div class="mac-hist-streak">'+streakLine+'</div>'
     +'<div class="mac-band" aria-hidden="true">'+band+'</div>'
@@ -1702,8 +1706,10 @@ function renderMacroHistory(rows){
       let flags=[];
       if(r.deep) flags.push('DEEP');
       if(r.gated) flags.push('BEAR-EXIT BLOCKED');
+      const projNote=r.projected?'<div class="mac-det-explain" style="color:#e6c878">PATTERN PROJECTION only — not engine output, not a forecast.</div>':'';
       detail.innerHTML=
-        '<div class="mac-det-title">'+r.month+(r.close!=null?' · $'+Math.round(r.close).toLocaleString('en-US'):'')+'</div>'
+        '<div class="mac-det-title">'+r.month+(r.close!=null?' · $'+Math.round(r.close).toLocaleString('en-US'):'')+(r.projected?' · PROJ':'')+'</div>'
+        +projNote
         +'<div class="mac-det-state" style="color:'+st.fg+'">'+r.regime_label+' · '+r.risk_label+(flags.length?' · '+flags.join(' · '):'')+'</div>'
         +'<div class="mac-det-rows">'
         +'<div><span>ADJ REGIME</span><b>'+rs+'</b></div>'
@@ -1725,9 +1731,21 @@ async function loadMacro(){
     // chronological post-process on full series (Adj + BEAR-exit gate)
     const sorted=all.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
     const allN=applyMacroPostProcess(sorted);
-    const rows=allN.filter(r=>r.month>='2012-01' && r.adj_regime!=null);
-    const latest=allN.filter(r=>r.adj_regime!=null).slice(-1)[0]||rows[rows.length-1];
-    renderMacroHistory(rows.length?rows:allN.filter(r=>r.adj_regime!=null));
+    let rows=allN.filter(r=>r.month>='2012-01' && r.adj_regime!=null);
+    // Append pattern projection (next ~3y) — not live scores
+    try{
+      const pr=await fetch('data/macro-pattern-projection.json?v=20260906',{cache:'no-store'});
+      if(pr.ok){
+        const pj=await pr.json();
+        const lastM=rows.length?rows[rows.length-1].month:'';
+        for(const p of pj){
+          if(lastM && p.month<=lastM) continue;
+          rows.push(Object.assign({},p,{projected:true,raw_regime:p.regime_score,adj_regime:p.regime_score}));
+        }
+      }
+    }catch(e){console.warn('projection',e);}
+    const latest=allN.filter(r=>r.adj_regime!=null).slice(-1)[0]||rows.filter(r=>!r.projected).slice(-1)[0];
+    renderMacroHistory(rows);
 
     if(latest){
       const st=twoScoreStyle(latest.regime_label, latest.risk_label);
