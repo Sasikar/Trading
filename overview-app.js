@@ -1604,8 +1604,24 @@ function renderMacroHistory(rows){
     +(last.regime_score!=null?' · R '+(last.regime_score>=0?'+':'')+last.regime_score.toFixed(2):'')
     +(last.risk_score!=null?' · K '+last.risk_score.toFixed(2):'');
 
+  
+  const refBar=
+    '<div class="mac-ref-sticky" id="mac-ref-sticky">'
+    +'<div class="mac-ref-title">VALUE REFERENCE · always visible while scrolling</div>'
+    +'<div class="mac-ref-row"><span class="mac-ref-lab">REGIME</span>'
+    +'<span class="mac-ref-chip bull">BULL &gt; +0.20</span>'
+    +'<span class="mac-ref-chip neu">NEU ±0.20</span>'
+    +'<span class="mac-ref-chip bear">BEAR &lt; −0.20</span></div>'
+    +'<div class="mac-ref-row"><span class="mac-ref-lab">RISK</span>'
+    +'<span class="mac-ref-chip norm">NORM 0–0.39</span>'
+    +'<span class="mac-ref-chip exte">EXTE 0.40–0.69</span>'
+    +'<span class="mac-ref-chip para">PARA ≥ 0.70</span></div>'
+    +'<div class="mac-ref-hint">Tile top label = regime · second line = risk · bottom = score R / K. Colors follow regime.</div>'
+    +'</div>';
+
   root.innerHTML=
     '<div class="mac-hist-head"><div class="mac-hist-title">📊 MACRO HISTORY</div><div class="mac-hist-sub">TWO-SCORE · REGIME + RISK · 2013+</div></div>'
+    +refBar
     +'<div class="mac-hist-streak">'+streakLine+'</div>'
     +'<div class="mac-band" aria-hidden="true">'+band+'</div>'
     +grid
@@ -1664,9 +1680,7 @@ async function loadMacro(){
     }
     // evidence strip: simple legend
     if($('mac-evidence')){
-      $('mac-evidence').innerHTML=
-        '<div class="mac-two-line">Regime: BULLISH >+0.20 · NEUTRAL |score|≤0.20 · BEARISH <−0.20</div>'
-        +'<div class="mac-two-line">Risk: NORMAL 0–0.39 · EXTENDED 0.40–0.69 · PARABOLIC ≥0.70</div>';
+      $('mac-evidence').innerHTML='';
     }
   }catch(e){
     console.warn('loadMacro two-score', e);
