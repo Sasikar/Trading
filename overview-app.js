@@ -1515,6 +1515,59 @@ function buildMacroHistory(m1all, displayN){
 
 /* ========== TWO-SCORE MACRO (Regime + Risk) — replaces ladder engine display ========== */
 
+
+/** Post-process monthly Regime scores (Risk untouched).
+ * 1 Raw (from data)  2 Rate-limit if Adj_prev < -0.70  3 Tentative label  4 BEAR-exit gate
+ */
+function applyMacroPostProcess(history){
+  const MAX_DELTA=0.15;
+  const out=[];
+  let prevAdj=null, prev2Adj=null, prevState=null;
+  for(let i=0;i<history.length;i++){
+    const row=Object.assign({}, history[i]);
+    const raw=row.regime_score;
+    const risk=row.risk_score;
+    if(raw==null||!isFinite(raw)){
+      row.raw_regime=null; row.adj_regime=null;
+      row.regime_label='INSUFFICIENT';
+      row.deep=false; row.gated=false;
+      row.risk_label=riskLabelFromScore(risk);
+      out.push(row);
+      continue;
+    }
+    // Stage 2: rate-limit
+    let adj=raw;
+    if(prevAdj!=null && prevAdj < -0.70){
+      adj=Math.min(raw, prevAdj + MAX_DELTA);
+    }
+    row.raw_regime=raw;
+    row.adj_regime=adj;
+    row.regime_score=adj; // display/history consume Adj only
+    // Stage 3: tentative label
+    let tentative=regimeLabelFromScore(adj);
+    const deep=adj < -0.70;
+    row.deep=deep;
+    // Stage 4: BEAR-exit gate
+    let gated=false;
+    if(prevState==='BEARISH' && tentative!=='BEARISH'){
+      const rising2=(prevAdj!=null && prev2Adj!=null && adj>prevAdj && prevAdj>prev2Adj);
+      if(!(adj > -0.20 && rising2)){
+        tentative='BEARISH';
+        gated=true;
+      }
+    }
+    row.gated=gated;
+    row.regime_label=tentative;
+    row.risk_label=riskLabelFromScore(risk);
+    out.push(row);
+    prev2Adj=prevAdj;
+    prevAdj=adj;
+    prevState=tentative;
+  }
+  return out;
+}
+
+
 function regimeLabelFromScore(v){
   if(v==null||!isFinite(v)) return 'INSUFFICIENT';
   if(v>0.20) return 'BULLISH';
@@ -1580,13 +1633,15 @@ function renderMacroHistory(rows){
     for(const r of byYear[y]){
       const m=parseInt(r.month.slice(5),10);
       const st=twoScoreStyle(r.regime_label, r.risk_label);
-      const rs=r.regime_score==null?'—':(r.regime_score>=0?'+':'')+r.regime_score.toFixed(2);
+      const adj=r.adj_regime!=null?r.adj_regime:r.regime_score;
+      const rs=adj==null?'—':(adj>=0?'+':'')+adj.toFixed(2);
       const ks=r.risk_score==null?'—':r.risk_score.toFixed(2);
       const riskL=r.risk_label==='INSUFFICIENT'?'—':(r.risk_label||'—').slice(0,4);
+      const gateMark=r.gated?'*':'';
       grid+='<button type="button" class="mac-hist-cell" data-key="'+r.month+'" style="background:'+st.bg+';border-color:'+st.band+'33">'
         +'<div class="mac-hist-mon">'+mon[m-1]+'</div>'
         +'<div class="mac-hist-dot" style="color:'+st.fg+'">●</div>'
-        +'<div class="mac-hist-short" style="color:'+st.fg+'">'+st.short+'</div>'
+        +'<div class="mac-hist-short" style="color:'+st.fg+'">'+st.short+gateMark+'</div>'
         +'<div class="mac-hist-risk" style="color:'+riskFg(r.risk_label)+'">'+riskL+'</div>'
         +'<div class="mac-hist-scores">'+rs+' / '+ks+'</div>'
         +'</button>';
@@ -1616,7 +1671,7 @@ function renderMacroHistory(rows){
     +'<span class="mac-ref-chip norm">NORM 0–0.39</span>'
     +'<span class="mac-ref-chip exte">EXTE 0.40–0.69</span>'
     +'<span class="mac-ref-chip para">PARA ≥ 0.70</span></div>'
-    +'<div class="mac-ref-hint">Tile top label = regime · second line = risk · bottom = score R / K. Colors follow regime.</div>'
+    +'<div class="mac-ref-hint">Post-process: max +0.15/mo if prior Adj&lt;−0.70 · leave BEAR only if Adj&gt;−0.20 and 2 rising months · * = gate held BEAR · Risk independent.</div>'
     +'</div>';
 
   root.innerHTML=
@@ -1637,13 +1692,20 @@ function renderMacroHistory(rows){
       const r=map[btn.getAttribute('data-key')];
       if(!r||!detail) return;
       const st=twoScoreStyle(r.regime_label, r.risk_label);
-      const rs=r.regime_score==null?'—':(r.regime_score>=0?'+':'')+r.regime_score.toFixed(3);
-      const ks=r.risk_score==null?'—':r.risk_score.toFixed(3);
+      const adj=r.adj_regime!=null?r.adj_regime:r.regime_score;
+      const raw=r.raw_regime!=null?r.raw_regime:r.regime_score;
+      const rs=adj==null?'—':(adj>=0?'+':'')+Number(adj).toFixed(3);
+      const raws=raw==null?'—':(raw>=0?'+':'')+Number(raw).toFixed(3);
+      const ks=r.risk_score==null?'—':Number(r.risk_score).toFixed(3);
+      let flags=[];
+      if(r.deep) flags.push('DEEP');
+      if(r.gated) flags.push('BEAR-EXIT BLOCKED');
       detail.innerHTML=
         '<div class="mac-det-title">'+r.month+(r.close!=null?' · $'+Math.round(r.close).toLocaleString('en-US'):'')+'</div>'
-        +'<div class="mac-det-state" style="color:'+st.fg+'">'+r.regime_label+' · '+r.risk_label+'</div>'
+        +'<div class="mac-det-state" style="color:'+st.fg+'">'+r.regime_label+' · '+r.risk_label+(flags.length?' · '+flags.join(' · '):'')+'</div>'
         +'<div class="mac-det-rows">'
-        +'<div><span>REGIME SCORE</span><b>'+rs+'</b></div>'
+        +'<div><span>ADJ REGIME</span><b>'+rs+'</b></div>'
+        +'<div><span>RAW REGIME</span><b>'+raws+'</b></div>'
         +'<div><span>RISK SCORE</span><b>'+ks+'</b></div>'
         +'</div>'
         +'<div class="mac-det-explain">'+explainTwoScore(r)+'</div>';
@@ -1658,16 +1720,12 @@ async function loadMacro(){
     if(!res.ok) throw new Error('two-score fetch '+res.status);
     const all=await res.json();
     // display history from 2018+ for grid density; keep full in detail
-    const norm=function(r){
-      const o=Object.assign({},r);
-      if(o.regime_score!=null) o.regime_label=regimeLabelFromScore(o.regime_score);
-      if(o.risk_score!=null) o.risk_label=riskLabelFromScore(o.risk_score);
-      return o;
-    };
-    const allN=all.map(norm);
-    const rows=allN.filter(r=>r.month>='2018-01' && r.regime_score!=null);
-    const latest=allN.filter(r=>r.regime_score!=null).slice(-1)[0]||rows[rows.length-1];
-    renderMacroHistory(rows.length?rows:allN.filter(r=>r.regime_score!=null));
+    // chronological post-process on full series (Adj + BEAR-exit gate)
+    const sorted=all.slice().sort(function(a,b){return String(a.month).localeCompare(String(b.month));});
+    const allN=applyMacroPostProcess(sorted);
+    const rows=allN.filter(r=>r.month>='2018-01' && r.adj_regime!=null);
+    const latest=allN.filter(r=>r.adj_regime!=null).slice(-1)[0]||rows[rows.length-1];
+    renderMacroHistory(rows.length?rows:allN.filter(r=>r.adj_regime!=null));
 
     if(latest){
       const st=twoScoreStyle(latest.regime_label, latest.risk_label);
@@ -1675,8 +1733,14 @@ async function loadMacro(){
       if($('mac-state')){$('mac-state').textContent=combo;$('mac-state').style.color=st.fg;}
       if($('mac-regime'))$('mac-regime').textContent=latest.regime_label+(latest.regime_score!=null?' ('+(latest.regime_score>=0?'+':'')+latest.regime_score.toFixed(2)+')':'');
       if($('mac-phase'))$('mac-phase').textContent=latest.risk_label+(latest.risk_score!=null?' ('+latest.risk_score.toFixed(2)+')':'');
-      if($('mac-conf'))$('mac-conf').textContent=(latest.regime_score!=null?(latest.regime_score>=0?'+':'')+latest.regime_score.toFixed(2):'—')+' / '+(latest.risk_score!=null?latest.risk_score.toFixed(2):'—');
-      if($('mac-explain'))$('mac-explain').textContent=explainTwoScore(latest);
+      const la=latest.adj_regime!=null?latest.adj_regime:latest.regime_score;
+      if($('mac-conf'))$('mac-conf').textContent=(la!=null?(la>=0?'+':'')+la.toFixed(2):'—')+' / '+(latest.risk_score!=null?latest.risk_score.toFixed(2):'—');
+      let exp=explainTwoScore(latest);
+      if(latest.gated) exp+=' BEAR-exit gate held prior BEAR (need Adj>-0.20 and 2 rising months).';
+      if(latest.deep) exp+=' Deep flag: Adj < −0.70.';
+      if(latest.raw_regime!=null && latest.adj_regime!=null && Math.abs(latest.raw_regime-latest.adj_regime)>1e-6)
+        exp+=' Raw '+((latest.raw_regime>=0?'+':'')+latest.raw_regime.toFixed(2))+' rate-limited to Adj '+((latest.adj_regime>=0?'+':'')+latest.adj_regime.toFixed(2))+'.';
+      if($('mac-explain'))$('mac-explain').textContent=exp;
     }
     // evidence strip: simple legend
     if($('mac-evidence')){
