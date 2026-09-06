@@ -157,7 +157,7 @@
     "month": "2013-11",
     "regime_score": 0.22,
     "risk_score": 0.867,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BULLISH",
     "risk_label": "PARABOLIC"
   },
   {
@@ -430,7 +430,7 @@
     "month": "2017-02",
     "regime_score": 0.261,
     "risk_score": 0.673,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BULLISH",
     "risk_label": "EXTENDED"
   },
   {
@@ -444,7 +444,7 @@
     "month": "2017-04",
     "regime_score": 0.248,
     "risk_score": 0.678,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BULLISH",
     "risk_label": "EXTENDED"
   },
   {
@@ -1075,7 +1075,7 @@
     "month": "2023-12",
     "regime_score": 0.254,
     "risk_score": 0.42,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BULLISH",
     "risk_label": "EXTENDED",
     "close": 42258.0
   },
@@ -1107,7 +1107,7 @@
     "month": "2024-04",
     "regime_score": 0.285,
     "risk_score": 0.374,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BULLISH",
     "risk_label": "NORMAL",
     "close": 60632.0
   },
@@ -1171,7 +1171,7 @@
     "month": "2024-12",
     "regime_score": 0.242,
     "risk_score": 0.362,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BULLISH",
     "risk_label": "NORMAL",
     "close": 93381.0
   },
@@ -1179,7 +1179,7 @@
     "month": "2025-01",
     "regime_score": 0.295,
     "risk_score": 0.454,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BULLISH",
     "risk_label": "EXTENDED",
     "close": 102412.0
   },
@@ -1187,7 +1187,7 @@
     "month": "2025-02",
     "regime_score": -0.231,
     "risk_score": 0.122,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BEARISH",
     "risk_label": "NORMAL",
     "close": 84321.0
   },
@@ -1235,7 +1235,7 @@
     "month": "2025-08",
     "regime_score": -0.233,
     "risk_score": 0.205,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BEARISH",
     "risk_label": "NORMAL",
     "close": 108269.0
   },
@@ -1243,7 +1243,7 @@
     "month": "2025-09",
     "regime_score": -0.218,
     "risk_score": 0.224,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BEARISH",
     "risk_label": "NORMAL",
     "close": 114065.0
   },
@@ -1331,7 +1331,7 @@
     "month": "2026-08",
     "regime_score": -0.299,
     "risk_score": 0.357,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BEARISH",
     "risk_label": "NORMAL",
     "close": 78571.17
   },
@@ -1339,7 +1339,7 @@
     "month": "2026-09",
     "regime_score": -0.257,
     "risk_score": 0.342,
-    "regime_label": "NEUTRAL",
+    "regime_label": "BEARISH",
     "risk_label": "NORMAL"
   }
 ]
