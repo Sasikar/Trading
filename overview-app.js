@@ -2034,16 +2034,15 @@ function runSignalBacktest(kl, mode, isS, isE, oosS, oosE){
   const rsi=rsiSeries(closes,14), atr=atrSeries(kl,14), volSma=smaSeries(vols,20);
   let equity=10000, peak=equity, maxDd=0;
   let wins=0, losses=0, trades=0;
-  let pos=null; // {side,entry,sl,tp,qty,entryI}
+  let pos=null;
   const signals=[];
+  const closedTrades=[];
   for(let i=200;i<kl.length-1;i++){
     const ts=kl[i][0];
-    if(!inDateMode(ts, mode, isS, isE, oosS, oosE)) continue;
+    // Always manage open positions for realism; only open new ones in selected range
     const ev=evaluateSignalBar(kl, i, ema50, ema200, rsi, volSma, atr);
-    if(!ev) continue;
-    // manage open position on this bar's path using next bar open for entry only
     if(pos){
-      const hi=+kl[i][2], lo=+kl[i][3], op=+kl[i][1];
+      const hi=+kl[i][2], lo=+kl[i][3];
       let exit=null, reason='';
       if(pos.side==='LONG'){
         if(lo<=pos.sl){ exit=pos.sl; reason='SL'; }
@@ -2053,18 +2052,26 @@ function runSignalBacktest(kl, mode, isS, isE, oosS, oosE){
         else if(lo<=pos.tp){ exit=pos.tp; reason='TP'; }
       }
       if(exit!=null){
-        const pnl=pos.side==='LONG'?(exit-pos.entry)*pos.qty:(pos.entry-exit)*pos.qty;
-        // commission 0.1% each side approx
+        const gross=pos.side==='LONG'?(exit-pos.entry)*pos.qty:(pos.entry-exit)*pos.qty;
         const fees=0.001*(pos.entry*pos.qty+exit*pos.qty);
-        equity+=pnl-fees;
+        const pnl=gross-fees;
+        const retPct=(pos.side==='LONG'?(exit-pos.entry)/pos.entry:(pos.entry-exit)/pos.entry)*100;
+        const retPctNet=pos.entry*pos.qty>0?(pnl/(pos.entry*pos.qty))*100:retPct;
+        equity+=pnl;
         trades++;
         if(pnl>0) wins++; else losses++;
         peak=Math.max(peak,equity);
         maxDd=Math.max(maxDd, peak>0?(peak-equity)/peak:0);
+        closedTrades.push({
+          side:pos.side, score:pos.score, entry:pos.entry, exit:exit, reason:reason,
+          entryTime:pos.entryTime, exitTime:kl[i][0],
+          pnl:pnl, retPct:retPct, retPctNet:retPctNet, qty:pos.qty, conds:pos.conds
+        });
         pos=null;
       }
     }
-    // signal on close → enter next bar open
+    if(!inDateMode(ts, mode, isS, isE, oosS, oosE)) continue;
+    if(!ev) continue;
     if(!pos && ev.side){
       const nextOpen=+kl[i+1][1];
       const atrV=ev.atr;
@@ -2074,16 +2081,24 @@ function runSignalBacktest(kl, mode, isS, isE, oosS, oosE){
       if(!(qty>0)) continue;
       const sl=ev.side==='LONG'?nextOpen-riskPerUnit:nextOpen+riskPerUnit;
       const tp=ev.side==='LONG'?nextOpen+3*atrV:nextOpen-3*atrV;
-      pos={side:ev.side, entry:nextOpen, sl, tp, qty, entryI:i+1};
+      pos={side:ev.side, entry:nextOpen, sl, tp, qty, entryI:i+1, entryTime:kl[i+1][0], score:ev.score, conds:ev.conds};
       signals.push({
         time:kl[i+1][0], side:ev.side, score:ev.score, entry:nextOpen, sl, tp,
         conds:ev.conds, confirmTime:kl[i][0]
       });
     }
   }
+  // mark open trade if any
+  if(pos){
+    closedTrades.push({
+      side:pos.side, score:pos.score, entry:pos.entry, exit:null, reason:'OPEN',
+      entryTime:pos.entryTime, exitTime:null,
+      pnl:null, retPct:null, retPctNet:null, qty:pos.qty, conds:pos.conds, open:true
+    });
+  }
   const winRate=trades?wins/trades:0;
   const ret=(equity-10000)/10000;
-  return {equity, ret, trades, wins, losses, winRate, maxDd, signals, last:evaluateSignalBar(kl, kl.length-1, ema50, ema200, rsi, volSma, atr)};
+  return {equity, ret, trades, wins, losses, winRate, maxDd, signals, closedTrades, last:evaluateSignalBar(kl, kl.length-1, ema50, ema200, rsi, volSma, atr)};
 }
 function destroySigChart(){
   if(sigChart){ try{sigChart.remove();}catch(e){} sigChart=null; sigCandle=sigEma50=sigEma200=null; }
@@ -2194,12 +2209,33 @@ async function loadSignal(){
         +'<div class="m"><div class="k">MAX DD</div><div class="v">'+(bt.maxDd*100).toFixed(1)+'%</div></div>';
     }
     if($('sig-list')){
-      const rows=bt.signals.slice(-25).reverse();
-      $('sig-list').innerHTML=rows.length?rows.map(s=>{
-        const d=new Date(s.time).toISOString().slice(0,10);
-        const bits=s.conds?Object.keys(s.conds).filter(k=>s.conds[k]).join(','):'';
-        return '<div class="row"><span class="'+(s.side==='LONG'?'buy':'sell')+'">'+s.side+' '+s.score+'/4</span><span>'+d+' · '+money(s.entry)+'</span><span>'+bits+'</span></div>';
-      }).join(''):'<div class="row">No signals in selected date range</div>';
+      const closed=(bt.closedTrades||[]).filter(t=>!t.open && t.exit!=null);
+      const openT=(bt.closedTrades||[]).filter(t=>t.open);
+      const rows=closed.slice(-10).reverse();
+      let html='<div class="sig-hist-head">SIGNAL HISTORY · last 10 closed</div>';
+      html+='<div class="sig-hist-cols"><span>Side</span><span>Entry → Exit</span><span>Return</span></div>';
+      if(!rows.length && !openT.length){
+        html+='<div class="row">No closed trades in selected date range</div>';
+      } else {
+        html+=rows.map(t=>{
+          const de=new Date(t.entryTime).toISOString().slice(0,10);
+          const dx=new Date(t.exitTime).toISOString().slice(0,10);
+          const ret=t.retPct;
+          const retStr=(ret>=0?'+':'')+ret.toFixed(2)+'%';
+          const col=ret>=0?'#62e3a0':'#ff6f7c';
+          return '<div class="row sig-hist-row">'
+            +'<span class="'+(t.side==='LONG'?'buy':'sell')+'">'+t.side+' '+t.score+'/4 · '+t.reason+'</span>'
+            +'<span>'+de+' → '+dx+'<br><span class="sig-hist-px">'+money(t.entry)+' → '+money(t.exit)+'</span></span>'
+            +'<span style="color:'+col+';font-weight:900">'+retStr+'</span>'
+            +'</div>';
+        }).join('');
+        if(openT.length){
+          const t=openT[0];
+          const de=new Date(t.entryTime).toISOString().slice(0,10);
+          html+='<div class="row sig-hist-row open"><span class="'+(t.side==='LONG'?'buy':'sell')+'">'+t.side+' '+t.score+'/4 · OPEN</span><span>'+de+' → —<br><span class="sig-hist-px">'+money(t.entry)+'</span></span><span style="color:#e6c878">—</span></div>';
+        }
+      }
+      $('sig-list').innerHTML=html;
     }
     renderSigChart(kl, bt.signals);
     if($('sig-source')) $('sig-source').textContent='LIVE · 1D · mode '+mode.toUpperCase();
