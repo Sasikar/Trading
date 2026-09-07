@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id);
 const fmt=(n,d)=>n==null||!isFinite(n)?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d!=null?d:(n>=1000?0:2)});
 const money=n=>n==null?'—':'$'+fmt(n,n>=1000?0:2);
 const TF={'4h':{interval:'4h',label:'4H',limit:100,swing:50,volAvg:20,fibBars:40,macdBars:40,rightOff:8,barSp:5},'1d':{interval:'1d',label:'1D',limit:120,swing:60,volAvg:20,fibBars:40,macdBars:50,rightOff:10,barSp:6},'1w':{interval:'1w',label:'1W',limit:80,swing:26,volAvg:20,fibBars:26,macdBars:40,rightOff:8,barSp:12},'1M':{interval:'1M',label:'1M',limit:48,swing:18,volAvg:12,fibBars:18,macdBars:24,rightOff:6,barSp:14}};
-let currentTF='trend',fibChart,fibSeries,fibVol,fibLines=[],macdChart,macdLineS,sigLineS,histS;
+let currentTF='trend',fibChart,fibSeries,fibVol,fibLines=[],macdChart,macdLineS,sigLineS,histS,structW1Chart,structW1Series,structW1Lines=[];
 async function jget(url){
   try{
     // static JSON same-origin; external APIs omit credentials
@@ -950,6 +950,138 @@ function badgeStruct(bias, okText, badText, midText){
   return {t:'🟡 '+(midText||'MIXED'), c:'#e6c878'};
 }
 
+
+function destroyStructW1(){
+  if(structW1Chart){
+    try{structW1Chart.remove();}catch(e){}
+    structW1Chart=null;structW1Series=null;structW1Lines=[];
+  }
+}
+function ensureStructW1(){
+  const el=$('struct-w1-tv');
+  if(!el||typeof LightweightCharts==='undefined') return null;
+  if(structW1Chart) return structW1Chart;
+  structW1Chart=LightweightCharts.createChart(el,{
+    layout:{background:{type:'solid',color:'#080d13'},textColor:'#9aa6b5'},
+    grid:{vertLines:{color:'#121820'},horzLines:{color:'#121820'}},
+    rightPriceScale:{borderColor:'#1c2430'},
+    timeScale:{borderColor:'#1c2430',timeVisible:true,secondsVisible:false},
+    crosshair:{mode:1},
+    width:el.clientWidth,
+    height:el.clientHeight||280
+  });
+  structW1Series=structW1Chart.addCandlestickSeries({
+    upColor:'#62e3a0',downColor:'#ff6f7c',
+    borderUpColor:'#62e3a0',borderDownColor:'#ff6f7c',
+    wickUpColor:'#62e3a0',wickDownColor:'#ff6f7c'
+  });
+  return structW1Chart;
+}
+
+/** Lite TV chart: weekly candles + pivot LH/LL + protected HL/LH lines explaining 1W structure label */
+function renderStructW1Chart(klW, wStruct){
+  const cap=$('struct-w1-caption');
+  const leg=$('struct-w1-legend');
+  if(!klW||!klW.length||!wStruct||!wStruct.available){
+    if(cap) cap.textContent='Weekly structure unavailable';
+    if(leg) leg.textContent='';
+    destroyStructW1();
+    return;
+  }
+  const lookback=52;
+  const slice=klW.slice(-lookback);
+  const left=3, right=3;
+  const highs=slice.map(k=>+k[2]), lows=slice.map(k=>+k[3]);
+  const {pivH, pivL}=pivotsFromOHLC(highs, lows, left, right);
+
+  const wB=structureRowLabel(wStruct);
+  if(cap){
+    cap.textContent=wB.t+(wStruct.detail?(' · '+wStruct.detail):'');
+    cap.style.color=wB.c;
+  }
+
+  destroyStructW1();
+  if(!ensureStructW1()||!structW1Series) return;
+
+  const candles=slice.map(k=>({
+    time:Math.floor(k[0]/1000),
+    open:+k[1], high:+k[2], low:+k[3], close:+k[4]
+  }));
+  structW1Series.setData(candles);
+
+  // Markers on last significant pivot highs/lows (LH / LL story)
+  const markers=[];
+  const lastH=pivH.slice(-3);
+  const lastL=pivL.slice(-3);
+  lastH.forEach((p,idx)=>{
+    const t=candles[p.i]&&candles[p.i].time;
+    if(t==null) return;
+    markers.push({
+      time:t, position:'aboveBar',
+      color: idx===lastH.length-1?'#e6a050':'#8491a1',
+      shape:'arrowDown',
+      text: idx===0&&lastH.length>=2?'PH':(idx===lastH.length-1?'LH?':'H')
+    });
+  });
+  lastL.forEach((p,idx)=>{
+    const t=candles[p.i]&&candles[p.i].time;
+    if(t==null) return;
+    markers.push({
+      time:t, position:'belowBar',
+      color: idx===lastL.length-1?'#e6a050':'#8491a1',
+      shape:'arrowUp',
+      text: idx===0&&lastL.length>=2?'PL':(idx===lastL.length-1?'LL?':'L')
+    });
+  });
+  // Clarify labels when LH+LL confirmed
+  if(wStruct.lh&&lastH.length>=2){
+    const a=lastH[lastH.length-2], b=lastH[lastH.length-1];
+    if(candles[a.i]) markers.push({time:candles[a.i].time, position:'aboveBar', color:'#ff6f7c', shape:'circle', text:'H1'});
+    if(candles[b.i]) markers.push({time:candles[b.i].time, position:'aboveBar', color:'#ff6f7c', shape:'circle', text:'LH'});
+  }
+  if(wStruct.ll&&lastL.length>=2){
+    const a=lastL[lastL.length-2], b=lastL[lastL.length-1];
+    if(candles[a.i]) markers.push({time:candles[a.i].time, position:'belowBar', color:'#ff6f7c', shape:'circle', text:'L1'});
+    if(candles[b.i]) markers.push({time:candles[b.i].time, position:'belowBar', color:'#ff6f7c', shape:'circle', text:'LL'});
+  }
+  // Dedupe by time+position keep last
+  const mkMap={};
+  markers.forEach(m=>{mkMap[m.time+'|'+m.position]=m;});
+  structW1Series.setMarkers(Object.values(mkMap).sort((a,b)=>a.time-b.time));
+
+  structW1Lines=[];
+  if(wStruct.protectedHL!=null){
+    structW1Lines.push(structW1Series.createPriceLine({
+      price:wStruct.protectedHL, color:'#62e3a0', lineWidth:2, lineStyle:2,
+      axisLabelVisible:true, title:'Prot HL'
+    }));
+  }
+  if(wStruct.protectedLH!=null){
+    structW1Lines.push(structW1Series.createPriceLine({
+      price:wStruct.protectedLH, color:'#ff6f7c', lineWidth:2, lineStyle:2,
+      axisLabelVisible:true, title:'Prot LH'
+    }));
+  }
+
+  const n=candles.length;
+  structW1Chart.timeScale().applyOptions({rightOffset:4, barSpacing:8});
+  structW1Chart.timeScale().setVisibleLogicalRange({from:Math.max(-0.5,n-40), to:n+2});
+
+  if(leg){
+    const bits=[];
+    if(wStruct.lh&&wStruct.ll) bits.push('LH + LL = lower high and lower low pivots → DETERIORATING (not yet BROKEN unless closes lose Prot HL).');
+    else if(wStruct.hh&&wStruct.hl) bits.push('HH + HL = higher high and higher low → INTACT bullish structure.');
+    else bits.push('Mixed pivots — see markers vs protected levels.');
+    if(wStruct.protectedHL!=null) bits.push('Green line = protected higher-low (support thesis).');
+    if(wStruct.protectedLH!=null) bits.push('Red line = protected lower-high (resistance thesis).');
+    if(wStruct.hardBreakDown) bits.push('Two completed weekly closes below Prot HL → BROKEN.');
+    else if(wStruct.closeBelowHL) bits.push('Last completed week closed below Prot HL.');
+    else if(wStruct.wickBelowHL) bits.push('Wick under Prot HL only — warning, not close break.');
+    leg.textContent=bits.join(' ');
+  }
+}
+
+
 async function loadStructural(){
   try{
     const [klD,klW,kl4]=await Promise.all([
@@ -959,6 +1091,7 @@ async function loadStructural(){
     ]);
     const wStruct=swingStructure(klW, 52, '1w');
     const dStruct=swingStructure(klD, 90, '1d');
+    try{renderStructW1Chart(klW, wStruct);}catch(err){console.warn('struct chart',err);}
     const wEma=trendFromCloses((klW||[]).map(k=>+k[4]));
     const dEma=trendFromCloses((klD||[]).map(k=>+k[4]));
     const wMom=macdMomentum((klW||[]).map(k=>+k[4]),(klW||[]).map(k=>Math.floor(k[0]/1000)));
@@ -1801,7 +1934,7 @@ function showStruct(on){
 
 function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}if(mp&&on){mp.classList.remove('on');mp.style.display='none';}}
 document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showMacro(true);loadMacro();}else{showMacro(false);showStruct(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
-window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}});
+window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}if(structW1Chart){const el=$('struct-w1-tv');if(el)structW1Chart.applyOptions({width:el.clientWidth});}});
 
 async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else loadTF(currentTF);},60000);
 })();
