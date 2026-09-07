@@ -2152,12 +2152,12 @@ function renderSigChart(kl, signals){
 }
 async function loadSignal(){
   try{
-    const kl=await fetchKlines('1d', 500);
+    const kl=await fetchKlines('1d', 900);
     if(!kl||kl.length<220) throw new Error('need more daily bars');
-    const mode=($('sig-mode')&&$('sig-mode').value)||'all';
+    const mode=($('sig-mode')&&$('sig-mode').value)||'oos';
     const isS=($('sig-is-start')&&$('sig-is-start').value)||'2020-01-01';
     const isE=($('sig-is-end')&&$('sig-is-end').value)||'2023-12-31';
-    const oosS=($('sig-oos-start')&&$('sig-oos-start').value)||'2024-01-01';
+    const oosS=($('sig-oos-start')&&$('sig-oos-start').value)||'2025-01-01';
     const oosE=($('sig-oos-end')&&$('sig-oos-end').value)||'2026-12-31';
     const bt=runSignalBacktest(kl, mode, isS, isE, oosS, oosE);
     const live=bt.last;
@@ -2212,7 +2212,8 @@ async function loadSignal(){
       const closed=(bt.closedTrades||[]).filter(t=>!t.open && t.exit!=null);
       const openT=(bt.closedTrades||[]).filter(t=>t.open);
       const rows=closed.slice(-10).reverse();
-      let html='<div class="sig-hist-head">SIGNAL HISTORY · last 10 closed</div>';
+      const rangeLbl=mode==='is'?(isS+' → '+isE):(mode==='oos'?(oosS+' → '+oosE):'all history');
+      let html='<div class="sig-hist-head">SIGNAL HISTORY · last 10 closed · '+rangeLbl+'</div>';
       html+='<div class="sig-hist-cols"><span>Side</span><span>Entry → Exit</span><span>Return</span></div>';
       if(!rows.length && !openT.length){
         html+='<div class="row">No closed trades in selected date range</div>';
