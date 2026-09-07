@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id);
 const fmt=(n,d)=>n==null||!isFinite(n)?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d!=null?d:(n>=1000?0:2)});
 const money=n=>n==null?'—':'$'+fmt(n,n>=1000?0:2);
 const TF={'4h':{interval:'4h',label:'4H',limit:100,swing:50,volAvg:20,fibBars:40,macdBars:40,rightOff:8,barSp:5},'1d':{interval:'1d',label:'1D',limit:120,swing:60,volAvg:20,fibBars:40,macdBars:50,rightOff:10,barSp:6},'1w':{interval:'1w',label:'1W',limit:80,swing:26,volAvg:20,fibBars:26,macdBars:40,rightOff:8,barSp:12},'1M':{interval:'1M',label:'1M',limit:48,swing:18,volAvg:12,fibBars:18,macdBars:24,rightOff:6,barSp:14}};
-let currentTF='trend',fibChart,fibSeries,fibVol,fibLines=[],macdChart,macdLineS,sigLineS,histS,structW1Chart,structW1Series,structW1Lines=[];
+let currentTF='trend',fibChart,fibSeries,fibVol,fibLines=[],macdChart,macdLineS,sigLineS,histS,structW1Chart,structW1Series,structW1Lines=[],sigChart,sigCandle,sigEma50,sigEma200;
 async function jget(url){
   try{
     // static JSON same-origin; external APIs omit credentials
@@ -1914,12 +1914,323 @@ async function loadMacro(){
 }
 
 
-function showMacro(on){
-  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel');
+
+function emaSeries(closes, period){
+  const out=new Array(closes.length).fill(null);
+  if(closes.length<period) return out;
+  let k=2/(period+1), e=0;
+  for(let i=0;i<period;i++) e+=closes[i];
+  e/=period; out[period-1]=e;
+  for(let i=period;i<closes.length;i++){ e=closes[i]*k+e*(1-k); out[i]=e; }
+  return out;
+}
+function rsiSeries(closes, period){
+  const out=new Array(closes.length).fill(null);
+  if(closes.length<=period) return out;
+  let avgG=0, avgL=0;
+  for(let i=1;i<=period;i++){
+    const d=closes[i]-closes[i-1];
+    if(d>=0) avgG+=d; else avgL-=d;
+  }
+  avgG/=period; avgL/=period;
+  out[period]=avgL===0?100:100-(100/(1+avgG/avgL));
+  for(let i=period+1;i<closes.length;i++){
+    const d=closes[i]-closes[i-1];
+    const g=d>0?d:0, l=d<0?-d:0;
+    avgG=(avgG*(period-1)+g)/period;
+    avgL=(avgL*(period-1)+l)/period;
+    out[i]=avgL===0?100:100-(100/(1+avgG/avgL));
+  }
+  return out;
+}
+function atrSeries(kl, period){
+  const out=new Array(kl.length).fill(null);
+  if(kl.length<=period) return out;
+  const tr=[];
+  for(let i=0;i<kl.length;i++){
+    const h=+kl[i][2], l=+kl[i][3], c=+kl[i][4];
+    const pc=i?+kl[i-1][4]:c;
+    tr.push(Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc)));
+  }
+  let s=0;
+  for(let i=0;i<period;i++) s+=tr[i];
+  out[period-1]=s/period;
+  for(let i=period;i<tr.length;i++){
+    out[i]=(out[i-1]*(period-1)+tr[i])/period;
+  }
+  return out;
+}
+function smaSeries(arr, period){
+  const out=new Array(arr.length).fill(null);
+  let s=0;
+  for(let i=0;i<arr.length;i++){
+    s+=arr[i];
+    if(i>=period) s-=arr[i-period];
+    if(i>=period-1) out[i]=s/period;
+  }
+  return out;
+}
+function macdAt(closes, i){
+  if(i<35) return {macd:null, signal:null};
+  const e12=emaSeries(closes.slice(0,i+1),12);
+  const e26=emaSeries(closes.slice(0,i+1),26);
+  const line=[];
+  for(let j=0;j<=i;j++){
+    if(e12[j]==null||e26[j]==null) line.push(null);
+    else line.push(e12[j]-e26[j]);
+  }
+  const valid=line.map(v=>v==null?0:v);
+  // signal EMA9 of macd line — rough on full prefix
+  const sig=emaSeries(line.map(v=>v==null?0:v),9);
+  return {macd:line[i], signal:sig[i]};
+}
+function inDateMode(tsMs, mode, isS, isE, oosS, oosE){
+  const d=new Date(tsMs);
+  const y=d.getUTCFullYear(), m=d.getUTCMonth()+1, day=d.getUTCDate();
+  const key=y+'-'+String(m).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  if(mode==='all') return true;
+  if(mode==='is') return key>=isS && key<=isE;
+  if(mode==='oos') return key>=oosS && key<=oosE;
+  return true;
+}
+function evaluateSignalBar(kl, i, ema50, ema200, rsi, volSma, atr){
+  if(i<30||ema50[i]==null||ema200[i]==null||atr[i]==null) return null;
+  const closes=kl.map(k=>+k[4]), highs=kl.map(k=>+k[2]), lows=kl.map(k=>+k[3]), vols=kl.map(k=>+k[5]);
+  const longRegime=ema50[i]>ema200[i];
+  const shortRegime=ema50[i]<ema200[i];
+  // RSI cross within last 3 bars
+  let rsiLong=false, rsiShort=false;
+  for(let j=Math.max(1,i-2);j<=i;j++){
+    if(rsi[j]==null||rsi[j-1]==null) continue;
+    if(rsi[j-1]<40 && rsi[j]>=40) rsiLong=true;
+    if(rsi[j-1]>60 && rsi[j]<=60) rsiShort=true;
+  }
+  const m=macdAt(closes, i);
+  const macdLong=m.macd!=null&&m.signal!=null&&m.macd>m.signal;
+  const macdShort=m.macd!=null&&m.signal!=null&&m.macd<m.signal;
+  const volOk=volSma[i]!=null && vols[i]>volSma[i];
+  let hi20=-Infinity, lo20=Infinity;
+  for(let j=i-20;j<i;j++){ if(j>=0){ hi20=Math.max(hi20,highs[j]); lo20=Math.min(lo20,lows[j]); } }
+  const brkLong=closes[i]>hi20;
+  const brkShort=closes[i]<lo20;
+  const longConds=[rsiLong, macdLong, volOk, brkLong];
+  const shortConds=[rsiShort, macdShort, volOk, brkShort];
+  const longScore=longConds.filter(Boolean).length;
+  const shortScore=shortConds.filter(Boolean).length;
+  let side=null, score=0, conds=null;
+  if(longRegime && longScore>=3){ side='LONG'; score=longScore; conds={rsi:rsiLong,macd:macdLong,vol:volOk,brk:brkLong}; }
+  else if(shortRegime && shortScore>=3){ side='SHORT'; score=shortScore; conds={rsi:rsiShort,macd:macdShort,vol:volOk,brk:brkShort}; }
+  return {
+    side, score, conds, longRegime, shortRegime,
+    longScore, shortScore, longConds, shortConds,
+    atr:atr[i], close:closes[i],
+    ema50:ema50[i], ema200:ema200[i],
+    rsi:rsi[i], time:kl[i][0]
+  };
+}
+function runSignalBacktest(kl, mode, isS, isE, oosS, oosE){
+  const closes=kl.map(k=>+k[4]), vols=kl.map(k=>+k[5]);
+  const ema50=emaSeries(closes,50), ema200=emaSeries(closes,200);
+  const rsi=rsiSeries(closes,14), atr=atrSeries(kl,14), volSma=smaSeries(vols,20);
+  let equity=10000, peak=equity, maxDd=0;
+  let wins=0, losses=0, trades=0;
+  let pos=null; // {side,entry,sl,tp,qty,entryI}
+  const signals=[];
+  for(let i=200;i<kl.length-1;i++){
+    const ts=kl[i][0];
+    if(!inDateMode(ts, mode, isS, isE, oosS, oosE)) continue;
+    const ev=evaluateSignalBar(kl, i, ema50, ema200, rsi, volSma, atr);
+    if(!ev) continue;
+    // manage open position on this bar's path using next bar open for entry only
+    if(pos){
+      const hi=+kl[i][2], lo=+kl[i][3], op=+kl[i][1];
+      let exit=null, reason='';
+      if(pos.side==='LONG'){
+        if(lo<=pos.sl){ exit=pos.sl; reason='SL'; }
+        else if(hi>=pos.tp){ exit=pos.tp; reason='TP'; }
+      } else {
+        if(hi>=pos.sl){ exit=pos.sl; reason='SL'; }
+        else if(lo<=pos.tp){ exit=pos.tp; reason='TP'; }
+      }
+      if(exit!=null){
+        const pnl=pos.side==='LONG'?(exit-pos.entry)*pos.qty:(pos.entry-exit)*pos.qty;
+        // commission 0.1% each side approx
+        const fees=0.001*(pos.entry*pos.qty+exit*pos.qty);
+        equity+=pnl-fees;
+        trades++;
+        if(pnl>0) wins++; else losses++;
+        peak=Math.max(peak,equity);
+        maxDd=Math.max(maxDd, peak>0?(peak-equity)/peak:0);
+        pos=null;
+      }
+    }
+    // signal on close → enter next bar open
+    if(!pos && ev.side){
+      const nextOpen=+kl[i+1][1];
+      const atrV=ev.atr;
+      if(!(atrV>0)) continue;
+      const riskPerUnit=1.5*atrV;
+      const qty=(equity*0.015)/riskPerUnit;
+      if(!(qty>0)) continue;
+      const sl=ev.side==='LONG'?nextOpen-riskPerUnit:nextOpen+riskPerUnit;
+      const tp=ev.side==='LONG'?nextOpen+3*atrV:nextOpen-3*atrV;
+      pos={side:ev.side, entry:nextOpen, sl, tp, qty, entryI:i+1};
+      signals.push({
+        time:kl[i+1][0], side:ev.side, score:ev.score, entry:nextOpen, sl, tp,
+        conds:ev.conds, confirmTime:kl[i][0]
+      });
+    }
+  }
+  const winRate=trades?wins/trades:0;
+  const ret=(equity-10000)/10000;
+  return {equity, ret, trades, wins, losses, winRate, maxDd, signals, last:evaluateSignalBar(kl, kl.length-1, ema50, ema200, rsi, volSma, atr)};
+}
+function destroySigChart(){
+  if(sigChart){ try{sigChart.remove();}catch(e){} sigChart=null; sigCandle=sigEma50=sigEma200=null; }
+}
+function ensureSigChart(){
+  const el=$('sig-tv');
+  if(!el||typeof LightweightCharts==='undefined') return null;
+  if(sigChart) return sigChart;
+  sigChart=LightweightCharts.createChart(el,{
+    layout:{background:{type:'solid',color:'#080d13'},textColor:'#9aa6b5'},
+    grid:{vertLines:{color:'#121820'},horzLines:{color:'#121820'}},
+    rightPriceScale:{borderColor:'#1c2430'},
+    timeScale:{borderColor:'#1c2430',timeVisible:true},
+    crosshair:{mode:1}, width:el.clientWidth, height:el.clientHeight||280
+  });
+  sigCandle=sigChart.addCandlestickSeries({upColor:'#62e3a0',downColor:'#ff6f7c',borderUpColor:'#62e3a0',borderDownColor:'#ff6f7c',wickUpColor:'#62e3a0',wickDownColor:'#ff6f7c'});
+  sigEma50=sigChart.addLineSeries({color:'#6eb6ff',lineWidth:2});
+  sigEma200=sigChart.addLineSeries({color:'#e6c878',lineWidth:2});
+  return sigChart;
+}
+function renderSigChart(kl, signals){
+  destroySigChart();
+  if(!ensureSigChart()) return;
+  const slice=kl.slice(-120);
+  const closes=kl.map(k=>+k[4]);
+  const e50=emaSeries(closes,50), e200=emaSeries(closes,200);
+  const start=kl.length-slice.length;
+  const candles=slice.map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4]}));
+  sigCandle.setData(candles);
+  const l50=[], l200=[];
+  for(let i=start;i<kl.length;i++){
+    const t=Math.floor(kl[i][0]/1000);
+    if(e50[i]!=null) l50.push({time:t, value:e50[i]});
+    if(e200[i]!=null) l200.push({time:t, value:e200[i]});
+  }
+  sigEma50.setData(l50); sigEma200.setData(l200);
+  const markers=[];
+  const recent=signals.filter(s=>s.time>=slice[0][0]).slice(-30);
+  recent.forEach(s=>{
+    markers.push({
+      time:Math.floor(s.time/1000),
+      position:s.side==='LONG'?'belowBar':'aboveBar',
+      color:s.side==='LONG'?'#62e3a0':'#ff6f7c',
+      shape:s.side==='LONG'?'arrowUp':'arrowDown',
+      text:s.side==='LONG'?'L'+s.score:'S'+s.score
+    });
+  });
+  sigCandle.setMarkers(markers);
+  sigChart.timeScale().fitContent();
+  if($('sig-chart-cap')) $('sig-chart-cap').textContent='Blue EMA50 · Gold EMA200 · arrows = entries (next-bar open)';
+}
+async function loadSignal(){
+  try{
+    const kl=await fetchKlines('1d', 500);
+    if(!kl||kl.length<220) throw new Error('need more daily bars');
+    const mode=($('sig-mode')&&$('sig-mode').value)||'all';
+    const isS=($('sig-is-start')&&$('sig-is-start').value)||'2020-01-01';
+    const isE=($('sig-is-end')&&$('sig-is-end').value)||'2023-12-31';
+    const oosS=($('sig-oos-start')&&$('sig-oos-start').value)||'2024-01-01';
+    const oosE=($('sig-oos-end')&&$('sig-oos-end').value)||'2026-12-31';
+    const bt=runSignalBacktest(kl, mode, isS, isE, oosS, oosE);
+    const live=bt.last;
+    if(live){
+      const regime=live.longRegime?'BULL (EMA50>200)':(live.shortRegime?'BEAR (EMA50<200)':'FLAT');
+      if($('sig-regime')) $('sig-regime').textContent=regime;
+      const scoreShow=live.longRegime?live.longScore+'/4':(live.shortRegime?live.shortScore+'/4':live.longScore+'/4');
+      if($('sig-score')) $('sig-score').textContent=scoreShow;
+      let state='NO TRADE', col='#8491a1', exp='Need trend regime + at least 3 of 4 conditions on daily close.';
+      if(live.side==='LONG'){ state='LONG SETUP'; col='#62e3a0'; exp='Long regime + score '+live.score+'/4. Entry on next bar open. SL 1.5×ATR TP 3×ATR.'; }
+      else if(live.side==='SHORT'){ state='SHORT SETUP'; col='#ff6f7c'; exp='Short regime + score '+live.score+'/4. Entry on next bar open. SL 1.5×ATR TP 3×ATR.'; }
+      else {
+        state='WAIT';
+        exp='Regime '+regime+'. Long score '+live.longScore+'/4 · Short score '+live.shortScore+'/4.';
+      }
+      if($('sig-state')){ $('sig-state').textContent=state; $('sig-state').style.color=col; }
+      if($('sig-explain')) $('sig-explain').textContent=exp;
+      const useLong=live.longRegime||(!live.shortRegime);
+      const c=useLong?{rsi:live.longConds[0],macd:live.longConds[1],vol:live.longConds[2],brk:live.longConds[3]}
+        :{rsi:live.shortConds[0],macd:live.shortConds[1],vol:live.shortConds[2],brk:live.shortConds[3]};
+      const labels=useLong?[
+        ['Momentum RSI','Cross above 40 (3 bars)',c.rsi],
+        ['MACD','Line > Signal',c.macd],
+        ['Volume','Vol > 20 SMA',c.vol],
+        ['Breakout','Close > 20HH',c.brk]
+      ]:[
+        ['Momentum RSI','Cross below 60 (3 bars)',c.rsi],
+        ['MACD','Line < Signal',c.macd],
+        ['Volume','Vol > 20 SMA',c.vol],
+        ['Breakout','Close < 20LL',c.brk]
+      ];
+      if($('sig-conds')){
+        $('sig-conds').innerHTML=labels.map(x=>'<div class="sig-cond '+(x[2]?'on':'off')+'"><div class="k">'+x[0]+'</div><div class="v">'+(x[2]?'✓ ':'✗ ')+x[1]+'</div></div>').join('');
+      }
+      if($('sig-levels') && live.atr){
+        const px=live.close, a=live.atr;
+        const slL=px-1.5*a, tpL=px+3*a, slS=px+1.5*a, tpS=px-3*a;
+        $('sig-levels').innerHTML='Ref close '+money(px)+' · ATR(14) '+a.toFixed(0)
+          +'<br>If LONG next open≈: SL ~'+money(slL)+' · TP ~'+money(tpL)
+          +'<br>If SHORT next open≈: SL ~'+money(slS)+' · TP ~'+money(tpS)
+          +'<br>Size rule: qty = (equity × 1.5%) / (1.5 × ATR)';
+      }
+    }
+    if($('sig-bt')){
+      $('sig-bt').innerHTML=
+        '<div class="m"><div class="k">TRADES</div><div class="v">'+bt.trades+'</div></div>'
+        +'<div class="m"><div class="k">WIN RATE</div><div class="v">'+(bt.winRate*100).toFixed(0)+'%</div></div>'
+        +'<div class="m"><div class="k">RETURN</div><div class="v" style="color:'+(bt.ret>=0?'#62e3a0':'#ff6f7c')+'">'+(bt.ret*100).toFixed(1)+'%</div></div>'
+        +'<div class="m"><div class="k">MAX DD</div><div class="v">'+(bt.maxDd*100).toFixed(1)+'%</div></div>';
+    }
+    if($('sig-list')){
+      const rows=bt.signals.slice(-25).reverse();
+      $('sig-list').innerHTML=rows.length?rows.map(s=>{
+        const d=new Date(s.time).toISOString().slice(0,10);
+        const bits=s.conds?Object.keys(s.conds).filter(k=>s.conds[k]).join(','):'';
+        return '<div class="row"><span class="'+(s.side==='LONG'?'buy':'sell')+'">'+s.side+' '+s.score+'/4</span><span>'+d+' · '+money(s.entry)+'</span><span>'+bits+'</span></div>';
+      }).join(''):'<div class="row">No signals in selected date range</div>';
+    }
+    renderSigChart(kl, bt.signals);
+    if($('sig-source')) $('sig-source').textContent='LIVE · 1D · mode '+mode.toUpperCase();
+  }catch(e){
+    console.warn('loadSignal',e);
+    if($('sig-source')) $('sig-source').textContent='OFFLINE';
+    if($('sig-state')) $('sig-state').textContent='DATA UNAVAILABLE';
+    if($('sig-explain')) $('sig-explain').textContent=String(e&&e.message||e);
+  }
+}
+function showSignal(on){
+  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel'), sg=$('signal-panel');
   if(on){
     if(panels){panels.classList.add('hidden');panels.style.display='none';}
     if(trend){trend.classList.remove('on');trend.style.display='none';}
     if(sp){sp.classList.remove('on');sp.style.display='none';}
+    if(mp){mp.classList.remove('on');mp.style.display='none';}
+    if(sg){sg.classList.add('on');sg.style.display='block';}
+  } else {
+    if(sg){sg.classList.remove('on');sg.style.display='none';}
+  }
+}
+
+
+function showMacro(on){
+  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel'), sg=$('signal-panel');
+  if(on){
+    if(panels){panels.classList.add('hidden');panels.style.display='none';}
+    if(trend){trend.classList.remove('on');trend.style.display='none';}
+    if(sp){sp.classList.remove('on');sp.style.display='none';}
+    if(sg){sg.classList.remove('on');sg.style.display='none';}
     if(mp){mp.classList.add('on');mp.style.display='block';}
   } else {
     if(mp){mp.classList.remove('on');mp.style.display='none';}
@@ -1928,20 +2239,25 @@ function showMacro(on){
 
 
 function showStruct(on){
-  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel');
+  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel'), sg=$('signal-panel');
   if(on){
     if(panels){panels.classList.add('hidden');panels.style.display='none';}
     if(trend){trend.classList.remove('on');trend.style.display='none';}
     if(mp){mp.classList.remove('on');mp.style.display='none';}
+    if(sg){sg.classList.remove('on');sg.style.display='none';}
     if(sp){sp.classList.add('on');sp.style.display='block';}
   } else {
     if(sp){sp.classList.remove('on');sp.style.display='none';}
   }
 }
 
-function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}if(mp&&on){mp.classList.remove('on');mp.style.display='none';}}
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showMacro(true);loadMacro();}else{showMacro(false);showStruct(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
-window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}if(structW1Chart){const el=$('struct-w1-tv');if(el)structW1Chart.applyOptions({width:el.clientWidth});}});
+function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}if(mp&&on){mp.classList.remove('on');mp.style.display='none';}if(sg&&on){sg.classList.remove('on');sg.style.display='none';}}
+document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showTrend(false);showStruct(false);showMacro(false);showSignal(true);loadSignal();}else{showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
+// Signal date controls
+['sig-mode','sig-is-start','sig-is-end','sig-oos-start','sig-oos-end'].forEach(id=>{
+  const el=$(id); if(el) el.addEventListener('change',()=>{if((document.querySelector('#tf-tabs .tab.active')&&document.querySelector('#tf-tabs .tab.active').getAttribute('data-tf')==='signal')) loadSignal();});
+});
+window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}if(structW1Chart){const el=$('struct-w1-tv');if(el)structW1Chart.applyOptions({width:el.clientWidth});}if(sigChart){const el=$('sig-tv');if(el)sigChart.applyOptions({width:el.clientWidth});}});
 
-async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else loadTF(currentTF);},60000);
+async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='signal')loadSignal();else loadTF(currentTF);},60000);
 })();
