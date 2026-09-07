@@ -185,6 +185,28 @@
 .struct-chart-legend{font-size:10px;color:#8491a1;margin-top:8px;line-height:1.4}
 @media(max-width:560px){#struct-w1-tv{height:240px}}
 
+
+.signal-panel{display:none}.signal-panel.on{display:block!important}
+.sig-controls{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:10px 12px;border-radius:12px;border:1px solid #263341;background:#0c1219}
+.sig-controls label{font-size:10px;font-weight:700;color:#8491a1;display:flex;flex-direction:column;gap:4px}
+.sig-controls input,.sig-controls select{font-size:12px;padding:6px 8px;border-radius:8px;border:1px solid #263341;background:#080d13;color:#e8eef6}
+.sig-conds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.sig-cond{padding:10px 12px;border-radius:12px;border:1px solid #263341;background:#0c1219}
+.sig-cond .k{font-size:10px;font-weight:800;color:#8491a1}
+.sig-cond .v{font-size:13px;font-weight:800;margin-top:4px}
+.sig-cond.on .v{color:#62e3a0}.sig-cond.off .v{color:#66717d}
+.sig-levels{font-size:12px;font-weight:700;color:#c5d0dc;padding:10px 12px;border-radius:12px;border:1px solid #263341;background:#0c1219;margin-bottom:12px;line-height:1.45}
+#sig-tv{width:100%;height:280px;background:#080d13}
+.sig-bt{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.sig-bt .m{padding:10px;border-radius:12px;border:1px solid #263341;background:#0c1219;text-align:center}
+.sig-bt .m .k{font-size:9px;font-weight:800;color:#8491a1}
+.sig-bt .m .v{font-size:14px;font-weight:900;color:#e8eef6;margin-top:4px}
+.sig-list{max-height:220px;overflow:auto;border:1px solid #263341;border-radius:12px;background:#0c1219}
+.sig-list .row{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid #1a222c;font-size:11px;font-weight:700}
+.sig-list .row:last-child{border-bottom:0}
+.sig-list .buy{color:#62e3a0}.sig-list .sell{color:#ff6f7c}
+@media(max-width:560px){.sig-conds{grid-template-columns:1fr}.sig-bt{grid-template-columns:repeat(2,1fr)}#sig-tv{height:240px}}
+
 </style></head><body>
 <div class="shell"><main>
 <section class="section">
@@ -202,6 +224,7 @@
   <button type="button" class="tab active" data-tf="trend">Trend</button>
   <button type="button" class="tab" data-tf="struct">Struct</button>
   <button type="button" class="tab" data-tf="macro">Macro</button>
+  <button type="button" class="tab" data-tf="signal">Signal</button>
   <button type="button" class="tab" data-tf="1w">1W</button>
   <button type="button" class="tab" data-tf="1M">1M</button>
 </div>
@@ -328,6 +351,46 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260907-structchart2"></script>
+<script src="overview-app.js?v=20260907-signal"></script>
+</div>
+
+<div id="signal-panel" class="signal-panel">
+<section class="section">
+  <div class="head">
+    <div><h2>Signal · Trend Continuation</h2><p>EMA regime · 3/4 score · ATR risk · 1D</p></div>
+    <span class="source" id="sig-source">…</span>
+  </div>
+  <div class="sig-controls">
+    <label>Mode <select id="sig-mode"><option value="all">All History</option><option value="is">In-Sample</option><option value="oos">Out-of-Sample</option></select></label>
+    <label>IS start <input type="date" id="sig-is-start" value="2020-01-01"></label>
+    <label>IS end <input type="date" id="sig-is-end" value="2023-12-31"></label>
+    <label>OOS start <input type="date" id="sig-oos-start" value="2024-01-01"></label>
+    <label>OOS end <input type="date" id="sig-oos-end" value="2026-12-31"></label>
+  </div>
+  <div class="st-primary">
+    <div class="st-title">LIVE SETUP</div>
+    <div class="st-state" id="sig-state">—</div>
+    <div class="st-meta">
+      <span>REGIME <b id="sig-regime">—</b></span>
+      <span>SCORE <b id="sig-score">—</b></span>
+      <span>R:R <b>2:1 ATR</b></span>
+    </div>
+    <div class="st-explain" id="sig-explain">Loading…</div>
+  </div>
+  <div class="sig-conds" id="sig-conds"></div>
+  <div class="sig-levels" id="sig-levels"></div>
+  <div class="struct-chart-wrap">
+    <div class="struct-chart-head">
+      <div class="struct-chart-title">1D · EMA50 / EMA200 · signals</div>
+      <div class="struct-chart-sub" id="sig-chart-cap">—</div>
+    </div>
+    <div id="sig-tv"></div>
+  </div>
+  <div class="sig-bt" id="sig-bt"></div>
+  <div class="sig-list" id="sig-list"></div>
+  <div class="st-weights">Rules: Long only EMA50&gt;EMA200 · Short only EMA50&lt;EMA200 · need ≥3/4 of RSI cross, MACD, Volume, Breakout · SL 1.5×ATR · TP 3×ATR · size ≈ 1.5% equity at stop · next-bar open (no lookahead). Dashboard is signal/monitor only — not live order routing.</div>
+</section>
+</div>
+
 <script src="site-nav.js?v=20260904-kraken"></script>
 </body></html>
