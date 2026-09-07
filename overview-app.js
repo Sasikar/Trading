@@ -1998,13 +1998,15 @@ function evaluateSignalBar(kl, i, ema50, ema200, rsi, volSma, atr){
   const closes=kl.map(k=>+k[4]), highs=kl.map(k=>+k[2]), lows=kl.map(k=>+k[3]), vols=kl.map(k=>+k[5]);
   const longRegime=ema50[i]>ema200[i];
   const shortRegime=ema50[i]<ema200[i];
-  // RSI cross within last 3 bars
+  // RSI: cross in last 3 bars OR supportive level
   let rsiLong=false, rsiShort=false;
   for(let j=Math.max(1,i-2);j<=i;j++){
     if(rsi[j]==null||rsi[j-1]==null) continue;
     if(rsi[j-1]<40 && rsi[j]>=40) rsiLong=true;
     if(rsi[j-1]>60 && rsi[j]<=60) rsiShort=true;
   }
+  if(rsi[i]!=null && rsi[i]>=45 && rsi[i]<=70) rsiLong=true;
+  if(rsi[i]!=null && rsi[i]<=55 && rsi[i]>=30) rsiShort=true;
   const m=macdAt(closes, i);
   const macdLong=m.macd!=null&&m.signal!=null&&m.macd>m.signal;
   const macdShort=m.macd!=null&&m.signal!=null&&m.macd<m.signal;
@@ -2042,14 +2044,22 @@ function runSignalBacktest(kl, mode, isS, isE, oosS, oosE){
     // Always manage open positions for realism; only open new ones in selected range
     const ev=evaluateSignalBar(kl, i, ema50, ema200, rsi, volSma, atr);
     if(pos){
-      const hi=+kl[i][2], lo=+kl[i][3];
+      const hi=+kl[i][2], lo=+kl[i][3], cl=+kl[i][4];
       let exit=null, reason='';
-      if(pos.side==='LONG'){
+      const held=i-pos.entryI;
+      // regime flip exit (close)
+      if(pos.side==='LONG' && ema50[i]!=null && ema200[i]!=null && ema50[i]<ema200[i]){
+        exit=cl; reason='REGIME';
+      } else if(pos.side==='SHORT' && ema50[i]!=null && ema200[i]!=null && ema50[i]>ema200[i]){
+        exit=cl; reason='REGIME';
+      } else if(pos.side==='LONG'){
         if(lo<=pos.sl){ exit=pos.sl; reason='SL'; }
         else if(hi>=pos.tp){ exit=pos.tp; reason='TP'; }
+        else if(held>=15){ exit=cl; reason='TIME'; }
       } else {
         if(hi>=pos.sl){ exit=pos.sl; reason='SL'; }
         else if(lo<=pos.tp){ exit=pos.tp; reason='TP'; }
+        else if(held>=15){ exit=cl; reason='TIME'; }
       }
       if(exit!=null){
         const gross=pos.side==='LONG'?(exit-pos.entry)*pos.qty:(pos.entry-exit)*pos.qty;
@@ -2211,9 +2221,10 @@ async function loadSignal(){
     if($('sig-list')){
       const closed=(bt.closedTrades||[]).filter(t=>!t.open && t.exit!=null);
       const openT=(bt.closedTrades||[]).filter(t=>t.open);
-      const rows=closed.slice(-10).reverse();
+      const rows=closed.slice(-15).reverse();
       const rangeLbl=mode==='is'?(isS+' → '+isE):(mode==='oos'?(oosS+' → '+oosE):'all history');
-      let html='<div class="sig-hist-head">SIGNAL HISTORY · last 10 closed · '+rangeLbl+'</div>';
+      let html='<div class="sig-hist-head">SIGNAL HISTORY · last '+rows.length+' closed (of '+closed.length+') · '+rangeLbl+'</div>';
+      html+='<div class="sig-hist-note">Exits: SL / TP / REGIME flip / TIME (max 15 bars). One position at a time.</div>';
       html+='<div class="sig-hist-cols"><span>Side</span><span>Entry → Exit</span><span>Return</span></div>';
       if(!rows.length && !openT.length){
         html+='<div class="row">No closed trades in selected date range</div>';
