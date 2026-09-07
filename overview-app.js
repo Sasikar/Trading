@@ -1158,6 +1158,13 @@ async function loadStructural(){
     if($('stt-evidence')){
       $('stt-evidence').innerHTML=rows.map(r=>'<div class="st-ev-row"><span class="k">'+r[0]+'</span><span class="v" style="color:'+r[2]+'">'+r[1]+'</span></div>').join('');
     }
+    try{
+      renderStructW1Chart(klW, wStruct);
+      requestAnimationFrame(function(){
+        const el=$('struct-w1-tv');
+        if(structW1Chart&&el){structW1Chart.applyOptions({width:el.clientWidth||el.parentElement.clientWidth});structW1Chart.timeScale().fitContent();}
+      });
+    }catch(err){console.warn('struct chart',err);}
     if($('struct-source'))$('struct-source').textContent='LIVE · close-based breaks · hysteresis on';
   }catch(e){
     console.warn(e);
