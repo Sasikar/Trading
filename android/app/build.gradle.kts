@@ -10,8 +10,8 @@ android {
         applicationId = "com.sasikar.atrader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "3.0-ATrader"
+        versionCode = 22
+        versionName = "3.1-pages"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
