@@ -214,10 +214,14 @@ class MarketWidget : AppWidgetProvider() {
             }
         }
 
-        private fun refreshAll(context: Context) {
+        fun refreshAllBlocking(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, MarketWidget::class.java))
             doRefresh(context, ids)
+        }
+
+        private fun refreshAll(context: Context) {
+            refreshAllBlocking(context)
         }
 
         private fun refreshOne(context: Context, id: Int) {
@@ -266,6 +270,16 @@ class MarketWidget : AppWidgetProvider() {
             fun put(id: String, v: Double?) {
                 if (v != null && v > 0 && !result.containsKey(id)) result[id] = formatPrice(v)
             }
+            // A0) CoinCap bulk
+            try {
+                val arr = JSONObject(get("https://api.coincap.io/v2/assets?ids=bitcoin,ethereum,solana")).getJSONArray("data")
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val id = o.getString("id")
+                    val px = o.getString("priceUsd").toDouble()
+                    put(id, px)
+                }
+            } catch (_: Throwable) {}
             // A) Binance (usually works on Indian mobile networks)
             try {
                 put("bitcoin", JSONObject(get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")).getString("price").toDouble())
