@@ -187,9 +187,10 @@ class MarketWidget : AppWidgetProvider() {
             val running = AtomicBoolean(true)
             val spinner = spinWhile(context, ids, running)
             try {
+                val feed = fetchPagesFeed()
                 val prices = fetchPrices()
-                val fomo = fetchFomo()
-                val nasdaq = fetchNasdaq()
+                val fomo = feed?.optString("fomo")?.takeIf { it.isNotBlank() } ?: fetchFomo()
+                val nasdaq = feed?.let { parseNasdaqFromFeed(it) } ?: fetchNasdaq()
                 saveValues(context, prices, fomo, nasdaq)
                 if (prices.isEmpty()) {
                     try {
@@ -265,11 +266,53 @@ class MarketWidget : AppWidgetProvider() {
             }
         }
 
-                private fun fetchPrices(): Map<String, String> {
+        
+        private fun fetchPagesFeed(): JSONObject? {
+            val bust = System.currentTimeMillis()
+            val urls = listOf(
+                "https://sasikar.github.io/Trading/data/widget-prices.json?t=$bust",
+                "https://raw.githubusercontent.com/Sasikar/Trading/master/data/widget-prices.json?t=$bust"
+            )
+            for (u in urls) {
+                try {
+                    return JSONObject(get(u))
+                } catch (_: Throwable) {
+                }
+            }
+            return null
+        }
+
+        private fun parseNasdaqFromFeed(root: JSONObject): Pair<String, String>? {
+            val text = root.optString("nasdaq", "")
+            if (text.isBlank()) return null
+            val dir = root.optString("nasdaq_dir", "flat")
+            return text to dir
+        }
+
+
+        private fun fetchPrices(): Map<String, String> {
             val result = linkedMapOf<String, String>()
             fun put(id: String, v: Double?) {
                 if (v != null && v > 0 && !result.containsKey(id)) result[id] = formatPrice(v)
             }
+            // 0) Our GitHub Pages feed (works when phone blocks exchange APIs)
+            try {
+                val bust = System.currentTimeMillis()
+                val urls = listOf(
+                    "https://sasikar.github.io/Trading/data/widget-prices.json?t=$bust",
+                    "https://raw.githubusercontent.com/Sasikar/Trading/master/data/widget-prices.json?t=$bust"
+                )
+                for (u in urls) {
+                    try {
+                        val root = JSONObject(get(u))
+                        put("bitcoin", root.optDouble("bitcoin", Double.NaN).takeIf { !it.isNaN() })
+                        put("ethereum", root.optDouble("ethereum", Double.NaN).takeIf { !it.isNaN() })
+                        put("solana", root.optDouble("solana", Double.NaN).takeIf { !it.isNaN() })
+                        if (result.size >= 3) break
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {}
+
             // A0) CoinCap bulk
             try {
                 val arr = JSONObject(get("https://api.coincap.io/v2/assets?ids=bitcoin,ethereum,solana")).getJSONArray("data")
