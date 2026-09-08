@@ -181,37 +181,63 @@ class MarketWidget : AppWidgetProvider() {
         }
 
         private fun doRefresh(context: Context, ids: IntArray) {
-            if (ids.isEmpty()) return
             val manager = AppWidgetManager.getInstance(context)
-            ids.forEach { render(context, manager, it, true, 0) }
+            val widgetIds = if (ids.isNotEmpty()) ids else manager.getAppWidgetIds(
+                ComponentName(context, MarketWidget::class.java)
+            )
+            if (widgetIds.isNotEmpty()) {
+                widgetIds.forEach { render(context, manager, it, true, 0) }
+            }
             val running = AtomicBoolean(true)
-            val spinner = spinWhile(context, ids, running)
+            val spinner = if (widgetIds.isNotEmpty()) spinWhile(context, widgetIds, running) else null
             try {
+                // Always load feed + prices into prefs (even if no widget yet)
                 val feed = fetchPagesFeed()
-                val prices = fetchPrices()
-                val fomo = feed?.optString("fomo")?.takeIf { it.isNotBlank() } ?: fetchFomo()
+                val prices = linkedMapOf<String, String>()
+                // Prefer feed numbers (most reliable on restricted networks)
+                if (feed != null) {
+                    fun fromFeed(key: String) {
+                        try {
+                            if (!feed.isNull(key)) {
+                                val v = feed.getDouble(key)
+                                if (v > 0) prices[key] = formatPrice(v)
+                            }
+                        } catch (_: Throwable) {
+                            try {
+                                val s = feed.optString(key, "")
+                                val v = s.toDoubleOrNull()
+                                if (v != null && v > 0) prices[key] = formatPrice(v)
+                            } catch (_: Throwable) {}
+                        }
+                    }
+                    fromFeed("bitcoin"); fromFeed("ethereum"); fromFeed("solana")
+                }
+                if (prices.size < 3) {
+                    fetchPrices().forEach { (k, v) -> if (!prices.containsKey(k)) prices[k] = v }
+                }
+                val fomo = when {
+                    feed != null && feed.optString("fomo").isNotBlank() -> feed.optString("fomo")
+                    else -> fetchFomo()
+                }
                 val nasdaq = feed?.let { parseNasdaqFromFeed(it) } ?: fetchNasdaq()
                 saveValues(context, prices, fomo, nasdaq)
                 if (prices.isEmpty()) {
-                    try {
-                        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                            .putString("last_refreshed", "No data · check network")
-                            .apply()
-                    } catch (_: Throwable) {}
+                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                        .putString("last_refreshed", "No data · check network")
+                        .apply()
                 }
             } catch (e: Throwable) {
                 try {
                     context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                        .putString("last_refreshed", "Err: " + (e.message ?: "fetch"))
+                        .putString("last_refreshed", "Err: " + (e.message ?: "fetch").take(40))
                         .apply()
                 } catch (_: Throwable) {}
             } finally {
                 running.set(false)
-                try {
-                    spinner.join(500)
-                } catch (_: InterruptedException) {
+                try { spinner?.join(800) } catch (_: InterruptedException) {}
+                if (widgetIds.isNotEmpty()) {
+                    widgetIds.forEach { render(context, manager, it, false) }
                 }
-                ids.forEach { render(context, manager, it, false) }
             }
         }
 
@@ -261,7 +287,7 @@ class MarketWidget : AppWidgetProvider() {
                         putLong("last_refreshed_ms", ms)
                         putString("last_refreshed", "Updated " + nowStamp())
                     }
-                }.apply()
+                }.commit()
             } catch (_: Throwable) {
             }
         }
