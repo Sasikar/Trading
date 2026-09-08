@@ -1,9 +1,9 @@
 {
-  "bitcoin": 78809.645,
-  "ethereum": 2483.615,
-  "solana": 103.265,
+  "updated_at": "2026-09-08T04:39:39.352808+00:00",
+  "bitcoin": 78805.235,
+  "ethereum": 2484.14,
+  "solana": 103.405,
   "fomo": "69",
   "nasdaq": "26,506.99  \u25bc -0.29%",
-  "nasdaq_dir": "down",
-  "updated_at": "2026-09-08T04:12:31.412912+00:00"
+  "nasdaq_dir": "down"
 }
