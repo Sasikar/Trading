@@ -191,7 +191,19 @@ class MarketWidget : AppWidgetProvider() {
                 val fomo = fetchFomo()
                 val nasdaq = fetchNasdaq()
                 saveValues(context, prices, fomo, nasdaq)
-            } catch (_: Throwable) {
+                if (prices.isEmpty()) {
+                    try {
+                        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                            .putString("last_refreshed", "No data · check network")
+                            .apply()
+                    } catch (_: Throwable) {}
+                }
+            } catch (e: Throwable) {
+                try {
+                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                        .putString("last_refreshed", "Err: " + (e.message ?: "fetch"))
+                        .apply()
+                } catch (_: Throwable) {}
             } finally {
                 running.set(false)
                 try {
@@ -249,87 +261,59 @@ class MarketWidget : AppWidgetProvider() {
             }
         }
 
-        private fun fetchPrices(): Map<String, String> {
-            val result = mutableMapOf<String, String>()
-            // 1) Kraken single call (reliable on mobile)
-            try {
-                val json = get("https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD,SOLUSD")
-                val root = JSONObject(json).getJSONObject("result")
-                fun last(key: String): Double? {
-                    return try {
-                        root.getJSONObject(key).getJSONArray("c").getString(0).toDouble()
-                    } catch (_: Throwable) { null }
-                }
-                // key names vary
-                val keys = root.keys()
-                val map = mutableMapOf<String, Double>()
-                while (keys.hasNext()) {
-                    val k = keys.next()
-                    last(k)?.let { map[k] = it }
-                }
-                fun pick(vararg names: String): Double? {
-                    for (n in names) if (map.containsKey(n)) return map[n]
-                    // partial match
-                    for ((k, v) in map) {
-                        val u = k.uppercase()
-                        if (names.any { u.contains(it) }) return v
-                    }
-                    return null
-                }
-                pick("XXBTZUSD", "XBTUSD", "XBT")?.let { result["bitcoin"] = formatPrice(it) }
-                pick("XETHZUSD", "ETHUSD", "ETH")?.let { result["ethereum"] = formatPrice(it) }
-                pick("SOLUSD", "SOL")?.let { result["solana"] = formatPrice(it) }
-            } catch (_: Throwable) {
+                private fun fetchPrices(): Map<String, String> {
+            val result = linkedMapOf<String, String>()
+            fun put(id: String, v: Double?) {
+                if (v != null && v > 0 && !result.containsKey(id)) result[id] = formatPrice(v)
             }
-            // 2) Coinbase per-asset fill
+            // A) Binance (usually works on Indian mobile networks)
+            try {
+                put("bitcoin", JSONObject(get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")).getString("price").toDouble())
+            } catch (_: Throwable) {}
+            try {
+                put("ethereum", JSONObject(get("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT")).getString("price").toDouble())
+            } catch (_: Throwable) {}
+            try {
+                put("solana", JSONObject(get("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT")).getString("price").toDouble())
+            } catch (_: Throwable) {}
+            // B) Coinbase
             if (result.size < 3) {
-                val pairs = listOf(
-                    "bitcoin" to "BTC-USD",
-                    "ethereum" to "ETH-USD",
-                    "solana" to "SOL-USD"
-                )
-                for ((id, pair) in pairs) {
+                for ((id, pair) in listOf("bitcoin" to "BTC-USD", "ethereum" to "ETH-USD", "solana" to "SOL-USD")) {
                     if (result.containsKey(id)) continue
                     try {
-                        val json = get("https://api.coinbase.com/v2/prices/$pair/spot")
-                        val amount = JSONObject(json).getJSONObject("data").getString("amount").toDouble()
-                        result[id] = formatPrice(amount)
-                    } catch (_: Throwable) {
-                    }
+                        val amt = JSONObject(get("https://api.coinbase.com/v2/prices/$pair/spot"))
+                            .getJSONObject("data").getString("amount").toDouble()
+                        put(id, amt)
+                    } catch (_: Throwable) {}
                 }
             }
-            // 3) CoinGecko
+            // C) Kraken
             if (result.size < 3) {
                 try {
-                    val root = JSONObject(
-                        get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd")
-                    )
-                    listOf("bitcoin", "ethereum", "solana").forEach { id ->
-                        if (!result.containsKey(id)) {
-                            try {
-                                result[id] = formatPrice(root.getJSONObject(id).getDouble("usd"))
-                            } catch (_: Throwable) {
+                    val root = JSONObject(get("https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD,SOLUSD")).getJSONObject("result")
+                    val it = root.keys()
+                    while (it.hasNext()) {
+                        val k = it.next()
+                        try {
+                            val px = root.getJSONObject(k).getJSONArray("c").getString(0).toDouble()
+                            val u = k.uppercase()
+                            when {
+                                u.contains("XBT") || u.contains("BTC") -> put("bitcoin", px)
+                                u.contains("ETH") -> put("ethereum", px)
+                                u.contains("SOL") -> put("solana", px)
                             }
-                        }
+                        } catch (_: Throwable) {}
                     }
-                } catch (_: Throwable) {
-                }
+                } catch (_: Throwable) {}
             }
-            // 4) Binance USDT approx
+            // D) CoinGecko
             if (result.size < 3) {
-                val bins = listOf(
-                    "bitcoin" to "BTCUSDT",
-                    "ethereum" to "ETHUSDT",
-                    "solana" to "SOLUSDT"
-                )
-                for ((id, sym) in bins) {
-                    if (result.containsKey(id)) continue
-                    try {
-                        val json = get("https://api.binance.com/api/v3/ticker/price?symbol=$sym")
-                        result[id] = formatPrice(JSONObject(json).getString("price").toDouble())
-                    } catch (_: Throwable) {
-                    }
-                }
+                try {
+                    val root = JSONObject(get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd"))
+                    put("bitcoin", root.optJSONObject("bitcoin")?.optDouble("usd"))
+                    put("ethereum", root.optJSONObject("ethereum")?.optDouble("usd"))
+                    put("solana", root.optJSONObject("solana")?.optDouble("usd"))
+                } catch (_: Throwable) {}
             }
             return result
         }
@@ -432,22 +416,35 @@ class MarketWidget : AppWidgetProvider() {
         }
 
         private fun get(urlString: String): String {
-            val connection = URL(urlString).openConnection() as HttpURLConnection
-            connection.connectTimeout = 12000
-            connection.readTimeout = 12000
-            connection.requestMethod = "GET"
-            connection.useCaches = false
-            connection.instanceFollowRedirects = true
-            connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 TradingWidget/2.8")
-            return try {
-                if (connection.responseCode !in 200..299) {
-                    throw IllegalStateException("HTTP ${connection.responseCode}")
+            var last: Exception? = null
+            // retry twice
+            repeat(2) { attempt ->
+                var connection: HttpURLConnection? = null
+                try {
+                    connection = URL(urlString).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 15000
+                    connection.requestMethod = "GET"
+                    connection.useCaches = false
+                    connection.instanceFollowRedirects = true
+                    connection.setRequestProperty("Accept", "application/json,*/*")
+                    connection.setRequestProperty(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36"
+                    )
+                    val code = connection.responseCode
+                    val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                    val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                    if (code in 200..299 && body.isNotBlank()) return body
+                    last = IllegalStateException("HTTP $code ${body.take(80)}")
+                } catch (e: Exception) {
+                    last = e
+                    try { Thread.sleep(200L * (attempt + 1)) } catch (_: InterruptedException) {}
+                } finally {
+                    try { connection?.disconnect() } catch (_: Throwable) {}
                 }
-                connection.inputStream.bufferedReader().use { it.readText() }
-            } finally {
-                connection.disconnect()
             }
+            throw last ?: IllegalStateException("request failed")
         }
     }
 
