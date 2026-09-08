@@ -25,7 +25,7 @@ class MarketWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.sasikar.trading.action.REFRESH_WIDGET"
         private const val ACTION_AUTO = "com.sasikar.trading.action.AUTO_REFRESH_WIDGET"
-        private const val PREFS = "market_widget_cache"
+        private const val PREFS = PriceStore.PREFS
         private const val AUTO_REQ = 7001
         private const val INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
         private val SPIN = arrayOf("↻", "⟳", "↻", "⟳", "↻", "⟳")
@@ -103,7 +103,7 @@ class MarketWidget : AppWidgetProvider() {
             spinIndex: Int = 0
         ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.market_widget)
-            val c = cachedValues(context)
+            val c = PriceStore.read(context)
 
             views.setImageViewResource(R.id.btc_icon, R.drawable.ic_btc)
             views.setImageViewResource(R.id.eth_icon, R.drawable.ic_eth)
@@ -130,11 +130,7 @@ class MarketWidget : AppWidgetProvider() {
                 views.setTextColor(R.id.last_refreshed, Color.parseColor("#16C784"))
             } else {
                 views.setTextViewText(R.id.refresh, "↻")
-                val ms = try {
-                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                        .getLong("last_refreshed_ms", 0L)
-                } catch (_: Throwable) { 0L }
-                val age = ageLabel(ms)
+                val age = PriceStore.ageLabel(PriceStore.lastMs(context))
                 views.setTextViewText(R.id.refresh_age, age)
                 views.setTextColor(R.id.refresh_age, Color.parseColor("#9AA3AD"))
                 views.setTextViewText(R.id.last_refreshed, (c["last_refreshed"] ?: "Updated —") + " · " + age)
@@ -191,53 +187,12 @@ class MarketWidget : AppWidgetProvider() {
             val running = AtomicBoolean(true)
             val spinner = if (widgetIds.isNotEmpty()) spinWhile(context, widgetIds, running) else null
             try {
-                // Always load feed + prices into prefs (even if no widget yet)
-                val feed = fetchPagesFeed()
-                val prices = linkedMapOf<String, String>()
-                // Prefer feed numbers (most reliable on restricted networks)
-                if (feed != null) {
-                    fun fromFeed(key: String) {
-                        try {
-                            if (!feed.isNull(key)) {
-                                val v = feed.getDouble(key)
-                                if (v > 0) prices[key] = formatPrice(v)
-                            }
-                        } catch (_: Throwable) {
-                            try {
-                                val s = feed.optString(key, "")
-                                val v = s.toDoubleOrNull()
-                                if (v != null && v > 0) prices[key] = formatPrice(v)
-                            } catch (_: Throwable) {}
-                        }
-                    }
-                    fromFeed("bitcoin"); fromFeed("ethereum"); fromFeed("solana")
-                }
-                if (prices.size < 3) {
-                    fetchPrices().forEach { (k, v) -> if (!prices.containsKey(k)) prices[k] = v }
-                }
-                val fomo = when {
-                    feed != null && feed.optString("fomo").isNotBlank() -> feed.optString("fomo")
-                    else -> fetchFomo()
-                }
-                val nasdaq = feed?.let { parseNasdaqFromFeed(it) } ?: fetchNasdaq()
-                saveValues(context, prices, fomo, nasdaq)
-                if (prices.isEmpty()) {
-                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                        .putString("last_refreshed", "No data · check network")
-                        .apply()
-                }
-            } catch (e: Throwable) {
-                try {
-                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                        .putString("last_refreshed", "Err: " + (e.message ?: "fetch").take(40))
-                        .apply()
-                } catch (_: Throwable) {}
+                PriceStore.refreshFromNetwork(context)
+            } catch (_: Throwable) {
             } finally {
                 running.set(false)
                 try { spinner?.join(800) } catch (_: InterruptedException) {}
-                if (widgetIds.isNotEmpty()) {
-                    widgetIds.forEach { render(context, manager, it, false) }
-                }
+                pushUpdate(context)
             }
         }
 
@@ -245,6 +200,19 @@ class MarketWidget : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, MarketWidget::class.java))
             doRefresh(context, ids)
+        }
+
+        /** Re-render all widgets from current prefs (no network). */
+        fun pushUpdate(context: Context) {
+            try {
+                val manager = AppWidgetManager.getInstance(context)
+                val ids = manager.getAppWidgetIds(ComponentName(context, MarketWidget::class.java))
+                ids.forEach { id ->
+                    try {
+                        manager.updateAppWidget(id, buildViews(context, id, false, 0))
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {}
         }
 
         private fun refreshAll(context: Context) {
