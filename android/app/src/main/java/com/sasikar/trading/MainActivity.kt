@@ -1,6 +1,7 @@
 package com.sasikar.trading
 
 import android.app.Activity
+import android.content.Context
 import android.os.Bundle
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -13,19 +14,20 @@ class MainActivity : Activity() {
         web.webViewClient = WebViewClient()
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        web.settings.setSupportZoom(false)
         web.loadUrl("https://sasikar.github.io/Trading/")
         setContentView(web)
-        // Force a price pull while app is in foreground (most reliable on OEMs)
+
         Thread {
             try {
                 MarketWidget.refreshAllBlocking(applicationContext)
-                runOnUiThread {
-                    Toast.makeText(this, "ATrader prices updated", Toast.LENGTH_SHORT).show()
-                }
+                val p = getSharedPreferences("market_widget_cache", Context.MODE_PRIVATE)
+                val btc = p.getString("bitcoin", null)
+                val eth = p.getString("ethereum", null)
+                val msg = if (btc != null) "BTC $btc · ETH ${eth ?: "—"}" else (p.getString("last_refreshed", "No prices"))
+                runOnUiThread { Toast.makeText(this, msg, Toast.LENGTH_LONG).show() }
             } catch (e: Throwable) {
                 runOnUiThread {
-                    Toast.makeText(this, "Price update failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Fail: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
