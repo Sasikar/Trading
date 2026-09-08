@@ -1,6 +1,9 @@
 package com.sasikar.trading
 
 import android.app.PendingIntent
+import android.os.Build
+import android.os.SystemClock
+import android.app.AlarmManager
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
@@ -21,8 +24,45 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MarketWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.sasikar.trading.action.REFRESH_WIDGET"
-        private const val PREFS = "market_widget_cache"
+        private const val ACTION_AUTO = "com.sasikar.trading.action.AUTO_REFRESH_WIDGET"
+        private const val PREFS = PriceStore.PREFS
+        private const val AUTO_REQ = 7001
+        private const val INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
         private val SPIN = arrayOf("↻", "⟳", "↻", "⟳", "↻", "⟳")
+
+        fun scheduleAutoRefresh(context: Context) {
+            try {
+                val app = context.applicationContext
+                val am = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val intent = Intent(app, MarketWidget::class.java).apply { action = ACTION_AUTO }
+                val pi = PendingIntent.getBroadcast(
+                    app, AUTO_REQ, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                val trigger = System.currentTimeMillis() + INTERVAL_MS
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi)
+                } else {
+                    @Suppress("DEPRECATION")
+                    am.set(AlarmManager.RTC_WAKEUP, trigger, pi)
+                }
+            } catch (_: Throwable) {
+            }
+        }
+
+        fun cancelAutoRefresh(context: Context) {
+            try {
+                val app = context.applicationContext
+                val am = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val intent = Intent(app, MarketWidget::class.java).apply { action = ACTION_AUTO }
+                val pi = PendingIntent.getBroadcast(
+                    app, AUTO_REQ, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                am.cancel(pi)
+            } catch (_: Throwable) {
+            }
+        }
 
         private fun refreshIntent(context: Context, widgetId: Int): PendingIntent {
             val intent = Intent(context, MarketWidget::class.java).apply {
@@ -40,6 +80,22 @@ class MarketWidget : AppWidgetProvider() {
         private fun nowStamp(): String =
             SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date())
 
+        /** e.g. "just now", "1m", "2m", "1h 3m" from epoch ms */
+        private fun ageLabel(fromMs: Long): String {
+            if (fromMs <= 0L) return "—m"
+            val mins = ((System.currentTimeMillis() - fromMs) / 60000L).coerceAtLeast(0L)
+            return when {
+                mins <= 0L -> "just now"
+                mins == 1L -> "1m ago"
+                mins < 60L -> "${mins}m ago"
+                else -> {
+                    val h = mins / 60L
+                    val m = mins % 60L
+                    if (m == 0L) "${h}h ago" else "${h}h ${m}m ago"
+                }
+            }
+        }
+
         private fun buildViews(
             context: Context,
             widgetId: Int,
@@ -47,7 +103,7 @@ class MarketWidget : AppWidgetProvider() {
             spinIndex: Int = 0
         ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.market_widget)
-            val c = cachedValues(context)
+            val c = PriceStore.read(context)
 
             views.setImageViewResource(R.id.btc_icon, R.drawable.ic_btc)
             views.setImageViewResource(R.id.eth_icon, R.drawable.ic_eth)
@@ -68,11 +124,16 @@ class MarketWidget : AppWidgetProvider() {
 
             if (loading) {
                 views.setTextViewText(R.id.refresh, SPIN[spinIndex % SPIN.size])
+                views.setTextViewText(R.id.refresh_age, "…")
+                views.setTextColor(R.id.refresh_age, Color.parseColor("#16C784"))
                 views.setTextViewText(R.id.last_refreshed, "Refreshing…")
                 views.setTextColor(R.id.last_refreshed, Color.parseColor("#16C784"))
             } else {
                 views.setTextViewText(R.id.refresh, "↻")
-                views.setTextViewText(R.id.last_refreshed, c["last_refreshed"] ?: "Updated —")
+                val age = PriceStore.ageLabel(PriceStore.lastMs(context))
+                views.setTextViewText(R.id.refresh_age, age)
+                views.setTextColor(R.id.refresh_age, Color.parseColor("#9AA3AD"))
+                views.setTextViewText(R.id.last_refreshed, (c["last_refreshed"] ?: "Updated —") + " · " + age)
                 views.setTextColor(R.id.last_refreshed, Color.parseColor("#747B86"))
             }
 
@@ -116,31 +177,46 @@ class MarketWidget : AppWidgetProvider() {
         }
 
         private fun doRefresh(context: Context, ids: IntArray) {
-            if (ids.isEmpty()) return
             val manager = AppWidgetManager.getInstance(context)
-            ids.forEach { render(context, manager, it, true, 0) }
+            val widgetIds = if (ids.isNotEmpty()) ids else manager.getAppWidgetIds(
+                ComponentName(context, MarketWidget::class.java)
+            )
+            if (widgetIds.isNotEmpty()) {
+                widgetIds.forEach { render(context, manager, it, true, 0) }
+            }
             val running = AtomicBoolean(true)
-            val spinner = spinWhile(context, ids, running)
+            val spinner = if (widgetIds.isNotEmpty()) spinWhile(context, widgetIds, running) else null
             try {
-                val prices = fetchPrices()
-                val fomo = fetchFomo()
-                val nasdaq = fetchNasdaq()
-                saveValues(context, prices, fomo, nasdaq)
+                PriceStore.refreshFromNetwork(context)
             } catch (_: Throwable) {
             } finally {
                 running.set(false)
-                try {
-                    spinner.join(500)
-                } catch (_: InterruptedException) {
-                }
-                ids.forEach { render(context, manager, it, false) }
+                try { spinner?.join(800) } catch (_: InterruptedException) {}
+                pushUpdate(context)
             }
         }
 
-        private fun refreshAll(context: Context) {
+        fun refreshAllBlocking(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, MarketWidget::class.java))
             doRefresh(context, ids)
+        }
+
+        /** Re-render all widgets from current prefs (no network). */
+        fun pushUpdate(context: Context) {
+            try {
+                val manager = AppWidgetManager.getInstance(context)
+                val ids = manager.getAppWidgetIds(ComponentName(context, MarketWidget::class.java))
+                ids.forEach { id ->
+                    try {
+                        manager.updateAppWidget(id, buildViews(context, id, false, 0))
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {}
+        }
+
+        private fun refreshAll(context: Context) {
+            refreshAllBlocking(context)
         }
 
         private fun refreshOne(context: Context, id: Int) {
@@ -150,7 +226,7 @@ class MarketWidget : AppWidgetProvider() {
         private fun cachedValues(context: Context): Map<String, String> {
             return try {
                 val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                listOf("bitcoin", "ethereum", "solana", "fomo", "nasdaq", "nasdaq_dir", "last_refreshed")
+                listOf("bitcoin", "ethereum", "solana", "fomo", "nasdaq", "nasdaq_dir", "last_refreshed", "last_refreshed_ms")
                     .mapNotNull { k -> p.getString(k, null)?.let { k to it } }
                     .toMap()
             } catch (_: Throwable) {
@@ -158,13 +234,14 @@ class MarketWidget : AppWidgetProvider() {
             }
         }
 
-        private fun saveValues(
+                private fun saveValues(
             context: Context,
             prices: Map<String, String>,
             fomo: String?,
             nasdaq: Pair<String, String>?
         ) {
             try {
+                val got = prices.isNotEmpty() || fomo != null || nasdaq != null
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
                     prices.forEach { (k, v) -> putString(k, v) }
                     fomo?.let { putString("fomo", it) }
@@ -172,56 +249,124 @@ class MarketWidget : AppWidgetProvider() {
                         putString("nasdaq", text)
                         putString("nasdaq_dir", dir)
                     }
-                    putString("last_refreshed", "Updated " + nowStamp())
-                }.apply()
+                    // Only mark "just now" when at least one value actually arrived
+                    if (got) {
+                        val ms = System.currentTimeMillis()
+                        putLong("last_refreshed_ms", ms)
+                        putString("last_refreshed", "Updated " + nowStamp())
+                    }
+                }.commit()
             } catch (_: Throwable) {
             }
         }
 
-        private fun fetchPrices(): Map<String, String> {
-            val ids = listOf("bitcoin", "ethereum", "solana")
-            val executor = Executors.newFixedThreadPool(3)
-            return try {
-                val jobs = ids.map { id ->
-                    executor.submit(Callable {
-                        try {
-                            val pair = when (id) {
-                                "bitcoin" -> "BTC-USD"
-                                "ethereum" -> "ETH-USD"
-                                else -> "SOL-USD"
-                            }
-                            val json = get("https://api.coinbase.com/v2/prices/$pair/spot")
-                            val amount = JSONObject(json).getJSONObject("data").getString("amount").toDouble()
-                            id to formatPrice(amount)
-                        } catch (_: Throwable) {
-                            null
-                        }
-                    })
+        
+        private fun fetchPagesFeed(): JSONObject? {
+            val bust = System.currentTimeMillis()
+            val urls = listOf(
+                "https://sasikar.github.io/Trading/data/widget-prices.json?t=$bust",
+                "https://raw.githubusercontent.com/Sasikar/Trading/master/data/widget-prices.json?t=$bust"
+            )
+            for (u in urls) {
+                try {
+                    return JSONObject(get(u))
+                } catch (_: Throwable) {
                 }
-                val result = mutableMapOf<String, String>()
-                jobs.forEach { job ->
-                    try {
-                        job.get()?.let { (id, price) -> result[id] = price }
-                    } catch (_: Throwable) {
-                    }
-                }
-                if (result.size < ids.size) {
-                    try {
-                        val root = JSONObject(
-                            get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd")
-                        )
-                        ids.forEach { id ->
-                            if (!result.containsKey(id)) {
-                                result[id] = formatPrice(root.getJSONObject(id).getDouble("usd"))
-                            }
-                        }
-                    } catch (_: Throwable) {
-                    }
-                }
-                result
-            } finally {
-                executor.shutdownNow()
             }
+            return null
+        }
+
+        private fun parseNasdaqFromFeed(root: JSONObject): Pair<String, String>? {
+            val text = root.optString("nasdaq", "")
+            if (text.isBlank()) return null
+            val dir = root.optString("nasdaq_dir", "flat")
+            return text to dir
+        }
+
+
+        private fun fetchPrices(): Map<String, String> {
+            val result = linkedMapOf<String, String>()
+            fun put(id: String, v: Double?) {
+                if (v != null && v > 0 && !result.containsKey(id)) result[id] = formatPrice(v)
+            }
+            // 0) Our GitHub Pages feed (works when phone blocks exchange APIs)
+            try {
+                val bust = System.currentTimeMillis()
+                val urls = listOf(
+                    "https://sasikar.github.io/Trading/data/widget-prices.json?t=$bust",
+                    "https://raw.githubusercontent.com/Sasikar/Trading/master/data/widget-prices.json?t=$bust"
+                )
+                for (u in urls) {
+                    try {
+                        val root = JSONObject(get(u))
+                        put("bitcoin", root.optDouble("bitcoin", Double.NaN).takeIf { !it.isNaN() })
+                        put("ethereum", root.optDouble("ethereum", Double.NaN).takeIf { !it.isNaN() })
+                        put("solana", root.optDouble("solana", Double.NaN).takeIf { !it.isNaN() })
+                        if (result.size >= 3) break
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {}
+
+            // A0) CoinCap bulk
+            try {
+                val arr = JSONObject(get("https://api.coincap.io/v2/assets?ids=bitcoin,ethereum,solana")).getJSONArray("data")
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val id = o.getString("id")
+                    val px = o.getString("priceUsd").toDouble()
+                    put(id, px)
+                }
+            } catch (_: Throwable) {}
+            // A) Binance (usually works on Indian mobile networks)
+            try {
+                put("bitcoin", JSONObject(get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")).getString("price").toDouble())
+            } catch (_: Throwable) {}
+            try {
+                put("ethereum", JSONObject(get("https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT")).getString("price").toDouble())
+            } catch (_: Throwable) {}
+            try {
+                put("solana", JSONObject(get("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT")).getString("price").toDouble())
+            } catch (_: Throwable) {}
+            // B) Coinbase
+            if (result.size < 3) {
+                for ((id, pair) in listOf("bitcoin" to "BTC-USD", "ethereum" to "ETH-USD", "solana" to "SOL-USD")) {
+                    if (result.containsKey(id)) continue
+                    try {
+                        val amt = JSONObject(get("https://api.coinbase.com/v2/prices/$pair/spot"))
+                            .getJSONObject("data").getString("amount").toDouble()
+                        put(id, amt)
+                    } catch (_: Throwable) {}
+                }
+            }
+            // C) Kraken
+            if (result.size < 3) {
+                try {
+                    val root = JSONObject(get("https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD,SOLUSD")).getJSONObject("result")
+                    val it = root.keys()
+                    while (it.hasNext()) {
+                        val k = it.next()
+                        try {
+                            val px = root.getJSONObject(k).getJSONArray("c").getString(0).toDouble()
+                            val u = k.uppercase()
+                            when {
+                                u.contains("XBT") || u.contains("BTC") -> put("bitcoin", px)
+                                u.contains("ETH") -> put("ethereum", px)
+                                u.contains("SOL") -> put("solana", px)
+                            }
+                        } catch (_: Throwable) {}
+                    }
+                } catch (_: Throwable) {}
+            }
+            // D) CoinGecko
+            if (result.size < 3) {
+                try {
+                    val root = JSONObject(get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd"))
+                    put("bitcoin", root.optJSONObject("bitcoin")?.optDouble("usd"))
+                    put("ethereum", root.optJSONObject("ethereum")?.optDouble("usd"))
+                    put("solana", root.optJSONObject("solana")?.optDouble("usd"))
+                } catch (_: Throwable) {}
+            }
+            return result
         }
 
         private fun formatPrice(price: Double): String = when {
@@ -322,21 +467,35 @@ class MarketWidget : AppWidgetProvider() {
         }
 
         private fun get(urlString: String): String {
-            val connection = URL(urlString).openConnection() as HttpURLConnection
-            connection.connectTimeout = 6000
-            connection.readTimeout = 6000
-            connection.requestMethod = "GET"
-            connection.useCaches = false
-            connection.setRequestProperty("Accept", "*/*")
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 MemeWidget/2.5")
-            return try {
-                if (connection.responseCode !in 200..299) {
-                    throw IllegalStateException("HTTP ${connection.responseCode}")
+            var last: Exception? = null
+            // retry twice
+            repeat(2) { attempt ->
+                var connection: HttpURLConnection? = null
+                try {
+                    connection = URL(urlString).openConnection() as HttpURLConnection
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 15000
+                    connection.requestMethod = "GET"
+                    connection.useCaches = false
+                    connection.instanceFollowRedirects = true
+                    connection.setRequestProperty("Accept", "application/json,*/*")
+                    connection.setRequestProperty(
+                        "User-Agent",
+                        "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Mobile Safari/537.36"
+                    )
+                    val code = connection.responseCode
+                    val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+                    val body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                    if (code in 200..299 && body.isNotBlank()) return body
+                    last = IllegalStateException("HTTP $code ${body.take(80)}")
+                } catch (e: Exception) {
+                    last = e
+                    try { Thread.sleep(200L * (attempt + 1)) } catch (_: InterruptedException) {}
+                } finally {
+                    try { connection?.disconnect() } catch (_: Throwable) {}
                 }
-                connection.inputStream.bufferedReader().use { it.readText() }
-            } finally {
-                connection.disconnect()
             }
+            throw last ?: IllegalStateException("request failed")
         }
     }
 
@@ -345,6 +504,7 @@ class MarketWidget : AppWidgetProvider() {
             ids.forEach { id -> render(context.applicationContext, manager, id, false) }
         } catch (_: Throwable) {
         }
+        scheduleAutoRefresh(context.applicationContext)
         val pending = goAsync()
         Thread {
             try {
@@ -359,18 +519,40 @@ class MarketWidget : AppWidgetProvider() {
         }.start()
     }
 
+    override fun onEnabled(context: Context) {
+        scheduleAutoRefresh(context.applicationContext)
+        super.onEnabled(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        cancelAutoRefresh(context.applicationContext)
+        super.onDisabled(context)
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
-        if (action == ACTION_REFRESH || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+        if (action == ACTION_REFRESH || action == ACTION_AUTO
+            || action == Intent.ACTION_MY_PACKAGE_REPLACED
+            || action == Intent.ACTION_BOOT_COMPLETED
+        ) {
             val requestedId =
                 intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             val pending = goAsync()
             Thread {
                 try {
-                    if (requestedId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                    if (action == ACTION_AUTO || action == Intent.ACTION_BOOT_COMPLETED
+                        || action == Intent.ACTION_MY_PACKAGE_REPLACED
+                    ) {
+                        scheduleAutoRefresh(context.applicationContext)
+                    }
+                    if (requestedId != AppWidgetManager.INVALID_APPWIDGET_ID && action == ACTION_REFRESH) {
                         refreshOne(context.applicationContext, requestedId)
                     } else {
                         refreshAll(context.applicationContext)
+                    }
+                    // chain next 5-min alarm after each auto refresh
+                    if (action == ACTION_AUTO) {
+                        scheduleAutoRefresh(context.applicationContext)
                     }
                 } catch (_: Throwable) {
                 } finally {
