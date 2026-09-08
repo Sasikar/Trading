@@ -7,11 +7,11 @@ android {
     namespace = "com.sasikar.trading"
     compileSdk = 35
     defaultConfig {
-        applicationId = "com.sasikar.trading"
+        applicationId = "com.sasikar.atrader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "2.5"
+        versionCode = 25
+        versionName = "4.1-working"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -25,4 +25,5 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 }
