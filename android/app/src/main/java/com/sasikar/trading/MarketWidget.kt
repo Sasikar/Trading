@@ -80,6 +80,22 @@ class MarketWidget : AppWidgetProvider() {
         private fun nowStamp(): String =
             SimpleDateFormat("h:mm:ss a", Locale.getDefault()).format(Date())
 
+        /** e.g. "just now", "1m", "2m", "1h 3m" from epoch ms */
+        private fun ageLabel(fromMs: Long): String {
+            if (fromMs <= 0L) return "—m"
+            val mins = ((System.currentTimeMillis() - fromMs) / 60000L).coerceAtLeast(0L)
+            return when {
+                mins <= 0L -> "just now"
+                mins == 1L -> "1m ago"
+                mins < 60L -> "${mins}m ago"
+                else -> {
+                    val h = mins / 60L
+                    val m = mins % 60L
+                    if (m == 0L) "${h}h ago" else "${h}h ${m}m ago"
+                }
+            }
+        }
+
         private fun buildViews(
             context: Context,
             widgetId: Int,
@@ -108,11 +124,20 @@ class MarketWidget : AppWidgetProvider() {
 
             if (loading) {
                 views.setTextViewText(R.id.refresh, SPIN[spinIndex % SPIN.size])
+                views.setTextViewText(R.id.refresh_age, "…")
+                views.setTextColor(R.id.refresh_age, Color.parseColor("#16C784"))
                 views.setTextViewText(R.id.last_refreshed, "Refreshing…")
                 views.setTextColor(R.id.last_refreshed, Color.parseColor("#16C784"))
             } else {
                 views.setTextViewText(R.id.refresh, "↻")
-                views.setTextViewText(R.id.last_refreshed, c["last_refreshed"] ?: "Updated —")
+                val ms = try {
+                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .getLong("last_refreshed_ms", 0L)
+                } catch (_: Throwable) { 0L }
+                val age = ageLabel(ms)
+                views.setTextViewText(R.id.refresh_age, age)
+                views.setTextColor(R.id.refresh_age, Color.parseColor("#9AA3AD"))
+                views.setTextViewText(R.id.last_refreshed, (c["last_refreshed"] ?: "Updated —") + " · " + age)
                 views.setTextColor(R.id.last_refreshed, Color.parseColor("#747B86"))
             }
 
@@ -190,7 +215,7 @@ class MarketWidget : AppWidgetProvider() {
         private fun cachedValues(context: Context): Map<String, String> {
             return try {
                 val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                listOf("bitcoin", "ethereum", "solana", "fomo", "nasdaq", "nasdaq_dir", "last_refreshed")
+                listOf("bitcoin", "ethereum", "solana", "fomo", "nasdaq", "nasdaq_dir", "last_refreshed", "last_refreshed_ms")
                     .mapNotNull { k -> p.getString(k, null)?.let { k to it } }
                     .toMap()
             } catch (_: Throwable) {
@@ -212,6 +237,8 @@ class MarketWidget : AppWidgetProvider() {
                         putString("nasdaq", text)
                         putString("nasdaq_dir", dir)
                     }
+                    val ms = System.currentTimeMillis()
+                    putLong("last_refreshed_ms", ms)
                     putString("last_refreshed", "Updated " + nowStamp())
                 }.apply()
             } catch (_: Throwable) {
