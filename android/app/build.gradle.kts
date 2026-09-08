@@ -10,8 +10,8 @@ android {
         applicationId = "com.sasikar.atrader"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
-        versionName = "3.2-fix"
+        versionCode = 24
+        versionName = "4.0-webview"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
