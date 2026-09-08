@@ -1,6 +1,9 @@
 package com.sasikar.trading
 
 import android.app.PendingIntent
+import android.os.Build
+import android.os.SystemClock
+import android.app.AlarmManager
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
@@ -21,8 +24,45 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MarketWidget : AppWidgetProvider() {
     companion object {
         private const val ACTION_REFRESH = "com.sasikar.trading.action.REFRESH_WIDGET"
+        private const val ACTION_AUTO = "com.sasikar.trading.action.AUTO_REFRESH_WIDGET"
         private const val PREFS = "market_widget_cache"
+        private const val AUTO_REQ = 7001
+        private const val INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
         private val SPIN = arrayOf("↻", "⟳", "↻", "⟳", "↻", "⟳")
+
+        fun scheduleAutoRefresh(context: Context) {
+            try {
+                val app = context.applicationContext
+                val am = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val intent = Intent(app, MarketWidget::class.java).apply { action = ACTION_AUTO }
+                val pi = PendingIntent.getBroadcast(
+                    app, AUTO_REQ, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                val trigger = System.currentTimeMillis() + INTERVAL_MS
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, trigger, pi)
+                } else {
+                    @Suppress("DEPRECATION")
+                    am.set(AlarmManager.RTC_WAKEUP, trigger, pi)
+                }
+            } catch (_: Throwable) {
+            }
+        }
+
+        fun cancelAutoRefresh(context: Context) {
+            try {
+                val app = context.applicationContext
+                val am = app.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val intent = Intent(app, MarketWidget::class.java).apply { action = ACTION_AUTO }
+                val pi = PendingIntent.getBroadcast(
+                    app, AUTO_REQ, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                am.cancel(pi)
+            } catch (_: Throwable) {
+            }
+        }
 
         private fun refreshIntent(context: Context, widgetId: Int): PendingIntent {
             val intent = Intent(context, MarketWidget::class.java).apply {
@@ -345,6 +385,7 @@ class MarketWidget : AppWidgetProvider() {
             ids.forEach { id -> render(context.applicationContext, manager, id, false) }
         } catch (_: Throwable) {
         }
+        scheduleAutoRefresh(context.applicationContext)
         val pending = goAsync()
         Thread {
             try {
@@ -359,18 +400,40 @@ class MarketWidget : AppWidgetProvider() {
         }.start()
     }
 
+    override fun onEnabled(context: Context) {
+        scheduleAutoRefresh(context.applicationContext)
+        super.onEnabled(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        cancelAutoRefresh(context.applicationContext)
+        super.onDisabled(context)
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
-        if (action == ACTION_REFRESH || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+        if (action == ACTION_REFRESH || action == ACTION_AUTO
+            || action == Intent.ACTION_MY_PACKAGE_REPLACED
+            || action == Intent.ACTION_BOOT_COMPLETED
+        ) {
             val requestedId =
                 intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             val pending = goAsync()
             Thread {
                 try {
-                    if (requestedId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                    if (action == ACTION_AUTO || action == Intent.ACTION_BOOT_COMPLETED
+                        || action == Intent.ACTION_MY_PACKAGE_REPLACED
+                    ) {
+                        scheduleAutoRefresh(context.applicationContext)
+                    }
+                    if (requestedId != AppWidgetManager.INVALID_APPWIDGET_ID && action == ACTION_REFRESH) {
                         refreshOne(context.applicationContext, requestedId)
                     } else {
                         refreshAll(context.applicationContext)
+                    }
+                    // chain next 5-min alarm after each auto refresh
+                    if (action == ACTION_AUTO) {
+                        scheduleAutoRefresh(context.applicationContext)
                     }
                 } catch (_: Throwable) {
                 } finally {
