@@ -223,13 +223,14 @@ class MarketWidget : AppWidgetProvider() {
             }
         }
 
-        private fun saveValues(
+                private fun saveValues(
             context: Context,
             prices: Map<String, String>,
             fomo: String?,
             nasdaq: Pair<String, String>?
         ) {
             try {
+                val got = prices.isNotEmpty() || fomo != null || nasdaq != null
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().apply {
                     prices.forEach { (k, v) -> putString(k, v) }
                     fomo?.let { putString("fomo", it) }
@@ -237,58 +238,100 @@ class MarketWidget : AppWidgetProvider() {
                         putString("nasdaq", text)
                         putString("nasdaq_dir", dir)
                     }
-                    val ms = System.currentTimeMillis()
-                    putLong("last_refreshed_ms", ms)
-                    putString("last_refreshed", "Updated " + nowStamp())
+                    // Only mark "just now" when at least one value actually arrived
+                    if (got) {
+                        val ms = System.currentTimeMillis()
+                        putLong("last_refreshed_ms", ms)
+                        putString("last_refreshed", "Updated " + nowStamp())
+                    }
                 }.apply()
             } catch (_: Throwable) {
             }
         }
 
         private fun fetchPrices(): Map<String, String> {
-            val ids = listOf("bitcoin", "ethereum", "solana")
-            val executor = Executors.newFixedThreadPool(3)
-            return try {
-                val jobs = ids.map { id ->
-                    executor.submit(Callable {
-                        try {
-                            val pair = when (id) {
-                                "bitcoin" -> "BTC-USD"
-                                "ethereum" -> "ETH-USD"
-                                else -> "SOL-USD"
-                            }
-                            val json = get("https://api.coinbase.com/v2/prices/$pair/spot")
-                            val amount = JSONObject(json).getJSONObject("data").getString("amount").toDouble()
-                            id to formatPrice(amount)
-                        } catch (_: Throwable) {
-                            null
-                        }
-                    })
+            val result = mutableMapOf<String, String>()
+            // 1) Kraken single call (reliable on mobile)
+            try {
+                val json = get("https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD,SOLUSD")
+                val root = JSONObject(json).getJSONObject("result")
+                fun last(key: String): Double? {
+                    return try {
+                        root.getJSONObject(key).getJSONArray("c").getString(0).toDouble()
+                    } catch (_: Throwable) { null }
                 }
-                val result = mutableMapOf<String, String>()
-                jobs.forEach { job ->
-                    try {
-                        job.get()?.let { (id, price) -> result[id] = price }
-                    } catch (_: Throwable) {
+                // key names vary
+                val keys = root.keys()
+                val map = mutableMapOf<String, Double>()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    last(k)?.let { map[k] = it }
+                }
+                fun pick(vararg names: String): Double? {
+                    for (n in names) if (map.containsKey(n)) return map[n]
+                    // partial match
+                    for ((k, v) in map) {
+                        val u = k.uppercase()
+                        if (names.any { u.contains(it) }) return v
                     }
+                    return null
                 }
-                if (result.size < ids.size) {
-                    try {
-                        val root = JSONObject(
-                            get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd")
-                        )
-                        ids.forEach { id ->
-                            if (!result.containsKey(id)) {
-                                result[id] = formatPrice(root.getJSONObject(id).getDouble("usd"))
-                            }
-                        }
-                    } catch (_: Throwable) {
-                    }
-                }
-                result
-            } finally {
-                executor.shutdownNow()
+                pick("XXBTZUSD", "XBTUSD", "XBT")?.let { result["bitcoin"] = formatPrice(it) }
+                pick("XETHZUSD", "ETHUSD", "ETH")?.let { result["ethereum"] = formatPrice(it) }
+                pick("SOLUSD", "SOL")?.let { result["solana"] = formatPrice(it) }
+            } catch (_: Throwable) {
             }
+            // 2) Coinbase per-asset fill
+            if (result.size < 3) {
+                val pairs = listOf(
+                    "bitcoin" to "BTC-USD",
+                    "ethereum" to "ETH-USD",
+                    "solana" to "SOL-USD"
+                )
+                for ((id, pair) in pairs) {
+                    if (result.containsKey(id)) continue
+                    try {
+                        val json = get("https://api.coinbase.com/v2/prices/$pair/spot")
+                        val amount = JSONObject(json).getJSONObject("data").getString("amount").toDouble()
+                        result[id] = formatPrice(amount)
+                    } catch (_: Throwable) {
+                    }
+                }
+            }
+            // 3) CoinGecko
+            if (result.size < 3) {
+                try {
+                    val root = JSONObject(
+                        get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd")
+                    )
+                    listOf("bitcoin", "ethereum", "solana").forEach { id ->
+                        if (!result.containsKey(id)) {
+                            try {
+                                result[id] = formatPrice(root.getJSONObject(id).getDouble("usd"))
+                            } catch (_: Throwable) {
+                            }
+                        }
+                    }
+                } catch (_: Throwable) {
+                }
+            }
+            // 4) Binance USDT approx
+            if (result.size < 3) {
+                val bins = listOf(
+                    "bitcoin" to "BTCUSDT",
+                    "ethereum" to "ETHUSDT",
+                    "solana" to "SOLUSDT"
+                )
+                for ((id, sym) in bins) {
+                    if (result.containsKey(id)) continue
+                    try {
+                        val json = get("https://api.binance.com/api/v3/ticker/price?symbol=$sym")
+                        result[id] = formatPrice(JSONObject(json).getString("price").toDouble())
+                    } catch (_: Throwable) {
+                    }
+                }
+            }
+            return result
         }
 
         private fun formatPrice(price: Double): String = when {
@@ -390,12 +433,13 @@ class MarketWidget : AppWidgetProvider() {
 
         private fun get(urlString: String): String {
             val connection = URL(urlString).openConnection() as HttpURLConnection
-            connection.connectTimeout = 6000
-            connection.readTimeout = 6000
+            connection.connectTimeout = 12000
+            connection.readTimeout = 12000
             connection.requestMethod = "GET"
             connection.useCaches = false
-            connection.setRequestProperty("Accept", "*/*")
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 MemeWidget/2.5")
+            connection.instanceFollowRedirects = true
+            connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36 TradingWidget/2.8")
             return try {
                 if (connection.responseCode !in 200..299) {
                     throw IllegalStateException("HTTP ${connection.responseCode}")
