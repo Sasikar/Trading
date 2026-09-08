@@ -10,8 +10,8 @@ android {
         applicationId = "com.sasikar.trading"
         minSdk = 26
         targetSdk = 35
-        versionCode = 18
-        versionName = "2.7-age"
+        versionCode = 19
+        versionName = "2.8-prices"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
