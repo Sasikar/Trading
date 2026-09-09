@@ -16,9 +16,10 @@
 .coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
 .coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
 .change{font-size:11px;font-weight:800;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}
-.tabs{display:flex;gap:6px;padding:4px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 16px;overflow-x:auto}
-.tab{flex:1;min-width:56px;border:0;background:transparent;color:#9aa6b5;font:800 13px Inter,system-ui,sans-serif;padding:12px 8px;border-radius:11px;cursor:pointer}
-.tab.active{background:rgba(98,227,160,.16);color:#f4f7fb}
+.tabs{display:flex;gap:5px;padding:5px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tab{flex:0 0 auto;min-width:max-content;border:0;background:transparent;color:#9aa6b5;font:800 13px Inter,system-ui,sans-serif;padding:11px 14px;border-radius:11px;cursor:pointer;white-space:nowrap;letter-spacing:.02em}
+.tab.active{background:rgba(98,227,160,.28)!important;color:#f4f7fb!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.45)}
+.tab[data-tf="memegate"].active{background:rgba(98,227,160,.32)!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.55)}
 .price-now{padding:14px 16px;border-bottom:1px solid #ffffff0c;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .price-now .big{font-size:24px;font-weight:900}.price-now .meta{font-size:12px;color:var(--muted);margin-top:4px}
 #fib-tv,#macd-tv{width:100%;height:260px;background:#080d13}#macd-tv{height:200px}
@@ -245,14 +246,14 @@
   </div></div>
 </section>
 <div class="tabs" id="tf-tabs">
+  <button type="button" class="tab active" data-tf="memegate">MemeGate</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
-  <button type="button" class="tab active" data-tf="trend">Trend</button>
+  <button type="button" class="tab" data-tf="trend">Trend</button>
   <button type="button" class="tab" data-tf="struct">Struct</button>
   <button type="button" class="tab" data-tf="macro">Macro</button>
   <button type="button" class="tab" data-tf="signal">Signal</button>
-  <button type="button" class="tab" data-tf="memegate">MemeGate</button>
   <button type="button" class="tab" data-tf="1w">1W</button>
   <button type="button" class="tab" data-tf="1M">1M</button>
 </div>
@@ -294,7 +295,7 @@
   </div>
 </section>
 </div>
-<div id="trend-panel" class="trend-panel on">
+<div id="trend-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head"><div><h2>Trend Context</h2><p>1D+1W EMA · MACD · 4H</p></div><span class="source" id="trend-source">…</span></div>
   <div class="card">
@@ -394,7 +395,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260910-1h"></script>
+<script src="overview-app.js?v=20260910-mgdef"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -436,7 +437,7 @@
 </div>
 
 
-<div id="memegate-panel" class="trend-panel" style="display:none">
+<div id="memegate-panel" class="trend-panel" style="display:block">
 <section class="section">
   <div class="head"><div><h2>BTC MemeGate</h2><p>Permission layer only — not a meme buy signal</p></div><span class="source" id="mg-source">LIVE</span></div>
   <div class="card">
