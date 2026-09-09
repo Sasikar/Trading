@@ -18,6 +18,10 @@
 <div class="head"><div><div class="title">Trump News</div><div class="sub">His Truth Social posts only · market-relevant · last 3 days</div></div><span class="badge" id="tn-badge">…</span></div>
 <div class="list" id="hi-list"><div style="padding:14px;color:#8f99a4">Loading Truth posts…</div></div>
 </section>
+<section class="box" id="x-front-panel">
+<div class="head"><div><div class="title">X Front-Run</div><div class="sub">High-signal accounts · often ahead of wires · not a buy signal</div></div><span class="badge news" id="xf-badge">X</span></div>
+<div class="list" id="xf-list"><div style="padding:14px;color:#8f99a4">Loading X…</div></div>
+</section>
 <section class="box" id="market-news-panel">
 <div class="head"><div><div class="title">Market News</div><div class="sub">Latest market news · Reuters / Bloomberg / AP style · not only Trump</div></div><span class="badge news" id="mn-badge">NEWS</span></div>
 <div class="list" id="mn-list"><div style="padding:14px;color:#8f99a4">Loading market news…</div></div>
@@ -89,6 +93,19 @@
     badge.textContent=n+' POSTS';
     box.innerHTML=items.map(x=>'<a class="card trump" href="'+esc(x.url)+'" rel="noopener"><div class="meta">TRUTH SOCIAL</div><div class="ago">'+esc(label(x))+'</div><div class="post">'+esc(x.text)+'</div><div class="why">'+esc(x.why||'Market-relevant')+' · open post →</div></a>').join('');
   }).catch(()=>{badge.textContent='ZERO';badge.classList.add('zero');box.innerHTML='<div class="zero"><b>ZERO</b>Could not load Truth batch.</div>';});
+
+  
+  const xf=document.getElementById('xf-list');
+  const xfb=document.getElementById('xf-badge');
+  if(xf){
+    fetch('./x-front.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{
+      const items=(d&&d.items)||[];
+      function xago(t){try{const ms=Date.now()-new Date(t).getTime();const m=Math.floor(ms/60000);if(m<1)return 'just now';if(m<60)return m+'m';const h=Math.floor(m/60);if(h<48)return h+'h';return Math.floor(h/24)+'d';}catch(e){return '';}}
+      if(!items.length){if(xfb){xfb.textContent='ZERO';xfb.classList.add('zero');}xf.innerHTML='<div class="zero"><b>ZERO</b>No X front-run posts in batch. Add X_BEARER_TOKEN for hourly refresh.</div>';return;}
+      if(xfb)xfb.textContent=items.length+' POSTS';
+      xf.innerHTML=items.slice(0,15).map(x=>'<a class="card" href="'+esc(x.url)+'" rel="noopener"><div class="meta">@'+esc(x.user||'x')+' · X</div><div class="ago">'+esc(xago(x.time))+'</div><div class="post">'+esc(x.text||'')+'</div><div class="why">Open on X →</div></a>').join('');
+    }).catch(()=>{if(xf)xf.innerHTML='<div class="zero">Could not load X front-run.</div>';});
+  }
 
   const mbox=document.getElementById('mn-list');
   const mbadge=document.getElementById('mn-badge');
