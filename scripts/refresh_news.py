@@ -24,6 +24,10 @@ QUERIES = [
     "bitcoin crypto market when:1d",
     "oil prices OPEC when:1d",
     "US economy inflation jobs when:1d",
+    "US Treasury debt buyback when:1d",
+    "Treasury buyback liquidity when:1d",
+    "Treasury Scott Bessent markets when:1d",
+    "US dollar liquidity treasury when:1d",
 ]
 
 # Exact publisher names; regional rebroadcasters such as "BNN Bloomberg" or
@@ -83,6 +87,10 @@ MARKET_KEYWORDS = (
     "jobs",
     "recession",
     "treasury",
+    "buyback",
+    "liquidity",
+    "debt",
+    "bessent",
 )
 
 
