@@ -2349,7 +2349,7 @@ function showSignal(on){
     if(mp){mp.classList.remove('on');mp.style.display='none';}
     if(sg){sg.classList.add('on');sg.style.display='block';}
   } else {
-    if(sg){sg.classList.remove('on');sg.style.display='none';}
+    if(sg){sg.classList.remove('on');sg.style.display='none';}const _mg=$('memegate-panel');if(_mg)_mg.style.display='none';
   }
 }
 
@@ -2360,7 +2360,7 @@ function showMacro(on){
     if(panels){panels.classList.add('hidden');panels.style.display='none';}
     if(trend){trend.classList.remove('on');trend.style.display='none';}
     if(sp){sp.classList.remove('on');sp.style.display='none';}
-    if(sg){sg.classList.remove('on');sg.style.display='none';}
+    if(sg){sg.classList.remove('on');sg.style.display='none';}const _mg=$('memegate-panel');if(_mg)_mg.style.display='none';
     if(mp){mp.classList.add('on');mp.style.display='block';}
   } else {
     if(mp){mp.classList.remove('on');mp.style.display='none';}
@@ -2374,20 +2374,269 @@ function showStruct(on){
     if(panels){panels.classList.add('hidden');panels.style.display='none';}
     if(trend){trend.classList.remove('on');trend.style.display='none';}
     if(mp){mp.classList.remove('on');mp.style.display='none';}
-    if(sg){sg.classList.remove('on');sg.style.display='none';}
+    if(sg){sg.classList.remove('on');sg.style.display='none';}const _mg=$('memegate-panel');if(_mg)_mg.style.display='none';
     if(sp){sp.classList.add('on');sp.style.display='block';}
   } else {
     if(sp){sp.classList.remove('on');sp.style.display='none';}
   }
 }
 
+
+/* ===== MemeGate — downstream permission layer (does not alter BTC engine) =====
+Formulas (live, initial params — not claimed optimal):
+
+clamp(x) = max(-1, min(1, x))
+
+HTF Structure (20%):
+  sW,sD from swingStructure()
+  raw = 0.6*sW + 0.4*sD
+  sW/sD map: hardBreakDown=-1; confirmedBreakDown=-0.7; LH+LL=-0.25; HH+HL=+0.85; else 0
+
+BTC Trend (20%):
+  1D trendFromCloses: BULLISH=+0.7, BEARISH=-0.7, else 0
+  4H vs EMA50/200: both above +0.3, both below -0.3, mixed 0
+  trend = clamp(1D + 4H overlay)
+
+4H Momentum (15%) / 1D Momentum (10%):
+  MACD line>signal & hist>0 → +0.8
+  line<signal & hist<0 → -0.8
+  else 0
+  +0.2 if fresh hist cross with direction
+
+RSI 4H (10%):
+  base = clamp((RSI-50)/25)   // 25→-1, 50→0, 75→+1
+  if RSI>78: base -= 0.25*(RSI-78)/12   // modest exhaustion
+  if RSI<22: base += 0.15               // washout, not auto ON
+
+Volume 4H (10%):
+  r = lastVol / avg(prev 20)
+  score = clamp((r-1)/0.8)             // 0.2x→neg, 1.8x→+1
+  if price falling (close<open) and r>1.3: score *= -1  // dump volume
+
+CVD (10%):
+  lastΔ sign + CVD slope over last 6 bars
+  score = clamp( 0.5*sign(Δ) + 0.5*sign(slope) * min(1, |slope|/ref) )
+
+BTC.D (used as dampener, not 5% additive):
+  DominanceModifier ∈ [-1,+1]
+  BTC↑ & D rising/strong outperform vs ETH → negative (concentration)
+  BTC↑ & ETH/BTC rising → positive (risk expand)
+  BTC↓ & D rising → strongly negative
+  BTC↓ & D/alts falling → 0 (not auto bullish for memes)
+
+FinalMemeScore = clamp( BaseScore * (1 + 0.35 * DominanceModifier) )
+  BaseScore = Σ w_i * s_i   (weights below)
+  DampingFactor = 0.35 (initial)
+
+Gate: ON >= +0.35 and no veto; OFF <= -0.35 or veto; else WAIT
+
+Veto: 1D hardBreakDown OR (>=3 of trend/4H mom/1D mom/CVD/structure) <= -0.55
+
+Confidence ≠ |score|:
+  agreement = 1 - stdev(component scores)/1.2
+  completeness = #finite / #components
+  distance = min(1, |score-threshold|/0.35)
+  conf = 100 * clamp01(0.45*agreement + 0.25*completeness + 0.30*distance)
+*/
+const MG_W={struct:0.20,trend:0.20,m4:0.15,m1:0.10,rsi:0.10,vol:0.10,cvd:0.10};
+const MG_DAMP=0.35, MG_ON=0.35, MG_OFF=-0.35;
+
+function mgClamp(x,a,b){a=a==null?-1:a;b=b==null?1:b;return Math.max(a,Math.min(b,x));}
+function mgSign(x){return x>0?1:x<0?-1:0;}
+function mgStructScore(s){
+  if(!s) return 0;
+  if(s.hardBreakDown) return -1;
+  if(s.confirmedBreakDown) return -0.7;
+  const det=String(s.detail||'');
+  if(/HH/.test(det)&&/HL/.test(det)) return 0.85;
+  if(/LH/.test(det)&&/LL/.test(det)) return -0.25;
+  if(/intact/i.test(det)) return 0.35;
+  return 0;
+}
+function mgMomScore(pack){
+  if(!pack||pack.lastMacd==null||pack.lastSig==null||pack.lastHist==null) return 0;
+  let s=0;
+  if(pack.lastMacd>pack.lastSig&&pack.lastHist>0) s=0.8;
+  else if(pack.lastMacd<pack.lastSig&&pack.lastHist<0) s=-0.8;
+  const fresh=pack.prevHist!=null&&((pack.prevHist<0&&pack.lastHist>=0)||(pack.prevHist>=0&&pack.lastHist<0));
+  if(fresh) s=mgClamp(s+0.2*mgSign(pack.lastHist));
+  return s;
+}
+async function fetchBtcDominance(){
+  const out={d:null,btcRet7:null,ethBtcRet7:null,note:'snapshot'};
+  try{
+    const g=await jget('https://api.coingecko.com/api/v3/global');
+    const d=g&&g.data&&g.data.market_cap_percentage&&g.data.market_cap_percentage.btc;
+    if(d!=null) out.d=+d;
+  }catch(e){}
+  try{
+    const b=await jget('https://api.coingecko.com/api/v3/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false');
+    const e=await jget('https://api.coingecko.com/api/v3/coins/ethereum?localization=false&tickers=false&community_data=false&developer_data=false');
+    const br=b&&b.market_data&&b.market_data.price_change_percentage_7d_in_currency;
+    const er=e&&e.market_data&&e.market_data.price_change_percentage_7d_in_currency;
+    if(br&&br.usd!=null) out.btcRet7=+br.usd;
+    if(br&&br.usd!=null&&er&&er.usd!=null){
+      // ETH/BTC ~ ethUsdRet - btcUsdRet (log approx)
+      out.ethBtcRet7=+er.usd-+br.usd;
+    }
+  }catch(e){}
+  return out;
+}
+function mgDomModifier(dom){
+  const btcUp=dom.btcRet7!=null?dom.btcRet7>0:null;
+  const ethBtcUp=dom.ethBtcRet7!=null?dom.ethBtcRet7>0:null;
+  let m=0, regime='n/a';
+  if(btcUp===true&&ethBtcUp===false){m=-0.55;regime='BTC↑ + alts lag (concentration)';}
+  else if(btcUp===true&&ethBtcUp===true){m=0.45;regime='BTC↑ + ETH/BTC↑ (risk expand)';}
+  else if(btcUp===true){m=0.10;regime='BTC↑ · D context limited';}
+  else if(btcUp===false&&ethBtcUp===false){m=-0.35;regime='BTC↓ + ETH/BTC↓ (broad risk-off)';}
+  else if(btcUp===false&&ethBtcUp===true){m=-0.15;regime='BTC↓ · not auto-bullish for memes';}
+  else {m=0;regime='BTC.D context incomplete';}
+  // extreme D level is context only — not a standalone veto
+  if(dom.d!=null&&dom.d>=62){m=mgClamp(m-0.15);regime+=' · D elevated';}
+  if(dom.d!=null&&dom.d<=45){m=mgClamp(m+0.05);}
+  return {mod:mgClamp(m),regime};
+}
+
+function showMemeGate(on){
+  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel');
+  if(panels){panels.classList.add('hidden');panels.style.display='none';}
+  if(trend){trend.classList.remove('on');trend.style.display='none';}
+  if(sp){sp.classList.remove('on');sp.style.display='none';}
+  if(mp){mp.classList.remove('on');mp.style.display='none';}
+  if(sg){sg.classList.remove('on');sg.style.display='none';}const _mg=$('memegate-panel');if(_mg)_mg.style.display='none';
+  if(mg){mg.style.display=on?'block':'none';}
+}
+
+async function loadMemeGate(){
+  const box=$('mg-rows'); if(!box) return;
+  try{
+    const [kl4,klD,klW,dom]=await Promise.all([
+      fetchKlines('4h',120), fetchKlines('1d',220), fetchKlines('1w',120), fetchBtcDominance()
+    ]);
+    const sD=swingStructure(klD,80,'1D');
+    const sW=swingStructure(klW,52,'1W');
+    const struct=mgClamp(0.6*mgStructScore(sW)+0.4*mgStructScore(sD));
+    const dTrend=trendFromCloses(klD.map(k=>+k[4]));
+    const c4=kl4.map(k=>+k[4]);
+    const e50=emaArr(c4,50), e200=emaArr(c4,200);
+    const last=c4[c4.length-1], a=e50[e50.length-1], b=e200[e200.length-1];
+    let t4=0;
+    if(a!=null&&b!=null&&last!=null){
+      if(last>a&&last>b) t4=0.3; else if(last<a&&last<b) t4=-0.3;
+    }
+    const t1=dTrend.dir==='BULLISH'?0.7:dTrend.dir==='BEARISH'?-0.7:0;
+    const trend=mgClamp(t1+t4);
+    const m4=mgMomScore(calcMACDSeries(c4,kl4.map(k=>Math.floor(k[0]/1000))));
+    const m1=mgMomScore(calcMACDSeries(klD.map(k=>+k[4]),klD.map(k=>Math.floor(k[0]/1000))));
+    const rsi=calcRSI(c4,14);
+    let rsiS=0;
+    if(rsi!=null){
+      rsiS=mgClamp((rsi-50)/25);
+      if(rsi>78) rsiS=mgClamp(rsiS-0.25*(rsi-78)/12);
+      if(rsi<22) rsiS=mgClamp(rsiS+0.15);
+    }
+    const vols=kl4.map(k=>+k[5]||0);
+    const lastV=vols[vols.length-1];
+    const avg=vols.slice(-21,-1).reduce((s,x)=>s+x,0)/Math.max(1,Math.min(20,vols.length-1));
+    const vRatio=avg?lastV/avg:1;
+    let volS=mgClamp((vRatio-1)/0.8);
+    const lastBar=kl4[kl4.length-1];
+    if(lastBar&&+lastBar[4]<+lastBar[1]&&vRatio>1.3) volS=mgClamp(-Math.abs(volS));
+    const cvd=calcCVD(kl4);
+    let cvdS=0;
+    if(cvd.length){
+      const lastC=cvd[cvd.length-1];
+      const prev=cvd.length>5?cvd[cvd.length-6]:cvd[0];
+      const slope=lastC.cvd-prev.cvd;
+      const ref=Math.max(1, Math.abs(prev.cvd)*0.05+1);
+      cvdS=mgClamp(0.5*mgSign(lastC.delta)+0.5*mgSign(slope)*Math.min(1,Math.abs(slope)/ref));
+    }
+    const base=MG_W.struct*struct+MG_W.trend*trend+MG_W.m4*m4+MG_W.m1*m1+MG_W.rsi*rsiS+MG_W.vol*volS+MG_W.cvd*cvdS;
+    const dm=mgDomModifier(dom);
+    let finalS=mgClamp(base*(1+MG_DAMP*dm.mod));
+    const comps=[struct,trend,m4,m1,rsiS,volS,cvdS];
+    const vetoStruct=!!(sD&&sD.hardBreakDown);
+    const strongNeg=comps.filter(x=>x<=-0.55).length>=3;
+    const veto=vetoStruct||strongNeg;
+    let gate='WAIT', klass='wait', label='🟡 BTC MEME GATE: WAIT';
+    if(veto||finalS<=MG_OFF){gate='OFF';klass='off';label='🔴 BTC MEME GATE: MEME OFF';}
+    else if(finalS>=MG_ON){gate='ON';klass='on';label='🟢 BTC MEME GATE: MEME ON';}
+    const mean=comps.reduce((s,x)=>s+x,0)/comps.length;
+    const std=Math.sqrt(comps.reduce((s,x)=>s+(x-mean)*(x-mean),0)/comps.length);
+    const agree=mgClamp(1-std/1.2,0,1);
+    const complete=1;
+    const dist=Math.min(1, Math.abs(finalS-(gate==='WAIT'?0:(gate==='ON'?MG_ON:MG_OFF)))/0.35);
+    const conf=Math.round(100*mgClamp(0.45*agree+0.25*complete+0.30*dist,0,1));
+    const rows=[
+      ['1W Structure',mgStructScore(sW),(sW&&sW.detail)||'—'],
+      ['1D Structure',mgStructScore(sD),(sD&&sD.detail)||'—'],
+      ['HTF Structure (20%)',struct, (sW&&sW.hardBreakDown?'1W broken ':'')+(sD&&sD.hardBreakDown?'1D broken':'blend')],
+      ['BTC Trend (20%)',trend,dTrend.dir+(a!=null?(' · 4H vs EMA50/200'):'')],
+      ['4H Momentum (15%)',m4,m4>0.2?'improving/positive':m4<-0.2?'deteriorating':'flat'],
+      ['1D Momentum (10%)',m1,m1>0.2?'positive':m1<-0.2?'negative':'flat'],
+      ['RSI 4H (10%)',rsiS,rsi==null?'n/a':('RSI '+rsi.toFixed(1))],
+      ['Volume 4H (10%)',volS,vRatio.toFixed(2)+'× vs avg'],
+      ['CVD (10%)',cvdS,cvdS>0?'buy-leaning':cvdS<0?'sell-leaning':'mixed'],
+      ['BTC.D modifier',dm.mod,dm.regime+(dom.d!=null?(' · D '+dom.d.toFixed(1)+'%'):'')],
+    ];
+    box.innerHTML=rows.map(([n,sc,st])=>{
+      const col=sc>0.15?'#62e3a0':sc<-0.15?'#ff6f7c':'#e6c878';
+      return '<tr><td>'+n+'</td><td class="sc" style="color:'+col+'">'+(sc>=0?'+':'')+sc.toFixed(2)+'</td><td>'+st+'</td></tr>';
+    }).join('');
+    const g=$('mg-gate'); if(g){g.textContent=label;g.className='gate '+klass;}
+    if($('mg-score'))$('mg-score').textContent=(finalS>=0?'+':'')+finalS.toFixed(2);
+    if($('mg-conf'))$('mg-conf').textContent=conf+'%';
+    if($('mg-dom'))$('mg-dom').textContent=dom.d!=null?(dom.d.toFixed(1)+'%'):'n/a';
+    if($('mg-source'))$('mg-source').textContent='LIVE · engine reuse';
+    const missing=[];
+    if(m4<0.2) missing.push('4H momentum confirmation');
+    if(volS<0.1) missing.push('volume confirmation');
+    if(cvdS<=0) missing.push('CVD buy pressure');
+    if(trend<0.2) missing.push('clear BTC trend');
+    if(struct<0.2) missing.push('clean HTF structure');
+    if(dm.mod<0) missing.push('friendlier BTC.D / alt-risk backdrop');
+    let why='';
+    if(gate==='ON') why='BTC HTF structure is not in confirmed breakdown, trend/momentum mix is constructive enough after BTC.D dampening, and no risk veto fired. Conditions permit considering meme risk — not buying a specific coin.';
+    else if(gate==='OFF') why=vetoStruct?'Confirmed 1D structural breakdown vetoed meme risk.':(strongNeg?'Multiple major components are simultaneously weak.':'Final score is at or below the OFF threshold after BTC.D context.');
+    else why='Score is in the mixed band. Some BTC pieces may be fine, but confirmation is not strong enough to permit new meme exposure.';
+    if($('mg-why'))$('mg-why').textContent=why;
+    if($('mg-miss'))$('mg-miss').textContent=gate==='ON'?'None required for permission — individual meme setup still required.':(missing.slice(0,4).join(' · ')||'Closer agreement among structure, momentum, and CVD.');
+    if($('mg-inv'))$('mg-inv').textContent='Invalidation: 1D hard breakdown, or final score ≤ −0.35, or ≥3 major components ≤ −0.55.';
+    if($('mg-act'))$('mg-act').textContent=gate==='ON'?'Meme risk permitted — individual meme confirmation still required.':(gate==='OFF'?'No new meme exposure.':'No new meme entries yet.');
+    if($('mg-formulas'))$('mg-formulas').textContent=
+      'FORMULAS (initial params)\\n'+
+      'BaseScore = 0.20·Struct + 0.20·Trend + 0.15·Mom4H + 0.10·Mom1D + 0.10·RSI + 0.10·Vol + 0.10·CVD\\n'+
+      'Final = clamp(Base · (1 + 0.35·DominanceModifier), -1, +1)\\n'+
+      'ON if Final≥+0.35 and no veto · WAIT if |Final|<0.35 · OFF if Final≤−0.35 or veto\\n'+
+      'Veto: 1D hardBreakDown OR ≥3 components ≤ −0.55\\n'+
+      'Confidence ≠ |score| · uses agreement + completeness + distance-to-threshold\\n'+
+      'Backtest/ablation/OOS not run in this live layer — verdict: INCONCLUSIVE until tested.';
+  }catch(e){
+    if($('mg-why'))$('mg-why').textContent='MemeGate load failed: '+(e&&e.message||e);
+    if($('mg-source'))$('mg-source').textContent='ERROR';
+  }
+}
+
+
 function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}if(mp&&on){mp.classList.remove('on');mp.style.display='none';}if(sg&&on){sg.classList.remove('on');sg.style.display='none';}}
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showTrend(false);showStruct(false);showMacro(false);showSignal(true);loadSignal();}else{showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
+document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showTrend(false);showStruct(false);showMacro(false);showMemeGate(false);showSignal(true);loadSignal();}else if(tf==='memegate'){showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else{showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
 // Signal date controls
 ['sig-mode','sig-is-start','sig-is-end','sig-oos-start','sig-oos-end'].forEach(id=>{
   const el=$(id); if(el) el.addEventListener('change',()=>{if((document.querySelector('#tf-tabs .tab.active')&&document.querySelector('#tf-tabs .tab.active').getAttribute('data-tf')==='signal')) loadSignal();});
 });
 window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}if(structW1Chart){const el=$('struct-w1-tv');if(el)structW1Chart.applyOptions({width:el.clientWidth});}if(sigChart){const el=$('sig-tv');if(el)sigChart.applyOptions({width:el.clientWidth});}});
 
-async function tick(){await loadMarket();if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='signal')loadSignal();else loadTF(currentTF);},60000);
+async function tick(){await loadMarket();
+try{
+  const q=new URLSearchParams(location.search).get('tab');
+  if(q==='memegate'){
+    document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));
+    const btn=document.querySelector('#tf-tabs .tab[data-tf="memegate"]');
+    if(btn) btn.classList.add('active');
+    showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);
+    await loadMemeGate(); return;
+  }
+}catch(e){}
+if(currentTF==='trend'){showTrend(true);await loadTrend();}else{showTrend(false);await loadTF(currentTF);}}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='signal')loadSignal();else if(at==='memegate')loadMemeGate();else loadTF(currentTF);},60000);
 })();
