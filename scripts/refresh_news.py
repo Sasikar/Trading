@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Refresh trump-news.json with recent market news from reputable wires."""
+"""Dynamically refresh trump-news.json with latest market/crypto-impact news.
+
+No event hardcoding. Themes stay fixed; headlines change every run via Google News RSS.
+Only major wires; filtered by impact keywords (liquidity, rates, risk, crypto, etc.).
+"""
 import html
 import json
 import os
@@ -14,24 +18,36 @@ import requests
 
 OUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "trump-news.json")
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; TradingPulse/1.0)"}
-MAX_AGE_HOURS = 36
+MAX_AGE_HOURS = 48
 MAX_ITEMS = 30
 
+# Theme queries only — never specific one-day event titles.
+# Google News returns whatever is currently top for each theme.
 QUERIES = [
-    "stock market when:1d",
+    # Broad markets
+    "US stock market when:1d",
+    "Wall Street stocks when:1d",
+    "S&P 500 Nasdaq when:1d",
+    # Policy / liquidity / rates (catches Fed, Treasury ops, buybacks, QT/QE when they matter)
     "Federal Reserve interest rates when:1d",
-    "Trump tariffs markets when:1d",
+    "US Treasury bond yield liquidity when:1d",
+    "US dollar liquidity markets when:1d",
+    "bond market yields when:1d",
+    # Macro
+    "US inflation jobs economy when:1d",
+    "recession risk markets when:1d",
+    # Geopolitics / trade that moves risk assets
+    "tariffs trade war markets when:1d",
+    "oil prices OPEC markets when:1d",
+    # Crypto / digital assets
     "bitcoin crypto market when:1d",
-    "oil prices OPEC when:1d",
-    "US economy inflation jobs when:1d",
-    "US Treasury debt buyback when:1d",
-    "Treasury buyback liquidity when:1d",
-    "Treasury Scott Bessent markets when:1d",
-    "US dollar liquidity treasury when:1d",
+    "bitcoin ETF flows when:1d",
+    "cryptocurrency regulation market when:1d",
+    # Risk sentiment
+    "market selloff rally when:1d",
+    "financial markets breaking when:1d",
 ]
 
-# Exact publisher names; regional rebroadcasters such as "BNN Bloomberg" or
-# "CNBC TV18" are intentionally excluded because their coverage is local.
 ALLOWED_SOURCES = {
     "reuters",
     "associated press",
@@ -54,43 +70,30 @@ ALLOWED_SOURCES = {
     "the washington post",
     "coindesk",
     "the block",
+    "cointelegraph",
 }
 
-# Auto-generated single-ticker filler and publisher landing pages.
 NOISE_PATTERNS = (
     re.compile(r"\bstock (?:falls|rises|climbs|slides|outperforms|underperforms)\b", re.I),
     re.compile(r"here is why\b", re.I),
     re.compile(r"^stock market quotes", re.I),
+    re.compile(r"\bprice of oil as of\b", re.I),
+    re.compile(r"\btop \d+ things to watch\b", re.I),
 )
 
-MARKET_KEYWORDS = (
-    "market",
-    "stock",
-    "s&p",
-    "nasdaq",
-    "dow",
-    "fed",
-    "rate",
-    "inflation",
-    "tariff",
-    "trade",
-    "bond",
-    "yield",
-    "dollar",
-    "oil",
-    "gold",
-    "bitcoin",
-    "crypto",
-    "etf",
-    "earnings",
-    "economy",
-    "jobs",
-    "recession",
-    "treasury",
-    "buyback",
-    "liquidity",
-    "debt",
-    "bessent",
+# Impact filter — story must touch at least one of these (not a single-ticker gossip piece)
+IMPACT_KEYWORDS = (
+    "market", "markets", "stock", "stocks", "s&p", "nasdaq", "dow", "equit",
+    "fed", "federal reserve", "fomc", "rate", "rates", "inflation", "cpi", "ppi",
+    "tariff", "trade war", "sanctions",
+    "bond", "bonds", "yield", "yields", "treasury", "treasuries", "buyback", "buy back",
+    "liquidity", "debt", "deficit", "qt", "qe", "balance sheet",
+    "dollar", "dxy", "currency", "fx",
+    "oil", "brent", "crude", "opec", "gold",
+    "bitcoin", "btc", "crypto", "ethereum", "etf",
+    "economy", "gdp", "jobs", "payroll", "unemployment", "recession",
+    "risk-off", "risk-on", "selloff", "sell-off", "rally", "crash",
+    "bank", "credit", "default",
 )
 
 
@@ -108,7 +111,7 @@ def main():
     for query in QUERIES:
         try:
             root = fetch_feed(query)
-        except Exception as exc:  # noqa: BLE001 - one bad feed must not kill the run
+        except Exception as exc:  # noqa: BLE001
             print(f"Query failed ({query}): {exc}")
             continue
         for node in root.findall("./channel/item"):
@@ -118,7 +121,7 @@ def main():
             if source.lower() not in ALLOWED_SOURCES:
                 continue
             low = title.lower()
-            if not any(keyword in low for keyword in MARKET_KEYWORDS):
+            if not any(keyword in low for keyword in IMPACT_KEYWORDS):
                 continue
             if any(pattern.search(title) for pattern in NOISE_PATTERNS):
                 continue
@@ -155,12 +158,14 @@ def main():
 
     payload = {
         "updated": now.isoformat(timespec="seconds"),
-        "source": "Google News RSS · major wires only",
+        "source": "Google News RSS · dynamic themes · major wires",
         "items": items,
     }
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
     print(f"Saved {len(items)} items. Newest: {items[0]['time']} ({items[0]['source']})")
+    for it in items[:5]:
+        print(" -", it["title"][:90])
 
 
 if __name__ == "__main__":
