@@ -216,6 +216,23 @@
 .sig-list{max-height:320px}
 
 .sig-hist-note{font-size:9px;color:#66717d;padding:0 12px 8px;font-weight:650}
+
+.mg-hero{padding:18px 16px;border-bottom:1px solid #1c2633}
+.mg-hero .kicker{font-size:11px;font-weight:800;letter-spacing:.12em;color:#8aa0b8}
+.mg-hero .gate{font-size:26px;font-weight:900;margin-top:8px}
+.mg-hero .gate.on{color:#62e3a0}.mg-hero .gate.wait{color:#e6c878}.mg-hero .gate.off{color:#ff6f7c}
+.mg-metrics{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px;font-weight:800}
+.mg-metrics span{color:#9aa6b5}.mg-metrics b{color:#f4f7fb}
+.mg-warn{margin-top:10px;font-size:12px;color:#e6c878;font-weight:700;line-height:1.4}
+.mg-table{width:100%;border-collapse:collapse;font-size:13px}
+.mg-table th{text-align:left;color:#8491a1;font-size:10px;letter-spacing:.08em;padding:8px 12px;border-bottom:1px solid #1c2633}
+.mg-table td{padding:10px 12px;border-bottom:1px solid #16202a;font-weight:700}
+.mg-table td.sc{font-variant-numeric:tabular-nums}
+.mg-block{padding:14px 16px;border-top:1px solid #1c2633}
+.mg-block h3{margin:0 0 6px;font-size:12px;letter-spacing:.08em;color:#8aa0b8}
+.mg-block p{margin:0;color:#d5dde8;font-size:13px;line-height:1.5;font-weight:650}
+.mg-form{padding:12px 16px;font-size:11px;color:#6b7a8c;line-height:1.55;border-top:1px solid #1c2633;white-space:pre-wrap}
+
 </style></head><body>
 <div class="shell"><main>
 <section class="section">
@@ -234,6 +251,7 @@
   <button type="button" class="tab" data-tf="struct">Struct</button>
   <button type="button" class="tab" data-tf="macro">Macro</button>
   <button type="button" class="tab" data-tf="signal">Signal</button>
+  <button type="button" class="tab" data-tf="memegate">MemeGate</button>
   <button type="button" class="tab" data-tf="1w">1W</button>
   <button type="button" class="tab" data-tf="1M">1M</button>
 </div>
@@ -375,7 +393,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260909-trscore"></script>
+<script src="overview-app.js?v=20260909-mg"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -413,6 +431,34 @@
   <div class="sig-bt" id="sig-bt"></div>
   <div class="sig-list" id="sig-list"></div>
   <div class="st-weights">Rules: Long only EMA50&gt;EMA200 · Short only EMA50&lt;EMA200 · need ≥3/4 of RSI cross, MACD, Volume, Breakout · SL 1.5×ATR · TP 3×ATR · size ≈ 1.5% equity at stop · next-bar open (no lookahead). Dashboard is signal/monitor only — not live order routing.</div>
+</section>
+</div>
+
+
+<div id="memegate-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>BTC MemeGate</h2><p>Permission layer only — not a meme buy signal</p></div><span class="source" id="mg-source">LIVE</span></div>
+  <div class="card">
+    <div class="mg-hero">
+      <div class="kicker">BTC MEME GATE</div>
+      <div class="gate wait" id="mg-gate">🟡 WAIT</div>
+      <div class="mg-metrics">
+        <span>Score <b id="mg-score">—</b></span>
+        <span>Confidence <b id="mg-conf">—</b></span>
+        <span>BTC.D <b id="mg-dom">—</b></span>
+      </div>
+      <div class="mg-warn">MEME ON ≠ BUY · BTC permission first. Individual meme confirmation second.</div>
+    </div>
+    <table class="mg-table">
+      <thead><tr><th>Signal</th><th>Score</th><th>Status</th></tr></thead>
+      <tbody id="mg-rows"></tbody>
+    </table>
+    <div class="mg-block"><h3>WHY</h3><p id="mg-why">—</p></div>
+    <div class="mg-block"><h3>WHAT IS MISSING</h3><p id="mg-miss">—</p></div>
+    <div class="mg-block"><h3>INVALIDATION</h3><p id="mg-inv">—</p></div>
+    <div class="mg-block"><h3>ACTION</h3><p id="mg-act">—</p></div>
+    <div class="mg-form" id="mg-formulas"></div>
+  </div>
 </section>
 </div>
 
