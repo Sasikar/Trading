@@ -2839,11 +2839,14 @@ Thresholds documented in mgStateExplain().
 const MG_STATES = ['OFF','STRETCHED','STRONG CONFIRMED','EARLY','RESET/WAIT','WATCH'];
 
 function mgBreakoutInfo(klD){
+  /* Breakout AGE = days since FIRST close above a pre-break range high that is still held.
+     NOT days since the latest new high (that bug kept daysSince=0 all expansion).
+     Age: breakout close=0, next day=1, second day=2. Fresh window = age <= 2. */
   const n = klD.length;
-  if(n < 25) return {fresh:false,held:false,level:null,brokeToday:false,daysSince:99,pctAbove:0};
+  if(n < 25) return {fresh:false,held:false,level:null,brokeToday:false,daysSince:99,pctAbove:0,firstBreakIdx:null};
   const closes = klD.map(k=>+k[4]);
   const highs = klD.map(k=>+k[2]);
-  // prior 20-bar high excluding last 2 closes (no look-ahead on current formation beyond close)
+  // Rolling prior high (for brokeToday / held vs recent structure)
   let rh = -Infinity;
   for(let i=n-22;i<=n-3;i++){ if(i>=0) rh = Math.max(rh, highs[i]); }
   if(!isFinite(rh)) rh = highs[n-3];
@@ -2851,14 +2854,25 @@ function mgBreakoutInfo(klD){
   const brokeToday = c0 > rh && c1 <= rh;
   const brokeYday = c1 > rh && c2 <= rh;
   const held = c0 >= rh * 0.997;
-  let daysSince = 99;
-  for(let i=n-1;i>=Math.max(0,n-8);i--){
-    const prevH = (()=>{ let h=-Infinity; for(let j=i-21;j<=i-2;j++) if(j>=0) h=Math.max(h,highs[j]); return h; })();
-    if(closes[i] > prevH){ daysSince = n-1-i; break; }
+
+  // Expansion start: earliest day in last 20 bars that closed above ITS prior-20 high,
+  // where that break level is still held today (c0 >= level). First such day = age 0 origin.
+  let firstBreakIdx = null;
+  let breakLevel = null;
+  const lookStart = Math.max(22, n - 20);
+  for(let i=lookStart;i<n;i++){
+    let prevH = -Infinity;
+    for(let j=i-21;j<=i-2;j++) if(j>=0) prevH = Math.max(prevH, highs[j]);
+    if(!isFinite(prevH)) continue;
+    if(closes[i] > prevH && c0 >= prevH * 0.997){
+      if(firstBreakIdx==null){ firstBreakIdx = i; breakLevel = prevH; }
+    }
   }
-  const fresh = held && daysSince <= 3;
-  const pctAbove = rh ? ((c0/rh)-1)*100 : 0;
-  return {fresh, held, level:rh, brokeToday, brokeYday, daysSince, pctAbove};
+  const daysSince = firstBreakIdx!=null ? (n - 1 - firstBreakIdx) : 99;
+  // Fresh = still holding and within protected window (break + 2 following closes)
+  const fresh = held && firstBreakIdx!=null && daysSince <= 2;
+  const pctAbove = (breakLevel!=null && breakLevel>0) ? ((c0/breakLevel)-1)*100 : (rh ? ((c0/rh)-1)*100 : 0);
+  return {fresh, held, level:breakLevel!=null?breakLevel:rh, brokeToday, brokeYday, daysSince, pctAbove, firstBreakIdx};
 }
 
 function mgExtensionInfo(klD){
@@ -2979,7 +2993,7 @@ function mgStateMachine(kl4, klD, klW, domMod, prevState){
 
   // Fresh breakout window = first 2 daily closes after/at range-high break.
   // Spec: do NOT mark the first legitimate expansion candle(s) as STRETCHED.
-  const inFreshWindow = brk.fresh && brk.daysSince <= 2;
+  const inFreshWindow = brk.fresh && brk.daysSince <= 2; // age 0..2 only (break + 2 following closes)
 
   // --- STRONG CONFIRMED (checked before STRETCHED when still in fresh window) ---
   const strongOk = conf.majorOk && conf.groups.breakout && conf.passCount >= 5
@@ -3002,7 +3016,7 @@ function mgStateMachine(kl4, klD, klW, domMod, prevState){
   const earlyMomOk = conf.m4 >= 0.15 || conf.m1 >= 0.15;
   const earlyVolOk = conf.volS >= -0.40;
   const earlyMemeOk = (domMod==null) || domMod >= -0.55;
-  const meaningfulBreak = brk.fresh && brk.held && brk.daysSince <= 3;
+  const meaningfulBreak = brk.fresh && brk.held && brk.daysSince <= 2; // same cap as fresh window
   if(earlyStructOk && earlyTrendOk && earlyMomOk && earlyVolOk && earlyMemeOk && meaningfulBreak && (conf.groups.extension_ok || inFreshWindow)){
     if(!(ext.stretched && !inFreshWindow)){
       return {
