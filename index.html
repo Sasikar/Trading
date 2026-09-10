@@ -238,6 +238,19 @@
 .mg-hist th{position:sticky;top:0;background:#0e151d;text-align:left;color:#8491a1;font-size:10px;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid #1c2633}
 .mg-hist td{padding:8px 10px;border-bottom:1px solid #16202a;font-weight:700;white-space:nowrap}
 .mg-hist .on{color:#62e3a0}.mg-hist .off{color:#ff6f7c}.mg-hist .wait{color:#e6c878}
+.coin-ca{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.coin-ca select,.coin-ca input,.coin-ca button{border:1px solid #2a3544;background:#0b121a;color:#e8eef6;border-radius:10px;padding:10px 12px;font:700 13px Inter,system-ui,sans-serif}
+.coin-ca input{flex:1;min-width:180px}
+.coin-ca button{background:rgba(98,227,160,.2);border-color:rgba(98,227,160,.4);cursor:pointer;color:#c8f5dc}
+.coin-meta{font-size:12px;color:#8491a1;margin:6px 0 12px;line-height:1.5}
+.coin-tf{display:flex;gap:6px;margin:0 0 12px}
+.coin-tf button{border:1px solid #2a3544;background:#0b121a;color:#9aa6b5;border-radius:10px;padding:8px 14px;font:800 12px Inter,system-ui,sans-serif;cursor:pointer}
+.coin-tf button.on{background:rgba(98,227,160,.28);color:#f4f7fb;border-color:rgba(98,227,160,.45)}
+.coin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:10px 0}
+.coin-stats .st{background:#0b121a;border:1px solid #1c2633;border-radius:12px;padding:10px}
+.coin-stats .lab{font-size:10px;color:#8491a1;font-weight:800;letter-spacing:.06em}
+.coin-stats .val{font-size:16px;font-weight:900;margin-top:4px}
+
 
 
 </style></head><body>
@@ -253,6 +266,7 @@
 </section>
 <div class="tabs" id="tf-tabs">
   <button type="button" class="tab active" data-tf="memegate">MemeGate</button>
+  <button type="button" class="tab" data-tf="coin">CA</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
@@ -401,7 +415,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260910-mghist"></script>
+<script src="overview-app.js?v=20260910-coin"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -468,6 +482,40 @@
     <div class="mg-block"><h3>LAST 30 DAYS · DAILY CLOSE</h3><p style="color:#8491a1;font-size:12px;margin:0 0 8px">Same gate rules · BTC.D hist dampener = 0 · +1d/+3d BTC return after signal</p></div>
     <div class="mg-hist-wrap"><table class="mg-hist"><thead><tr><th>Date</th><th>BTC</th><th>Final</th><th>Gate</th><th>Why</th><th>+1d</th><th>+3d</th></tr></thead><tbody id="mg-hist-body"><tr><td colspan="7" style="color:#8491a1">Loading history…</td></tr></tbody></table></div>
     <div class="mg-form" id="mg-formulas"></div>
+  </div>
+</section>
+</div>
+
+<div id="coin-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Meme CA · Indicators</h2><p>ETH / SOL · GeckoTerminal OHLCV · same stack as BTC TFs</p></div><span class="source" id="coin-source">—</span></div>
+  <div class="card">
+    <div class="coin-ca">
+      <select id="coin-chain"><option value="eth">ETH</option><option value="solana">SOL</option></select>
+      <input id="coin-ca" type="text" placeholder="Contract address (CA)" spellcheck="false" autocomplete="off"/>
+      <button type="button" id="coin-load">Load</button>
+    </div>
+    <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
+    <div class="coin-tf" id="coin-tf">
+      <button type="button" data-ctf="4h" class="on">4H</button>
+      <button type="button" data-ctf="1d">1D</button>
+      <button type="button" data-ctf="1w">1W</button>
+    </div>
+    <div class="price-now"><div><div class="big" id="coin-spot">—</div><div class="meta" id="coin-spot-meta">—</div></div><div class="meta" id="coin-bias" style="font-weight:800;text-align:right">—</div></div>
+    <div class="coin-stats">
+      <div class="st"><div class="lab">RSI 14</div><div class="val" id="coin-rsi">—</div></div>
+      <div class="st"><div class="lab">MACD</div><div class="val" id="coin-macd">—</div></div>
+      <div class="st"><div class="lab">VOLUME</div><div class="val" id="coin-vol">—</div></div>
+      <div class="st"><div class="lab">CVD</div><div class="val" id="coin-cvd">—</div></div>
+    </div>
+    <div class="head" style="padding:12px 0 6px"><div><h2 style="font-size:15px">Fibonacci · <span id="coin-tf-name">4H</span></h2></div></div>
+    <div id="coin-fib-tv"></div>
+    <div class="ladder" id="coin-fib-ladder"></div>
+    <div class="head" style="padding:16px 0 6px"><div><h2 style="font-size:15px">MACD chart</h2></div></div>
+    <div id="coin-macd-tv"></div>
+    <div class="head" style="padding:16px 0 6px"><div><h2 style="font-size:15px">S / R pivots</h2></div></div>
+    <div class="ladder" id="coin-sr-ladder"></div>
+    <div class="note" id="coin-note">OHLCV via GeckoTerminal · CVD approximate from candle body · not CEX flow</div>
   </div>
 </section>
 </div>
