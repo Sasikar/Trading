@@ -2713,8 +2713,9 @@ function coinRenderSR(kl){
 
 
 function coinEntryGate(kl, tfLabel){
-  /* Same for ETH + SOL. Always returns a state — never silent. */
-  const empty = {state:'WATCH', entry:false, sizePct:0, reason:'Need more candles', detail:{tf:tfLabel||coinTF}};
+  /* Same for ETH + SOL. STRETCHED only when RSI is hot or thrust is extreme — not mid-RSI + mild pump. */
+  const tf = (tfLabel || coinTF || '4h').toLowerCase();
+  const empty = {state:'WATCH', entry:false, sizePct:0, reason:'Need more candles', detail:{tf:tf}};
   try{
     if(!kl || kl.length < 15) return empty;
     const closes = kl.map(k=>+k[4]).filter(x=>isFinite(x)&&x>0);
@@ -2726,7 +2727,6 @@ function coinEntryGate(kl, tfLabel){
       pack = calcMACDSeries(closes, kl.slice(-closes.length).map(k=>Math.floor(+k[0]/1000)));
       mScore = (typeof mgMomScore==='function') ? mgMomScore(pack) : 0;
       hist = pack && pack.lastHist;
-      // Use relative hist for micro-priced tokens (hist can be ~0 in absolute terms)
       const macd = pack && pack.lastMacd, sig = pack && pack.lastSig;
       if(macd!=null && sig!=null){
         const eps = Math.max(Math.abs(macd)*1e-9, Math.abs(spot)*1e-12, 1e-18);
@@ -2757,15 +2757,31 @@ function coinEntryGate(kl, tfLabel){
     let lo10 = Infinity;
     for(let i=Math.max(0,kl.length-11);i<kl.length-1;i++) lo10 = Math.min(lo10, +kl[i][3]);
     const gain10 = lo10>0 && isFinite(lo10) ? ((spot/lo10)-1)*100 : 0;
-    const stretched = (rsi!=null && rsi>=72 && consUp>=3) || (gain10>=25 && consUp>=3) || (rsi!=null && rsi>=78);
+
+    /* STRETCHED thresholds — TF-aware, RSI must be hot OR thrust extreme */
+    const gainThr = tf==='1w' ? 55 : (tf==='1d' ? 45 : 35);  // 4h more sensitive
+    const consThr = tf==='1w' ? 4 : 3;
+    let stretched = false;
+    let stretchWhy = '';
+    if(rsi!=null && rsi >= 78){
+      stretched = true; stretchWhy = 'RSI '+rsi.toFixed(1)+' ≥ 78 (overbought)';
+    } else if(rsi!=null && rsi >= 72 && consUp >= consThr){
+      stretched = true; stretchWhy = 'RSI '+rsi.toFixed(1)+' ≥ 72 + '+consUp+' up closes';
+    } else if(gain10 >= gainThr && consUp >= consThr && (rsi==null || rsi >= 65)){
+      // thrust only counts as stretch if RSI is also elevated (≥65) — blocks mid-RSI false stretch
+      stretched = true; stretchWhy = '+'+gain10.toFixed(0)+'% from 10-bar low + '+consUp+' up + RSI '+(rsi!=null?rsi.toFixed(1):'?');
+    } else if(gain10 >= gainThr + 15 && consUp >= consThr + 1){
+      // extreme thrust alone (e.g. +60% 1D with 4 up days)
+      stretched = true; stretchWhy = 'Extreme thrust +'+gain10.toFixed(0)+'% / '+consUp+' up closes';
+    }
+
     const detail = {
       rsi, macdBull, macdBear, mScore, vRatio, cvdSlope,
-      trendUp:!!trendUp, trendDn:!!trendDn, consUp, gain10, stretched:!!stretched, tf:tfLabel||coinTF
+      trendUp:!!trendUp, trendDn:!!trendDn, consUp, gain10, stretched:!!stretched, stretchWhy, tf
     };
 
-    // Priority matches BTC-style gate
     if(stretched){
-      return {state:'STRETCHED', entry:false, sizePct:0, reason:'Extended · do not chase (RSI/thrust)', detail};
+      return {state:'STRETCHED', entry:false, sizePct:0, reason:'Do not chase · '+stretchWhy, detail};
     }
     if(trendDn && macdBear){
       return {state:'OFF', entry:false, sizePct:0, reason:'Bearish trend + MACD · no new size', detail};
@@ -2782,13 +2798,12 @@ function coinEntryGate(kl, tfLabel){
     if(rsi!=null && rsi <= 32 && !macdBear){
       return {state:'WATCH', entry:false, sizePct:0, reason:'Oversold · wait for MACD/volume confirm', detail};
     }
-    // Explicit mid-range dead tape (ANDY-style)
     if(macdBear && vRatio < 0.4){
       return {state:'WATCH', entry:false, sizePct:0, reason:'Weak tape · MACD bear + volume dry', detail};
     }
     return {state:'WATCH', entry:false, sizePct:0, reason:'No clear alignment yet', detail};
   }catch(e){
-    return {state:'WATCH', entry:false, sizePct:0, reason:'Gate error: '+(e&&e.message||e), detail:{tf:tfLabel||coinTF}};
+    return {state:'WATCH', entry:false, sizePct:0, reason:'Gate error: '+(e&&e.message||e), detail:{tf:tf}};
   }
 }
 
