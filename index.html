@@ -418,7 +418,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260910-ca-tf1"></script>
+<script src="overview-app.js?v=20260910-ca-gate1"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -502,10 +502,11 @@
     </div>
     <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
     <div class="coin-tf" id="coin-tf">
-      <button type="button" data-ctf="4h" class="on">4H</button>
-      <button type="button" data-ctf="1d">1D</button>
-      <button type="button" data-ctf="1w">1W</button>
+      <button type="button" data-ctf="4h" class="on" onclick="try{window.setCoinTF&&window.setCoinTF('4h')}catch(e){}">4H</button>
+      <button type="button" data-ctf="1d" onclick="try{window.setCoinTF&&window.setCoinTF('1d')}catch(e){}">1D</button>
+      <button type="button" data-ctf="1w" onclick="try{window.setCoinTF&&window.setCoinTF('1w')}catch(e){}">1W</button>
     </div>
+    <div id="coin-entry-box" style="margin:0 0 14px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c)"><div style="color:#8491a1;font-size:12px">Load CA → entry gate appears here</div></div>
     <div class="price-now"><div><div class="big" id="coin-spot">—</div><div class="meta" id="coin-spot-meta">—</div></div><div class="meta" id="coin-bias" style="font-weight:800;text-align:right">—</div></div>
     <div class="coin-stats">
       <div class="st"><div class="lab">RSI 14</div><div class="val" id="coin-rsi">—</div></div>
