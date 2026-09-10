@@ -2875,38 +2875,93 @@ function mgEvaluateSlice(kl4,klD,klW,domMod){
   else if(finalS<=MG_OFF){gate='OFF'; reason='SCORE';}
   else if(finalS>=MG_ON){gate='ON'; reason='SCORE';}
   const btc=+klD[klD.length-1][4];
-  return {finalS,gate,reason,btc,base};
+  let stretch={intensity:'NONE',side:'MID',score:0,label:'—'};
+  try{ stretch=calcStretchScore(klD)||stretch; }catch(e){}
+  const highStretch=stretch.intensity==='HIGH'||stretch.intensity==='ELEVATED';
+  const upsideStretch=(stretch.side||stretch.direction)==='UPSIDE'&&highStretch;
+  let entryQ='N/A';
+  if(gate==='ON'){
+    if(stretch.intensity==='HIGH'&&(stretch.side||'')==='UPSIDE') entryQ='POOR';
+    else if(upsideStretch) entryQ='STRETCHED';
+    else entryQ='GOOD';
+  } else if(gate==='WAIT') entryQ='WAIT';
+  else entryQ='OFF';
+  return {finalS,gate,reason,btc,base,stretch,entryQ};
+}
+function mgApplyActionLayer(ev, prevGate){
+  if(!ev) return ev;
+  const gate=ev.gate;
+  const firstDay=gate==='ON'&&prevGate!=null&&prevGate!=='ON';
+  let entryQ=ev.entryQ;
+  let action='No new meme exposure.';
+  let actionCode='NONE';
+  let displayGate=gate;
+  if(gate==='OFF'){
+    action='No new meme exposure.';
+    actionCode='NO_NEW';
+  } else if(gate==='WAIT'){
+    action='No new meme entries yet.';
+    actionCode='WAIT';
+  } else if(gate==='ON'){
+    if(firstDay){
+      displayGate='WATCH';
+      actionCode='WATCH';
+      action='First ON day · WATCH only — no new size today. Re-check tomorrow or after a pullback.';
+      if(entryQ==='GOOD') entryQ='WATCH';
+    } else if(entryQ==='POOR'||entryQ==='STRETCHED'){
+      actionCode='NO_CHASE';
+      action='Meme risk allowed · NO CHASE — stretch elevated. Adds only on pullback, not into extension.';
+    } else {
+      actionCode='SIZE_OK';
+      action='Meme risk allowed · size only on pullback / individual meme confirmation — not a market buy.';
+    }
+  }
+  return Object.assign({},ev,{firstDay:!!firstDay,entryQ,action,actionCode,displayGate,prevGate:prevGate||null});
 }
 function mgBuildHistory(klD,kl4,klW){
   const rows=[];
   if(!klD||klD.length<50) return rows;
   const n=klD.length;
   const start=Math.max(40, n-30);
+  let prevGate=null;
   for(let i=start;i<n;i++){
     const dSlice=klD.slice(0,i+1);
     const dayEnd=+dSlice[dSlice.length-1][0]+86400000-1;
     const hSlice=kl4.filter(k=>+k[0]<=dayEnd);
     const wSlice=(klW||[]).filter(k=>+k[0]<=dayEnd);
-    const ev=mgEvaluateSlice(hSlice.slice(-120), dSlice, wSlice.slice(-60), 0);
-    if(!ev) continue;
+    const raw=mgEvaluateSlice(hSlice.slice(-120), dSlice, wSlice.slice(-60), 0);
+    if(!raw) continue;
+    const ev=mgApplyActionLayer(raw, prevGate);
     const px0=ev.btc;
-    let r1=null,r3=null;
+    let r1=null,r3=null,r7=null;
     if(i+1<n){r1=((+klD[i+1][4]/px0)-1)*100;}
     if(i+3<n){r3=((+klD[i+3][4]/px0)-1)*100;}
+    if(i+7<n){r7=((+klD[i+7][4]/px0)-1)*100;}
     const dt=new Date(+dSlice[dSlice.length-1][0]);
     const ds=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
-    rows.push({date:ds,btc:px0,final:ev.finalS,gate:ev.gate,reason:ev.reason,r1,r3});
+    rows.push({
+      date:ds,btc:px0,final:ev.finalS,
+      gate:ev.displayGate||ev.gate,
+      rawGate:ev.gate,
+      reason:ev.firstDay?'WATCH · first ON':(ev.actionCode==='NO_CHASE'?'NO CHASE · stretch':ev.reason),
+      entryQ:ev.entryQ,r1,r3,r7
+    });
+    prevGate=ev.gate;
   }
-  return rows.reverse(); // newest first
+  return rows.reverse();
 }
 function mgRenderHistory(rows){
   const body=$('mg-hist-body'); if(!body) return;
-  if(!rows||!rows.length){body.innerHTML='<tr><td colspan="7" style="color:#8491a1">No history</td></tr>';return;}
+  if(!rows||!rows.length){body.innerHTML='<tr><td colspan="9" style="color:#8491a1">No history</td></tr>';return;}
   body.innerHTML=rows.map(r=>{
-    const gcls=r.gate==='ON'?'on':(r.gate==='OFF'?'off':'wait');
+    const g=r.gate||'WAIT';
+    const gcls=(g==='ON')?'on':(g==='OFF'?'off':'wait');
     const f1=r.r1==null?'—':((r.r1>=0?'+':'')+r.r1.toFixed(1)+'%');
     const f3=r.r3==null?'—':((r.r3>=0?'+':'')+r.r3.toFixed(1)+'%');
-    return '<tr><td>'+r.date+'</td><td>$'+Math.round(r.btc).toLocaleString('en-US')+'</td><td style="color:'+(r.final>=0?'#62e3a0':'#ff6f7c')+'">'+(r.final>=0?'+':'')+r.final.toFixed(2)+'</td><td class="'+gcls+'">'+r.gate+'</td><td style="color:#8491a1;font-size:11px">'+r.reason+'</td><td>'+f1+'</td><td>'+f3+'</td></tr>';
+    const f7=r.r7==null?'—':((r.r7>=0?'+':'')+r.r7.toFixed(1)+'%');
+    const eq=r.entryQ||'—';
+    const eqc=eq==='GOOD'?'#62e3a0':(eq==='POOR'||eq==='STRETCHED'?'#ff6f7c':(eq==='WATCH'?'#e6c878':'#8491a1'));
+    return '<tr><td>'+r.date+'</td><td>$'+Math.round(r.btc).toLocaleString('en-US')+'</td><td style="color:'+(r.final>=0?'#62e3a0':'#ff6f7c')+'">'+(r.final>=0?'+':'')+r.final.toFixed(2)+'</td><td class="'+gcls+'">'+g+'</td><td style="color:'+eqc+'">'+eq+'</td><td style="color:#8491a1;font-size:11px">'+r.reason+'</td><td>'+f1+'</td><td>'+f3+'</td><td>'+f7+'</td></tr>';
   }).join('');
 }
 
@@ -2965,6 +3020,33 @@ async function loadMemeGate(){
     let gate='WAIT', klass='wait', label='🟡 BTC MEME GATE: WAIT';
     if(veto||finalS<=MG_OFF){gate='OFF';klass='off';label='🔴 BTC MEME GATE: MEME OFF';}
     else if(finalS>=MG_ON){gate='ON';klass='on';label='🟢 BTC MEME GATE: MEME ON';}
+    /* Permission vs entry quality · stretch no-chase · first-day WATCH */
+    let stretchLive={intensity:'NONE',side:'MID',score:0,label:'—'};
+    try{stretchLive=calcStretchScore(klD)||stretchLive;}catch(e){}
+    const highUp=(stretchLive.intensity==='HIGH'||stretchLive.intensity==='ELEVATED')&&(stretchLive.side||'')==='UPSIDE';
+    let entryQ='N/A';
+    if(gate==='ON'){
+      if(stretchLive.intensity==='HIGH'&&(stretchLive.side||'')==='UPSIDE') entryQ='POOR';
+      else if(highUp) entryQ='STRETCHED';
+      else entryQ='GOOD';
+    } else if(gate==='WAIT') entryQ='WAIT';
+    else entryQ='OFF';
+    let prevGateLive=null;
+    try{
+      const histTmp=mgBuildHistory(klD,kl4,klW);
+      /* hist is newest-first; day before today is index 1 if today matches last bar */
+      if(histTmp&&histTmp.length>1) prevGateLive=histTmp[1].rawGate||histTmp[1].gate;
+      else if(histTmp&&histTmp.length===1) prevGateLive=null;
+    }catch(e){}
+    const layered=mgApplyActionLayer({finalS,gate,reason:gate==='ON'?'SCORE':(gate==='OFF'?'SCORE':'MIXED'),btc:+klD[klD.length-1][4],entryQ,stretch:stretchLive}, prevGateLive);
+    entryQ=layered.entryQ;
+    const actionCode=layered.actionCode;
+    const actionText=layered.action;
+    if(layered.displayGate==='WATCH'){
+      gate='WATCH'; klass='wait'; label='🟡 BTC MEME GATE: WATCH (first ON day)';
+    } else if(gate==='ON'&&(entryQ==='STRETCHED'||entryQ==='POOR')){
+      label='🟢 BTC MEME GATE: ON · NO CHASE';
+    }
     const mean=comps.reduce((s,x)=>s+x,0)/comps.length;
     const std=Math.sqrt(comps.reduce((s,x)=>s+(x-mean)*(x-mean),0)/comps.length);
     const agree=mgClamp(1-std/1.2,0,1);
@@ -2991,6 +3073,11 @@ async function loadMemeGate(){
     if($('mg-score'))$('mg-score').textContent=(finalS>=0?'+':'')+finalS.toFixed(2);
     if($('mg-conf'))$('mg-conf').textContent=conf+'%';
     if($('mg-dom'))$('mg-dom').textContent=dom.d!=null?(dom.d.toFixed(1)+'%'):'n/a';
+    if($('mg-entry')){
+      $('mg-entry').textContent=entryQ;
+      $('mg-entry').style.color=entryQ==='GOOD'?'#62e3a0':(entryQ==='POOR'||entryQ==='STRETCHED'?'#ff6f7c':(entryQ==='WATCH'?'#e6c878':'#8491a1'));
+    }
+    if($('mg-stretch'))$('mg-stretch').textContent=(stretchLive.intensity||'NONE')+' · '+(stretchLive.side||'MID');
     if($('mg-source'))$('mg-source').textContent='LIVE · engine reuse';
     const missing=[];
     if(m4<0.2) missing.push('4H momentum confirmation');
@@ -3000,14 +3087,16 @@ async function loadMemeGate(){
     if(struct<0.2) missing.push('clean HTF structure');
     if(dm.mod<0) missing.push('friendlier BTC.D / alt-risk backdrop');
     let why='';
-    if(gate==='ON') why='BTC HTF structure is not in confirmed breakdown, trend/momentum mix is constructive enough after BTC.D dampening, and no risk veto fired. Conditions permit considering meme risk — not buying a specific coin.';
+    if(gate==='WATCH') why='Permission score cleared ON, but this is the first day after non-ON. First-day rule: WATCH only — do not add size until day-2 confirmation or a pullback from the ON-day high.';
+    else if(gate==='ON'&&(entryQ==='STRETCHED'||entryQ==='POOR')) why='Permission is ON, but daily stretch is elevated on the upside ('+(stretchLive.label||'extended')+'). Treat as no-chase: meme risk allowed, new size only after pullback — not into extension (Sep-3-style local high protection).';
+    else if(gate==='ON') why='BTC HTF structure is not in confirmed breakdown, trend/momentum mix is constructive enough after BTC.D dampening, and no risk veto fired. Permission ON · entry quality GOOD — still not a buy of a specific coin.';
     else if(gate==='OFF') why=vetoStruct?'Confirmed 1D structural breakdown vetoed meme risk.':(strongNeg?'Multiple major components are simultaneously weak.':'Final score is at or below the OFF threshold after BTC.D context.');
     else why='Score is in the mixed band. Some BTC pieces may be fine, but confirmation is not strong enough to permit new meme exposure.';
     if($('mg-why'))$('mg-why').textContent=why;
-    if($('mg-miss'))$('mg-miss').textContent=gate==='ON'?'None required for permission — individual meme setup still required.':(missing.slice(0,4).join(' · ')||'Closer agreement among structure, momentum, and CVD.');
-    if($('mg-inv'))$('mg-inv').textContent='Invalidation: 1D hard breakdown, or final score ≤ −0.35, or ≥3 major components ≤ −0.55.';
-    if($('mg-act'))$('mg-act').textContent=gate==='ON'?'Meme risk permitted — individual meme confirmation still required.':(gate==='OFF'?'No new meme exposure.':'No new meme entries yet.');
-    try{mgRenderHistory(mgBuildHistory(klD,kl4,klW));}catch(e){if($('mg-hist-body'))$('mg-hist-body').innerHTML='<tr><td colspan="7">History error</td></tr>';}
+    if($('mg-miss'))$('mg-miss').textContent=(gate==='ON'||gate==='WATCH')?('Permission side clear. Entry: '+entryQ+' · stretch '+((stretchLive.intensity||'NONE'))+'. Individual meme setup still required.'):(missing.slice(0,4).join(' · ')||'Closer agreement among structure, momentum, and CVD.');
+    if($('mg-inv'))$('mg-inv').textContent='Invalidation: 1D hard breakdown, or final score ≤ −0.35, or ≥3 major components ≤ −0.55. OFF = stop adding — not an automatic exit of existing size.';
+    if($('mg-act'))$('mg-act').textContent=actionText||(gate==='OFF'?'No new meme exposure.':'No new meme entries yet.');
+    try{mgRenderHistory(mgBuildHistory(klD,kl4,klW));}catch(e){if($('mg-hist-body'))$('mg-hist-body').innerHTML='<tr><td colspan="9">History error</td></tr>';}
     if($('mg-formulas'))$('mg-formulas').textContent=
       'FORMULAS (initial params)\\n'+
       'BaseScore = 0.20·Struct + 0.20·Trend + 0.15·Mom4H + 0.10·Mom1D + 0.10·RSI + 0.10·Vol + 0.10·CVD\\n'+
