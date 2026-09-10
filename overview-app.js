@@ -2510,37 +2510,43 @@ function showCoin(on){
   if(cp){cp.style.display=on?'block':'none';}
 }
 async function gtGet(path){
+  const PROXY='https://trading-proxy.sasipudi.workers.dev/gt?path=';
   const primary='https://api.geckoterminal.com/api/v2'+path;
-  // Browser pages: GeckoTerminal often blocks CORS — allorigins works
   const attempts=[
+    {url:PROXY+encodeURIComponent(path), wrap:'proxy'},
     {url:'https://api.allorigins.win/get?url='+encodeURIComponent(primary), wrap:'allorigins'},
-    {url:primary, wrap:'direct'},
-    {url:'https://api.allorigins.win/raw?url='+encodeURIComponent(primary), wrap:'raw'}
+    {url:primary, wrap:'direct'}
   ];
   let lastErr=null;
   for(const a of attempts){
     try{
-      const r=await fetch(a.url, {cache:'no-store'});
+      const r=await fetch(a.url,{cache:'no-store'});
       if(!r.ok){lastErr=new Error('HTTP '+r.status+' via '+a.wrap); continue;}
       const txt=await r.text();
       let j;
       if(a.wrap==='allorigins'){
         const outer=JSON.parse(txt);
-        if(outer.contents) j=JSON.parse(outer.contents);
-        else throw new Error('empty allorigins');
+        if(!outer.contents) throw new Error('empty proxy');
+        j=JSON.parse(outer.contents);
       } else {
         j=JSON.parse(txt);
       }
-      if(j) return j;
+      if(j && j.status && j.status.error_code) throw new Error(j.status.error_message||('GT '+j.status.error_code));
+      return j;
     }catch(e){lastErr=e;}
   }
   throw lastErr||new Error('GeckoTerminal unreachable');
 }
 async function dexToken(ca){
-  const url='https://api.dexscreener.com/latest/dex/tokens/'+encodeURIComponent(ca);
-  const r=await fetch(url);
-  if(!r.ok) throw new Error('DexScreener '+r.status);
-  return r.json();
+  const path='/latest/dex/tokens/'+encodeURIComponent(ca);
+  // DexScreener allows browser CORS
+  try{
+    const r=await fetch('https://api.dexscreener.com'+path,{cache:'no-store'});
+    if(r.ok) return r.json();
+  }catch(e){}
+  const pr=await fetch('https://trading-proxy.sasipudi.workers.dev/dex?path='+encodeURIComponent(path),{cache:'no-store'});
+  if(!pr.ok) throw new Error('DexScreener '+pr.status);
+  return pr.json();
 }
 async function coinResolvePool(chain, ca){
   const want=chain==='solana'?'solana':'ethereum';
@@ -2668,6 +2674,11 @@ async function loadCoin(){
     if($('coin-source'))$('coin-source').textContent='…';
     coinPool=await coinResolvePool(chain, ca);
     if($('coin-meta'))$('coin-meta').textContent=coinPool.name+' · liq $'+fmt(coinPool.liq,0)+' · '+String(coinPool.address).slice(0,12)+'…';
+    if(coinPool.price && $('coin-spot')){
+      const spot=+coinPool.price;
+      $('coin-spot').textContent=spot>=1?money(spot):(spot>=0.01?('$'+spot.toFixed(4)):('$'+spot.toPrecision(4)));
+      if($('coin-spot-meta'))$('coin-spot-meta').textContent=(coinPool.base||'TOKEN')+' · Dex price';
+    }
     await loadCoinTF();
   }catch(e){
     console.error(e);
