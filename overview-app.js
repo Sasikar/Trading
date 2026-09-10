@@ -2511,19 +2511,27 @@ function showCoin(on){
 }
 async function gtGet(path){
   const primary='https://api.geckoterminal.com/api/v2'+path;
-  const proxies=[
-    primary,
-    'https://corsproxy.io/?'+encodeURIComponent(primary),
-    'https://api.allorigins.win/raw?url='+encodeURIComponent(primary)
+  // Browser pages: GeckoTerminal often blocks CORS — allorigins works
+  const attempts=[
+    {url:'https://api.allorigins.win/get?url='+encodeURIComponent(primary), wrap:'allorigins'},
+    {url:primary, wrap:'direct'},
+    {url:'https://api.allorigins.win/raw?url='+encodeURIComponent(primary), wrap:'raw'}
   ];
   let lastErr=null;
-  for(const url of proxies){
+  for(const a of attempts){
     try{
-      const r=await fetch(url,{headers:{'Accept':'application/json'}});
-      if(!r.ok){lastErr=new Error('GT '+r.status); continue;}
+      const r=await fetch(a.url, {cache:'no-store'});
+      if(!r.ok){lastErr=new Error('HTTP '+r.status+' via '+a.wrap); continue;}
       const txt=await r.text();
-      const j=JSON.parse(txt);
-      return j;
+      let j;
+      if(a.wrap==='allorigins'){
+        const outer=JSON.parse(txt);
+        if(outer.contents) j=JSON.parse(outer.contents);
+        else throw new Error('empty allorigins');
+      } else {
+        j=JSON.parse(txt);
+      }
+      if(j) return j;
     }catch(e){lastErr=e;}
   }
   throw lastErr||new Error('GeckoTerminal unreachable');
@@ -2668,8 +2676,9 @@ async function loadCoin(){
     if($('coin-source'))$('coin-source').textContent='ERROR';
   }
 }
+window.loadCoin=loadCoin; window.loadCoinTF=loadCoinTF;
 function wireCoinUI(){
-  const btn=$('coin-load'); if(btn) btn.onclick=()=>loadCoin();
+  const btn=$('coin-load'); if(btn){ btn.onclick=function(e){e.preventDefault();loadCoin();}; }
   const inp=$('coin-ca'); if(inp) inp.addEventListener('keydown',e=>{if(e.key==='Enter')loadCoin();});
   document.querySelectorAll('#coin-tf button').forEach(b=>{
     b.addEventListener('click',()=>{
