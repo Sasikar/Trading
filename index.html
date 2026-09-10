@@ -415,7 +415,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260910-coin2"></script>
+<script src="overview-app.js?v=20260910-coin3"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -493,7 +493,7 @@
     <div class="coin-ca">
       <select id="coin-chain"><option value="eth">ETH</option><option value="solana">SOL</option></select>
       <input id="coin-ca" type="text" placeholder="Full CA e.g. Ai66LHZG9M…pump" spellcheck="false" autocomplete="off"/>
-      <button type="button" id="coin-load">Load</button>
+      <button type="button" id="coin-load" onclick="try{window.loadCoin&&window.loadCoin()}catch(e){alert(e)}">Load</button>
     </div>
     <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
     <div class="coin-tf" id="coin-tf">
