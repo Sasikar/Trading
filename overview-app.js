@@ -2637,6 +2637,70 @@ async function coinFetchOHLCV(network, pool, ctf){
   throw lastErr||new Error('No OHLCV');
 }
 function coinResampleNote(){return '';}
+
+function coinRenderFib(kl, spot, label){
+  const el=$('coin-fib-tv'); if(!el||typeof LightweightCharts==='undefined') return;
+  el.style.minHeight='280px'; el.innerHTML='';
+  if(coinFibChart){try{coinFibChart.remove();}catch(e){} coinFibChart=null; coinFibLines=[];}
+  const swing=kl.slice(-Math.min(50,kl.length));
+  let hi=-Infinity,lo=Infinity;
+  for(const k of swing){hi=Math.max(hi,+k[2]);lo=Math.min(lo,+k[3]);}
+  const range=hi-lo||1;
+  const levels=[0,0.236,0.382,0.5,0.618,0.786,1].map(r=>({key:(r*100).toFixed(r%1?1:0)+'%',price:lo+range*r,r})).sort((a,b)=>b.price-a.price);
+  let nearest=levels[0],nd=Math.abs(spot-levels[0].price);
+  levels.forEach(l=>{const d=Math.abs(spot-l.price);if(d<nd){nd=d;nearest=l;}});
+  if($('coin-bias'))$('coin-bias').textContent='Near '+nearest.key;
+  const ladder=$('coin-fib-ladder');
+  if(ladder) ladder.innerHTML=levels.map(l=>{
+    const dist=((spot-l.price)/spot*100);
+    return '<div class="r" style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a222c"><span>'+l.key+'</span><span>$'+fmt(l.price,l.price<1?6:4)+' · '+(dist>=0?'+':'')+dist.toFixed(2)+'%</span></div>';
+  }).join('');
+  coinFibChart=LightweightCharts.createChart(el,{width:el.clientWidth||el.parentElement.clientWidth||320,height:280,layout:{background:{color:'#000'},textColor:'#9aa6b5'},grid:{vertLines:{color:'#141a22'},horzLines:{color:'#141a22'}},rightPriceScale:{borderVisible:false},timeScale:{borderVisible:false,timeVisible:true}});
+  coinFibSeries=coinFibChart.addCandlestickSeries({upColor:'#35d98a',downColor:'#ef3f4f',borderVisible:false,wickUpColor:'#35d98a',wickDownColor:'#ef3f4f'});
+  coinFibSeries.setData(kl.map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4]})));
+  levels.forEach(l=>{
+    coinFibLines.push(coinFibSeries.createPriceLine({price:l.price,color:(l.r===0.618||l.r===0.5||l.r===0.382)?'#62e3a0':'#3a4555',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:l.key}));
+  });
+  coinFibChart.timeScale().fitContent();
+}
+function coinRenderMacd(kl){
+  const el=$('coin-macd-tv'); if(!el||typeof LightweightCharts==='undefined') return;
+  el.style.minHeight='180px'; el.innerHTML='';
+  if(coinMacdChart){try{coinMacdChart.remove();}catch(e){} coinMacdChart=null;}
+  const closes=kl.map(k=>+k[4]);
+  const times=kl.map(k=>Math.floor(k[0]/1000));
+  const pack=calcMACDSeries(closes,times);
+  coinMacdChart=LightweightCharts.createChart(el,{width:el.clientWidth||el.parentElement.clientWidth||320,height:180,layout:{background:{color:'#000'},textColor:'#9aa6b5'},grid:{vertLines:{color:'#141a22'},horzLines:{color:'#141a22'}},rightPriceScale:{borderVisible:false},timeScale:{borderVisible:false,timeVisible:true}});
+  coinHist=coinMacdChart.addHistogramSeries({base:0});
+  coinMacdLine=coinMacdChart.addLineSeries({color:'#72a7ff',lineWidth:2});
+  coinSigLine=coinMacdChart.addLineSeries({color:'#e6c878',lineWidth:2});
+  coinHist.setData(pack.hist||[]);
+  coinMacdLine.setData(pack.ml||[]);
+  coinSigLine.setData(pack.sl||[]);
+  coinMacdChart.timeScale().fitContent();
+  const h=pack.lastHist,m=pack.lastMacd,s=pack.lastSig;
+  let lab='—';
+  if(m!=null&&s!=null){
+    const dir=m>s&&h>0?'Bullish':m<s&&h<0?'Bearish':'Mixed';
+    lab=dir+' · '+(h!=null?(h>=0?'+':'')+fmt(h,6):'');
+  }
+  if($('coin-macd')){$('coin-macd').textContent=lab;$('coin-macd').style.color=/Bullish/.test(lab)?'#62e3a0':/Bearish/.test(lab)?'#ff6f7c':'#e6c878';}
+}
+function coinRenderSR(kl){
+  const el=$('coin-sr-ladder'); if(!el) return;
+  const s=swingStructure(kl, Math.min(50,kl.length), '1D');
+  const rows=[];
+  if(s.resistance!=null) rows.push(['Resistance', s.resistance]);
+  if(s.support!=null) rows.push(['Support', s.support]);
+  if(s.protectedLH!=null) rows.push(['Prot. LH', s.protectedLH]);
+  if(s.protectedHL!=null) rows.push(['Prot. HL', s.protectedHL]);
+  rows.push(['Structure', null, s.detail||s.bias||'—']);
+  el.innerHTML=rows.map(r=>{
+    if(r[1]==null) return '<div class="r" style="padding:8px 0;border-bottom:1px solid #1a222c"><b>'+r[0]+'</b> · '+(r[2]||'')+'</div>';
+    return '<div class="r" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a222c"><span>'+r[0]+'</span><span>$'+fmt(r[1], r[1]<1?6:4)+'</span></div>';
+  }).join('')||'<div style="color:#8491a1">No pivots</div>';
+}
+
 async function loadCoinTF(){
   if(!coinPool) return;
   try{
