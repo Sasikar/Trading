@@ -2712,35 +2712,77 @@ function coinRenderSR(kl){
 }
 
 
+
+/* ===== CA TAB STATE MACHINE (coin-local; NOT BTC MemeGate) =====
+   WATCH → EARLY → STRONG CONFIRMED → STRETCHED | OFF
+   BIG SIZE only on STRONG CONFIRMED. STRONG_MIN_CONFIRMS = 6.
+*/
+const CA_STRONG_MIN_CONFIRMS = 6;
+
+function coinBreakoutAge(kl){
+  /* Age = closed bars since FIRST close above pre-break range high that is still held.
+     NOT days since latest new high (that bug kept age=0 all expansion).
+     breakout bar = 0, next = 1, second = 2; age >= 3 → not fresh. */
+  const n = kl.length;
+  if(n < 25) return {age:99, fresh:false, held:false, level:null, firstIdx:null};
+  const closes = kl.map(k=>+k[4]);
+  const highs = kl.map(k=>+k[2]);
+  let rh = -Infinity;
+  for(let i=n-22;i<=n-3;i++) if(i>=0) rh = Math.max(rh, highs[i]);
+  if(!isFinite(rh)) rh = highs[n-3];
+  const c0 = closes[n-1];
+  const heldRolling = c0 >= rh * 0.997;
+  let firstIdx = null, breakLevel = null;
+  const lookStart = Math.max(22, n - 20);
+  for(let i=lookStart;i<n;i++){
+    let prevH = -Infinity;
+    for(let j=i-21;j<=i-2;j++) if(j>=0) prevH = Math.max(prevH, highs[j]);
+    if(!isFinite(prevH)) continue;
+    if(closes[i] > prevH && c0 >= prevH * 0.997){
+      if(firstIdx==null){ firstIdx = i; breakLevel = prevH; }
+    }
+  }
+  const age = firstIdx!=null ? (n - 1 - firstIdx) : 99;
+  const fresh = heldRolling && firstIdx!=null && age <= 2;
+  return {age, fresh, held: heldRolling, level: breakLevel!=null?breakLevel:rh, firstIdx};
+}
+
 function coinEntryGate(kl, tfLabel){
-  /* Same for ETH + SOL. STRETCHED only when RSI is hot or thrust is extreme — not mid-RSI + mild pump. */
   const tf = (tfLabel || coinTF || '4h').toLowerCase();
-  const empty = {state:'WATCH', entry:false, sizePct:0, reason:'Need more candles', detail:{tf:tf}};
+  const empty = {
+    state:'WATCH', entry:false, sizePct:0, bigSize:false,
+    reason:'Need more candles', confirms:0, groups:{},
+    detail:{tf:tf}, brk:null, ext:null
+  };
   try{
-    if(!kl || kl.length < 15) return empty;
+    if(!kl || kl.length < 20) return empty;
     const closes = kl.map(k=>+k[4]).filter(x=>isFinite(x)&&x>0);
-    if(closes.length < 15) return Object.assign({}, empty, {reason:'Invalid / thin price series'});
+    if(closes.length < 20) return Object.assign({}, empty, {reason:'Invalid / thin price series'});
     const spot = closes[closes.length-1];
+    const highs = kl.map(k=>+k[2]);
+    const lows = kl.map(k=>+k[3]);
+    const vols = kl.map(k=>+k[5]||0);
+
+    // --- indicators (existing only) ---
     const rsi = calcRSI(closes, 14);
-    let pack = null, mScore = 0, hist = null, macdBull = false, macdBear = false;
+    let pack=null, mScore=0, hist=null, macdBull=false, macdBear=false;
     try{
       pack = calcMACDSeries(closes, kl.slice(-closes.length).map(k=>Math.floor(+k[0]/1000)));
       mScore = (typeof mgMomScore==='function') ? mgMomScore(pack) : 0;
       hist = pack && pack.lastHist;
-      const macd = pack && pack.lastMacd, sig = pack && pack.lastSig;
+      const macd = pack&&pack.lastMacd, sig = pack&&pack.lastSig;
       if(macd!=null && sig!=null){
-        const eps = Math.max(Math.abs(macd)*1e-9, Math.abs(spot)*1e-12, 1e-18);
-        macdBull = macd > sig && (hist==null || hist > -eps);
-        macdBear = macd < sig && (hist==null || hist < eps);
         if(hist!=null){
-          if(hist > 0 && macd > sig) macdBull = true;
-          if(hist < 0 && macd < sig) macdBear = true;
+          macdBull = macd > sig && hist > 0;
+          macdBear = macd < sig && hist < 0;
+        } else {
+          macdBull = macd > sig;
+          macdBear = macd < sig;
         }
       }
     }catch(e){}
-    const vols = kl.map(k=>+k[5]||0);
     const lastV = vols[vols.length-1];
-    const avg = vols.slice(-21,-1).reduce((s,x)=>s+x,0)/Math.max(1, Math.min(20, vols.length-1));
+    const avg = vols.slice(-21,-1).reduce((s,x)=>s+x,0)/Math.max(1,Math.min(20,vols.length-1));
     const vRatio = avg ? lastV/avg : 1;
     let cvdSlope = 0;
     try{
@@ -2750,97 +2792,226 @@ function coinEntryGate(kl, tfLabel){
     const e20 = emaArr(closes, Math.min(20, closes.length-1));
     const e50 = emaArr(closes, Math.min(50, closes.length-1));
     const a20 = e20[e20.length-1], a50 = e50[e50.length-1];
+    const aboveEma50Pct = (a50!=null && a50>0) ? ((spot/a50)-1)*100 : null;
     const trendUp = a20!=null && spot > a20 && (a50==null || a20 >= a50*0.998);
     const trendDn = a20!=null && spot < a20 && (a50==null || a20 <= a50*1.002);
+
+    // simple structure HH/HL vs LH/LL on half-window
+    const lb = Math.min(40, closes.length);
+    const mid = Math.floor(lb/2);
+    const hSlice = highs.slice(-lb), lSlice = lows.slice(-lb), cSlice = closes.slice(-lb);
+    const hh = Math.max.apply(null, hSlice.slice(mid)) > Math.max.apply(null, hSlice.slice(0,mid));
+    const hl = Math.min.apply(null, lSlice.slice(mid)) > Math.min.apply(null, lSlice.slice(0,mid));
+    const lh = Math.max.apply(null, hSlice.slice(mid)) < Math.max.apply(null, hSlice.slice(0,mid));
+    const ll = Math.min.apply(null, lSlice.slice(mid)) < Math.min.apply(null, lSlice.slice(0,mid));
+    const hardBreak = cSlice[cSlice.length-1] < Math.min.apply(null, lSlice.slice(0,-2))*0.99
+      && cSlice[cSlice.length-2] < Math.min.apply(null, lSlice.slice(0,-2))*0.99;
+    let structScore = 0.1;
+    if(hardBreak) structScore = -1;
+    else if(hh && hl) structScore = 0.85;
+    else if(lh && ll) structScore = -0.25;
+
+    const brk = coinBreakoutAge(kl);
     let consUp = 0;
     for(let i=closes.length-1;i>=1;i--){ if(closes[i]>=closes[i-1]) consUp++; else break; }
     let lo10 = Infinity;
     for(let i=Math.max(0,kl.length-11);i<kl.length-1;i++) lo10 = Math.min(lo10, +kl[i][3]);
     const gain10 = lo10>0 && isFinite(lo10) ? ((spot/lo10)-1)*100 : 0;
 
-    /* STRETCHED thresholds — TF-aware, RSI must be hot OR thrust extreme */
-    const gainThr = tf==='1w' ? 55 : (tf==='1d' ? 45 : 35);  // 4h more sensitive
-    const consThr = tf==='1w' ? 4 : 3;
+    // Extension / STRETCHED (EMA50 is anti-FOMO filter, NOT a buy signal)
+    // Spec: Price ≥ 10% above EMA50 AND RSI ≥ 75 → STRETCHED
     let stretched = false;
     let stretchWhy = '';
     if(rsi!=null && rsi >= 78){
-      stretched = true; stretchWhy = 'RSI '+rsi.toFixed(1)+' ≥ 78 (overbought)';
-    } else if(rsi!=null && rsi >= 72 && consUp >= consThr){
-      stretched = true; stretchWhy = 'RSI '+rsi.toFixed(1)+' ≥ 72 + '+consUp+' up closes';
-    } else if(gain10 >= gainThr && consUp >= consThr && (rsi==null || rsi >= 65)){
-      // thrust only counts as stretch if RSI is also elevated (≥65) — blocks mid-RSI false stretch
-      stretched = true; stretchWhy = '+'+gain10.toFixed(0)+'% from 10-bar low + '+consUp+' up + RSI '+(rsi!=null?rsi.toFixed(1):'?');
-    } else if(gain10 >= gainThr + 15 && consUp >= consThr + 1){
-      // extreme thrust alone (e.g. +60% 1D with 4 up days)
-      stretched = true; stretchWhy = 'Extreme thrust +'+gain10.toFixed(0)+'% / '+consUp+' up closes';
+      stretched = true;
+      stretchWhy = 'RSI '+rsi.toFixed(1)+' ≥ 78 (overbought)';
+    } else if(aboveEma50Pct!=null && aboveEma50Pct >= 10 && rsi!=null && rsi >= 75){
+      stretched = true;
+      stretchWhy = 'Price +'+aboveEma50Pct.toFixed(1)+'% above EMA50 + RSI '+rsi.toFixed(1)+' ≥ 75';
+    } else if(rsi!=null && rsi >= 72 && consUp >= 3){
+      stretched = true;
+      stretchWhy = 'RSI '+rsi.toFixed(1)+' ≥ 72 + '+consUp+' up closes';
+    } else if(gain10 >= 45 && consUp >= 3 && rsi!=null && rsi >= 65){
+      stretched = true;
+      stretchWhy = '+'+gain10.toFixed(0)+'% from 10-bar low + RSI '+rsi.toFixed(1);
     }
+
+    // --- 8 confirmation groups ---
+    const gStructure = structScore >= 0.35 && !hardBreak;
+    const gTrend = trendUp && !trendDn;
+    const gMomentum = macdBull || mScore >= 0.2;
+    const gBreakout = !!(brk.fresh && brk.held);
+    const gVolume = vRatio >= 0.85;
+    const gCvd = cvdSlope >= 0;
+    const gExtension = !stretched; // pass when NOT extended
+    // Meme environment: light local proxy (vol not dead + not hard breakdown). BTC regime is separate layer.
+    const gMemeEnv = !hardBreak && vRatio >= 0.5 && structScore > -0.5;
+
+    const groups = {
+      structure: gStructure,
+      trend: gTrend,
+      momentum: gMomentum,
+      breakout: gBreakout,
+      volume: gVolume,
+      cvd: gCvd,
+      extension: gExtension,
+      meme_env: gMemeEnv
+    };
+    const confirms = Object.keys(groups).filter(k=>groups[k]).length;
+    const majorOk = gStructure && gTrend;
+    const inFresh = brk.fresh && brk.age <= 2;
 
     const detail = {
-      rsi, macdBull, macdBear, mScore, vRatio, cvdSlope,
-      trendUp:!!trendUp, trendDn:!!trendDn, consUp, gain10, stretched:!!stretched, stretchWhy, tf
+      tf, rsi, macdBull, macdBear, mScore, vRatio, cvdSlope,
+      trendUp:!!trendUp, trendDn:!!trendDn, structScore, hardBreak,
+      aboveEma50Pct, ema50:a50, spot, consUp, gain10,
+      stretched, stretchWhy, age:brk.age, fresh:brk.fresh
     };
+    const extInfo = {stretched, why:stretchWhy, aboveEma50Pct, rsi, ema50:a50, spot};
 
-    if(stretched){
-      return {state:'STRETCHED', entry:false, sizePct:0, reason:'Do not chase · '+stretchWhy, detail};
+    // --- OFF (thesis broken) ---
+    if(hardBreak || (trendDn && macdBear && structScore <= -0.2)){
+      return {
+        state:'OFF', entry:false, sizePct:0, bigSize:false,
+        reason:'Thesis invalidated / risk structure broken',
+        confirms, groups, detail, brk, ext:extInfo
+      };
     }
-    if(trendDn && macdBear){
-      return {state:'OFF', entry:false, sizePct:0, reason:'Bearish trend + MACD · no new size', detail};
+    if(macdBear && cvdSlope < 0 && vRatio < 0.45 && !inFresh){
+      return {
+        state:'OFF', entry:false, sizePct:0, bigSize:false,
+        reason:'Thesis invalidated · MACD bear + CVD sell + dead volume',
+        confirms, groups, detail, brk, ext:extInfo
+      };
     }
-    if(macdBear && cvdSlope < 0 && vRatio < 0.5){
-      return {state:'OFF', entry:false, sizePct:0, reason:'MACD bear + CVD sell + dead volume', detail};
+
+    // --- STRETCHED (bullish may intact; no new entry) — after fresh window ---
+    // Extreme RSI still vetoes even in fresh window
+    if(stretched && (!inFresh || (rsi!=null && rsi >= 78))){
+      return {
+        state:'STRETCHED', entry:false, sizePct:0, bigSize:false,
+        reason:'Bullish thesis may remain intact · no new entry · '+stretchWhy,
+        confirms, groups, detail, brk, ext:extInfo
+      };
     }
-    if(trendUp && macdBull && vRatio >= 0.85 && cvdSlope >= 0 && rsi!=null && rsi >= 45 && rsi < 70){
-      return {state:'STRONG', entry:true, sizePct:70, reason:'Trend+MACD+vol+CVD aligned', detail};
+
+    // --- STRONG CONFIRMED (BIG SIZE only here) ---
+    if(majorOk && gBreakout && confirms >= CA_STRONG_MIN_CONFIRMS && gMomentum
+       && gMemeEnv && (gExtension || inFresh) && !(stretched && !inFresh)){
+      if(!(stretched && rsi!=null && rsi >= 78)){
+        return {
+          state:'STRONG CONFIRMED', entry:true, sizePct:85, bigSize:true,
+          reason:'Multi-group confirmation · BIG SIZE permitted ('+confirms+'/'+Object.keys(groups).length+')',
+          confirms, groups, detail, brk, ext:extInfo
+        };
+      }
     }
-    if((macdBull || mScore > 0.15) && (trendUp || (a20!=null && spot > a20)) && (rsi==null || (rsi > 35 && rsi < 68)) && vRatio >= 0.7){
-      return {state:'EARLY', entry:true, sizePct:30, reason:'Momentum improving · starter size only', detail};
+
+    // --- EARLY (fresh breakout, starter size only) ---
+    const earlyStruct = structScore >= -0.05 && !hardBreak;
+    const earlyTrend = trendUp || (a20!=null && spot > a20);
+    const earlyMom = macdBull || mScore >= 0.15;
+    const earlyVol = vRatio >= 0.7;
+    if(earlyStruct && earlyTrend && earlyMom && earlyVol && inFresh && brk.age <= 2
+       && !(stretched && !inFresh) && !(rsi!=null && rsi >= 78)){
+      return {
+        state:'EARLY', entry:true, sizePct:30, bigSize:false,
+        reason:'Fresh breakout/expansion · starter size only (age '+brk.age+')',
+        confirms, groups, detail, brk, ext:extInfo
+      };
     }
+
+    // --- WATCH ---
     if(rsi!=null && rsi <= 32 && !macdBear){
-      return {state:'WATCH', entry:false, sizePct:0, reason:'Oversold · wait for MACD/volume confirm', detail};
+      return {
+        state:'WATCH', entry:false, sizePct:0, bigSize:false,
+        reason:'Oversold · wait for breakout + MACD/volume confirm',
+        confirms, groups, detail, brk, ext:extInfo
+      };
     }
-    if(macdBear && vRatio < 0.4){
-      return {state:'WATCH', entry:false, sizePct:0, reason:'Weak tape · MACD bear + volume dry', detail};
-    }
-    return {state:'WATCH', entry:false, sizePct:0, reason:'No clear alignment yet', detail};
+    return {
+      state:'WATCH', entry:false, sizePct:0, bigSize:false,
+      reason: inFresh ? 'Fresh print but confirmation incomplete' : 'Setup developing · no actionable breakout',
+      confirms, groups, detail, brk, ext:extInfo
+    };
   }catch(e){
-    return {state:'WATCH', entry:false, sizePct:0, reason:'Gate error: '+(e&&e.message||e), detail:{tf:tf}};
+    return {
+      state:'WATCH', entry:false, sizePct:0, bigSize:false,
+      reason:'Gate error: '+(e&&e.message||e),
+      confirms:0, groups:{}, detail:{tf:tf}, brk:null, ext:null
+    };
   }
 }
 
 function coinRenderEntry(gate){
   let el = $('coin-entry-box');
   if(!el){
-    // Create box if missing (old cached HTML)
-    const tf = $('coin-tf');
-    if(tf && tf.parentNode){
+    const tfRow = $('coin-tf');
+    if(tfRow && tfRow.parentNode){
       el = document.createElement('div');
       el.id = 'coin-entry-box';
       el.style.cssText = 'margin:0 0 14px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c)';
-      tf.parentNode.insertBefore(el, tf.nextSibling);
+      tfRow.parentNode.insertBefore(el, tfRow.nextSibling);
     }
   }
   if(!el) return;
-  gate = gate || {state:'WATCH', entry:false, sizePct:0, reason:'—', detail:{}};
+  gate = gate || {state:'WATCH', entry:false, sizePct:0, bigSize:false, reason:'—', confirms:0, groups:{}, detail:{}};
   const st = gate.state || 'WATCH';
-  const col = st==='STRONG'||st==='EARLY' ? '#62e3a0' : (st==='STRETCHED'||st==='OFF' ? '#ff6f7c' : '#e6c878');
-  const entry = gate.entry ? ('ON · '+(gate.sizePct||0)+'%') : 'OFF · 0%';
+  const isBullState = st==='STRONG CONFIRMED' || st==='EARLY';
+  const isStretch = st==='STRETCHED';
+  const isOff = st==='OFF';
+  const col = isBullState ? '#62e3a0' : (isOff ? '#ff6f7c' : (isStretch ? '#f0a060' : '#e6c878'));
+  const entry = gate.entry
+    ? (gate.bigSize ? 'ON · BIG '+(gate.sizePct||85)+'%' : 'ON · '+(gate.sizePct||30)+'%')
+    : 'OFF · 0%';
   const d = gate.detail || {};
+  const g = gate.groups || {};
+  const order = ['structure','trend','momentum','breakout','volume','cvd','extension','meme_env'];
+  const labels = {structure:'Structure',trend:'Trend',momentum:'Momentum',breakout:'Breakout',volume:'Volume',cvd:'CVD',extension:'Extension',meme_env:'Meme env'};
+  const total = order.length;
+  const confN = gate.confirms!=null ? gate.confirms : order.filter(k=>g[k]).length;
+  const confRows = order.map(k=>{
+    const ok = !!g[k];
+    return '<span style="display:inline-block;margin:2px 6px 2px 0;font-size:11px;font-weight:700;color:'+(ok?'#62e3a0':'#8491a1')+'">'+(ok?'✓':'✕')+' '+labels[k]+'</span>';
+  }).join('');
+
+  let thesisLine = '';
+  if(isStretch){
+    thesisLine = '<div style="margin-top:6px;font-size:11px;color:#f0a060;font-weight:700">Bullish thesis may remain intact · anti-FOMO only (not OFF)</div>';
+  } else if(isOff){
+    thesisLine = '<div style="margin-top:6px;font-size:11px;color:#ff6f7c;font-weight:700">Thesis / risk structure broken</div>';
+  }
+
+  let emaLine = '';
+  if(d.aboveEma50Pct!=null && isFinite(d.aboveEma50Pct)){
+    emaLine = '<div style="margin-top:6px;font-size:11px;color:#8491a1">EMA50 dist '+(d.aboveEma50Pct>=0?'+':'')+(+d.aboveEma50Pct).toFixed(1)+'%'
+      +(d.ema50!=null?' · EMA50 '+(d.ema50>=0.01?d.ema50.toPrecision(4):d.ema50.toExponential(2)):'')
+      +(d.rsi!=null?' · RSI '+(+d.rsi).toFixed(1):'')
+      +(d.age!=null?' · break age '+d.age+(d.fresh?' (fresh)':''):'')
+      +'</div>';
+  } else if(d.age!=null){
+    emaLine = '<div style="margin-top:6px;font-size:11px;color:#8491a1">Break age '+d.age+(d.fresh?' (fresh ≤2)':' (not fresh)')+'</div>';
+  }
+
   el.style.display = 'block';
   el.innerHTML =
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
-      '<div><div style="font-size:10px;letter-spacing:.08em;color:#8491a1;font-weight:800">ENTRY GATE · '+(d.tf||coinTF||'').toUpperCase()+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
+      '<div><div style="font-size:10px;letter-spacing:.08em;color:#8491a1;font-weight:800">CA SIGNAL · '+(d.tf||coinTF||'').toUpperCase()+'</div>'+
       '<div style="font-size:18px;font-weight:900;color:'+col+';margin-top:4px">'+st+'</div></div>'+
       '<div style="text-align:right"><div style="font-size:10px;color:#8491a1;font-weight:800">NEW SIZE</div>'+
-      '<div style="font-size:16px;font-weight:900;color:'+(gate.entry?'#62e3a0':'#8491a1')+'">'+entry+'</div></div>'+
+      '<div style="font-size:16px;font-weight:900;color:'+(gate.entry?'#62e3a0':'#8491a1')+'">'+entry+'</div>'+
+      (gate.bigSize?'<div style="font-size:10px;color:#62e3a0;font-weight:800">BIG SIZE OK</div>':'')+
+      '</div>'+
     '</div>'+
+    thesisLine+
     '<div style="margin-top:10px;font-size:12px;color:#c5d0dc;line-height:1.45">'+(gate.reason||'—')+'</div>'+
-    '<div style="margin-top:8px;font-size:11px;color:#8491a1">RSI '+(d.rsi==null||!isFinite(d.rsi)?'—':(+d.rsi).toFixed(1))+
-      ' · MACD '+(d.macdBull?'bull':(d.macdBear?'bear':'flat'))+
-      ' · Vol '+(d.vRatio!=null&&isFinite(d.vRatio)?(+d.vRatio).toFixed(2)+'×':'—')+
-      ' · CVD '+(d.cvdSlope>0?'buy':(d.cvdSlope<0?'sell':'flat'))+
-      ' · Trend '+(d.trendUp?'up':(d.trendDn?'down':'mix'))+'</div>';
+    '<div style="margin-top:10px;font-size:11px;font-weight:800;color:#8491a1">CA CONFIRMS '+confN+'/'+total
+      +(st==='STRONG CONFIRMED'?' · need ≥'+CA_STRONG_MIN_CONFIRMS:' · STRONG needs ≥'+CA_STRONG_MIN_CONFIRMS)+'</div>'+
+    '<div style="margin-top:4px;line-height:1.7">'+confRows+'</div>'+
+    emaLine;
+
   if($('coin-bias')){
-    $('coin-bias').textContent = st+(gate.entry?' · ENTRY '+gate.sizePct+'%':' · NO ENTRY');
+    $('coin-bias').textContent = st+(gate.entry?(gate.bigSize?' · BIG ENTRY':' · ENTRY '+gate.sizePct+'%'):' · NO ENTRY');
     $('coin-bias').style.color = col;
   }
 }
