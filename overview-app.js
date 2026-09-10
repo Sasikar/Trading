@@ -6,7 +6,7 @@ const $=id=>document.getElementById(id);
 const fmt=(n,d)=>n==null||!isFinite(n)?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d!=null?d:(n>=1000?0:2)});
 const money=n=>n==null?'—':'$'+fmt(n,n>=1000?0:2);
 const TF={'1h':{interval:'1h',label:'1H',limit:120,swing:60,volAvg:20,fibBars:48,macdBars:48,rightOff:10,barSp:4},'4h':{interval:'4h',label:'4H',limit:100,swing:50,volAvg:20,fibBars:40,macdBars:40,rightOff:8,barSp:5},'1d':{interval:'1d',label:'1D',limit:120,swing:60,volAvg:20,fibBars:40,macdBars:50,rightOff:10,barSp:6},'1w':{interval:'1w',label:'1W',limit:80,swing:26,volAvg:20,fibBars:26,macdBars:40,rightOff:8,barSp:12},'1M':{interval:'1M',label:'1M',limit:48,swing:18,volAvg:12,fibBars:18,macdBars:24,rightOff:6,barSp:14}};
-let currentTF='trend',fibChart,fibSeries,fibVol,fibLines=[],macdChart,macdLineS,sigLineS,histS,structW1Chart,structW1Series,structW1Lines=[],sigChart,sigCandle,sigEma50,sigEma200;
+let currentTF='memegate',coinTF='4h',coinPool=null,coinChain='eth',coinCA='',coinFibChart,coinFibSeries,coinFibLines=[],coinMacdChart,coinMacdLine,coinSigLine,coinHist,fibChart,fibSeries,fibVol,fibLines=[],macdChart,macdLineS,sigLineS,histS,structW1Chart,structW1Series,structW1Lines=[],sigChart,sigCandle,sigEma50,sigEma200;
 async function jget(url){
   try{
     // static JSON same-origin; external APIs omit credentials
@@ -2498,8 +2498,186 @@ function mgDomModifier(dom){
   return {mod:mgClamp(m),regime};
 }
 
+
+function showCoin(on){
+  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel');
+  if(panels){panels.classList.add('hidden');panels.style.display='none';}
+  if(trend){trend.classList.remove('on');trend.style.display='none';}
+  if(sp){sp.classList.remove('on');sp.style.display='none';}
+  if(mp){mp.classList.remove('on');mp.style.display='none';}
+  if(sg){sg.classList.remove('on');sg.style.display='none';}
+  if(mg){mg.style.display='none';}
+  if(cp){cp.style.display=on?'block':'none';}
+}
+async function gtGet(path){
+  const url='https://api.geckoterminal.com/api/v2'+path;
+  const r=await fetch(url,{headers:{'Accept':'application/json'}});
+  if(!r.ok) throw new Error('GT '+r.status);
+  return r.json();
+}
+async function coinResolvePool(chain, ca){
+  const net=chain==='solana'?'solana':'eth';
+  const j=await gtGet('/networks/'+net+'/tokens/'+encodeURIComponent(ca)+'/pools?page=1');
+  const data=j.data||[];
+  if(!data.length) throw new Error('No pools for this CA on '+net);
+  // highest reserve_in_usd
+  data.sort((a,b)=>parseFloat((b.attributes&&b.attributes.reserve_in_usd)||0)-parseFloat((a.attributes&&a.attributes.reserve_in_usd)||0));
+  const top=data[0];
+  const attr=top.attributes||{};
+  return {
+    network:net,
+    address:attr.address||(top.id||'').split('_').pop(),
+    name:attr.name||'pool',
+    liq:parseFloat(attr.reserve_in_usd||0),
+    base:attr.name||ca.slice(0,8)
+  };
+}
+async function coinFetchOHLCV(network, pool, ctf){
+  // ctf: 4h|1d|1w
+  let timeframe='hour', aggregate=4, limit=120;
+  if(ctf==='1d'){timeframe='day';aggregate=1;limit=120;}
+  else if(ctf==='1w'){timeframe='day';aggregate=7;limit=80;}
+  else {timeframe='hour';aggregate=4;limit=120;}
+  const j=await gtGet('/networks/'+network+'/pools/'+encodeURIComponent(pool)+'/ohlcv/'+timeframe+'?aggregate='+aggregate+'&limit='+limit+'&currency=usd&token=base');
+  const list=((j.data||{}).attributes||{}).ohlcv_list||[];
+  // [ts, o, h, l, c, vol]
+  return list.map(x=>[x[0]*1000,+x[1],+x[2],+x[3],+x[4],+x[5]||0]).filter(k=>isFinite(k[4]));
+}
+function coinRenderFib(kl, spot, label){
+  const el=$('coin-fib-tv'); if(!el||typeof LightweightCharts==='undefined') return;
+  if(coinFibChart){try{coinFibChart.remove();}catch(e){} coinFibChart=null; coinFibLines=[];}
+  const swing=kl.slice(-Math.min(50,kl.length));
+  let hi=-Infinity,lo=Infinity;
+  for(const k of swing){hi=Math.max(hi,+k[2]);lo=Math.min(lo,+k[3]);}
+  const range=hi-lo||1;
+  const FIB=[{r:0,label:'0%'},{r:0.236,label:'23.6%'},{r:0.382,label:'38.2%'},{r:0.5,label:'50%'},{r:0.618,label:'61.8%'},{r:0.786,label:'78.6%'},{r:1,label:'100%'}];
+  const levels=FIB.map(({r,label})=>({key:label,price:lo+range*r,r})).sort((a,b)=>b.price-a.price);
+  let nearest=levels[0],nd=Math.abs(spot-levels[0].price);
+  levels.forEach(l=>{const d=Math.abs(spot-l.price);if(d<nd){nd=d;nearest=l;}});
+  if($('coin-bias'))$('coin-bias').textContent='Near '+nearest.key;
+  const ladder=$('coin-fib-ladder');
+  if(ladder) ladder.innerHTML=levels.map(l=>{
+    const above=spot>=l.price; const dist=((spot-l.price)/spot*100);
+    return '<div class="r" style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a222c"><span>'+l.key+'</span><span>$'+fmt(l.price, l.price<1?6:4)+' · '+(dist>=0?'+':'')+dist.toFixed(2)+'%</span></div>';
+  }).join('');
+  coinFibChart=LightweightCharts.createChart(el,{width:el.clientWidth,height:280,layout:{background:{color:'#000'},textColor:'#9aa6b5'},grid:{vertLines:{color:'#141a22'},horzLines:{color:'#141a22'}},rightPriceScale:{borderVisible:false},timeScale:{borderVisible:false,timeVisible:true}});
+  coinFibSeries=coinFibChart.addCandlestickSeries({upColor:'#35d98a',downColor:'#ef3f4f',borderVisible:false,wickUpColor:'#35d98a',wickDownColor:'#ef3f4f'});
+  coinFibSeries.setData(kl.map(k=>({time:Math.floor(k[0]/1000),open:+k[1],high:+k[2],low:+k[3],close:+k[4]})));
+  levels.forEach(l=>{
+    const line=coinFibSeries.createPriceLine({price:l.price,color:l.r===0.618||l.r===0.5||l.r===0.382?'#62e3a0':'#3a4555',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:l.key});
+    coinFibLines.push(line);
+  });
+  coinFibChart.timeScale().fitContent();
+}
+function coinRenderMacd(kl){
+  const el=$('coin-macd-tv'); if(!el||typeof LightweightCharts==='undefined') return;
+  if(coinMacdChart){try{coinMacdChart.remove();}catch(e){} coinMacdChart=null;}
+  const closes=kl.map(k=>+k[4]);
+  const times=kl.map(k=>Math.floor(k[0]/1000));
+  const pack=calcMACDSeries(closes,times);
+  coinMacdChart=LightweightCharts.createChart(el,{width:el.clientWidth,height:180,layout:{background:{color:'#000'},textColor:'#9aa6b5'},grid:{vertLines:{color:'#141a22'},horzLines:{color:'#141a22'}},rightPriceScale:{borderVisible:false},timeScale:{borderVisible:false,timeVisible:true}});
+  coinHist=coinMacdChart.addHistogramSeries({base:0});
+  coinMacdLine=coinMacdChart.addLineSeries({color:'#72a7ff',lineWidth:2});
+  coinSigLine=coinMacdChart.addLineSeries({color:'#e6c878',lineWidth:2});
+  coinHist.setData(pack.hist||[]);
+  coinMacdLine.setData(pack.ml||[]);
+  coinSigLine.setData(pack.sl||[]);
+  coinMacdChart.timeScale().fitContent();
+  const h=pack.lastHist,m=pack.lastMacd,s=pack.lastSig;
+  let lab='—';
+  if(m!=null&&s!=null){
+    const dir=m>s&&h>0?'Bullish':m<s&&h<0?'Bearish':'Mixed';
+    lab=dir+' · '+(h!=null?(h>=0?'+':'')+fmt(h,6):'');
+  }
+  if($('coin-macd')){$('coin-macd').textContent=lab;$('coin-macd').style.color=/Bullish/.test(lab)?'#62e3a0':/Bearish/.test(lab)?'#ff6f7c':'#e6c878';}
+}
+function coinRenderSR(kl){
+  const el=$('coin-sr-ladder'); if(!el) return;
+  const s=swingStructure(kl, Math.min(50,kl.length), '1D');
+  const rows=[];
+  if(s.resistance!=null) rows.push(['Resistance', s.resistance]);
+  if(s.support!=null) rows.push(['Support', s.support]);
+  if(s.protectedLH!=null) rows.push(['Prot. LH', s.protectedLH]);
+  if(s.protectedHL!=null) rows.push(['Prot. HL', s.protectedHL]);
+  rows.push(['Structure', null, s.detail||s.bias||'—']);
+  el.innerHTML=rows.map(r=>{
+    if(r[1]==null) return '<div class="r" style="padding:8px 0;border-bottom:1px solid #1a222c"><b>'+r[0]+'</b> · '+r[2]+'</div>';
+    return '<div class="r" style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1a222c"><span>'+r[0]+'</span><span>$'+fmt(r[1], r[1]<1?6:4)+'</span></div>';
+  }).join('')||'<div style="color:#8491a1">No pivots</div>';
+}
+async function loadCoinTF(){
+  if(!coinPool) return;
+  try{
+    if($('coin-source'))$('coin-source').textContent='LOADING…';
+    if($('coin-tf-name'))$('coin-tf-name').textContent=coinTF.toUpperCase();
+    const kl=await coinFetchOHLCV(coinPool.network, coinPool.address, coinTF);
+    if(!kl.length) throw new Error('No OHLCV');
+    const spot=+kl[kl.length-1][4];
+    if($('coin-spot'))$('coin-spot').textContent=spot>=1?money(spot):('$'+spot.toPrecision(4));
+    if($('coin-spot-meta'))$('coin-spot-meta').textContent=(coinPool.base||'TOKEN')+' · '+coinTF.toUpperCase()+' · liq $'+fmt(coinPool.liq,0);
+    const rsi=calcRSI(kl.map(k=>+k[4]),14);
+    if($('coin-rsi')){
+      $('coin-rsi').textContent=rsi==null?'—':rsi.toFixed(1);
+      $('coin-rsi').style.color=rsi==null?'#9aa6b5':rsi>=70?'#ff6f7c':rsi<=30?'#62e3a0':'#e6c878';
+    }
+    const vols=kl.map(k=>+k[5]||0);
+    const lastV=vols[vols.length-1];
+    const avg=vols.slice(-21,-1).reduce((s,x)=>s+x,0)/Math.max(1,Math.min(20,vols.length-1));
+    const vRatio=avg?lastV/avg:1;
+    if($('coin-vol')){
+      $('coin-vol').textContent=vRatio.toFixed(2)+'× avg';
+      $('coin-vol').style.color=vRatio>=1.3?'#62e3a0':vRatio<=0.7?'#ff6f7c':'#e6c878';
+    }
+    const cvd=calcCVD(kl);
+    if(cvd.length&&$('coin-cvd')){
+      const last=cvd[cvd.length-1];
+      const prev=cvd.length>5?cvd[cvd.length-6]:cvd[0];
+      const slope=last.cvd-prev.cvd;
+      const lab=(slope>=0?'BUY':'SELL')+' pressure';
+      $('coin-cvd').textContent=lab;
+      $('coin-cvd').style.color=slope>=0?'#62e3a0':'#ff6f7c';
+    }
+    coinRenderFib(kl, spot, coinTF);
+    coinRenderMacd(kl);
+    coinRenderSR(kl);
+    if($('coin-source'))$('coin-source').textContent='LIVE · GeckoTerminal';
+  }catch(e){
+    if($('coin-source'))$('coin-source').textContent='ERROR';
+    if($('coin-meta'))$('coin-meta').textContent='Load failed: '+(e&&e.message||e);
+  }
+}
+async function loadCoin(){
+  const chain=(($('coin-chain')||{}).value)||'eth';
+  const ca=(($('coin-ca')||{}).value||'').trim();
+  if(!ca){if($('coin-meta'))$('coin-meta').textContent='Enter a contract address.';return;}
+  coinChain=chain; coinCA=ca;
+  try{
+    if($('coin-meta'))$('coin-meta').textContent='Resolving top pool…';
+    if($('coin-source'))$('coin-source').textContent='…';
+    coinPool=await coinResolvePool(chain, ca);
+    if($('coin-meta'))$('coin-meta').textContent=coinPool.name+' · liq $'+fmt(coinPool.liq,0)+' · '+coinPool.address.slice(0,10)+'…';
+    await loadCoinTF();
+  }catch(e){
+    coinPool=null;
+    if($('coin-meta'))$('coin-meta').textContent='Could not resolve CA: '+(e&&e.message||e);
+    if($('coin-source'))$('coin-source').textContent='ERROR';
+  }
+}
+function wireCoinUI(){
+  const btn=$('coin-load'); if(btn) btn.onclick=()=>loadCoin();
+  const inp=$('coin-ca'); if(inp) inp.addEventListener('keydown',e=>{if(e.key==='Enter')loadCoin();});
+  document.querySelectorAll('#coin-tf button').forEach(b=>{
+    b.addEventListener('click',()=>{
+      document.querySelectorAll('#coin-tf button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      coinTF=b.getAttribute('data-ctf')||'4h';
+      loadCoinTF();
+    });
+  });
+}
+
 function showMemeGate(on){
-  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel');
+  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel');const cp=$('coin-panel');if(cp&&on)cp.style.display='none';
   if(panels){panels.classList.add('hidden');panels.style.display='none';}
   if(trend){trend.classList.remove('on');trend.style.display='none';}
   if(sp){sp.classList.remove('on');sp.style.display='none';}
@@ -2720,7 +2898,7 @@ async function loadMemeGate(){
 
 
 function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}if(mp&&on){mp.classList.remove('on');mp.style.display='none';}if(sg&&on){sg.classList.remove('on');sg.style.display='none';}}
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showTrend(false);showStruct(false);showMacro(false);showMemeGate(false);showSignal(true);loadSignal();}else if(tf==='memegate'){showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else{showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
+document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showTrend(false);showStruct(false);showMacro(false);showMemeGate(false);showSignal(true);loadSignal();}else if(tf==='memegate'){showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else if(tf==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}else{showCoin(false);showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
 // Signal date controls
 ['sig-mode','sig-is-start','sig-is-end','sig-oos-start','sig-oos-end'].forEach(id=>{
   const el=$(id); if(el) el.addEventListener('change',()=>{if((document.querySelector('#tf-tabs .tab.active')&&document.querySelector('#tf-tabs .tab.active').getAttribute('data-tf')==='signal')) loadSignal();});
@@ -2740,7 +2918,7 @@ try{
 const act=document.querySelector('#tf-tabs .tab.active');
 const at=(act&&act.getAttribute('data-tf'))||currentTF||'memegate';
 currentTF=at;
-if(at==='memegate'){showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);await loadMemeGate();}
+if(at==='memegate'){showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);await loadMemeGate();}else if(at==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}
 else if(at==='trend'){showMemeGate(false);showStruct(false);showMacro(false);showSignal(false);showTrend(true);await loadTrend();}
 else if(at==='struct'){showMemeGate(false);showTrend(false);showMacro(false);showSignal(false);showStruct(true);await loadStructural();}
 else if(at==='macro'){showMemeGate(false);showTrend(false);showStruct(false);showSignal(false);showMacro(true);await loadMacro();}
