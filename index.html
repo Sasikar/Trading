@@ -233,6 +233,12 @@
 .mg-block h3{margin:0 0 6px;font-size:12px;letter-spacing:.08em;color:#8aa0b8}
 .mg-block p{margin:0;color:#d5dde8;font-size:13px;line-height:1.5;font-weight:650}
 .mg-form{padding:12px 16px;font-size:11px;color:#6b7a8c;line-height:1.55;border-top:1px solid #1c2633;white-space:pre-wrap}
+.mg-hist-wrap{max-height:420px;overflow:auto;border-top:1px solid #1c2633}
+.mg-hist{width:100%;border-collapse:collapse;font-size:12px}
+.mg-hist th{position:sticky;top:0;background:#0e151d;text-align:left;color:#8491a1;font-size:10px;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid #1c2633}
+.mg-hist td{padding:8px 10px;border-bottom:1px solid #16202a;font-weight:700;white-space:nowrap}
+.mg-hist .on{color:#62e3a0}.mg-hist .off{color:#ff6f7c}.mg-hist .wait{color:#e6c878}
+
 
 </style></head><body>
 <div class="shell"><main>
@@ -395,7 +401,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260910-mgdef"></script>
+<script src="overview-app.js?v=20260910-mghist"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -459,6 +465,8 @@
     <div class="mg-block"><h3>WHAT IS MISSING</h3><p id="mg-miss">—</p></div>
     <div class="mg-block"><h3>INVALIDATION</h3><p id="mg-inv">—</p></div>
     <div class="mg-block"><h3>ACTION</h3><p id="mg-act">—</p></div>
+    <div class="mg-block"><h3>LAST 30 DAYS · DAILY CLOSE</h3><p style="color:#8491a1;font-size:12px;margin:0 0 8px">Same gate rules · BTC.D hist dampener = 0 · +1d/+3d BTC return after signal</p></div>
+    <div class="mg-hist-wrap"><table class="mg-hist"><thead><tr><th>Date</th><th>BTC</th><th>Final</th><th>Gate</th><th>Why</th><th>+1d</th><th>+3d</th></tr></thead><tbody id="mg-hist-body"><tr><td colspan="7" style="color:#8491a1">Loading history…</td></tr></tbody></table></div>
     <div class="mg-form" id="mg-formulas"></div>
   </div>
 </section>
