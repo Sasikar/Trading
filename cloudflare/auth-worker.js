@@ -78,6 +78,38 @@ function cacheSet(key, data, ttlMs) {
   okxCache.set(key, { data, exp: Date.now() + ttlMs });
 }
 
+
+async function fetchGtProxy(path) {
+  if (!path || !path.startsWith('/')) throw new Error('bad path');
+  if (path.includes('://') || path.includes('..')) throw new Error('bad path');
+  const upstream = 'https://api.geckoterminal.com/api/v2' + path;
+  const res = await fetch(upstream, { headers: { Accept: 'application/json', 'User-Agent': 'TradingProxy/1.0' } });
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'access-control-allow-origin': '*',
+      'cache-control': 'public, max-age=30',
+    },
+  });
+}
+async function fetchDexProxy(path) {
+  if (!path || !path.startsWith('/')) throw new Error('bad path');
+  if (path.includes('://') || path.includes('..')) throw new Error('bad path');
+  const upstream = 'https://api.dexscreener.com' + path;
+  const res = await fetch(upstream, { headers: { Accept: 'application/json', 'User-Agent': 'TradingProxy/1.0' } });
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'access-control-allow-origin': '*',
+      'cache-control': 'public, max-age=30',
+    },
+  });
+}
+
 async function fetchOkx(path, params) {
   const allowed = path === 'ticker' || path === 'candles';
   if (!allowed) throw new Error('invalid okx endpoint');
@@ -287,6 +319,14 @@ async function handleApi(url) {
       return json(
         await fetchOrderbook(url.searchParams.get('instId') || 'BTC-USDT', url.searchParams.get('sz') || '50')
       );
+    }
+    if (url.pathname === '/api/gt') {
+      const path = url.searchParams.get('path') || '';
+      return await fetchGtProxy(path);
+    }
+    if (url.pathname === '/api/dex') {
+      const path = url.searchParams.get('path') || '';
+      return await fetchDexProxy(path);
     }
     if (url.pathname === '/api/health') {
       return json({ ok: true, ts: Date.now() });
