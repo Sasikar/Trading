@@ -2873,7 +2873,7 @@ function mgBreakoutInfo(klD){
   }
   const daysSince = firstBreakIdx!=null ? (n - 1 - firstBreakIdx) : 99;
   // Fresh = still holding and within protected window (break + 2 following closes)
-  const fresh = held && firstBreakIdx!=null && daysSince <= 2;
+  const fresh = held && firstBreakIdx!=null && daysSince <= 1; // breakout + 1 following close only
   const pctAbove = (breakLevel!=null && breakLevel>0) ? ((c0/breakLevel)-1)*100 : (rh ? ((c0/rh)-1)*100 : 0);
   return {fresh, held, level:breakLevel!=null?breakLevel:rh, brokeToday, brokeYday, daysSince, pctAbove, firstBreakIdx};
 }
@@ -2996,7 +2996,7 @@ function mgStateMachine(kl4, klD, klW, domMod, prevState){
 
   // Fresh breakout window = first 2 daily closes after/at range-high break.
   // Spec: do NOT mark the first legitimate expansion candle(s) as STRETCHED.
-  const inFreshWindow = brk.fresh && brk.daysSince <= 2; // age 0..2 only (break + 2 following closes)
+  const inFreshWindow = brk.fresh && brk.daysSince <= 1; // age 0..1 only (break + 1 following close)
 
   // --- STRONG CONFIRMED (checked before STRETCHED when still in fresh window) ---
   const strongOk = conf.majorOk && conf.groups.breakout && conf.passCount >= 5
@@ -3019,7 +3019,7 @@ function mgStateMachine(kl4, klD, klW, domMod, prevState){
   const earlyMomOk = conf.m4 >= 0.15 || conf.m1 >= 0.15;
   const earlyVolOk = conf.volS >= -0.40;
   const earlyMemeOk = (domMod==null) || domMod >= -0.55;
-  const meaningfulBreak = brk.fresh && brk.held && brk.daysSince <= 2; // same cap as fresh window
+  const meaningfulBreak = brk.fresh && brk.held && brk.daysSince <= 1; // same cap as fresh window
   if(earlyStructOk && earlyTrendOk && earlyMomOk && earlyVolOk && earlyMemeOk && meaningfulBreak && (conf.groups.extension_ok || inFreshWindow)){
     if(!(ext.stretched && !inFreshWindow)){
       return {
@@ -3030,11 +3030,13 @@ function mgStateMachine(kl4, klD, klW, domMod, prevState){
     }
   }
 
-  // --- STRETCHED (only after fresh window; bullish thesis may still hold) ---
-  if(ext.stretched && !inFreshWindow){
+  // --- STRETCHED (after fresh window; or extreme extension even late in window) ---
+  // Extreme thrust: age>=1 and already +15% from 10d low → no chase even if still "fresh"
+  const extremeThrust = (brk.daysSince>=2) && (ext.gain10>=15) && (ext.consUp>=3 || ext.intensity==='HIGH' || ext.intensity==='ELEVATED');
+  if((ext.stretched && !inFreshWindow) || extremeThrust){
     return {
       state:'STRETCHED', entry:false, sizePct:0, bigSize:false,
-      reason: 'Do not chase · '+ (ext.why||'extension'),
+      reason: 'Do not chase · '+ (extremeThrust && !ext.stretched ? 'extreme thrust ≥15% after break day' : (ext.why||'extension')),
       finalS:conf.finalS, btc, conf, brk, ext, prevState
     };
   }
@@ -3118,6 +3120,7 @@ function mgBuildHistory(klD,kl4,klW){
       gate:ev.state||ev.gate, rawGate:ev.state||ev.gate,
       reason:ev.reason, entryQ:ev.state,
       entry:ev.entry, sizePct:ev.sizePct||0, bigSize:!!ev.bigSize,
+      age:(ev.brk&&ev.brk.daysSince!=null)?ev.brk.daysSince:null, fresh:!!(ev.brk&&ev.brk.fresh),
       r1,r3,r7
     });
     prevState = ev.state || ev.gate;
@@ -3136,7 +3139,8 @@ function mgRenderHistory(rows){
     const f7=r.r7==null?'—':((r.r7>=0?'+':'')+r.r7.toFixed(1)+'%');
     const ent = r.entry ? 'ON' : 'OFF';
     const sz = r.entry ? ((r.bigSize?'BIG ':'')+(r.sizePct||0)+'%') : '0%';
-    return '<tr><td>'+r.date+'</td><td>$'+Math.round(r.btc).toLocaleString('en-US')+'</td><td style="color:'+(r.final>=0?'#62e3a0':'#ff6f7c')+'">'+(r.final>=0?'+':'')+r.final.toFixed(2)+'</td><td class="'+gcls+'">'+g+'</td><td style="color:'+(r.entry?'#62e3a0':'#8491a1')+'">'+ent+'</td><td>'+sz+'</td><td style="color:#8491a1;font-size:11px;max-width:140px;white-space:normal">'+r.reason+'</td><td>'+f1+'</td><td>'+f3+'</td><td>'+f7+'</td></tr>';
+    const age = r.age==null?'—':String(r.age);
+    return '<tr><td>'+r.date+'</td><td>$'+Math.round(r.btc).toLocaleString('en-US')+'</td><td>'+age+'</td><td style="color:'+(r.final>=0?'#62e3a0':'#ff6f7c')+'">'+(r.final>=0?'+':'')+r.final.toFixed(2)+'</td><td class="'+gcls+'">'+g+'</td><td style="color:'+(r.entry?'#62e3a0':'#8491a1')+'">'+ent+'</td><td>'+sz+'</td><td style="color:#8491a1;font-size:11px;max-width:140px;white-space:normal">'+r.reason+'</td><td>'+f1+'</td><td>'+f3+'</td><td>'+f7+'</td></tr>';
   }).join('');
 }
 
