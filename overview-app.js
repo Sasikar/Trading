@@ -2564,7 +2564,9 @@ async function coinResolvePool(chain, ca){
         liq: parseFloat((p.liquidity&&p.liquidity.usd)||0),
         base: (p.baseToken&&p.baseToken.symbol)||ca.slice(0,6),
         price: parseFloat(p.priceUsd||0),
-        dexUrl: p.url||''
+        dexUrl: p.url||'',
+        vol24: parseFloat((p.volume&&p.volume.h24)||0),
+        chg24: parseFloat((p.priceChange&&p.priceChange.h24)||0)
       };
     }
   }catch(e){console.warn('dex resolve',e);}
@@ -2677,9 +2679,19 @@ async function loadCoin(){
     if(coinPool.price && $('coin-spot')){
       const spot=+coinPool.price;
       $('coin-spot').textContent=spot>=1?money(spot):(spot>=0.01?('$'+spot.toFixed(4)):('$'+spot.toPrecision(4)));
-      if($('coin-spot-meta'))$('coin-spot-meta').textContent=(coinPool.base||'TOKEN')+' · Dex price';
+      if($('coin-spot-meta'))$('coin-spot-meta').textContent=(coinPool.base||'TOKEN')+' · DexScreener live'+(coinPool.chg24!=null?(' · 24h '+(coinPool.chg24>=0?'+':'')+Number(coinPool.chg24).toFixed(1)+'%'):'');
     }
-    await loadCoinTF();
+    if($('coin-vol') && coinPool.vol24){ $('coin-vol').textContent='$'+fmt(coinPool.vol24,0)+' 24h'; $('coin-vol').style.color='#e6c878'; }
+
+    // Always show Dex embed chart (works even when GT OHLCV rate-limited)
+    const emb=$('coin-embed');
+    if(emb && coinPool.address){
+      const ch=coinPool.network==='solana'?'solana':'ethereum';
+      emb.innerHTML='<iframe title="dex" src="https://dexscreener.com/'+ch+'/'+coinPool.address+'?embed=1&theme=dark&trades=0&info=0" style="width:100%;height:420px;border:0;border-radius:14px;background:#000"></iframe>';
+    }
+    if($('coin-source'))$('coin-source').textContent='LIVE · Dex pair';
+    try{ await loadCoinTF(); }
+    catch(e){ if($('coin-meta'))$('coin-meta').textContent=(coinPool.name||'')+' · price OK · indicators pending: '+(e&&e.message||e); }
   }catch(e){
     console.error(e);
     coinPool=null;
