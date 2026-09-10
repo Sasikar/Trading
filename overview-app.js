@@ -2713,74 +2713,104 @@ function coinRenderSR(kl){
 
 
 function coinEntryGate(kl, tfLabel){
-  /* Lightweight gate for memecoins — same ideas as BTC MemeGate, not full HTF engine.
-     States: OFF · WATCH · EARLY · STRONG · STRETCHED */
-  if(!kl || kl.length < 20){
-    return {state:'WATCH', entry:false, sizePct:0, reason:'Need more candles', detail:{}};
-  }
-  const closes = kl.map(k=>+k[4]);
-  const spot = closes[closes.length-1];
-  const rsi = calcRSI(closes, 14);
-  const pack = calcMACDSeries(closes, kl.map(k=>Math.floor(+k[0]/1000)));
-  const mScore = (typeof mgMomScore==='function') ? mgMomScore(pack) : 0;
-  const hist = pack && pack.lastHist;
-  const macdBull = pack && pack.lastMacd!=null && pack.lastSig!=null && pack.lastMacd > pack.lastSig && hist > 0;
-  const macdBear = pack && pack.lastMacd!=null && pack.lastSig!=null && pack.lastMacd < pack.lastSig && hist < 0;
-  const vols = kl.map(k=>+k[5]||0);
-  const lastV = vols[vols.length-1];
-  const avg = vols.slice(-21,-1).reduce((s,x)=>s+x,0)/Math.max(1, Math.min(20, vols.length-1));
-  const vRatio = avg ? lastV/avg : 1;
-  const cvd = calcCVD(kl);
-  let cvdSlope = 0;
-  if(cvd.length > 5){
-    cvdSlope = cvd[cvd.length-1].cvd - cvd[cvd.length-6].cvd;
-  }
-  const e20 = emaArr(closes, 20);
-  const e50 = emaArr(closes, Math.min(50, closes.length-1));
-  const a20 = e20[e20.length-1], a50 = e50[e50.length-1];
-  const trendUp = a20!=null && a50!=null && spot > a20 && a20 >= a50;
-  const trendDn = a20!=null && a50!=null && spot < a20 && a20 <= a50;
-  // extension: consecutive up + RSI hot
-  let consUp = 0;
-  for(let i=closes.length-1;i>=1;i--){ if(closes[i]>=closes[i-1]) consUp++; else break; }
-  let lo10 = Infinity;
-  for(let i=Math.max(0,closes.length-11);i<closes.length-1;i++) lo10 = Math.min(lo10, +kl[i][3]);
-  const gain10 = lo10>0 ? ((spot/lo10)-1)*100 : 0;
-  const stretched = (rsi!=null && rsi>=72 && consUp>=3) || (gain10>=25 && consUp>=3) || (rsi!=null && rsi>=78);
-  const detail = {
-    rsi: rsi, macdBull: !!macdBull, macdBear: !!macdBear, mScore: mScore,
-    vRatio: vRatio, cvdSlope: cvdSlope, trendUp: !!trendUp, trendDn: !!trendDn,
-    consUp: consUp, gain10: gain10, stretched: !!stretched, tf: tfLabel||coinTF
-  };
+  /* Same for ETH + SOL. Always returns a state — never silent. */
+  const empty = {state:'WATCH', entry:false, sizePct:0, reason:'Need more candles', detail:{tf:tfLabel||coinTF}};
+  try{
+    if(!kl || kl.length < 15) return empty;
+    const closes = kl.map(k=>+k[4]).filter(x=>isFinite(x)&&x>0);
+    if(closes.length < 15) return Object.assign({}, empty, {reason:'Invalid / thin price series'});
+    const spot = closes[closes.length-1];
+    const rsi = calcRSI(closes, 14);
+    let pack = null, mScore = 0, hist = null, macdBull = false, macdBear = false;
+    try{
+      pack = calcMACDSeries(closes, kl.slice(-closes.length).map(k=>Math.floor(+k[0]/1000)));
+      mScore = (typeof mgMomScore==='function') ? mgMomScore(pack) : 0;
+      hist = pack && pack.lastHist;
+      // Use relative hist for micro-priced tokens (hist can be ~0 in absolute terms)
+      const macd = pack && pack.lastMacd, sig = pack && pack.lastSig;
+      if(macd!=null && sig!=null){
+        const eps = Math.max(Math.abs(macd)*1e-9, Math.abs(spot)*1e-12, 1e-18);
+        macdBull = macd > sig && (hist==null || hist > -eps);
+        macdBear = macd < sig && (hist==null || hist < eps);
+        if(hist!=null){
+          if(hist > 0 && macd > sig) macdBull = true;
+          if(hist < 0 && macd < sig) macdBear = true;
+        }
+      }
+    }catch(e){}
+    const vols = kl.map(k=>+k[5]||0);
+    const lastV = vols[vols.length-1];
+    const avg = vols.slice(-21,-1).reduce((s,x)=>s+x,0)/Math.max(1, Math.min(20, vols.length-1));
+    const vRatio = avg ? lastV/avg : 1;
+    let cvdSlope = 0;
+    try{
+      const cvd = calcCVD(kl);
+      if(cvd.length > 5) cvdSlope = cvd[cvd.length-1].cvd - cvd[cvd.length-6].cvd;
+    }catch(e){}
+    const e20 = emaArr(closes, Math.min(20, closes.length-1));
+    const e50 = emaArr(closes, Math.min(50, closes.length-1));
+    const a20 = e20[e20.length-1], a50 = e50[e50.length-1];
+    const trendUp = a20!=null && spot > a20 && (a50==null || a20 >= a50*0.998);
+    const trendDn = a20!=null && spot < a20 && (a50==null || a20 <= a50*1.002);
+    let consUp = 0;
+    for(let i=closes.length-1;i>=1;i--){ if(closes[i]>=closes[i-1]) consUp++; else break; }
+    let lo10 = Infinity;
+    for(let i=Math.max(0,kl.length-11);i<kl.length-1;i++) lo10 = Math.min(lo10, +kl[i][3]);
+    const gain10 = lo10>0 && isFinite(lo10) ? ((spot/lo10)-1)*100 : 0;
+    const stretched = (rsi!=null && rsi>=72 && consUp>=3) || (gain10>=25 && consUp>=3) || (rsi!=null && rsi>=78);
+    const detail = {
+      rsi, macdBull, macdBear, mScore, vRatio, cvdSlope,
+      trendUp:!!trendUp, trendDn:!!trendDn, consUp, gain10, stretched:!!stretched, tf:tfLabel||coinTF
+    };
 
-  if(trendDn && macdBear && (rsi==null || rsi < 45)){
-    return {state:'OFF', entry:false, sizePct:0, reason:'Bearish trend + MACD', detail};
+    // Priority matches BTC-style gate
+    if(stretched){
+      return {state:'STRETCHED', entry:false, sizePct:0, reason:'Extended · do not chase (RSI/thrust)', detail};
+    }
+    if(trendDn && macdBear){
+      return {state:'OFF', entry:false, sizePct:0, reason:'Bearish trend + MACD · no new size', detail};
+    }
+    if(macdBear && cvdSlope < 0 && vRatio < 0.5){
+      return {state:'OFF', entry:false, sizePct:0, reason:'MACD bear + CVD sell + dead volume', detail};
+    }
+    if(trendUp && macdBull && vRatio >= 0.85 && cvdSlope >= 0 && rsi!=null && rsi >= 45 && rsi < 70){
+      return {state:'STRONG', entry:true, sizePct:70, reason:'Trend+MACD+vol+CVD aligned', detail};
+    }
+    if((macdBull || mScore > 0.15) && (trendUp || (a20!=null && spot > a20)) && (rsi==null || (rsi > 35 && rsi < 68)) && vRatio >= 0.7){
+      return {state:'EARLY', entry:true, sizePct:30, reason:'Momentum improving · starter size only', detail};
+    }
+    if(rsi!=null && rsi <= 32 && !macdBear){
+      return {state:'WATCH', entry:false, sizePct:0, reason:'Oversold · wait for MACD/volume confirm', detail};
+    }
+    // Explicit mid-range dead tape (ANDY-style)
+    if(macdBear && vRatio < 0.4){
+      return {state:'WATCH', entry:false, sizePct:0, reason:'Weak tape · MACD bear + volume dry', detail};
+    }
+    return {state:'WATCH', entry:false, sizePct:0, reason:'No clear alignment yet', detail};
+  }catch(e){
+    return {state:'WATCH', entry:false, sizePct:0, reason:'Gate error: '+(e&&e.message||e), detail:{tf:tfLabel||coinTF}};
   }
-  if(stretched){
-    return {state:'STRETCHED', entry:false, sizePct:0, reason:'Extended · do not chase (RSI/thrust)', detail};
-  }
-  // STRONG: trend up + MACD bull + volume ok + CVD not selling + RSI not extreme
-  if(trendUp && macdBull && vRatio >= 0.85 && cvdSlope >= 0 && rsi!=null && rsi >= 45 && rsi < 70){
-    return {state:'STRONG', entry:true, sizePct:70, reason:'Trend+MACD+vol+CVD aligned', detail};
-  }
-  // EARLY: improving momentum, not extended
-  if((macdBull || mScore > 0.2) && (trendUp || (a20!=null && spot > a20)) && (rsi==null || (rsi > 35 && rsi < 68)) && vRatio >= 0.7){
-    return {state:'EARLY', entry:true, sizePct:30, reason:'Momentum improving · starter size only', detail};
-  }
-  // Bounce watch
-  if(rsi!=null && rsi <= 32 && !macdBear){
-    return {state:'WATCH', entry:false, sizePct:0, reason:'Oversold · wait for MACD/volume confirm', detail};
-  }
-  return {state:'WATCH', entry:false, sizePct:0, reason:'No clear alignment yet', detail};
 }
 
 function coinRenderEntry(gate){
-  const el = $('coin-entry-box');
-  if(!el || !gate) return;
+  let el = $('coin-entry-box');
+  if(!el){
+    // Create box if missing (old cached HTML)
+    const tf = $('coin-tf');
+    if(tf && tf.parentNode){
+      el = document.createElement('div');
+      el.id = 'coin-entry-box';
+      el.style.cssText = 'margin:0 0 14px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c)';
+      tf.parentNode.insertBefore(el, tf.nextSibling);
+    }
+  }
+  if(!el) return;
+  gate = gate || {state:'WATCH', entry:false, sizePct:0, reason:'—', detail:{}};
   const st = gate.state || 'WATCH';
   const col = st==='STRONG'||st==='EARLY' ? '#62e3a0' : (st==='STRETCHED'||st==='OFF' ? '#ff6f7c' : '#e6c878');
   const entry = gate.entry ? ('ON · '+(gate.sizePct||0)+'%') : 'OFF · 0%';
   const d = gate.detail || {};
+  el.style.display = 'block';
   el.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">'+
       '<div><div style="font-size:10px;letter-spacing:.08em;color:#8491a1;font-weight:800">ENTRY GATE · '+(d.tf||coinTF||'').toUpperCase()+'</div>'+
@@ -2788,10 +2818,10 @@ function coinRenderEntry(gate){
       '<div style="text-align:right"><div style="font-size:10px;color:#8491a1;font-weight:800">NEW SIZE</div>'+
       '<div style="font-size:16px;font-weight:900;color:'+(gate.entry?'#62e3a0':'#8491a1')+'">'+entry+'</div></div>'+
     '</div>'+
-    '<div style="margin-top:10px;font-size:12px;color:#c5d0dc;line-height:1.45">'+gate.reason+'</div>'+
-    '<div style="margin-top:8px;font-size:11px;color:#8491a1">RSI '+(d.rsi==null?'—':d.rsi.toFixed(1))+
+    '<div style="margin-top:10px;font-size:12px;color:#c5d0dc;line-height:1.45">'+(gate.reason||'—')+'</div>'+
+    '<div style="margin-top:8px;font-size:11px;color:#8491a1">RSI '+(d.rsi==null||!isFinite(d.rsi)?'—':(+d.rsi).toFixed(1))+
       ' · MACD '+(d.macdBull?'bull':(d.macdBear?'bear':'flat'))+
-      ' · Vol '+(d.vRatio!=null?d.vRatio.toFixed(2)+'×':'—')+
+      ' · Vol '+(d.vRatio!=null&&isFinite(d.vRatio)?(+d.vRatio).toFixed(2)+'×':'—')+
       ' · CVD '+(d.cvdSlope>0?'buy':(d.cvdSlope<0?'sell':'flat'))+
       ' · Trend '+(d.trendUp?'up':(d.trendDn?'down':'mix'))+'</div>';
   if($('coin-bias')){
@@ -2832,13 +2862,16 @@ async function loadCoinTF(){
       $('coin-cvd').textContent=(slope>=0?'BUY':'SELL')+' pressure';
       $('coin-cvd').style.color=slope>=0?'#62e3a0':'#ff6f7c';
     }
-    coinRenderFib(kl, spot, coinTF);
-    coinRenderMacd(kl);
-    coinRenderSR(kl);
     try{
       const gate = coinEntryGate(kl, coinTF);
       coinRenderEntry(gate);
-    }catch(ge){ console.warn('entry gate', ge); }
+    }catch(ge){
+      console.warn('entry gate', ge);
+      coinRenderEntry({state:'WATCH', entry:false, sizePct:0, reason:'Gate failed: '+(ge&&ge.message||ge), detail:{tf:coinTF}});
+    }
+    coinRenderFib(kl, spot, coinTF);
+    coinRenderMacd(kl);
+    coinRenderSR(kl);
     if($('coin-source'))$('coin-source').textContent='LIVE · GT OHLCV · '+coinTF.toUpperCase();
     if($('coin-meta'))$('coin-meta').textContent=coinPool.name+' · liq $'+fmt(coinPool.liq,0)+' · '+coinTF.toUpperCase()+(coinPool.dexUrl?' · pair ok':'');
   }catch(e){
