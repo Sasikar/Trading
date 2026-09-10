@@ -2593,7 +2593,8 @@ async function coinResolvePool(chain, ca){
   };
 }
 async function coinFetchOHLCV(network, pool, ctf){
-  /* GT rate-limits hour/day hard. Pull 15m bars (more reliable) then resample. */
+  /* GeckoTerminal: day aggregate=7 returns 400. Build 1W from daily.
+     15m limit≈500 is only ~5 days — too short for 1D/1W. Prefer day/hour. */
   function resample(bars, periodMs){
     const map={};
     for(const b of bars){
@@ -2610,34 +2611,37 @@ async function coinFetchOHLCV(network, pool, ctf){
     const list=((j.data||{}).attributes||{}).ohlcv_list||[];
     return list.map(x=>[x[0]*1000,+x[1],+x[2],+x[3],+x[4],+x[5]||0]).filter(k=>isFinite(k[4])).sort((a,b)=>a[0]-b[0]);
   }
-  // Try native TF first, then 15m resample fallback
   const tries=[];
-  if(ctf==='4h') tries.push({tf:'hour',agg:4,limit:120});
-  else if(ctf==='1d') tries.push({tf:'day',agg:1,limit:120});
-  else if(ctf==='1w') tries.push({tf:'day',agg:7,limit:80});
-  tries.push({tf:'minute',agg:15,limit:500}); // reliable fallback
-  tries.push({tf:'minute',agg:15,limit:200});
-  tries.push({tf:'hour',agg:1,limit:200});
+  if(ctf==='4h'){
+    tries.push({tf:'hour',agg:4,limit:150,rs:null});
+    tries.push({tf:'hour',agg:1,limit:300,rs:4*3600*1000});
+    tries.push({tf:'minute',agg:15,limit:1000,rs:4*3600*1000});
+  } else if(ctf==='1d'){
+    tries.push({tf:'day',agg:1,limit:180,rs:null});
+    tries.push({tf:'hour',agg:1,limit:500,rs:24*3600*1000});
+    tries.push({tf:'minute',agg:15,limit:1000,rs:24*3600*1000});
+  } else if(ctf==='1w'){
+    // NEVER day?aggregate=7 — GT returns 400
+    tries.push({tf:'day',agg:1,limit:220,rs:7*24*3600*1000});
+    tries.push({tf:'hour',agg:1,limit:1000,rs:7*24*3600*1000});
+  } else {
+    tries.push({tf:'hour',agg:4,limit:120,rs:null});
+    tries.push({tf:'hour',agg:1,limit:200,rs:4*3600*1000});
+  }
   let lastErr=null;
+  const minBars = ctf==='1w' ? 4 : (ctf==='1d' ? 10 : 5);
   for(const t of tries){
     try{
       const path='/networks/'+network+'/pools/'+encodeURIComponent(pool)+'/ohlcv/'+t.tf+'?aggregate='+t.agg+'&limit='+t.limit+'&currency=usd&token=base';
       const j=await gtGet(path);
       let bars=parseList(j);
-      if(!bars.length) continue;
-      if(t.tf==='minute'){
-        if(ctf==='4h') bars=resample(bars,4*3600*1000);
-        else if(ctf==='1d') bars=resample(bars,24*3600*1000);
-        else if(ctf==='1w') bars=resample(bars,7*24*3600*1000);
-      } else if(t.tf==='hour' && t.agg===1 && ctf==='4h'){
-        bars=resample(bars,4*3600*1000);
-      } else if(t.tf==='day' && t.agg===1 && ctf==='1w'){
-        bars=resample(bars,7*24*3600*1000);
-      }
-      if(bars.length>=5) return bars;
+      if(!bars.length){ lastErr=new Error('empty '+t.tf+'/'+t.agg); continue; }
+      if(t.rs) bars=resample(bars, t.rs);
+      if(bars.length>=minBars) return bars;
+      lastErr=new Error('too few bars after resample: '+bars.length+' ('+t.tf+' agg'+t.agg+')');
     }catch(e){ lastErr=e; }
   }
-  throw lastErr||new Error('No OHLCV');
+  throw lastErr||new Error('No OHLCV for '+ctf);
 }
 function coinResampleNote(){return '';}
 
@@ -2743,7 +2747,7 @@ async function loadCoinTF(){
   }catch(e){
     console.error(e);
     if($('coin-source'))$('coin-source').textContent='INDICATORS ERR';
-    if($('coin-meta'))$('coin-meta').textContent='Indicators: '+(e&&e.message||e)+' · Dex chart may still work';
+    if($('coin-meta'))$('coin-meta').textContent='Indicators '+coinTF.toUpperCase()+': '+(e&&e.message||e)+' · try 4H or reload';
     if($('coin-macd-tv'))$('coin-macd-tv').innerHTML='<div style="padding:16px;color:#ff6f7c;font-size:12px">MACD needs candles — '+(e&&e.message||e)+'</div>';
     if($('coin-sr-ladder'))$('coin-sr-ladder').innerHTML='<div style="padding:8px;color:#ff6f7c;font-size:12px">S/R needs candles</div>';
     if($('coin-fib-tv'))$('coin-fib-tv').innerHTML='<div style="padding:16px;color:#8491a1;font-size:12px">Fib chart waiting on OHLCV</div>';
