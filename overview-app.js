@@ -2830,33 +2830,91 @@ function mgVolScore(kl4, m4){
   dir=mgClamp(dir,-1,1);
   return mgClamp(mag*dir-0.25*thin);
 }
-function mgEvaluateSlice(kl4,klD,klW,domMod){
-  if(!kl4||!klD||kl4.length<30||klD.length<40) return null;
-  const sD=swingStructure(klD,Math.min(80,klD.length),'1D');
-  const sW=swingStructure(klW||klD,Math.min(52,(klW||klD).length),'1W');
-  const struct=mgClamp(0.6*mgStructScore(sW)+0.4*mgStructScore(sD));
-  const dTrend=trendFromCloses(klD.map(k=>+k[4]));
-  const c4=kl4.map(k=>+k[4]);
-  const e50=emaArr(c4,50), e200=emaArr(c4,200);
-  const last=c4[c4.length-1], a=e50[e50.length-1], b=e200[e200.length-1];
-  let t4=0;
+
+/* ===== MemeGate STATE MACHINE v2 =====
+States (priority): OFF > STRETCHED > STRONG CONFIRMED > EARLY > RESET/WAIT > WATCH
+BIG SIZE permitted only in STRONG CONFIRMED when not extended.
+Thresholds documented in mgStateExplain().
+*/
+const MG_STATES = ['OFF','STRETCHED','STRONG CONFIRMED','EARLY','RESET/WAIT','WATCH'];
+
+function mgBreakoutInfo(klD){
+  const n = klD.length;
+  if(n < 25) return {fresh:false,held:false,level:null,brokeToday:false,daysSince:99,pctAbove:0};
+  const closes = klD.map(k=>+k[4]);
+  const highs = klD.map(k=>+k[2]);
+  // prior 20-bar high excluding last 2 closes (no look-ahead on current formation beyond close)
+  let rh = -Infinity;
+  for(let i=n-22;i<=n-3;i++){ if(i>=0) rh = Math.max(rh, highs[i]); }
+  if(!isFinite(rh)) rh = highs[n-3];
+  const c0 = closes[n-1], c1 = closes[n-2], c2 = closes[n-3];
+  const brokeToday = c0 > rh && c1 <= rh;
+  const brokeYday = c1 > rh && c2 <= rh;
+  const held = c0 >= rh * 0.997;
+  let daysSince = 99;
+  for(let i=n-1;i>=Math.max(0,n-8);i--){
+    const prevH = (()=>{ let h=-Infinity; for(let j=i-21;j<=i-2;j++) if(j>=0) h=Math.max(h,highs[j]); return h; })();
+    if(closes[i] > prevH){ daysSince = n-1-i; break; }
+  }
+  const fresh = held && daysSince <= 3;
+  const pctAbove = rh ? ((c0/rh)-1)*100 : 0;
+  return {fresh, held, level:rh, brokeToday, brokeYday, daysSince, pctAbove};
+}
+
+function mgExtensionInfo(klD){
+  const stretch = (function(){ try{return calcStretchScore(klD)||{};}catch(e){return {};} })();
+  const n = klD.length;
+  const closes = klD.map(k=>+k[4]);
+  let consUp = 0;
+  for(let i=n-1;i>=1;i--){ if(closes[i]>=closes[i-1]) consUp++; else break; }
+  // gain from 10-bar low
+  let lo10 = Infinity;
+  for(let i=Math.max(0,n-11);i<n-1;i++) lo10 = Math.min(lo10, +klD[i][3]);
+  const gain10 = lo10>0 ? ((closes[n-1]/lo10)-1)*100 : 0;
+  const e50 = emaArr(closes,50);
+  const a = e50[e50.length-1];
+  const aboveEma = a!=null ? ((closes[n-1]/a)-1)*100 : 0;
+  const rsi = calcRSI(closes,14);
+  // STRETCHED thresholds — do NOT flag a single large breakout candle alone
+  let stretched = false;
+  let why = '';
+  // Note: caller suppresses STRETCHED during fresh breakout window (daysSince<=2)
+  if(stretch.intensity==='HIGH' && (stretch.side||'')==='UPSIDE' && consUp>=3){
+    stretched = true; why = 'HIGH upside stretch + ≥3 up days';
+  } else if(stretch.intensity==='ELEVATED' && (stretch.side||'')==='UPSIDE' && consUp>=3 && gain10>=10){
+    stretched = true; why = 'ELEVATED stretch + ≥3 up days + ≥10% from 10d low';
+  } else if(consUp>=4 && gain10>=14){
+    stretched = true; why = '≥4 consecutive up days + ≥14% thrust';
+  } else if(aboveEma>=12 && rsi!=null && rsi>=76 && consUp>=3){
+    stretched = true; why = '≥12% above EMA50 + RSI≥76 + ≥3 up days';
+  }
+  return {
+    stretch, stretched, why, consUp, gain10, aboveEma, rsi,
+    intensity: stretch.intensity||'NONE', side: stretch.side||'MID'
+  };
+}
+
+function mgConfirmGroups(kl4, klD, klW, domMod, brk, ext){
+  const sD = swingStructure(klD, Math.min(80,klD.length), '1D');
+  const sW = swingStructure(klW||klD, Math.min(52,(klW||klD).length), '1W');
+  const struct = mgClamp(0.6*mgStructScore(sW)+0.4*mgStructScore(sD));
+  const dTrend = trendFromCloses(klD.map(k=>+k[4]));
+  const c4 = kl4.map(k=>+k[4]);
+  const e50 = emaArr(c4,50), e200 = emaArr(c4,200);
+  const last = c4[c4.length-1], a=e50[e50.length-1], b=e200[e200.length-1];
+  let t4 = 0;
   if(a!=null&&b!=null&&last!=null){
     if(last>a&&last>b) t4=0.3; else if(last<a&&last<b) t4=-0.3;
   }
-  const t1=dTrend.dir==='BULLISH'?0.7:dTrend.dir==='BEARISH'?-0.7:0;
-  const trend=mgClamp(t1+t4);
-  const m4=mgMomScore(calcMACDSeries(c4,kl4.map(k=>Math.floor(k[0]/1000))));
-  const m1=mgMomScore(calcMACDSeries(klD.map(k=>+k[4]),klD.map(k=>Math.floor(k[0]/1000))));
-  const rsi=calcRSI(c4,14);
-  let rsiS=0;
-  if(rsi!=null){
-    rsiS=mgClamp((rsi-50)/25);
-    if(rsi>78) rsiS=mgClamp(rsiS-0.25*(rsi-78)/12);
-    if(rsi<22) rsiS=mgClamp(rsiS+0.15);
-  }
-  const volS=mgVolScore(kl4,m4);
-  const cvd=calcCVD(kl4);
-  let cvdS=0;
+  const t1 = dTrend.dir==='BULLISH'?0.7:dTrend.dir==='BEARISH'?-0.7:0;
+  const trend = mgClamp(t1+t4);
+  const pack4 = calcMACDSeries(c4, kl4.map(k=>Math.floor(k[0]/1000)));
+  const pack1 = calcMACDSeries(klD.map(k=>+k[4]), klD.map(k=>Math.floor(k[0]/1000)));
+  const m4 = mgMomScore(pack4);
+  const m1 = mgMomScore(pack1);
+  const volS = mgVolScore(kl4, m4);
+  const cvd = calcCVD(kl4);
+  let cvdS = 0;
   if(cvd.length){
     const lastC=cvd[cvd.length-1];
     const prev=cvd.length>5?cvd[cvd.length-6]:cvd[0];
@@ -2864,107 +2922,206 @@ function mgEvaluateSlice(kl4,klD,klW,domMod){
     const ref=Math.max(1, Math.abs(prev.cvd)*0.05+1);
     cvdS=mgClamp(0.5*mgSign(lastC.delta)+0.5*mgSign(slope)*Math.min(1,Math.abs(slope)/ref));
   }
-  const base=MG_W.struct*struct+MG_W.trend*trend+MG_W.m4*m4+MG_W.m1*m1+MG_W.rsi*rsiS+MG_W.vol*volS+MG_W.cvd*cvdS;
-  const finalS=mgClamp(base*(1+MG_DAMP*(domMod||0)));
-  const comps=[struct,trend,m4,m1,rsiS,volS,cvdS];
-  const vetoStruct=!!(sD&&sD.hardBreakDown);
-  const strongNeg=comps.filter(x=>x<=-0.55).length>=3;
-  const veto=vetoStruct||strongNeg;
-  let gate='WAIT', reason='MIXED';
-  if(veto){gate='OFF'; reason=vetoStruct?'OVERRIDE · 1D break':'OVERRIDE · multi-weak';}
-  else if(finalS<=MG_OFF){gate='OFF'; reason='SCORE';}
-  else if(finalS>=MG_ON){gate='ON'; reason='SCORE';}
-  const btc=+klD[klD.length-1][4];
-  let stretch={intensity:'NONE',side:'MID',score:0,label:'—'};
-  try{ stretch=calcStretchScore(klD)||stretch; }catch(e){}
-  const highStretch=stretch.intensity==='HIGH'||stretch.intensity==='ELEVATED';
-  const upsideStretch=(stretch.side||stretch.direction)==='UPSIDE'&&highStretch;
-  let entryQ='N/A';
-  if(gate==='ON'){
-    if(stretch.intensity==='HIGH'&&(stretch.side||'')==='UPSIDE') entryQ='POOR';
-    else if(upsideStretch) entryQ='STRETCHED';
-    else entryQ='GOOD';
-  } else if(gate==='WAIT') entryQ='WAIT';
-  else entryQ='OFF';
-  return {finalS,gate,reason,btc,base,stretch,entryQ};
+  const rsi4 = calcRSI(c4,14);
+  let rsiS = 0;
+  if(rsi4!=null){
+    rsiS=mgClamp((rsi4-50)/25);
+    if(rsi4>78) rsiS=mgClamp(rsiS-0.25*(rsi4-78)/12);
+    if(rsi4<22) rsiS=mgClamp(rsiS+0.15);
+  }
+  const base = MG_W.struct*struct+MG_W.trend*trend+MG_W.m4*m4+MG_W.m1*m1+MG_W.rsi*rsiS+MG_W.vol*volS+MG_W.cvd*cvdS;
+  const finalS = mgClamp(base*(1+MG_DAMP*(domMod||0)));
+
+  // Independent confirmation groups (boolean)
+  const gStruct = struct >= 0.35 && !(sD&&sD.hardBreakDown) && !(sW&&sW.hardBreakDown);
+  const gTrend = trend >= 0.40 && dTrend.dir!=='BEARISH';
+  const gMom = (m4 >= 0.20 && m1 >= -0.10) || (m4+m1 >= 0.50);
+  const gBreak = !!(brk && brk.fresh && brk.held);
+  const gVol = volS >= -0.05; // not contradicting
+  const gCvd = cvdS >= -0.05;
+  const gExtOk = !(ext && ext.stretched); // not excessively extended
+  const gMeme = (domMod==null) || domMod >= -0.35;
+
+  const groups = {
+    structure:gStruct, trend:gTrend, momentum:gMom, breakout:gBreak,
+    volume:gVol, cvd:gCvd, extension_ok:gExtOk, meme_env:gMeme
+  };
+  const passCount = Object.keys(groups).filter(k=>groups[k]).length;
+  const majorOk = gStruct && gTrend; // required for STRONG
+
+  return {
+    sD,sW,struct,trend,m4,m1,volS,cvdS,rsiS,rsi4,base,finalS,dTrend,
+    groups, passCount, majorOk, t4, t1
+  };
 }
-function mgApplyActionLayer(ev, prevGate){
-  if(!ev) return ev;
-  const gate=ev.gate;
-  const firstDay=gate==='ON'&&prevGate!=null&&prevGate!=='ON';
-  let entryQ=ev.entryQ;
-  let action='No new meme exposure.';
-  let actionCode='NONE';
-  let displayGate=gate;
-  if(gate==='OFF'){
-    action='No new meme exposure.';
-    actionCode='NO_NEW';
-  } else if(gate==='WAIT'){
-    action='No new meme entries yet.';
-    actionCode='WAIT';
-  } else if(gate==='ON'){
-    if(firstDay){
-      displayGate='WATCH';
-      actionCode='WATCH';
-      action='First ON day · WATCH only — no new size today. Re-check tomorrow or after a pullback.';
-      if(entryQ==='GOOD') entryQ='WATCH';
-    } else if(entryQ==='POOR'||entryQ==='STRETCHED'){
-      actionCode='NO_CHASE';
-      action='Meme risk allowed · NO CHASE — stretch elevated. Adds only on pullback, not into extension.';
-    } else {
-      actionCode='SIZE_OK';
-      action='Meme risk allowed · size only on pullback / individual meme confirmation — not a market buy.';
+
+function mgStateMachine(kl4, klD, klW, domMod, prevState){
+  if(!kl4||!klD||kl4.length<30||klD.length<40){
+    return {state:'WATCH',entry:false,sizePct:0,reason:'insufficient data',finalS:0};
+  }
+  const brk = mgBreakoutInfo(klD);
+  const ext = mgExtensionInfo(klD);
+  const conf = mgConfirmGroups(kl4, klD, klW, domMod||0, brk, ext);
+  const btc = +klD[klD.length-1][4];
+  const sD = conf.sD, sW = conf.sW;
+
+  // --- OFF ---
+  const vetoStruct = !!(sD&&sD.hardBreakDown) || !!(sW&&sW.hardBreakDown);
+  const strongBear = conf.trend <= -0.5 && conf.m1 <= -0.5;
+  const multiWeak = [conf.struct,conf.trend,conf.m4,conf.m1,conf.cvdS].filter(x=>x<=-0.55).length >= 3;
+  if(vetoStruct || strongBear || (conf.finalS <= MG_OFF && multiWeak) || conf.struct <= -0.7){
+    return {
+      state:'OFF', entry:false, sizePct:0, bigSize:false,
+      reason: vetoStruct ? 'Structural breakdown' : (multiWeak?'Multi-component weakness':'Bearish regime'),
+      finalS:conf.finalS, btc, conf, brk, ext, prevState
+    };
+  }
+
+  // Fresh breakout window = first 2 daily closes after/at range-high break.
+  // Spec: do NOT mark the first legitimate expansion candle(s) as STRETCHED.
+  const inFreshWindow = brk.fresh && brk.daysSince <= 2;
+
+  // --- STRONG CONFIRMED (checked before STRETCHED when still in fresh window) ---
+  const strongOk = conf.majorOk && conf.groups.breakout && conf.passCount >= 5
+     && conf.m4 >= 0.10 && conf.groups.meme_env
+     && (conf.groups.extension_ok || inFreshWindow);
+  if(strongOk && (conf.groups.extension_ok || inFreshWindow)){
+    // If outside fresh window and extended, fall through to STRETCHED instead
+    if(!(ext.stretched && !inFreshWindow)){
+      return {
+        state:'STRONG CONFIRMED', entry:true, sizePct:85, bigSize:true,
+        reason: 'Multi-group confirmation · BIG SIZE permitted',
+        finalS:conf.finalS, btc, conf, brk, ext, prevState
+      };
     }
   }
-  return Object.assign({},ev,{firstDay:!!firstDay,entryQ,action,actionCode,displayGate,prevGate:prevGate||null});
+
+  // --- EARLY (before STRETCHED inside fresh window) ---
+  const earlyStructOk = conf.struct >= -0.05 && !(sD&&sD.hardBreakDown);
+  const earlyTrendOk = conf.trend >= 0.10 || conf.dTrend.dir === 'BULLISH' || conf.dTrend.dir === 'NEUTRAL';
+  const earlyMomOk = conf.m4 >= 0.15 || conf.m1 >= 0.15;
+  const earlyVolOk = conf.volS >= -0.40;
+  const earlyMemeOk = (domMod==null) || domMod >= -0.55;
+  const meaningfulBreak = brk.fresh && brk.held && brk.daysSince <= 3;
+  if(earlyStructOk && earlyTrendOk && earlyMomOk && earlyVolOk && earlyMemeOk && meaningfulBreak && (conf.groups.extension_ok || inFreshWindow)){
+    if(!(ext.stretched && !inFreshWindow)){
+      return {
+        state:'EARLY', entry:true, sizePct:30, bigSize:false,
+        reason: 'Fresh breakout/expansion · starter size only',
+        finalS:conf.finalS, btc, conf, brk, ext, prevState
+      };
+    }
+  }
+
+  // --- STRETCHED (only after fresh window; bullish thesis may still hold) ---
+  if(ext.stretched && !inFreshWindow){
+    return {
+      state:'STRETCHED', entry:false, sizePct:0, bigSize:false,
+      reason: 'Do not chase · '+ (ext.why||'extension'),
+      finalS:conf.finalS, btc, conf, brk, ext, prevState
+    };
+  }
+
+  // --- RESET/WAIT ---
+  // After expansion cooled; no fresh breakout
+  const wasHot = prevState==='STRETCHED' || prevState==='STRONG CONFIRMED' || prevState==='EARLY';
+  const cooled = ext.intensity==='NONE' || ext.intensity==='MILD' || (ext.gain10 < 5 && ext.consUp <= 1);
+  if((wasHot && cooled && !brk.fresh) || (conf.finalS > MG_OFF && conf.finalS < MG_ON && !brk.fresh && conf.struct >= -0.2)){
+    return {
+      state:'RESET/WAIT', entry:false, sizePct:0, bigSize:false,
+      reason: wasHot && cooled ? 'Expansion cooled · waiting new breakout' : 'No fresh actionable breakout',
+      finalS:conf.finalS, btc, conf, brk, ext, prevState
+    };
+  }
+
+  // --- WATCH (default setup developing) ---
+  return {
+    state:'WATCH', entry:false, sizePct:0, bigSize:false,
+    reason: 'Setup developing · insufficient confirmation',
+    finalS:conf.finalS, btc, conf, brk, ext, prevState
+  };
 }
+
+function mgEvaluateSlice(kl4,klD,klW,domMod,prevState){
+  const sm = mgStateMachine(kl4,klD,klW,domMod,prevState||null);
+  return {
+    finalS: sm.finalS,
+    gate: sm.state,
+    reason: sm.reason,
+    btc: sm.btc,
+    base: sm.conf ? sm.conf.base : 0,
+    entry: !!sm.entry,
+    sizePct: sm.sizePct||0,
+    bigSize: !!sm.bigSize,
+    state: sm.state,
+    conf: sm.conf,
+    brk: sm.brk,
+    ext: sm.ext
+  };
+}
+
+function mgApplyActionLayer(ev, prevGate){
+  // State machine already encodes action; keep API compatible
+  if(!ev) return ev;
+  return Object.assign({}, ev, {
+    displayGate: ev.state || ev.gate,
+    action: ev.entry
+      ? (ev.bigSize ? 'Entry ON · BIG SIZE permitted (75–100% of max)' : 'Entry ON · starter size 25–40%')
+      : (ev.state==='STRETCHED' ? 'No new entry · do not chase (thesis may still be valid)' : 'Entry OFF · new exposure 0%'),
+    actionCode: ev.entry ? (ev.bigSize?'BIG':'EARLY_SIZE') : (ev.state==='STRETCHED'?'NO_CHASE':'NO_NEW'),
+    entryQ: ev.state,
+    firstDay: false,
+    prevGate: prevGate||null
+  });
+}
+
 function mgBuildHistory(klD,kl4,klW){
   const rows=[];
   if(!klD||klD.length<50) return rows;
   const n=klD.length;
-  const start=Math.max(40, n-30);
-  let prevGate=null;
+  const start=Math.max(40, n-45); // Aug15-ish window coverage
+  let prevState=null;
   for(let i=start;i<n;i++){
     const dSlice=klD.slice(0,i+1);
     const dayEnd=+dSlice[dSlice.length-1][0]+86400000-1;
     const hSlice=kl4.filter(k=>+k[0]<=dayEnd);
     const wSlice=(klW||[]).filter(k=>+k[0]<=dayEnd);
-    const raw=mgEvaluateSlice(hSlice.slice(-120), dSlice, wSlice.slice(-60), 0);
+    const raw=mgEvaluateSlice(hSlice.slice(-160), dSlice, wSlice.slice(-60), 0, prevState);
     if(!raw) continue;
-    const ev=mgApplyActionLayer(raw, prevGate);
+    const ev=mgApplyActionLayer(raw, prevState);
     const px0=ev.btc;
     let r1=null,r3=null,r7=null;
-    if(i+1<n){r1=((+klD[i+1][4]/px0)-1)*100;}
-    if(i+3<n){r3=((+klD[i+3][4]/px0)-1)*100;}
-    if(i+7<n){r7=((+klD[i+7][4]/px0)-1)*100;}
+    if(i+1<n) r1=((+klD[i+1][4]/px0)-1)*100;
+    if(i+3<n) r3=((+klD[i+3][4]/px0)-1)*100;
+    if(i+7<n) r7=((+klD[i+7][4]/px0)-1)*100;
     const dt=new Date(+dSlice[dSlice.length-1][0]);
     const ds=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
     rows.push({
-      date:ds,btc:px0,final:ev.finalS,
-      gate:ev.displayGate||ev.gate,
-      rawGate:ev.gate,
-      reason:ev.firstDay?'WATCH · first ON':(ev.actionCode==='NO_CHASE'?'NO CHASE · stretch':ev.reason),
-      entryQ:ev.entryQ,r1,r3,r7
+      date:ds, btc:px0, final:ev.finalS,
+      gate:ev.state||ev.gate, rawGate:ev.state||ev.gate,
+      reason:ev.reason, entryQ:ev.state,
+      entry:ev.entry, sizePct:ev.sizePct||0, bigSize:!!ev.bigSize,
+      r1,r3,r7
     });
-    prevGate=ev.gate;
+    prevState = ev.state || ev.gate;
   }
   return rows.reverse();
 }
+
 function mgRenderHistory(rows){
   const body=$('mg-hist-body'); if(!body) return;
-  if(!rows||!rows.length){body.innerHTML='<tr><td colspan="9" style="color:#8491a1">No history</td></tr>';return;}
+  if(!rows||!rows.length){body.innerHTML='<tr><td colspan="10" style="color:#8491a1">No history</td></tr>';return;}
   body.innerHTML=rows.map(r=>{
-    const g=r.gate||'WAIT';
-    const gcls=(g==='ON')?'on':(g==='OFF'?'off':'wait');
+    const g=r.gate||'WATCH';
+    const gcls = g==='STRONG CONFIRMED'||g==='EARLY'?'on':(g==='OFF'?'off':(g==='STRETCHED'?'off':'wait'));
     const f1=r.r1==null?'—':((r.r1>=0?'+':'')+r.r1.toFixed(1)+'%');
     const f3=r.r3==null?'—':((r.r3>=0?'+':'')+r.r3.toFixed(1)+'%');
     const f7=r.r7==null?'—':((r.r7>=0?'+':'')+r.r7.toFixed(1)+'%');
-    const eq=r.entryQ||'—';
-    const eqc=eq==='GOOD'?'#62e3a0':(eq==='POOR'||eq==='STRETCHED'?'#ff6f7c':(eq==='WATCH'?'#e6c878':'#8491a1'));
-    return '<tr><td>'+r.date+'</td><td>$'+Math.round(r.btc).toLocaleString('en-US')+'</td><td style="color:'+(r.final>=0?'#62e3a0':'#ff6f7c')+'">'+(r.final>=0?'+':'')+r.final.toFixed(2)+'</td><td class="'+gcls+'">'+g+'</td><td style="color:'+eqc+'">'+eq+'</td><td style="color:#8491a1;font-size:11px">'+r.reason+'</td><td>'+f1+'</td><td>'+f3+'</td><td>'+f7+'</td></tr>';
+    const ent = r.entry ? 'ON' : 'OFF';
+    const sz = r.entry ? ((r.bigSize?'BIG ':'')+(r.sizePct||0)+'%') : '0%';
+    return '<tr><td>'+r.date+'</td><td>$'+Math.round(r.btc).toLocaleString('en-US')+'</td><td style="color:'+(r.final>=0?'#62e3a0':'#ff6f7c')+'">'+(r.final>=0?'+':'')+r.final.toFixed(2)+'</td><td class="'+gcls+'">'+g+'</td><td style="color:'+(r.entry?'#62e3a0':'#8491a1')+'">'+ent+'</td><td>'+sz+'</td><td style="color:#8491a1;font-size:11px;max-width:140px;white-space:normal">'+r.reason+'</td><td>'+f1+'</td><td>'+f3+'</td><td>'+f7+'</td></tr>';
   }).join('');
 }
-
 
 async function loadMemeGate(){
   const box=$('mg-rows'); if(!box) return;
@@ -2972,139 +3129,95 @@ async function loadMemeGate(){
     const [kl4,klD,klW,dom]=await Promise.all([
       fetchKlines('4h',400), fetchKlines('1d',220), fetchKlines('1w',120), fetchBtcDominance()
     ]);
-    const sD=swingStructure(klD,80,'1D');
-    const sW=swingStructure(klW,52,'1W');
-    const struct=mgClamp(0.6*mgStructScore(sW)+0.4*mgStructScore(sD));
-    const dTrend=trendFromCloses(klD.map(k=>+k[4]));
-    const c4=kl4.map(k=>+k[4]);
-    const e50=emaArr(c4,50), e200=emaArr(c4,200);
-    const last=c4[c4.length-1], a=e50[e50.length-1], b=e200[e200.length-1];
-    let t4=0;
-    if(a!=null&&b!=null&&last!=null){
-      if(last>a&&last>b) t4=0.3; else if(last<a&&last<b) t4=-0.3;
-    }
-    const t1=dTrend.dir==='BULLISH'?0.7:dTrend.dir==='BEARISH'?-0.7:0;
-    const trend=mgClamp(t1+t4);
-    const m4=mgMomScore(calcMACDSeries(c4,kl4.map(k=>Math.floor(k[0]/1000))));
-    const m1=mgMomScore(calcMACDSeries(klD.map(k=>+k[4]),klD.map(k=>Math.floor(k[0]/1000))));
-    const rsi=calcRSI(c4,14);
-    let rsiS=0;
-    if(rsi!=null){
-      rsiS=mgClamp((rsi-50)/25);
-      if(rsi>78) rsiS=mgClamp(rsiS-0.25*(rsi-78)/12);
-      if(rsi<22) rsiS=mgClamp(rsiS+0.15);
-    }
-    const vols=kl4.map(k=>+k[5]||0);
-    const lastV=vols[vols.length-1];
-    const avg=vols.slice(-21,-1).reduce((s,x)=>s+x,0)/Math.max(1,Math.min(20,vols.length-1));
-    const vRatio=avg?lastV/avg:1;
-    let volS=mgClamp((vRatio-1)/0.8);
-    const lastBar=kl4[kl4.length-1];
-    if(lastBar&&+lastBar[4]<+lastBar[1]&&vRatio>1.3) volS=mgClamp(-Math.abs(volS));
-    const cvd=calcCVD(kl4);
-    let cvdS=0;
-    if(cvd.length){
-      const lastC=cvd[cvd.length-1];
-      const prev=cvd.length>5?cvd[cvd.length-6]:cvd[0];
-      const slope=lastC.cvd-prev.cvd;
-      const ref=Math.max(1, Math.abs(prev.cvd)*0.05+1);
-      cvdS=mgClamp(0.5*mgSign(lastC.delta)+0.5*mgSign(slope)*Math.min(1,Math.abs(slope)/ref));
-    }
-    const base=MG_W.struct*struct+MG_W.trend*trend+MG_W.m4*m4+MG_W.m1*m1+MG_W.rsi*rsiS+MG_W.vol*volS+MG_W.cvd*cvdS;
-    const dm=mgDomModifier(dom);
-    let finalS=mgClamp(base*(1+MG_DAMP*dm.mod));
-    const comps=[struct,trend,m4,m1,rsiS,volS,cvdS];
-    const vetoStruct=!!(sD&&sD.hardBreakDown);
-    const strongNeg=comps.filter(x=>x<=-0.55).length>=3;
-    const veto=vetoStruct||strongNeg;
-    let gate='WAIT', klass='wait', label='🟡 BTC MEME GATE: WAIT';
-    if(veto||finalS<=MG_OFF){gate='OFF';klass='off';label='🔴 BTC MEME GATE: MEME OFF';}
-    else if(finalS>=MG_ON){gate='ON';klass='on';label='🟢 BTC MEME GATE: MEME ON';}
-    /* Permission vs entry quality · stretch no-chase · first-day WATCH */
-    let stretchLive={intensity:'NONE',side:'MID',score:0,label:'—'};
-    try{stretchLive=calcStretchScore(klD)||stretchLive;}catch(e){}
-    const highUp=(stretchLive.intensity==='HIGH'||stretchLive.intensity==='ELEVATED')&&(stretchLive.side||'')==='UPSIDE';
-    let entryQ='N/A';
-    if(gate==='ON'){
-      if(stretchLive.intensity==='HIGH'&&(stretchLive.side||'')==='UPSIDE') entryQ='POOR';
-      else if(highUp) entryQ='STRETCHED';
-      else entryQ='GOOD';
-    } else if(gate==='WAIT') entryQ='WAIT';
-    else entryQ='OFF';
-    let prevGateLive=null;
+    const dm = mgDomModifier(dom||{});
+    // previous state from history (day before last)
+    let prevState=null;
     try{
       const histTmp=mgBuildHistory(klD,kl4,klW);
-      /* hist is newest-first; day before today is index 1 if today matches last bar */
-      if(histTmp&&histTmp.length>1) prevGateLive=histTmp[1].rawGate||histTmp[1].gate;
-      else if(histTmp&&histTmp.length===1) prevGateLive=null;
+      if(histTmp&&histTmp.length>1) prevState=histTmp[1].rawGate||histTmp[1].gate;
     }catch(e){}
-    const layered=mgApplyActionLayer({finalS,gate,reason:gate==='ON'?'SCORE':(gate==='OFF'?'SCORE':'MIXED'),btc:+klD[klD.length-1][4],entryQ,stretch:stretchLive}, prevGateLive);
-    entryQ=layered.entryQ;
-    const actionCode=layered.actionCode;
-    const actionText=layered.action;
-    if(layered.displayGate==='WATCH'){
-      gate='WATCH'; klass='wait'; label='🟡 BTC MEME GATE: WATCH (first ON day)';
-    } else if(gate==='ON'&&(entryQ==='STRETCHED'||entryQ==='POOR')){
-      label='🟢 BTC MEME GATE: ON · NO CHASE';
-    }
-    const mean=comps.reduce((s,x)=>s+x,0)/comps.length;
-    const std=Math.sqrt(comps.reduce((s,x)=>s+(x-mean)*(x-mean),0)/comps.length);
-    const agree=mgClamp(1-std/1.2,0,1);
-    const complete=1;
-    const dist=Math.min(1, Math.abs(finalS-(gate==='WAIT'?0:(gate==='ON'?MG_ON:MG_OFF)))/0.35);
-    const conf=Math.round(100*mgClamp(0.45*agree+0.25*complete+0.30*dist,0,1));
-    const rows=[
-      ['1W Structure',mgStructScore(sW),(sW&&sW.detail)||'—'],
-      ['1D Structure',mgStructScore(sD),(sD&&sD.detail)||'—'],
-      ['HTF Structure (20%)',struct, (sW&&sW.hardBreakDown?'1W broken ':'')+(sD&&sD.hardBreakDown?'1D broken':'blend')],
-      ['BTC Trend (20%)',trend,dTrend.dir+(a!=null?(' · 4H vs EMA50/200'):'')],
-      ['4H Momentum (15%)',m4,m4>0.2?'improving/positive':m4<-0.2?'deteriorating':'flat'],
-      ['1D Momentum (10%)',m1,m1>0.2?'positive':m1<-0.2?'negative':'flat'],
-      ['RSI 4H (10%)',rsiS,rsi==null?'n/a':('RSI '+rsi.toFixed(1))],
-      ['Volume 4H (10%)',volS,vRatio.toFixed(2)+'× vs avg'],
-      ['CVD (10%)',cvdS,cvdS>0?'buy-leaning':cvdS<0?'sell-leaning':'mixed'],
-      ['BTC.D modifier',dm.mod,dm.regime+(dom.d!=null?(' · D '+dom.d.toFixed(1)+'%'):'')],
-    ];
-    box.innerHTML=rows.map(([n,sc,st])=>{
-      const col=sc>0.15?'#62e3a0':sc<-0.15?'#ff6f7c':'#e6c878';
-      return '<tr><td>'+n+'</td><td class="sc" style="color:'+col+'">'+(sc>=0?'+':'')+sc.toFixed(2)+'</td><td>'+st+'</td></tr>';
+    const sm = mgStateMachine(kl4, klD, klW, dm.mod||0, prevState);
+    const conf = sm.conf || {};
+    const state = sm.state;
+    const finalS = sm.finalS||0;
+    let klass='wait', label='🟡 BTC MEME GATE: '+state;
+    if(state==='OFF'){klass='off'; label='🔴 BTC MEME GATE: OFF';}
+    else if(state==='STRETCHED'){klass='off'; label='🟠 BTC MEME GATE: STRETCHED · NO CHASE';}
+    else if(state==='STRONG CONFIRMED'){klass='on'; label='🟢 BTC MEME GATE: STRONG CONFIRMED · BIG SIZE OK';}
+    else if(state==='EARLY'){klass='on'; label='🟢 BTC MEME GATE: EARLY · STARTER SIZE';}
+    else if(state==='RESET/WAIT'){klass='wait'; label='🟡 BTC MEME GATE: RESET / WAIT';}
+    else {klass='wait'; label='🟡 BTC MEME GATE: WATCH';}
+
+    const gStruct=conf.groups?conf.groups.structure:false;
+    const gTrend=conf.groups?conf.groups.trend:false;
+    const gMom=conf.groups?conf.groups.momentum:false;
+    const gBrk=conf.groups?conf.groups.breakout:false;
+    const gVol=conf.groups?conf.groups.volume:false;
+    const gCvd=conf.groups?conf.groups.cvd:false;
+    const gExt=conf.groups?conf.groups.extension_ok:false;
+    const gMeme=conf.groups?conf.groups.meme_env:false;
+
+    box.innerHTML=[
+      ['State', state, sm.reason||''],
+      ['Entry', sm.entry?'ON':'OFF', sm.bigSize?'BIG SIZE permitted':'New size '+(sm.sizePct||0)+'%'],
+      ['HTF Structure', (conf.struct||0), (conf.sW&&conf.sW.detail)||'—'],
+      ['BTC Trend', (conf.trend||0), (conf.dTrend&&conf.dTrend.dir)||'—'],
+      ['4H Momentum', (conf.m4||0), gMom?'ok':'weak'],
+      ['1D Momentum', (conf.m1||0), ''],
+      ['Breakout', gBrk?1:0, sm.brk?(sm.brk.fresh?'fresh hold':'no fresh'):'—'],
+      ['Volume', (conf.volS||0), gVol?'supportive/neutral':'contradicting'],
+      ['CVD', (conf.cvdS||0), gCvd?'ok':'weak'],
+      ['Extension', sm.ext&&sm.ext.stretched?-1:1, sm.ext?(sm.ext.intensity+' · '+sm.ext.side):'—'],
+      ['Meme env (BTC.D)', dm.mod||0, dm.regime||'n/a'],
+      ['Confirm groups', conf.passCount||0, (conf.passCount||0)+'/8 pass'],
+    ].map(([n,sc,st])=>{
+      const num = typeof sc==='number'?sc:0;
+      const col=num>0.15?'#62e3a0':num<-0.15?'#ff6f7c':'#e6c878';
+      const scTxt = typeof sc==='number' ? ((sc>=0?'+':'')+sc.toFixed(2)) : String(sc);
+      return '<tr><td>'+n+'</td><td class="sc" style="color:'+col+'">'+scTxt+'</td><td>'+st+'</td></tr>';
     }).join('');
+
     const g=$('mg-gate'); if(g){g.textContent=label;g.className='gate '+klass;}
     if($('mg-score'))$('mg-score').textContent=(finalS>=0?'+':'')+finalS.toFixed(2);
-    if($('mg-conf'))$('mg-conf').textContent=conf+'%';
-    if($('mg-dom'))$('mg-dom').textContent=dom.d!=null?(dom.d.toFixed(1)+'%'):'n/a';
+    if($('mg-conf'))$('mg-conf').textContent=(conf.passCount||0)+'/8';
+    if($('mg-dom'))$('mg-dom').textContent=dom&&dom.d!=null?(dom.d.toFixed(1)+'%'):'n/a';
     if($('mg-entry')){
-      $('mg-entry').textContent=entryQ;
-      $('mg-entry').style.color=entryQ==='GOOD'?'#62e3a0':(entryQ==='POOR'||entryQ==='STRETCHED'?'#ff6f7c':(entryQ==='WATCH'?'#e6c878':'#8491a1'));
+      $('mg-entry').textContent=sm.entry?'ON · '+(sm.sizePct||0)+'%':'OFF';
+      $('mg-entry').style.color=sm.entry?'#62e3a0':'#8491a1';
     }
-    if($('mg-stretch'))$('mg-stretch').textContent=(stretchLive.intensity||'NONE')+' · '+(stretchLive.side||'MID');
-    if($('mg-source'))$('mg-source').textContent='LIVE · engine reuse';
-    const missing=[];
-    if(m4<0.2) missing.push('4H momentum confirmation');
-    if(volS<0.1) missing.push('volume confirmation');
-    if(cvdS<=0) missing.push('CVD buy pressure');
-    if(trend<0.2) missing.push('clear BTC trend');
-    if(struct<0.2) missing.push('clean HTF structure');
-    if(dm.mod<0) missing.push('friendlier BTC.D / alt-risk backdrop');
-    let why='';
-    if(gate==='WATCH') why='Permission score cleared ON, but this is the first day after non-ON. First-day rule: WATCH only — do not add size until day-2 confirmation or a pullback from the ON-day high.';
-    else if(gate==='ON'&&(entryQ==='STRETCHED'||entryQ==='POOR')) why='Permission is ON, but daily stretch is elevated on the upside ('+(stretchLive.label||'extended')+'). Treat as no-chase: meme risk allowed, new size only after pullback — not into extension (Sep-3-style local high protection).';
-    else if(gate==='ON') why='BTC HTF structure is not in confirmed breakdown, trend/momentum mix is constructive enough after BTC.D dampening, and no risk veto fired. Permission ON · entry quality GOOD — still not a buy of a specific coin.';
-    else if(gate==='OFF') why=vetoStruct?'Confirmed 1D structural breakdown vetoed meme risk.':(strongNeg?'Multiple major components are simultaneously weak.':'Final score is at or below the OFF threshold after BTC.D context.');
-    else why='Score is in the mixed band. Some BTC pieces may be fine, but confirmation is not strong enough to permit new meme exposure.';
-    if($('mg-why'))$('mg-why').textContent=why;
-    if($('mg-miss'))$('mg-miss').textContent=(gate==='ON'||gate==='WATCH')?('Permission side clear. Entry: '+entryQ+' · stretch '+((stretchLive.intensity||'NONE'))+'. Individual meme setup still required.'):(missing.slice(0,4).join(' · ')||'Closer agreement among structure, momentum, and CVD.');
-    if($('mg-inv'))$('mg-inv').textContent='Invalidation: 1D hard breakdown, or final score ≤ −0.35, or ≥3 major components ≤ −0.55. OFF = stop adding — not an automatic exit of existing size.';
-    if($('mg-act'))$('mg-act').textContent=actionText||(gate==='OFF'?'No new meme exposure.':'No new meme entries yet.');
-    try{mgRenderHistory(mgBuildHistory(klD,kl4,klW));}catch(e){if($('mg-hist-body'))$('mg-hist-body').innerHTML='<tr><td colspan="9">History error</td></tr>';}
+    if($('mg-stretch'))$('mg-stretch').textContent=state;
+    if($('mg-source'))$('mg-source').textContent='LIVE · state machine v2';
+
+    if($('mg-why'))$('mg-why').textContent=sm.reason||'—';
+    if($('mg-miss')){
+      const miss=[];
+      if(!gStruct) miss.push('HTF structure');
+      if(!gTrend) miss.push('BTC trend');
+      if(!gMom) miss.push('momentum');
+      if(!gBrk) miss.push('fresh breakout hold');
+      if(!gVol) miss.push('volume');
+      if(!gCvd) miss.push('CVD');
+      if(!gExt) miss.push('extension OK');
+      if(!gMeme) miss.push('meme environment');
+      $('mg-miss').textContent = state==='STRONG CONFIRMED' ? 'None for permission · individual meme setup still required'
+        : (miss.slice(0,5).join(' · ')||'—');
+    }
+    if($('mg-inv'))$('mg-inv').textContent='OFF: structural breakdown / multi-weak / bearish regime. STRETCHED: no new size (not a bearish call). Exit rules remain separate.';
+    if($('mg-act')){
+      if(state==='STRONG CONFIRMED') $('mg-act').textContent='Entry ON · BIG SIZE permitted (75–100% of max) · individual meme confirmation still required.';
+      else if(state==='EARLY') $('mg-act').textContent='Entry ON · starter size 25–40% · do NOT use BIG SIZE yet.';
+      else if(state==='STRETCHED') $('mg-act').textContent='No new entry · do not chase · existing size managed by separate exit system.';
+      else if(state==='OFF') $('mg-act').textContent='No new meme exposure.';
+      else $('mg-act').textContent='Entry OFF · new exposure 0% · wait for EARLY or STRONG CONFIRMED.';
+    }
+    try{mgRenderHistory(mgBuildHistory(klD,kl4,klW));}catch(e){if($('mg-hist-body'))$('mg-hist-body').innerHTML='<tr><td colspan="10">History error: '+(e&&e.message||e)+'</td></tr>';}
     if($('mg-formulas'))$('mg-formulas').textContent=
-      'FORMULAS (initial params)\\n'+
-      'BaseScore = 0.20·Struct + 0.20·Trend + 0.15·Mom4H + 0.10·Mom1D + 0.10·RSI + 0.10·Vol + 0.10·CVD\\n'+
-      'Final = clamp(Base · (1 + 0.35·DominanceModifier), -1, +1)\\n'+
-      'ON if Final≥+0.35 and no veto · WAIT if |Final|<0.35 · OFF if Final≤−0.35 or veto\\n'+
-      'Veto: 1D hardBreakDown OR ≥3 components ≤ −0.55\\n'+
-      'Confidence ≠ |score| · uses agreement + completeness + distance-to-threshold\\n'+
-      'Backtest/ablation/OOS not run in this live layer — verdict: INCONCLUSIVE until tested.';
+      'STATE MACHINE v2 (priority: OFF > STRETCHED > STRONG CONFIRMED > EARLY > RESET/WAIT > WATCH)\\n'+
+      'STRONG CONFIRMED: structure+trend required, breakout held, not extended, ≥6/8 confirm groups, BIG SIZE OK\\n'+
+      'EARLY: fresh breakout (≤3d hold above 20d prior high) + structure/trend/mom min + starter 25–40%\\n'+
+      'STRETCHED: HIGH upside stretch OR (ELEVATED+≥3 up days+≥8% thrust) OR (≥4 up+≥12%) OR (≥10% above EMA50+RSI≥75) — NO single green candle\\n'+
+      'OFF: hard breakdown OR multi-weak OR bearish trend+mom — not a healthy pullback\\n'+
+      'Path: WATCH → EARLY → STRONG CONFIRMED → STRETCHED → RESET/WAIT → … · ANY → OFF';
   }catch(e){
     if($('mg-why'))$('mg-why').textContent='MemeGate load failed: '+(e&&e.message||e);
     if($('mg-source'))$('mg-source').textContent='ERROR';
