@@ -2508,11 +2508,110 @@ function showMemeGate(on){
   if(mg){mg.style.display=on?'block':'none';}
 }
 
+
+function mgVolScore(kl4, m4){
+  if(!kl4||kl4.length<5) return 0;
+  const vols=kl4.map(k=>+k[5]||0);
+  const lastV=vols[vols.length-1];
+  const avg=vols.slice(-21,-1).reduce((s,x)=>s+x,0)/Math.max(1,Math.min(20,vols.length-1));
+  const vRatio=avg?lastV/avg:1;
+  const mag=mgClamp((vRatio-1)/0.8,0,1);
+  const thin=mgClamp((0.7-vRatio)/0.5,0,1);
+  const last=kl4[kl4.length-1];
+  let dir=0;
+  if(last) dir+=0.50*mgSign((+last[4])-(+last[1]));
+  const c4=kl4.map(k=>+k[4]);
+  if(c4.length>=4) dir+=0.30*mgSign(c4[c4.length-1]-c4[c4.length-4]);
+  dir+=0.20*mgSign(m4);
+  dir=mgClamp(dir,-1,1);
+  return mgClamp(mag*dir-0.25*thin);
+}
+function mgEvaluateSlice(kl4,klD,klW,domMod){
+  if(!kl4||!klD||kl4.length<30||klD.length<40) return null;
+  const sD=swingStructure(klD,Math.min(80,klD.length),'1D');
+  const sW=swingStructure(klW||klD,Math.min(52,(klW||klD).length),'1W');
+  const struct=mgClamp(0.6*mgStructScore(sW)+0.4*mgStructScore(sD));
+  const dTrend=trendFromCloses(klD.map(k=>+k[4]));
+  const c4=kl4.map(k=>+k[4]);
+  const e50=emaArr(c4,50), e200=emaArr(c4,200);
+  const last=c4[c4.length-1], a=e50[e50.length-1], b=e200[e200.length-1];
+  let t4=0;
+  if(a!=null&&b!=null&&last!=null){
+    if(last>a&&last>b) t4=0.3; else if(last<a&&last<b) t4=-0.3;
+  }
+  const t1=dTrend.dir==='BULLISH'?0.7:dTrend.dir==='BEARISH'?-0.7:0;
+  const trend=mgClamp(t1+t4);
+  const m4=mgMomScore(calcMACDSeries(c4,kl4.map(k=>Math.floor(k[0]/1000))));
+  const m1=mgMomScore(calcMACDSeries(klD.map(k=>+k[4]),klD.map(k=>Math.floor(k[0]/1000))));
+  const rsi=calcRSI(c4,14);
+  let rsiS=0;
+  if(rsi!=null){
+    rsiS=mgClamp((rsi-50)/25);
+    if(rsi>78) rsiS=mgClamp(rsiS-0.25*(rsi-78)/12);
+    if(rsi<22) rsiS=mgClamp(rsiS+0.15);
+  }
+  const volS=mgVolScore(kl4,m4);
+  const cvd=calcCVD(kl4);
+  let cvdS=0;
+  if(cvd.length){
+    const lastC=cvd[cvd.length-1];
+    const prev=cvd.length>5?cvd[cvd.length-6]:cvd[0];
+    const slope=lastC.cvd-prev.cvd;
+    const ref=Math.max(1, Math.abs(prev.cvd)*0.05+1);
+    cvdS=mgClamp(0.5*mgSign(lastC.delta)+0.5*mgSign(slope)*Math.min(1,Math.abs(slope)/ref));
+  }
+  const base=MG_W.struct*struct+MG_W.trend*trend+MG_W.m4*m4+MG_W.m1*m1+MG_W.rsi*rsiS+MG_W.vol*volS+MG_W.cvd*cvdS;
+  const finalS=mgClamp(base*(1+MG_DAMP*(domMod||0)));
+  const comps=[struct,trend,m4,m1,rsiS,volS,cvdS];
+  const vetoStruct=!!(sD&&sD.hardBreakDown);
+  const strongNeg=comps.filter(x=>x<=-0.55).length>=3;
+  const veto=vetoStruct||strongNeg;
+  let gate='WAIT', reason='MIXED';
+  if(veto){gate='OFF'; reason=vetoStruct?'OVERRIDE · 1D break':'OVERRIDE · multi-weak';}
+  else if(finalS<=MG_OFF){gate='OFF'; reason='SCORE';}
+  else if(finalS>=MG_ON){gate='ON'; reason='SCORE';}
+  const btc=+klD[klD.length-1][4];
+  return {finalS,gate,reason,btc,base};
+}
+function mgBuildHistory(klD,kl4,klW){
+  const rows=[];
+  if(!klD||klD.length<50) return rows;
+  const n=klD.length;
+  const start=Math.max(40, n-30);
+  for(let i=start;i<n;i++){
+    const dSlice=klD.slice(0,i+1);
+    const dayEnd=+dSlice[dSlice.length-1][0]+86400000-1;
+    const hSlice=kl4.filter(k=>+k[0]<=dayEnd);
+    const wSlice=(klW||[]).filter(k=>+k[0]<=dayEnd);
+    const ev=mgEvaluateSlice(hSlice.slice(-120), dSlice, wSlice.slice(-60), 0);
+    if(!ev) continue;
+    const px0=ev.btc;
+    let r1=null,r3=null;
+    if(i+1<n){r1=((+klD[i+1][4]/px0)-1)*100;}
+    if(i+3<n){r3=((+klD[i+3][4]/px0)-1)*100;}
+    const dt=new Date(+dSlice[dSlice.length-1][0]);
+    const ds=dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0');
+    rows.push({date:ds,btc:px0,final:ev.finalS,gate:ev.gate,reason:ev.reason,r1,r3});
+  }
+  return rows.reverse(); // newest first
+}
+function mgRenderHistory(rows){
+  const body=$('mg-hist-body'); if(!body) return;
+  if(!rows||!rows.length){body.innerHTML='<tr><td colspan="7" style="color:#8491a1">No history</td></tr>';return;}
+  body.innerHTML=rows.map(r=>{
+    const gcls=r.gate==='ON'?'on':(r.gate==='OFF'?'off':'wait');
+    const f1=r.r1==null?'—':((r.r1>=0?'+':'')+r.r1.toFixed(1)+'%');
+    const f3=r.r3==null?'—':((r.r3>=0?'+':'')+r.r3.toFixed(1)+'%');
+    return '<tr><td>'+r.date+'</td><td>$'+Math.round(r.btc).toLocaleString('en-US')+'</td><td style="color:'+(r.final>=0?'#62e3a0':'#ff6f7c')+'">'+(r.final>=0?'+':'')+r.final.toFixed(2)+'</td><td class="'+gcls+'">'+r.gate+'</td><td style="color:#8491a1;font-size:11px">'+r.reason+'</td><td>'+f1+'</td><td>'+f3+'</td></tr>';
+  }).join('');
+}
+
+
 async function loadMemeGate(){
   const box=$('mg-rows'); if(!box) return;
   try{
     const [kl4,klD,klW,dom]=await Promise.all([
-      fetchKlines('4h',120), fetchKlines('1d',220), fetchKlines('1w',120), fetchBtcDominance()
+      fetchKlines('4h',400), fetchKlines('1d',220), fetchKlines('1w',120), fetchBtcDominance()
     ]);
     const sD=swingStructure(klD,80,'1D');
     const sW=swingStructure(klW,52,'1W');
@@ -2604,6 +2703,7 @@ async function loadMemeGate(){
     if($('mg-miss'))$('mg-miss').textContent=gate==='ON'?'None required for permission — individual meme setup still required.':(missing.slice(0,4).join(' · ')||'Closer agreement among structure, momentum, and CVD.');
     if($('mg-inv'))$('mg-inv').textContent='Invalidation: 1D hard breakdown, or final score ≤ −0.35, or ≥3 major components ≤ −0.55.';
     if($('mg-act'))$('mg-act').textContent=gate==='ON'?'Meme risk permitted — individual meme confirmation still required.':(gate==='OFF'?'No new meme exposure.':'No new meme entries yet.');
+    try{mgRenderHistory(mgBuildHistory(klD,kl4,klW));}catch(e){if($('mg-hist-body'))$('mg-hist-body').innerHTML='<tr><td colspan="7">History error</td></tr>';}
     if($('mg-formulas'))$('mg-formulas').textContent=
       'FORMULAS (initial params)\\n'+
       'BaseScore = 0.20·Struct + 0.20·Trend + 0.15·Mom4H + 0.10·Mom1D + 0.10·RSI + 0.10·Vol + 0.10·CVD\\n'+
