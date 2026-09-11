@@ -3033,13 +3033,13 @@ function coinRenderEntry(gate){
     emaLine = '<div style="margin-top:8px;font-size:11px;color:'+emaCol+'">EMA50 dist '+(d.aboveEma50Pct>=0?'+':'')+(+d.aboveEma50Pct).toFixed(1)+'%'
       +(d.ema50!=null?' · EMA50 '+(d.ema50>=0.01?d.ema50.toPrecision(4):d.ema50.toExponential(2)):'')
       +(d.rsi!=null?' · RSI '+(+d.rsi).toFixed(1):'')
-      +(d.age!=null?' · break age '+d.age+(d.fresh?' (fresh)':''):'')
+      +(d.age!=null && d.age < 50 ? ' · break age '+fmtAge(d.age)+(d.fresh?' (fresh)':'') : ' · breakout: NO')
       +'</div>';
     if(d.extensionFailWhy && !d.stretched){
       emaLine += '<div style="margin-top:4px;font-size:11px;color:#f0a060">Extension ✕ · '+d.extensionFailWhy+'</div>';
     }
   } else if(d.age!=null){
-    emaLine = '<div style="margin-top:8px;font-size:11px;color:#8491a1">Break age '+d.age+(d.fresh?' (fresh ≤2)':' (not fresh)')+'</div>';
+    emaLine = '<div style="margin-top:8px;font-size:11px;color:#8491a1">'+(d.age!=null&&d.age<50?('Break age '+fmtAge(d.age)+(d.fresh?' (fresh ≤2)':' (not fresh)')):'Breakout: NO · Age — · Fresh NO')+'</div>';
   }
 
   el.style.display = 'block';
@@ -3084,6 +3084,16 @@ function _med(a){
   return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
 }
 function _fmtPct(x){ return x==null||!isFinite(x) ? '—' : ((x>=0?'+':'')+x.toFixed(1)+'%'); }
+function fmtAge(age){
+  /* Never show sentinel 99 (or any age>=50) as real breakout age */
+  if(age==null || !isFinite(age) || age < 0 || age >= 50) return '—';
+  return String(Math.floor(age));
+}
+function fmtFresh(age, held){
+  if(age==null || !isFinite(age) || age >= 50 || held===false) return 'NO';
+  return age <= 2 ? 'YES' : 'NO';
+}
+
 function _fmtDate(ms){
   try{ return new Date(ms).toISOString().slice(0,10); }catch(e){ return '—'; }
 }
@@ -3153,23 +3163,34 @@ function coinStateHistory(kl, tfLabel){
     out.counts[st] = (out.counts[st]||0)+1;
 
     // Breakout event — age anchored to FIRST candle of current run (not latest high)
-    let event = '—';
-    const age = d.age!=null ? d.age : (brk.age!=null?brk.age:null);
-    // AUTHORITATIVE display: fresh = age <= 2
-    const fresh = (age!=null && age <= 2 && !!(d.fresh!=null ? d.fresh : brk.fresh));
+    // Display: never show Age 99 sentinel
+    let event = 'NO BREAKOUT';
+    let ageRaw = d.age!=null ? d.age : (brk.age!=null?brk.age:null);
     const held = !!(brk.held);
     const firstIdx = brk.firstIdx;
     const firstTs = brk.firstTs!=null ? brk.firstTs : (firstIdx!=null ? +kl[firstIdx][0] : null);
-    if(firstIdx!=null && held){
-      if(prevFirstIdx!==firstIdx && age===0){
+    let ageDisp = null; // null → UI shows —
+    let freshDisp = false;
+
+    if(firstIdx!=null && held && ageRaw!=null && ageRaw < 50){
+      ageDisp = ageRaw;
+      freshDisp = ageRaw <= 2;
+      if(prevFirstIdx!==firstIdx && ageRaw===0){
         event = 'NEW BREAKOUT';
         out.breakouts.push({t: firstTs!=null?firstTs:+kl[i][0], candleT:+kl[i][0], i, firstIdx, level:brk.level});
-      } else if(age!=null && age>=0 && age < 99){
+      } else {
         event = 'BREAKOUT HELD';
       }
       prevFirstIdx = firstIdx;
     } else if(prevFirstIdx!=null && !held){
       event = 'BREAKOUT LOST';
+      ageDisp = null;
+      freshDisp = false;
+      prevFirstIdx = null;
+    } else {
+      event = 'NO BREAKOUT';
+      ageDisp = null;
+      freshDisp = false;
       prevFirstIdx = null;
     }
 
@@ -3186,8 +3207,8 @@ function coinStateHistory(kl, tfLabel){
       },
       emaPct: d.aboveEma50Pct,
       rsi: d.rsi,
-      age: age,
-      fresh: age!=null ? (age <= 2 && held) : false,
+      age: ageDisp,
+      fresh: freshDisp,
       event: event,
       firstTs: firstTs
     });
@@ -3379,7 +3400,7 @@ function coinBacktest(kl, tfLabel){
       entry:entryPx, entryHow,
       emaPct, rsi,
       confirms: gate.confirms,
-      age: age!=null ? age : null,
+      age: (age!=null && age < 50) ? age : null,
       r1, r3, r7,
       sizePct: gate.sizePct||0,
       big: !!gate.bigSize
