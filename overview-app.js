@@ -2743,8 +2743,10 @@ function coinBreakoutAge(kl){
     }
   }
   const age = firstIdx!=null ? (n - 1 - firstIdx) : 99;
+  // AUTHORITATIVE: fresh = age <= 2  (0,1,2 YES · 3+ NO)
   const fresh = heldRolling && firstIdx!=null && age <= 2;
-  return {age, fresh, held: heldRolling, level: breakLevel!=null?breakLevel:rh, firstIdx};
+  const firstTs = firstIdx!=null ? +kl[firstIdx][0] : null;
+  return {age, fresh, held: heldRolling, level: breakLevel!=null?breakLevel:rh, firstIdx, firstTs};
 }
 
 function coinEntryGate(kl, tfLabel){
@@ -2884,7 +2886,7 @@ function coinEntryGate(kl, tfLabel){
       tf, rsi, macdBull, macdBear, mScore, vRatio, cvdSlope,
       trendUp:!!trendUp, trendDn:!!trendDn, structScore, hardBreak,
       aboveEma50Pct, ema50:a50, spot, consUp, gain10,
-      stretched, stretchWhy, extensionFailWhy, age:brk.age, fresh:brk.fresh, emaExtFailThr, emaStretchThr
+      stretched, stretchWhy, extensionFailWhy, age:brk.age, fresh:brk.fresh, firstTs:brk.firstTs, firstIdx:brk.firstIdx, emaExtFailThr, emaStretchThr
     };
     const extInfo = {stretched, why:stretchWhy, aboveEma50Pct, rsi, ema50:a50, spot};
 
@@ -3128,9 +3130,19 @@ function coinStateHistory(kl, tfLabel){
   }
   if(tf==='1w') out.note='1W TF: 30 calendar days has few weekly bars — statistically thin';
 
+  // Exclude potentially incomplete current candle (last bar of live series)
+  if(lastWin >= kl.length-1) lastWin = kl.length-2;
+  if(lastWin < firstWin){
+    out.insufficient=true; out.note='INSUFFICIENT HISTORY — no fully closed bars in window';
+    return out;
+  }
+  out.rangeStart = +kl[firstWin][0];
+  out.rangeEnd = +kl[lastWin][0];
+  out.availableDays = Math.max(0,(out.rangeEnd-out.rangeStart)/(24*3600*1000));
+
   let prevFirstIdx = null;
   for(let i=Math.max(warm, firstWin); i<=lastWin; i++){
-    const slice = kl.slice(0, i+1); // closed through i only
+    const slice = kl.slice(0, i+1); // closed through i only — no future bars
     out.eligibleBars++;
     let gate;
     try{ gate = coinEntryGate(slice, tf); }catch(e){ continue; }
@@ -3140,16 +3152,18 @@ function coinStateHistory(kl, tfLabel){
     const st = gate.state || 'WATCH';
     out.counts[st] = (out.counts[st]||0)+1;
 
-    // Breakout event label from firstIdx / held / age
+    // Breakout event — age anchored to FIRST candle of current run (not latest high)
     let event = '—';
     const age = d.age!=null ? d.age : (brk.age!=null?brk.age:null);
-    const fresh = !!(d.fresh!=null ? d.fresh : brk.fresh);
+    // AUTHORITATIVE display: fresh = age <= 2
+    const fresh = (age!=null && age <= 2 && !!(d.fresh!=null ? d.fresh : brk.fresh));
     const held = !!(brk.held);
     const firstIdx = brk.firstIdx;
+    const firstTs = brk.firstTs!=null ? brk.firstTs : (firstIdx!=null ? +kl[firstIdx][0] : null);
     if(firstIdx!=null && held){
       if(prevFirstIdx!==firstIdx && age===0){
         event = 'NEW BREAKOUT';
-        out.breakouts.push({t:+kl[i][0], i, firstIdx, level:brk.level});
+        out.breakouts.push({t: firstTs!=null?firstTs:+kl[i][0], candleT:+kl[i][0], i, firstIdx, level:brk.level});
       } else if(age!=null && age>=0 && age < 99){
         event = 'BREAKOUT HELD';
       }
@@ -3173,8 +3187,9 @@ function coinStateHistory(kl, tfLabel){
       emaPct: d.aboveEma50Pct,
       rsi: d.rsi,
       age: age,
-      fresh: fresh,
-      event: event
+      fresh: age!=null ? (age <= 2 && held) : false,
+      event: event,
+      firstTs: firstTs
     });
   }
   return out;
@@ -3187,16 +3202,18 @@ function coinRenderStateHistory(h){
   if(!h){ sum.textContent='No history.'; tbl.innerHTML=''; return; }
   const rangeStr = (h.rangeStart&&h.rangeEnd)?(_fmtDate(h.rangeStart)+' → '+_fmtDate(h.rangeEnd)):'—';
   const c = h.counts||{};
-  let head = '<div style="font-weight:800;color:#c5d0dc;margin-bottom:6px">LAST 30 COMPLETED CALENDAR DAYS</div>';
+  let head = '<div style="font-weight:800;color:#c5d0dc;margin-bottom:6px">BACKTEST WINDOW: LAST 30 COMPLETED CALENDAR DAYS</div>';
   head += '<div style="font-size:12px;color:#8491a1;line-height:1.55">';
-  head += 'TF <b style="color:#c5d0dc">'+h.tf.toUpperCase()+'</b> · '+rangeStr+'<br>';
-  head += 'Eligible closed bars: <b style="color:#c5d0dc">'+h.eligibleBars+'</b> (every bar, not transitions only)<br>';
+  head += 'Timeframe: <b style="color:#c5d0dc">'+h.tf.toUpperCase()+'</b><br>';
+  head += 'Start: <b style="color:#c5d0dc">'+(h.rangeStart!=null?_fmtDt(h.rangeStart):'—')+'</b><br>';
+  head += 'End: <b style="color:#c5d0dc">'+(h.rangeEnd!=null?_fmtDt(h.rangeEnd):'—')+'</b> (last fully closed candle)<br>';
+  head += 'Eligible closed bars: <b style="color:#c5d0dc">'+h.eligibleBars+'</b> (every bar · not transitions only)<br>';
   head += 'WATCH <b>'+(c['WATCH']||0)+'</b> · EARLY <b style="color:#e6c878">'+(c['EARLY']||0)+'</b> · STRONG <b style="color:#62e3a0">'+(c['STRONG CONFIRMED']||0)+'</b> · STRETCHED <b style="color:#f0a060">'+(c['STRETCHED']||0)+'</b> · OFF <b style="color:#ff6f7c">'+(c['OFF']||0)+'</b>';
   if(h.breakouts && h.breakouts.length){
-    head += '<br>Breakout events: '+h.breakouts.map(b=>_fmtDate(b.t)).join(', ');
+    head += '<br>Original breakout candles: '+h.breakouts.map(b=>_fmtDt(b.t)).join(' · ');
   }
   if(h.note) head += '<br><span style="color:#f0a060">'+h.note+'</span>';
-  head += '<br><span style="color:#8491a1">Fresh = age ≤ 2 · age 3+ = not fresh · state uses close of bar N only</span>';
+  head += '<br><span style="color:#8491a1">Fresh = age ≤ 2 (0,1,2 YES · 3+ NO) · age anchored to FIRST breakout candle · no lookahead</span>';
   head += '</div>';
   sum.innerHTML = head;
 
@@ -3228,7 +3245,9 @@ function coinRenderStateHistory(h){
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+(r.rsi!=null&&isFinite(r.rsi)?(+r.rsi).toFixed(1):'—')+'</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+(r.age!=null?r.age:'—')+'</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px;font-weight:700;color:'+(r.fresh?'#62e3a0':'#8491a1')+'">'+(r.fresh?'YES':'NO')+'</td>'
-      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;font-size:10px;color:'+evCol+';font-weight:700">'+r.event+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;font-size:10px;color:'+evCol+';font-weight:700">'+r.event
+        +(r.event==='NEW BREAKOUT' && r.firstTs ? ' @ '+_fmtDt(r.firstTs) : (r.event==='BREAKOUT HELD' && r.firstTs ? ' (from '+_fmtDt(r.firstTs)+')' : ''))
+        +'</td>'
       +'</tr>';
   }).join('');
 
