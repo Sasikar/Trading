@@ -418,7 +418,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260911-ca-audit2"></script>
+<script src="overview-app.js?v=20260911-ca-multi1"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -507,6 +507,21 @@
       <button type="button" data-ctf="1w" onclick="try{window.setCoinTF&&window.setCoinTF('1w')}catch(e){}">1W</button>
     </div>
     <div id="coin-entry-box" style="margin:0 0 14px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c)"><div style="color:#8491a1;font-size:12px">Load CA → CA signal (WATCH / EARLY / STRONG / STRETCHED / OFF)</div></div>
+    <div id="coin-multi-box" style="margin:0 0 16px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:#0d141c">
+      <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:8px">MULTI-CA VALIDATION · FROZEN ENGINE</div>
+      <div style="font-size:11px;color:#8491a1;margin-bottom:8px;line-height:1.45">Historical validation of selected available CAs — not a complete market-universe backtest. Rules frozen. One line per coin: <code style="color:#c5d0dc">sol|CA</code> or <code style="color:#c5d0dc">eth|0x…</code></div>
+      <textarea id="coin-multi-list" rows="6" style="width:100%;box-sizing:border-box;background:#0b121a;color:#c5d0dc;border:1px solid #243041;border-radius:10px;padding:10px;font-size:11px;font-family:ui-monospace,monospace;resize:vertical">sol|Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump
+sol|DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
+sol|EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm
+sol|7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr
+sol|ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82</textarea>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button type="button" id="coin-multi-run" onclick="try{window.runMultiCA&&window.runMultiCA()}catch(e){alert(e)}" style="padding:10px 16px;border-radius:10px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Run 4H + 1D validation</button>
+        <span id="coin-multi-status" style="font-size:12px;color:#8491a1;align-self:center">Idle</span>
+      </div>
+      <div id="coin-multi-summary" style="margin-top:12px;font-size:12px;color:#8491a1"></div>
+      <div id="coin-multi-table" style="margin-top:10px;overflow-x:auto"></div>
+    </div>
     <div id="coin-hist-box" style="margin:0 0 16px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:#0d141c">
       <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:8px">CA 30-DAY STATE HISTORY · ALL CLOSED BARS</div>
       <div id="coin-hist-summary" style="font-size:12px;color:#8491a1">Load a CA — every closed bar state for last 30 days (audit, not transitions only).</div>
