@@ -3092,6 +3092,169 @@ function _fmtDt(ms){
   }catch(e){ return '—'; }
 }
 
+
+function coinStateHistory(kl, tfLabel){
+  /* FULL 30-day audit: EVERY closed bar state. Rules frozen. No lookahead. */
+  const tf = (tfLabel||coinTF||'4h').toLowerCase();
+  const out = {
+    tf, windowDays:30, rows:[], counts:{},
+    eligibleBars:0, rangeStart:null, rangeEnd:null, availableDays:0,
+    insufficient:false, note:'', breakouts:[]
+  };
+  ['WATCH','EARLY','STRONG CONFIRMED','STRETCHED','OFF'].forEach(s=> out.counts[s]=0);
+  if(!kl || kl.length < 25){
+    out.insufficient = true;
+    out.note = 'INSUFFICIENT HISTORY — need more closed bars';
+    return out;
+  }
+  const lastTs = +kl[kl.length-1][0];
+  const winStart = lastTs - 30*24*3600*1000;
+  const warm = 40;
+  let firstWin=-1, lastWin=-1;
+  for(let i=0;i<kl.length;i++){
+    const t=+kl[i][0];
+    if(t>=winStart){ if(firstWin<0) firstWin=i; lastWin=i; }
+  }
+  if(firstWin<0){
+    out.insufficient=true; out.note='INSUFFICIENT HISTORY — no bars in last 30 days';
+    return out;
+  }
+  out.rangeStart = +kl[firstWin][0];
+  out.rangeEnd = +kl[lastWin][0];
+  out.availableDays = Math.max(0,(out.rangeEnd-out.rangeStart)/(24*3600*1000));
+  if(out.availableDays < 25 && tf!=='1w'){
+    out.insufficient=true;
+    out.note='INSUFFICIENT HISTORY — '+out.availableDays.toFixed(1)+' DAYS AVAILABLE';
+  }
+  if(tf==='1w') out.note='1W TF: 30 calendar days has few weekly bars — statistically thin';
+
+  let prevFirstIdx = null;
+  for(let i=Math.max(warm, firstWin); i<=lastWin; i++){
+    const slice = kl.slice(0, i+1); // closed through i only
+    out.eligibleBars++;
+    let gate;
+    try{ gate = coinEntryGate(slice, tf); }catch(e){ continue; }
+    const d = gate.detail || {};
+    const g = gate.groups || {};
+    const brk = gate.brk || {};
+    const st = gate.state || 'WATCH';
+    out.counts[st] = (out.counts[st]||0)+1;
+
+    // Breakout event label from firstIdx / held / age
+    let event = '—';
+    const age = d.age!=null ? d.age : (brk.age!=null?brk.age:null);
+    const fresh = !!(d.fresh!=null ? d.fresh : brk.fresh);
+    const held = !!(brk.held);
+    const firstIdx = brk.firstIdx;
+    if(firstIdx!=null && held){
+      if(prevFirstIdx!==firstIdx && age===0){
+        event = 'NEW BREAKOUT';
+        out.breakouts.push({t:+kl[i][0], i, firstIdx, level:brk.level});
+      } else if(age!=null && age>=0 && age < 99){
+        event = 'BREAKOUT HELD';
+      }
+      prevFirstIdx = firstIdx;
+    } else if(prevFirstIdx!=null && !held){
+      event = 'BREAKOUT LOST';
+      prevFirstIdx = null;
+    }
+
+    out.rows.push({
+      t:+kl[i][0],
+      state:st,
+      entry:!!gate.entry,
+      sizePct:gate.sizePct||0,
+      confirms:gate.confirms!=null?gate.confirms:0,
+      g: {
+        structure:!!g.structure, trend:!!g.trend, momentum:!!g.momentum,
+        breakout:!!g.breakout, volume:!!g.volume, cvd:!!g.cvd,
+        extension:!!g.extension, meme_env:!!g.meme_env
+      },
+      emaPct: d.aboveEma50Pct,
+      rsi: d.rsi,
+      age: age,
+      fresh: fresh,
+      event: event
+    });
+  }
+  return out;
+}
+
+function coinRenderStateHistory(h){
+  const sum = $('coin-hist-summary');
+  const tbl = $('coin-hist-table');
+  if(!sum||!tbl) return;
+  if(!h){ sum.textContent='No history.'; tbl.innerHTML=''; return; }
+  const rangeStr = (h.rangeStart&&h.rangeEnd)?(_fmtDate(h.rangeStart)+' → '+_fmtDate(h.rangeEnd)):'—';
+  const c = h.counts||{};
+  let head = '<div style="font-weight:800;color:#c5d0dc;margin-bottom:6px">LAST 30 COMPLETED CALENDAR DAYS</div>';
+  head += '<div style="font-size:12px;color:#8491a1;line-height:1.55">';
+  head += 'TF <b style="color:#c5d0dc">'+h.tf.toUpperCase()+'</b> · '+rangeStr+'<br>';
+  head += 'Eligible closed bars: <b style="color:#c5d0dc">'+h.eligibleBars+'</b> (every bar, not transitions only)<br>';
+  head += 'WATCH <b>'+(c['WATCH']||0)+'</b> · EARLY <b style="color:#e6c878">'+(c['EARLY']||0)+'</b> · STRONG <b style="color:#62e3a0">'+(c['STRONG CONFIRMED']||0)+'</b> · STRETCHED <b style="color:#f0a060">'+(c['STRETCHED']||0)+'</b> · OFF <b style="color:#ff6f7c">'+(c['OFF']||0)+'</b>';
+  if(h.breakouts && h.breakouts.length){
+    head += '<br>Breakout events: '+h.breakouts.map(b=>_fmtDate(b.t)).join(', ');
+  }
+  if(h.note) head += '<br><span style="color:#f0a060">'+h.note+'</span>';
+  head += '<br><span style="color:#8491a1">Fresh = age ≤ 2 · age 3+ = not fresh · state uses close of bar N only</span>';
+  head += '</div>';
+  sum.innerHTML = head;
+
+  if(!h.rows || !h.rows.length){
+    tbl.innerHTML = '<div style="padding:10px;color:#f0a060">'+(h.note||'No rows')+'</div>';
+    return;
+  }
+  // newest first for readability
+  const rows = h.rows.slice().reverse().map(r=>{
+    const sc = r.state==='STRETCHED'?'#f0a060':r.state==='STRONG CONFIRMED'?'#62e3a0':r.state==='EARLY'?'#e6c878':r.state==='OFF'?'#ff6f7c':'#8491a1';
+    const mark = (ok)=> ok?'<span style="color:#62e3a0">✓</span>':'<span style="color:#ff6f7c">✕</span>';
+    const g = r.g||{};
+    const evCol = r.event==='NEW BREAKOUT'?'#62e3a0':r.event==='BREAKOUT LOST'?'#ff6f7c':r.event==='BREAKOUT HELD'?'#e6c878':'#8491a1';
+    return '<tr>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;white-space:nowrap;font-size:10px">'+_fmtDt(r.t)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;color:'+sc+';font-weight:800;font-size:10px">'+r.state.replace(' CONFIRMED','')+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;font-size:10px">'+(r.entry?'ON':'OFF')+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+r.sizePct+'%</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+r.confirms+'/8</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.structure)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.trend)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.momentum)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.breakout)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.volume)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.cvd)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.extension)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.meme_env)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+_fmtPct(r.emaPct)+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+(r.rsi!=null&&isFinite(r.rsi)?(+r.rsi).toFixed(1):'—')+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+(r.age!=null?r.age:'—')+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px;font-weight:700;color:'+(r.fresh?'#62e3a0':'#8491a1')+'">'+(r.fresh?'YES':'NO')+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;font-size:10px;color:'+evCol+';font-weight:700">'+r.event+'</td>'
+      +'</tr>';
+  }).join('');
+
+  tbl.innerHTML = '<table style="width:100%;border-collapse:collapse;min-width:920px">'
+    +'<thead><tr style="color:#8491a1;text-align:left;position:sticky;top:0;background:#0d141c">'
+    +'<th style="padding:5px 4px;font-size:10px">Date</th>'
+    +'<th style="padding:5px 4px;font-size:10px">State</th>'
+    +'<th style="padding:5px 4px;font-size:10px">Entry</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:right">Size</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:right">Conf</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">Str</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">Tr</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">Mom</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">Brk</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">Vol</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">CVD</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">Ext</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">Mem</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:right">EMA50</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:right">RSI</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:right">Age</th>'
+    +'<th style="padding:5px 4px;font-size:10px;text-align:center">Fresh</th>'
+    +'<th style="padding:5px 4px;font-size:10px">Event</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
 function coinBacktest(kl, tfLabel){
   /* 30-day closed-bar backtest. RULES FROZEN — reporting only.
      Signal at close of bar N; entry = next bar open (no lookahead).
@@ -3229,7 +3392,7 @@ function coinRenderBacktest(bt){
     ? (_fmtDate(bt.rangeStart)+' → '+_fmtDate(bt.rangeEnd))
     : '—';
 
-  let head = '<div style="font-weight:800;color:#c5d0dc;margin-bottom:6px">BACKTEST: LAST 30 COMPLETED DAYS</div>';
+  let head = '<div style="font-weight:800;color:#c5d0dc;margin-bottom:6px">CA SIGNAL BACKTEST · TRANSITIONS ONLY · LAST 30 DAYS</div>';
   head += '<div style="font-size:12px;color:#8491a1;line-height:1.55">';
   head += 'TF <b style="color:#c5d0dc">'+bt.tf.toUpperCase()+'</b> · range <b style="color:#c5d0dc">'+rangeStr+'</b><br>';
   head += 'Eligible closed bars: <b style="color:#c5d0dc">'+bt.eligibleBars+'</b> · ';
@@ -3335,6 +3498,13 @@ async function loadCoinTF(){
     }catch(ge){
       console.warn('entry gate', ge);
       coinRenderEntry({state:'WATCH', entry:false, sizePct:0, reason:'Gate failed: '+(ge&&ge.message||ge), detail:{tf:coinTF}});
+    }
+    try{
+      const hist = coinStateHistory(kl, coinTF);
+      coinRenderStateHistory(hist);
+    }catch(he){
+      console.warn('ca state history', he);
+      if($('coin-hist-summary')) $('coin-hist-summary').textContent = 'State history error: '+(he&&he.message||he);
     }
     try{
       const bt = coinBacktest(kl, coinTF);
