@@ -2989,9 +2989,13 @@ function coinRenderEntry(gate){
   const labels = {structure:'Structure',trend:'Trend',momentum:'Momentum',breakout:'Breakout',volume:'Volume',cvd:'CVD',extension:'Extension',meme_env:'Meme env'};
   const total = order.length;
   const confN = gate.confirms!=null ? gate.confirms : order.filter(k=>g[k]).length;
+  // One confirmation per line (not cramped inline)
   const confRows = order.map(k=>{
     const ok = !!g[k];
-    return '<span style="display:inline-block;margin:2px 6px 2px 0;font-size:11px;font-weight:700;color:'+(ok?'#62e3a0':'#8491a1')+'">'+(ok?'✓':'✕')+' '+labels[k]+'</span>';
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid #1a222c;font-size:12px;font-weight:700">'
+      +'<span style="color:#c5d0dc">'+labels[k]+'</span>'
+      +'<span style="color:'+(ok?'#62e3a0':'#ff6f7c')+'">'+(ok?'✓ PASS':'✕ FAIL')+'</span>'
+      +'</div>';
   }).join('');
 
   let thesisLine = '';
@@ -3001,11 +3005,30 @@ function coinRenderEntry(gate){
     thesisLine = '<div style="margin-top:6px;font-size:11px;color:#ff6f7c;font-weight:700">Thesis / risk structure broken</div>';
   }
 
+  // Explicit STRONG block reasons when count looks high but state is not STRONG
+  let blockLine = '';
+  if(st !== 'STRONG CONFIRMED' && confN >= CA_STRONG_MIN_CONFIRMS){
+    const reasons = [];
+    if(!g.extension) reasons.push('EXTENSION FAIL');
+    if(!g.breakout) reasons.push('BREAKOUT FAIL');
+    if(!g.structure) reasons.push('STRUCTURE FAIL');
+    if(!g.trend) reasons.push('TREND FAIL');
+    if(!g.momentum) reasons.push('MOMENTUM FAIL');
+    if(!g.meme_env) reasons.push('MEME ENV FAIL');
+    if(d.stretched) reasons.push('STRETCHED VETO');
+    if(!reasons.length) reasons.push('OTHER STRONG REQUIREMENT');
+    blockLine = '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid #5a3a20;background:#1a140e;font-size:12px;font-weight:800;color:#f0a060;letter-spacing:.02em">'
+      +'STRONG BLOCKED — '+reasons.join(' · ')
+      +'<div style="margin-top:4px;font-size:11px;font-weight:600;color:#c5d0dc;letter-spacing:0">'+confN+'/'+total+' confirms ≠ BIG SIZE while a veto is active</div>'
+      +'</div>';
+  } else if(st === 'STRONG CONFIRMED'){
+    blockLine = '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid #1e4a32;background:#0e1a14;font-size:12px;font-weight:800;color:#62e3a0">STRONG OK — Extension PASS · BIG SIZE eligible</div>';
+  }
+
   let emaLine = '';
   if(d.aboveEma50Pct!=null && isFinite(d.aboveEma50Pct)){
-    const extFail = d.extensionFailWhy || (gate.ext && gate.ext.why);
-    const emaCol = (d.stretched || (d.extensionFailWhy)) ? '#f0a060' : '#8491a1';
-    emaLine = '<div style="margin-top:6px;font-size:11px;color:'+emaCol+'">EMA50 dist '+(d.aboveEma50Pct>=0?'+':'')+(+d.aboveEma50Pct).toFixed(1)+'%'
+    const emaCol = (d.stretched || d.extensionFailWhy) ? '#f0a060' : '#8491a1';
+    emaLine = '<div style="margin-top:8px;font-size:11px;color:'+emaCol+'">EMA50 dist '+(d.aboveEma50Pct>=0?'+':'')+(+d.aboveEma50Pct).toFixed(1)+'%'
       +(d.ema50!=null?' · EMA50 '+(d.ema50>=0.01?d.ema50.toPrecision(4):d.ema50.toExponential(2)):'')
       +(d.rsi!=null?' · RSI '+(+d.rsi).toFixed(1):'')
       +(d.age!=null?' · break age '+d.age+(d.fresh?' (fresh)':''):'')
@@ -3014,7 +3037,7 @@ function coinRenderEntry(gate){
       emaLine += '<div style="margin-top:4px;font-size:11px;color:#f0a060">Extension ✕ · '+d.extensionFailWhy+'</div>';
     }
   } else if(d.age!=null){
-    emaLine = '<div style="margin-top:6px;font-size:11px;color:#8491a1">Break age '+d.age+(d.fresh?' (fresh ≤2)':' (not fresh)')+'</div>';
+    emaLine = '<div style="margin-top:8px;font-size:11px;color:#8491a1">Break age '+d.age+(d.fresh?' (fresh ≤2)':' (not fresh)')+'</div>';
   }
 
   el.style.display = 'block';
@@ -3029,9 +3052,10 @@ function coinRenderEntry(gate){
     '</div>'+
     thesisLine+
     '<div style="margin-top:10px;font-size:12px;color:#c5d0dc;line-height:1.45">'+(gate.reason||'—')+'</div>'+
-    '<div style="margin-top:10px;font-size:11px;font-weight:800;color:#8491a1">CA CONFIRMS '+confN+'/'+total
-      +(st==='STRONG CONFIRMED'?' · need ≥'+CA_STRONG_MIN_CONFIRMS:' · STRONG needs ≥'+CA_STRONG_MIN_CONFIRMS)+'</div>'+
-    '<div style="margin-top:4px;line-height:1.7">'+confRows+'</div>'+
+    blockLine+
+    '<div style="margin-top:12px;font-size:11px;font-weight:800;color:#8491a1">CA CONFIRMS '+confN+'/'+total
+      +' · STRONG needs ≥'+CA_STRONG_MIN_CONFIRMS+' + Extension PASS</div>'+
+    '<div style="margin-top:4px">'+confRows+'</div>'+
     emaLine;
 
   if($('coin-bias')){
