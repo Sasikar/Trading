@@ -2818,10 +2818,18 @@ function coinEntryGate(kl, tfLabel){
     for(let i=Math.max(0,kl.length-11);i<kl.length-1;i++) lo10 = Math.min(lo10, +kl[i][3]);
     const gain10 = lo10>0 && isFinite(lo10) ? ((spot/lo10)-1)*100 : 0;
 
-    // Extension / STRETCHED (EMA50 is anti-FOMO filter, NOT a buy signal)
-    // Spec: Price ≥ 10% above EMA50 AND RSI ≥ 75 → STRETCHED
+    // Extension: TWO ideas
+    //  A) RSI exhaustion (overbought) → STRETCHED
+    //  B) Extreme distance from EMA50 baseline → Extension group FAIL even if RSI is mid-range
+    //     (+107% above EMA50 must NOT pass Extension merely because RSI=56)
+    // EMA50 is anti-FOMO / baseline filter, NOT a buy signal by itself.
+    const emaExtFailThr = tf==='1w' ? 55 : (tf==='1d' ? 50 : 40);   // group ✕ beyond this
+    const emaStretchThr = tf==='1w' ? 90 : (tf==='1d' ? 80 : 70);  // STRETCHED state even mid-RSI
     let stretched = false;
     let stretchWhy = '';
+    let extensionFailWhy = '';
+
+    // --- RSI / classic stretch (state STRETCHED) ---
     if(rsi!=null && rsi >= 78){
       stretched = true;
       stretchWhy = 'RSI '+rsi.toFixed(1)+' ≥ 78 (overbought)';
@@ -2834,6 +2842,17 @@ function coinEntryGate(kl, tfLabel){
     } else if(gain10 >= 45 && consUp >= 3 && rsi!=null && rsi >= 65){
       stretched = true;
       stretchWhy = '+'+gain10.toFixed(0)+'% from 10-bar low + RSI '+rsi.toFixed(1);
+    } else if(aboveEma50Pct!=null && aboveEma50Pct >= emaStretchThr){
+      // Extreme baseline extension alone — even with mid RSI
+      stretched = true;
+      stretchWhy = 'Extreme EMA50 dist +'+aboveEma50Pct.toFixed(1)+'% (thr '+emaStretchThr+'%) · RSI '+(rsi!=null?rsi.toFixed(1):'—');
+    }
+
+    // --- Extension group: fail on stretched OR large EMA gap without needing RSI heat ---
+    if(stretched){
+      extensionFailWhy = stretchWhy;
+    } else if(aboveEma50Pct!=null && aboveEma50Pct >= emaExtFailThr){
+      extensionFailWhy = 'EMA50 dist +'+aboveEma50Pct.toFixed(1)+'% ≥ '+emaExtFailThr+'% baseline (RSI '+(rsi!=null?rsi.toFixed(1):'—')+' not required)';
     }
 
     // --- 8 confirmation groups ---
@@ -2843,7 +2862,7 @@ function coinEntryGate(kl, tfLabel){
     const gBreakout = !!(brk.fresh && brk.held);
     const gVolume = vRatio >= 0.85;
     const gCvd = cvdSlope >= 0;
-    const gExtension = !stretched; // pass when NOT extended
+    const gExtension = !stretched && !extensionFailWhy; // PASS only if not RSI-stretched AND not extreme EMA gap
     // Meme environment: light local proxy (vol not dead + not hard breakdown). BTC regime is separate layer.
     const gMemeEnv = !hardBreak && vRatio >= 0.5 && structScore > -0.5;
 
@@ -2865,7 +2884,7 @@ function coinEntryGate(kl, tfLabel){
       tf, rsi, macdBull, macdBear, mScore, vRatio, cvdSlope,
       trendUp:!!trendUp, trendDn:!!trendDn, structScore, hardBreak,
       aboveEma50Pct, ema50:a50, spot, consUp, gain10,
-      stretched, stretchWhy, age:brk.age, fresh:brk.fresh
+      stretched, stretchWhy, extensionFailWhy, age:brk.age, fresh:brk.fresh, emaExtFailThr, emaStretchThr
     };
     const extInfo = {stretched, why:stretchWhy, aboveEma50Pct, rsi, ema50:a50, spot};
 
@@ -2984,11 +3003,16 @@ function coinRenderEntry(gate){
 
   let emaLine = '';
   if(d.aboveEma50Pct!=null && isFinite(d.aboveEma50Pct)){
-    emaLine = '<div style="margin-top:6px;font-size:11px;color:#8491a1">EMA50 dist '+(d.aboveEma50Pct>=0?'+':'')+(+d.aboveEma50Pct).toFixed(1)+'%'
+    const extFail = d.extensionFailWhy || (gate.ext && gate.ext.why);
+    const emaCol = (d.stretched || (d.extensionFailWhy)) ? '#f0a060' : '#8491a1';
+    emaLine = '<div style="margin-top:6px;font-size:11px;color:'+emaCol+'">EMA50 dist '+(d.aboveEma50Pct>=0?'+':'')+(+d.aboveEma50Pct).toFixed(1)+'%'
       +(d.ema50!=null?' · EMA50 '+(d.ema50>=0.01?d.ema50.toPrecision(4):d.ema50.toExponential(2)):'')
       +(d.rsi!=null?' · RSI '+(+d.rsi).toFixed(1):'')
       +(d.age!=null?' · break age '+d.age+(d.fresh?' (fresh)':''):'')
       +'</div>';
+    if(d.extensionFailWhy && !d.stretched){
+      emaLine += '<div style="margin-top:4px;font-size:11px;color:#f0a060">Extension ✕ · '+d.extensionFailWhy+'</div>';
+    }
   } else if(d.age!=null){
     emaLine = '<div style="margin-top:6px;font-size:11px;color:#8491a1">Break age '+d.age+(d.fresh?' (fresh ≤2)':' (not fresh)')+'</div>';
   }
