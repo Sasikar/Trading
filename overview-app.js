@@ -3546,6 +3546,160 @@ async function loadCoinTF(){
     if($('coin-fib-tv'))$('coin-fib-tv').innerHTML='<div style="padding:16px;color:#8491a1;font-size:12px">Fib chart waiting on OHLCV</div>';
   }
 }
+
+async function runMultiCA(){
+  /* MULTI-CA validation using FROZEN coinEntryGate / coinStateHistory / coinBacktest.
+     CA trading rules unchanged during validation. */
+  const listEl = $('coin-multi-list');
+  const st = $('coin-multi-status');
+  const sum = $('coin-multi-summary');
+  const tbl = $('coin-multi-table');
+  if(!listEl) return;
+  const lines = String(listEl.value||'').split(/\n/).map(s=>s.trim()).filter(s=>s && !s.startsWith('#'));
+  if(!lines.length){ if(st) st.textContent='Add at least one sol|CA or eth|0x…'; return; }
+  if(st) st.textContent='Running… 0/'+lines.length;
+  if(sum) sum.innerHTML='';
+  if(tbl) tbl.innerHTML='';
+  const tfs = ['4h','1d'];
+  const results = [];
+  for(let li=0; li<lines.length; li++){
+    const raw = lines[li];
+    let chain='solana', ca=raw;
+    if(raw.indexOf('|')>=0){
+      const p=raw.split('|');
+      chain = (p[0]||'').toLowerCase().trim();
+      ca = (p[1]||'').trim();
+      if(chain==='sol') chain='solana';
+      if(chain==='eth') chain='eth';
+    }
+    if(st) st.textContent='Running… '+(li+1)+'/'+lines.length+' · '+ca.slice(0,8)+'…';
+    let pool=null, name=ca.slice(0,8)+'…';
+    try{
+      pool = await coinResolvePool(chain, ca);
+      name = (pool.base||pool.name||name).toString().slice(0,16);
+    }catch(e){
+      results.push({ca, chain, name, error: String(e&&e.message||e)});
+      continue;
+    }
+    for(const tf of tfs){
+      try{
+        const kl = await coinFetchOHLCV(pool.network, pool.address, tf);
+        const hist = coinStateHistory(kl, tf);
+        const bt = coinBacktest(kl, tf);
+        const early = bt.byState['EARLY']||{};
+        const strong = bt.byState['STRONG CONFIRMED']||{};
+        const stretch = bt.byState['STRETCHED']||{};
+        function med(a){ return _med(a); }
+        function avg(a){ return _avg(a); }
+        function sampleNote(n){
+          if(n<=0) return 'none';
+          if(n===1) return 'INSUFFICIENT SAMPLE';
+          if(n<5) return 'VERY SMALL SAMPLE';
+          if(n<10) return 'SMALL SAMPLE';
+          return 'ok';
+        }
+        // breakout sequences from hist
+        const sequences = [];
+        let cur = null;
+        for(const r of (hist.rows||[])){
+          if(r.event==='NEW BREAKOUT'){
+            cur = {start:r.t, ages:[{t:r.t, age:r.age, fresh:r.fresh, state:r.state}]};
+            sequences.push(cur);
+          } else if(cur && (r.event==='BREAKOUT HELD' || r.event==='BREAKOUT LOST')){
+            cur.ages.push({t:r.t, age:r.age, fresh:r.fresh, state:r.state, event:r.event});
+            if(r.event==='BREAKOUT LOST') cur=null;
+          }
+        }
+        results.push({
+          ca, chain, name, tf, error:null,
+          bars: hist.eligibleBars,
+          rangeStart: hist.rangeStart, rangeEnd: hist.rangeEnd,
+          counts: hist.counts,
+          earlyN: early.n||0, strongN: strong.n||0, stretchN: stretch.n||0,
+          earlyMed3: med(early.r3), strongMed3: med(strong.r3), stretchMed3: med(stretch.r3),
+          earlyAvg3: avg(early.r3), strongAvg3: avg(strong.r3), stretchAvg3: avg(stretch.r3),
+          earlyHit3: early.r3&&early.r3.length ? (100*early.hit3/early.r3.length) : null,
+          strongHit3: strong.r3&&strong.r3.length ? (100*strong.hit3/strong.r3.length) : null,
+          stretchHit3: stretch.r3&&stretch.r3.length ? (100*stretch.hit3/stretch.r3.length) : null,
+          earlyNote: sampleNote(early.n||0),
+          strongNote: sampleNote(strong.n||0),
+          stretchNote: sampleNote(stretch.n||0),
+          sequences: sequences.slice(0,4),
+          bt
+        });
+      }catch(e){
+        results.push({ca, chain, name, tf, error:String(e&&e.message||e)});
+      }
+    }
+  }
+
+  // Render aggregate
+  let html = '<div style="font-weight:800;color:#c5d0dc;margin-bottom:6px">MULTI-CA SUMMARY</div>';
+  html += '<div style="font-size:11px;color:#8491a1;margin-bottom:8px">Historical validation of selected available CAs — not a complete market-universe backtest. CA trading rules unchanged during validation.</div>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:720px">';
+  html += '<thead><tr style="color:#8491a1;text-align:left">'
+    +'<th style="padding:6px">CA</th><th style="padding:6px">TF</th>'
+    +'<th style="padding:6px;text-align:right">EARLY n</th><th style="padding:6px;text-align:right">STRONG n</th><th style="padding:6px;text-align:right">STRETCH n</th>'
+    +'<th style="padding:6px;text-align:right">E +3 med</th><th style="padding:6px;text-align:right">S +3 med</th><th style="padding:6px;text-align:right">X +3 med</th>'
+    +'<th style="padding:6px">Sample</th></tr></thead><tbody>';
+  for(const r of results){
+    if(r.error){
+      html += '<tr><td style="padding:6px;border-bottom:1px solid #1a222c">'+r.name+'</td><td style="padding:6px;border-bottom:1px solid #1a222c">'+(r.tf||'—')+'</td><td colspan="7" style="padding:6px;border-bottom:1px solid #1a222c;color:#ff6f7c">'+r.error+'</td></tr>';
+      continue;
+    }
+    const sample = 'E:'+r.earlyNote+' S:'+r.strongNote+' X:'+r.stretchNote;
+    html += '<tr>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c;font-weight:700">'+r.name+'</td>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c">'+r.tf.toUpperCase()+'</td>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c;text-align:right">'+r.earlyN+'</td>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c;text-align:right">'+r.strongN+'</td>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c;text-align:right">'+r.stretchN+'</td>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c;text-align:right">'+_fmtPct(r.earlyMed3)+'</td>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c;text-align:right">'+_fmtPct(r.strongMed3)+'</td>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c;text-align:right">'+_fmtPct(r.stretchMed3)+'</td>'
+      +'<td style="padding:6px;border-bottom:1px solid #1a222c;font-size:10px;color:#8491a1">'+sample+'</td>'
+      +'</tr>';
+  }
+  html += '</tbody></table></div>';
+
+  // Per-CA detail blocks
+  for(const r of results){
+    if(r.error) continue;
+    const c = r.counts||{};
+    html += '<div style="margin-top:14px;padding:12px;border:1px solid #243041;border-radius:12px;background:#0b121a">';
+    html += '<div style="font-weight:800;color:#c5d0dc">'+r.name+' · '+r.tf.toUpperCase()+'</div>';
+    html += '<div style="font-size:11px;color:#8491a1;margin-top:4px">Bars '+r.bars
+      +' · '+(r.rangeStart?_fmtDt(r.rangeStart):'—')+' → '+(r.rangeEnd?_fmtDt(r.rangeEnd):'—')+'</div>';
+    html += '<div style="font-size:11px;color:#8491a1;margin-top:4px">WATCH '+(c.WATCH||0)
+      +' · EARLY '+(c.EARLY||0)+' · STRONG '+(c['STRONG CONFIRMED']||0)
+      +' · STRETCHED '+(c.STRETCHED||0)+' · OFF '+(c.OFF||0)+'</div>';
+    html += '<div style="font-size:11px;color:#c5d0dc;margin-top:6px;line-height:1.5">';
+    html += 'EARLY n='+r.earlyN+' · +3 med '+_fmtPct(r.earlyMed3)+' · hit '+(r.earlyHit3!=null?r.earlyHit3.toFixed(0)+'%':'—')+' · <span style="color:#8491a1">'+r.earlyNote+'</span><br>';
+    html += 'STRONG n='+r.strongN+' · +3 med '+_fmtPct(r.strongMed3)+' · hit '+(r.strongHit3!=null?r.strongHit3.toFixed(0)+'%':'—')+' · <span style="color:#8491a1">'+r.strongNote+'</span><br>';
+    html += 'STRETCHED n='+r.stretchN+' · +3 med '+_fmtPct(r.stretchMed3)+' · hit '+(r.stretchHit3!=null?r.stretchHit3.toFixed(0)+'%':'—')+' · <span style="color:#8491a1">'+r.stretchNote+'</span>';
+    html += '</div>';
+    if(r.sequences && r.sequences.length){
+      html += '<div style="margin-top:8px;font-size:10px;font-weight:800;color:#8491a1">BREAKOUT AGE AUDIT (sample)</div>';
+      for(const seq of r.sequences){
+        html += '<div style="margin-top:4px;font-size:10px;color:#c5d0dc;line-height:1.45;font-family:ui-monospace,monospace">';
+        html += 'Origin '+_fmtDt(seq.start)+'<br>';
+        for(const a of seq.ages.slice(0,6)){
+          html += _fmtDt(a.t)+' · Age '+(a.age!=null?a.age:'—')+' · Fresh '+(a.fresh?'YES':'NO')+' · '+(a.state||'')+(a.event==='BREAKOUT LOST'?' · LOST':'')+'<br>';
+        }
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+
+  if(sum) sum.innerHTML = html;
+  if(tbl) tbl.innerHTML = '';
+  if(st) st.textContent = 'Done · '+results.filter(x=>!x.error).length+' ok / '+results.length+' runs';
+  console.log('MULTI-CA results', results);
+  return results;
+}
+window.runMultiCA = runMultiCA;
+
 async function loadCoin(){
   const chain=(($('coin-chain')||{}).value)||'eth';
   let ca=(($('coin-ca')||{}).value||'').trim();
