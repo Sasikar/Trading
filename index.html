@@ -418,7 +418,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260911-ca-ui1"></script>
+<script src="overview-app.js?v=20260911-ca-bt1"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -507,6 +507,11 @@
       <button type="button" data-ctf="1w" onclick="try{window.setCoinTF&&window.setCoinTF('1w')}catch(e){}">1W</button>
     </div>
     <div id="coin-entry-box" style="margin:0 0 14px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c)"><div style="color:#8491a1;font-size:12px">Load CA → CA signal (WATCH / EARLY / STRONG / STRETCHED / OFF)</div></div>
+    <div id="coin-bt-box" style="margin:0 0 16px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:#0d141c">
+      <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:8px">CA BACKTEST · CLOSED BARS ONLY</div>
+      <div id="coin-bt-summary" style="font-size:12px;color:#8491a1">Load a CA to run historical EARLY / STRONG / STRETCHED stats (+1D / +3D / +7D).</div>
+      <div id="coin-bt-table" style="margin-top:10px;overflow-x:auto"></div>
+    </div>
     <div class="price-now"><div><div class="big" id="coin-spot">—</div><div class="meta" id="coin-spot-meta">—</div></div><div class="meta" id="coin-bias" style="font-weight:800;text-align:right">—</div></div>
     <div class="coin-stats">
       <div class="st"><div class="lab">RSI 14</div><div class="val" id="coin-rsi">—</div></div>
