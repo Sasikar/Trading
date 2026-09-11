@@ -2915,24 +2915,24 @@ function coinEntryGate(kl, tfLabel){
     }
 
     // --- STRONG CONFIRMED (BIG SIZE only here) ---
+    // INVARIANT: Extension FAIL → never STRONG/BIG SIZE, even if confirms ≥ 6/8 or inFresh.
     if(majorOk && gBreakout && confirms >= CA_STRONG_MIN_CONFIRMS && gMomentum
-       && gMemeEnv && (gExtension || inFresh) && !(stretched && !inFresh)){
-      if(!(stretched && rsi!=null && rsi >= 78)){
-        return {
-          state:'STRONG CONFIRMED', entry:true, sizePct:85, bigSize:true,
-          reason:'Multi-group confirmation · BIG SIZE permitted ('+confirms+'/'+Object.keys(groups).length+')',
-          confirms, groups, detail, brk, ext:extInfo
-        };
-      }
+       && gMemeEnv && gExtension && !stretched){
+      return {
+        state:'STRONG CONFIRMED', entry:true, sizePct:85, bigSize:true,
+        reason:'Multi-group confirmation · BIG SIZE permitted ('+confirms+'/'+Object.keys(groups).length+')',
+        confirms, groups, detail, brk, ext:extInfo
+      };
     }
 
     // --- EARLY (fresh breakout, starter size only) ---
+    // Extension FAIL blocks BIG SIZE only; EARLY still allowed if not STRETCHED and fresh.
     const earlyStruct = structScore >= -0.05 && !hardBreak;
     const earlyTrend = trendUp || (a20!=null && spot > a20);
     const earlyMom = macdBull || mScore >= 0.15;
     const earlyVol = vRatio >= 0.7;
     if(earlyStruct && earlyTrend && earlyMom && earlyVol && inFresh && brk.age <= 2
-       && !(stretched && !inFresh) && !(rsi!=null && rsi >= 78)){
+       && !stretched && !(rsi!=null && rsi >= 78)){
       return {
         state:'EARLY', entry:true, sizePct:30, bigSize:false,
         reason:'Fresh breakout/expansion · starter size only (age '+brk.age+')',
