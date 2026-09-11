@@ -3065,6 +3065,129 @@ function coinRenderEntry(gate){
 }
 
 
+
+function coinFwdBars(tf){
+  const t = (tf||'4h').toLowerCase();
+  if(t==='1w') return {b1:1, b3:3, b7:7, unit:'W'};
+  if(t==='1d') return {b1:1, b3:3, b7:7, unit:'D'};
+  if(t==='1h') return {b1:24, b3:72, b7:168, unit:'D'};
+  return {b1:6, b3:18, b7:42, unit:'D'}; // 4h → calendar days
+}
+
+function coinBacktest(kl, tfLabel){
+  /* Closed-bar walk: on transition into EARLY / STRONG CONFIRMED / STRETCHED,
+     record EMA50 dist and forward +1/+3/+7 returns. */
+  const tf = (tfLabel||coinTF||'4h').toLowerCase();
+  const fwd = coinFwdBars(tf);
+  const out = {tf, unit:fwd.unit, signals:[], byState:{}};
+  const states = ['EARLY','STRONG CONFIRMED','STRETCHED'];
+  states.forEach(s=>{ out.byState[s] = {n:0, ema:[], r1:[], r3:[], r7:[], hit1:0, hit3:0, hit7:0}; });
+  if(!kl || kl.length < 50) return out;
+  let prev = 'WATCH';
+  const minI = 40;
+  const maxI = kl.length - 1 - Math.max(fwd.b7, 1);
+  for(let i=minI; i<=maxI; i++){
+    const slice = kl.slice(0, i+1); // closed through i
+    let gate;
+    try{ gate = coinEntryGate(slice, tf); }catch(e){ continue; }
+    const st = gate && gate.state;
+    if(states.indexOf(st) < 0){ prev = st||prev; continue; }
+    // only on entry into the state (avoid counting every consecutive bar)
+    if(st === prev) continue;
+    prev = st;
+    const entry = +slice[slice.length-1][4];
+    if(!(entry>0)) continue;
+    const emaPct = gate.detail && gate.detail.aboveEma50Pct;
+    const tMs = +slice[slice.length-1][0];
+    function retAt(bars){
+      const j = i + bars;
+      if(j >= kl.length) return null;
+      const px = +kl[j][4];
+      if(!(px>0)) return null;
+      return ((px/entry)-1)*100;
+    }
+    const r1 = retAt(fwd.b1), r3 = retAt(fwd.b3), r7 = retAt(fwd.b7);
+    const row = {
+      i, t:tMs, state:st, entry, emaPct,
+      r1, r3, r7,
+      sizePct: gate.sizePct||0,
+      big: !!gate.bigSize,
+      confirms: gate.confirms
+    };
+    out.signals.push(row);
+    const b = out.byState[st];
+    b.n++;
+    if(emaPct!=null && isFinite(emaPct)) b.ema.push(emaPct);
+    if(r1!=null){ b.r1.push(r1); if(r1>0) b.hit1++; }
+    if(r3!=null){ b.r3.push(r3); if(r3>0) b.hit3++; }
+    if(r7!=null){ b.r7.push(r7); if(r7>0) b.hit7++; }
+  }
+  return out;
+}
+
+function _avg(a){ return a.length ? a.reduce((s,x)=>s+x,0)/a.length : null; }
+function _fmtPct(x){ return x==null||!isFinite(x) ? '—' : ((x>=0?'+':'')+x.toFixed(1)+'%'); }
+function _fmtDate(ms){
+  try{ return new Date(ms).toISOString().slice(0,10); }catch(e){ return '—'; }
+}
+
+function coinRenderBacktest(bt){
+  const sum = $('coin-bt-summary');
+  const tbl = $('coin-bt-table');
+  if(!sum || !tbl) return;
+  if(!bt || !bt.signals || !bt.signals.length){
+    sum.innerHTML = 'Not enough closed history on this TF for a backtest (need ~50+ bars + forward window).';
+    tbl.innerHTML = '';
+    return;
+  }
+  const unit = bt.unit || 'D';
+  const order = ['EARLY','STRONG CONFIRMED','STRETCHED'];
+  let cards = order.map(st=>{
+    const b = bt.byState[st] || {n:0,ema:[],r1:[],r3:[],r7:[],hit1:0,hit3:0,hit7:0};
+    if(!b.n) return '<div style="padding:10px;border:1px solid #243041;border-radius:10px;margin-bottom:8px"><b style="color:#8491a1">'+st+'</b> · n=0</div>';
+    const avgEma = _avg(b.ema);
+    const col = st==='STRETCHED'?'#f0a060':(st==='STRONG CONFIRMED'?'#62e3a0':'#e6c878');
+    return '<div style="padding:12px;border:1px solid #243041;border-radius:12px;margin-bottom:8px;background:#0b121a">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">'
+      +'<b style="color:'+col+'">'+st+'</b><span style="color:#8491a1;font-size:11px">n='+b.n+'</span></div>'
+      +'<div style="margin-top:8px;font-size:12px;color:#c5d0dc;line-height:1.55">'
+      +'Avg EMA50 dist at signal: <b style="color:'+(avgEma!=null&&avgEma>40?'#f0a060':'#c5d0dc')+'">'+_fmtPct(avgEma)+'</b><br>'
+      +'+1'+unit+' avg <b>'+_fmtPct(_avg(b.r1))+'</b> · hit '+(b.r1.length?((100*b.hit1/b.r1.length).toFixed(0)+'%'):'—')+' ('+b.hit1+'/'+b.r1.length+')<br>'
+      +'+3'+unit+' avg <b>'+_fmtPct(_avg(b.r3))+'</b> · hit '+(b.r3.length?((100*b.hit3/b.r3.length).toFixed(0)+'%'):'—')+' ('+b.hit3+'/'+b.r3.length+')<br>'
+      +'+7'+unit+' avg <b>'+_fmtPct(_avg(b.r7))+'</b> · hit '+(b.r7.length?((100*b.hit7/b.r7.length).toFixed(0)+'%'):'—')+' ('+b.hit7+'/'+b.r7.length+')'
+      +'</div></div>';
+  }).join('');
+
+  // last signals table (most recent 12)
+  const recent = bt.signals.slice(-12).reverse();
+  let rows = recent.map(s=>{
+    const sc = s.state==='STRETCHED'?'#f0a060':(s.state==='STRONG CONFIRMED'?'#62e3a0':'#e6c878');
+    return '<tr>'
+      +'<td style="padding:6px 8px;border-bottom:1px solid #1a222c;white-space:nowrap">'+_fmtDate(s.t)+'</td>'
+      +'<td style="padding:6px 8px;border-bottom:1px solid #1a222c;color:'+sc+';font-weight:800">'+s.state.replace(' CONFIRMED','')+'</td>'
+      +'<td style="padding:6px 8px;border-bottom:1px solid #1a222c;text-align:right">'+_fmtPct(s.emaPct)+'</td>'
+      +'<td style="padding:6px 8px;border-bottom:1px solid #1a222c;text-align:right;color:'+(s.r1!=null&&s.r1>=0?'#62e3a0':'#ff6f7c')+'">'+_fmtPct(s.r1)+'</td>'
+      +'<td style="padding:6px 8px;border-bottom:1px solid #1a222c;text-align:right;color:'+(s.r3!=null&&s.r3>=0?'#62e3a0':'#ff6f7c')+'">'+_fmtPct(s.r3)+'</td>'
+      +'<td style="padding:6px 8px;border-bottom:1px solid #1a222c;text-align:right;color:'+(s.r7!=null&&s.r7>=0?'#62e3a0':'#ff6f7c')+'">'+_fmtPct(s.r7)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  sum.innerHTML = 'TF <b style="color:#c5d0dc">'+bt.tf.toUpperCase()+'</b> · '
+    +bt.signals.length+' state-entries · forward window in <b style="color:#c5d0dc">'+unit+'</b> '
+    +'(4H uses ~6 bars = 1D). Closed bars only · transitions into state.';
+  tbl.innerHTML = cards
+    +'<div style="margin-top:12px;font-size:11px;font-weight:800;color:#8491a1;letter-spacing:.06em">RECENT SIGNALS</div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:12px">'
+    +'<thead><tr style="color:#8491a1;text-align:left">'
+    +'<th style="padding:6px 8px">Date</th><th style="padding:6px 8px">State</th>'
+    +'<th style="padding:6px 8px;text-align:right">EMA50</th>'
+    +'<th style="padding:6px 8px;text-align:right">+1'+unit+'</th>'
+    +'<th style="padding:6px 8px;text-align:right">+3'+unit+'</th>'
+    +'<th style="padding:6px 8px;text-align:right">+7'+unit+'</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+
 async function loadCoinTF(){
   if(!coinPool) return;
   try{
@@ -3102,6 +3225,13 @@ async function loadCoinTF(){
     }catch(ge){
       console.warn('entry gate', ge);
       coinRenderEntry({state:'WATCH', entry:false, sizePct:0, reason:'Gate failed: '+(ge&&ge.message||ge), detail:{tf:coinTF}});
+    }
+    try{
+      const bt = coinBacktest(kl, coinTF);
+      coinRenderBacktest(bt);
+    }catch(be){
+      console.warn('ca backtest', be);
+      if($('coin-bt-summary')) $('coin-bt-summary').textContent = 'Backtest error: '+(be&&be.message||be);
     }
     coinRenderFib(kl, spot, coinTF);
     coinRenderMacd(kl);
