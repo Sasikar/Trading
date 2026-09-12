@@ -4,7 +4,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
   if(window.caches)caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});
 }
-const primary=[['Overview','index.html',true],['Pulse','pulse.html',true],['Markets','watchlist.html',false],['Memes','memes.html',false],['MemeGate','index.html?tab=memegate',true],['Portfolio','portfolio.html',false],['Catalysts','market-catalysts.html',false],['Process','pre-entry-checklist.html',false],['Scanner','scanner.html',false],['Tax','tax-qa.html',false],['Goals','goals.html',false],['Health','health.html',false]];
+const primary=[['Overview','index.html',true],['Pulse','pulse.html',true],['Anti-FOMO','index.html?tab=antifomo',true],['Markets','watchlist.html',false],['Memes','memes.html',false],['MemeGate','index.html?tab=memegate',true],['Portfolio','portfolio.html',false],['Catalysts','market-catalysts.html',false],['Process','pre-entry-checklist.html',false],['Scanner','scanner.html',false],['Tax','tax-qa.html',false],['Goals','goals.html',false],['Health','health.html',false]];
 const current=(location.pathname.split('/').pop()||'index.html').toLowerCase();
 const isActive=h=>current===h.split('?')[0].toLowerCase();
 const style=document.createElement('style');
