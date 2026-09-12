@@ -1,5 +1,13 @@
 {
-  "updated": "2026-09-12T09:18:55.523Z",
-  "count": 0,
-  "items": []
+  "updated": "2026-09-12T09:19:08.355Z",
+  "count": 1,
+  "items": [
+    {
+      "chain": "solana",
+      "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+      "name": "CATE",
+      "base": "CATE",
+      "t": 1789204747467
+    }
+  ]
 }
