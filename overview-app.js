@@ -3265,6 +3265,9 @@ function coinRenderStateHistory(h){
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;white-space:nowrap;font-size:10px">'+_fmtDt(r.t)+'</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;color:'+sc+';font-weight:800;font-size:10px">'+r.state.replace(' CONFIRMED','')+'</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;font-size:10px">'+(r.entry?'ON':'OFF')+'</td>'
+      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;font-size:10px;color:'+evCol+';font-weight:700">'+r.event
+        +(r.event==='NEW BREAKOUT' && r.firstTs ? ' @ '+_fmtDt(r.firstTs) : (r.event==='BREAKOUT HELD' && r.firstTs ? ' (from '+_fmtDt(r.firstTs)+')' : ''))
+        +'</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+r.sizePct+'%</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+r.confirms+'/8</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px">'+mark(g.structure)+'</td>'
@@ -3279,9 +3282,6 @@ function coinRenderStateHistory(h){
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+(r.rsi!=null&&isFinite(r.rsi)?(+r.rsi).toFixed(1):'—')+'</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:right;font-size:10px">'+(r.age!=null?r.age:'—')+'</td>'
       +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;text-align:center;font-size:10px;font-weight:700;color:'+(r.fresh?'#62e3a0':'#8491a1')+'">'+(r.fresh?'YES':'NO')+'</td>'
-      +'<td style="padding:5px 4px;border-bottom:1px solid #1a222c;font-size:10px;color:'+evCol+';font-weight:700">'+r.event
-        +(r.event==='NEW BREAKOUT' && r.firstTs ? ' @ '+_fmtDt(r.firstTs) : (r.event==='BREAKOUT HELD' && r.firstTs ? ' (from '+_fmtDt(r.firstTs)+')' : ''))
-        +'</td>'
       +'</tr>';
   }).join('');
 
@@ -3290,6 +3290,7 @@ function coinRenderStateHistory(h){
     +'<th style="padding:5px 4px;font-size:10px">Date</th>'
     +'<th style="padding:5px 4px;font-size:10px">State</th>'
     +'<th style="padding:5px 4px;font-size:10px">Entry</th>'
+    +'<th style="padding:5px 4px;font-size:10px">Event</th>'
     +'<th style="padding:5px 4px;font-size:10px;text-align:right">Size</th>'
     +'<th style="padding:5px 4px;font-size:10px;text-align:right">Conf</th>'
     +'<th style="padding:5px 4px;font-size:10px;text-align:center">Str</th>'
@@ -3304,7 +3305,6 @@ function coinRenderStateHistory(h){
     +'<th style="padding:5px 4px;font-size:10px;text-align:right">RSI</th>'
     +'<th style="padding:5px 4px;font-size:10px;text-align:right">Age</th>'
     +'<th style="padding:5px 4px;font-size:10px;text-align:center">Fresh</th>'
-    +'<th style="padding:5px 4px;font-size:10px">Event</th>'
     +'</tr></thead><tbody>'+rows+'</tbody></table>';
 }
 
