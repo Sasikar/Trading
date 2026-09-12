@@ -1,7 +1,21 @@
 {
-  "updated": "2026-09-12T11:36:03.884Z",
-  "count": 7,
+  "updated": "2026-09-12T11:42:03.465Z",
+  "count": 8,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
+      "name": "TROLL",
+      "base": "TROLL",
+      "t": 1789213217514
+    },
+    {
+      "chain": "solana",
+      "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+      "name": "CATE",
+      "base": "CATE",
+      "t": 1789213143747
+    },
     {
       "chain": "solana",
       "ca": "3WPep4ufaToK1aS5s8BL9inzeUrt4DYaQCiic6ZkkC1U",
@@ -36,13 +50,6 @@
       "name": "APU",
       "base": "APU",
       "t": 1789212055069
-    },
-    {
-      "chain": "solana",
-      "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
-      "name": "CATE",
-      "base": "CATE",
-      "t": 1789209032368
     },
     {
       "chain": "eth",
