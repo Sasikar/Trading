@@ -3738,7 +3738,7 @@ window.runMultiCA = runMultiCA;
 /* ===== CA RECENT LIST (persistent browser + data/ca-recents.json) ===== */
 const COIN_RECENTS_KEY='ca_recents_v1';
 const COIN_RECENTS_PATH='data/ca-recents.json';
-const COIN_RECENTS_MAX=40;
+const COIN_RECENTS_MAX=0; // 0 = unlimited until user deletes
 let coinRecentsSha=null;
 
 function coinRecentsLoadLocal(){
@@ -3748,7 +3748,16 @@ function coinRecentsLoadLocal(){
   }catch(e){ return []; }
 }
 function coinRecentsSaveLocal(arr){
-  try{ localStorage.setItem(COIN_RECENTS_KEY, JSON.stringify((arr||[]).slice(0,COIN_RECENTS_MAX))); }catch(e){}
+  try{
+    // No auto-prune — keep every CA until user hits ×
+    localStorage.setItem(COIN_RECENTS_KEY, JSON.stringify(arr||[]));
+  }catch(e){
+    console.warn('ca recents save failed (storage full?)', e);
+    try{
+      const st=$('coin-recents-status');
+      if(st) st.textContent='Storage full — delete some CAs';
+    }catch(e2){}
+  }
 }
 function coinRecentKey(e){
   return String(e.chain||'')+'|'+String(e.ca||'').toLowerCase();
@@ -3776,6 +3785,7 @@ function coinRecentsRender(){
     box.innerHTML='<div style="font-size:11px;color:#8491a1">No saved CAs yet — Load one and it stays here</div>';
     return;
   }
+  const st0=$('coin-recents-status'); if(st0&&!st0.textContent) st0.textContent=arr.length+' saved';
   box.innerHTML=arr.map(function(e,i){
     const short=e.ca.length>10?(e.ca.slice(0,4)+'…'+e.ca.slice(-4)):e.ca;
     const chainLab=(e.chain==='solana'||e.chain==='sol')?'SOL':'ETH';
@@ -3824,7 +3834,7 @@ async function coinRecentsSync(silent){
         const prev=map.get(k);
         if(!prev || (e.t||0)>=(prev.t||0)) map.set(k,e);
       });
-      const merged=Array.from(map.values()).sort((a,b)=>(b.t||0)-(a.t||0)).slice(0,COIN_RECENTS_MAX);
+      const merged=Array.from(map.values()).sort((a,b)=>(b.t||0)-(a.t||0));
       coinRecentsSaveLocal(merged);
       coinRecentsRender();
       if(!token){
