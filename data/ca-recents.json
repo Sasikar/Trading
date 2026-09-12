@@ -1,7 +1,42 @@
 {
-  "updated": "2026-09-12T11:20:10.640Z",
-  "count": 2,
+  "updated": "2026-09-12T11:23:44.891Z",
+  "count": 7,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "3WPep4ufaToK1aS5s8BL9inzeUrt4DYaQCiic6ZkkC1U",
+      "name": "GIKO",
+      "base": "GIKO",
+      "t": 1789212192205
+    },
+    {
+      "chain": "solana",
+      "ca": "DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2",
+      "name": "aura",
+      "base": "aura",
+      "t": 1789212171184
+    },
+    {
+      "chain": "solana",
+      "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+      "name": "USELESS",
+      "base": "USELESS",
+      "t": 1789212139106
+    },
+    {
+      "chain": "eth",
+      "ca": "0xE0f63A424a4439cBE457D80E4f4b51aD25b2c56C",
+      "name": "SPX",
+      "base": "SPX",
+      "t": 1789212097368
+    },
+    {
+      "chain": "eth",
+      "ca": "0x594DaaD7D77592a2b97b725A7AD59D7E188b5bFa",
+      "name": "APU",
+      "base": "APU",
+      "t": 1789212055069
+    },
     {
       "chain": "solana",
       "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
