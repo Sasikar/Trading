@@ -104,11 +104,23 @@ async function fetchKlines(interval,limit){
   }
   const iv={ '4h':240,'1d':1440,'1w':10080,'1h':60 }[interval];
   if(!iv) throw new Error('unsupported interval '+interval);
-  const j=await jget('https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval='+iv);
-  const rows=(j&&j.result&&(j.result.XXBTZUSD||j.result.XBTUSD))||[];
-  if(!rows.length) throw new Error('kraken empty '+interval);
-  const slice=rows.slice(-Math.min(limit,rows.length));
-  let mapped=slice.map(k=>[k[0]*1000,+k[1],+k[2],+k[3],+k[4],+k[6]]);
+  let mapped=[];
+  try{
+    const j=await jget('https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval='+iv);
+    const rows=(j&&j.result&&(j.result.XXBTZUSD||j.result.XBTUSD))||[];
+    if(rows.length){
+      const slice=rows.slice(-Math.min(limit,rows.length));
+      mapped=slice.map(k=>[k[0]*1000,+k[1],+k[2],+k[3],+k[4],+k[6]]);
+    }
+  }catch(e){}
+  // Fallback: Binance when Kraken empty (e.g. 1w sometimes)
+  if(!mapped.length){
+    const biv={'4h':'4h','1d':'1d','1w':'1w','1h':'1h'}[interval];
+    if(!biv) throw new Error('kraken empty '+interval);
+    const bj=await jget('https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval='+biv+'&limit='+Math.min(limit,500));
+    if(!bj||!bj.length) throw new Error('ohlc empty '+interval+' (kraken+binance)');
+    mapped=bj.map(r=>[+r[0],+r[1],+r[2],+r[3],+r[4],+r[5]]);
+  }
   // Optional: Binance taker-buy volume for CVD (field index 6). Ignore failures.
   try{
     const biv={'4h':'4h','1d':'1d','1w':'1w','1h':'1h'}[interval];
@@ -4238,18 +4250,20 @@ function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('
 
 function showAntifomo(on){
   const p=$('antifomo-panel');
-  if(p){p.style.display=on?'block':'none';p.classList.toggle('on',!!on);}
+  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel');
   if(on){
-    try{showCoin(false);}catch(e){}
-    try{showMemeGate(false);}catch(e){}
-    try{showTrend(false);}catch(e){}
-    try{showStruct(false);}catch(e){}
-    try{showMacro(false);}catch(e){}
-    try{showSignal(false);}catch(e){}
-    const panels=$('tf-panels');
     if(panels){panels.classList.add('hidden');panels.style.display='none';}
+    if(trend){trend.classList.remove('on');trend.style.display='none';}
+    if(sp){sp.classList.remove('on');sp.style.display='none';}
+    if(mp){mp.classList.remove('on');mp.style.display='none';}
+    if(sg){sg.classList.remove('on');sg.style.display='none';}
+    if(mg){mg.style.display='none';}
+    if(cp){cp.style.display='none';cp.classList.remove('on');}
+    if(p){p.style.display='block';p.classList.add('on');}
     try{afRenderCal();}catch(e){}
     try{afTickCool();}catch(e){}
+  } else {
+    if(p){p.style.display='none';p.classList.remove('on');}
   }
 }
 
