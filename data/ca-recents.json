@@ -1,7 +1,14 @@
 {
-  "updated": "2026-09-12T17:42:41.238Z",
+  "updated": "2026-09-12T17:49:00.149Z",
   "count": 8,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+      "name": "CATE",
+      "base": "CATE",
+      "t": 1789234971427
+    },
     {
       "chain": "solana",
       "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
@@ -15,13 +22,6 @@
       "name": "TROLL",
       "base": "TROLL",
       "t": 1789213217514
-    },
-    {
-      "chain": "solana",
-      "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
-      "name": "CATE",
-      "base": "CATE",
-      "t": 1789213143747
     },
     {
       "chain": "solana",
