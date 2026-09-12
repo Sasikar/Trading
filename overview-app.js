@@ -4268,7 +4268,12 @@ function showAntifomo(on){
     }catch(e){}
     try{afRenderCal();}catch(e){}
     try{afTickCool();}catch(e){}
-    // public raw load (no token) — merge monthly files if present
+    // Immediate delta from local (before network) so UI is never "—"
+    try{
+      const local=afLoadEvents();
+      if(local.length) afGitDeltaUI(local.length, 'Browser has '+local.length+' · checking GitHub…');
+      else afGitDeltaUI(0, 'No local events yet');
+    }catch(e){}
     try{ afGitLoadPublic(); }catch(e){}
   } else {
     if(p){p.style.display='none';p.classList.remove('on');}
@@ -4505,13 +4510,24 @@ window.afGitSave=afGitSave;
 async function afGitLoadPublic(){
   try{
     const remote=await afGitFetch('');
-    if(!remote.length) return;
-    const merged=afMergeEvents(afLoadEvents(), remote);
-    afSaveEvents(merged);
+    const local=afLoadEvents();
+    if(remote.length){
+      const merged=afMergeEvents(local, remote);
+      afSaveEvents(merged);
+    }
     afRenderCal();
-    const delta=afLocalOnly(merged, remote);
-    afGitDeltaUI(delta.length, 'Public log loaded · '+remote.length+' on GitHub · delta '+delta.length);
-  }catch(e){}
+    const nowLocal=afLoadEvents();
+    const delta=afLocalOnly(nowLocal, remote||[]);
+    afGitDeltaUI(
+      delta.length,
+      'GitHub '+((remote&&remote.length)||0)+' · browser '+nowLocal.length+' · delta '+delta.length+(delta.length?' not saved':' in sync')
+    );
+  }catch(e){
+    try{
+      const local=afLoadEvents();
+      afGitDeltaUI(local.length, 'Could not reach GitHub · treating all '+local.length+' local as delta');
+    }catch(e2){}
+  }
 }
 window.afGitLoad=afGitSync;
 window.afGitSaveMonth=afGitSave;
@@ -4793,6 +4809,36 @@ function afRenderCal(){
   grid.querySelectorAll('.af-day-btn').forEach(function(btn){
     btn.addEventListener('click', function(){ window.afShowDay && window.afShowDay(btn.getAttribute('data-day')); });
   });
+  // Recent events list (so 2 entries are always visible, not only via day tap)
+  let list=$('af-cal-list');
+  if(!list && grid.parentNode){
+    list=document.createElement('div');
+    list.id='af-cal-list';
+    list.style.cssText='margin-top:12px';
+    grid.parentNode.insertBefore(list, grid.nextSibling);
+  }
+  if(list){
+    const recent=events.slice().sort((a,b)=>b.t-a.t).slice(0,10);
+    if(!recent.length){
+      list.innerHTML='<div style="font-size:12px;color:#8491a1">No events in history yet</div>';
+    } else {
+      list.innerHTML='<div style="font-size:11px;font-weight:800;color:#8491a1;margin-bottom:6px">RECENT EVENTS · '+events.length+' total</div>'
+        +recent.map(function(e){
+          const col=e.score>=80?'#ff6f7c':e.score>=60?'#f0a060':e.score>=40?'#e6c878':'#62e3a0';
+          return '<div style="padding:10px 12px;margin-bottom:6px;border-radius:10px;border:1px solid #243041;background:#0b121a">'
+            +'<div style="display:flex;justify-content:space-between;gap:8px">'
+            +'<span style="font-weight:900;color:'+col+'">'+e.score+' · '+(e.band||'')+'</span>'
+            +'<span style="font-size:11px;color:#8491a1">'+String(e.day||'')+'</span></div>'
+            +'<div style="font-size:11px;color:#c5d0dc;margin-top:4px">'+(e.pre?'Pre-planned':'Reactive')+' · '+(e.quality||'')+' · '+String(e.asset||'').toUpperCase()+'</div>'
+            +'<div style="font-size:11px;color:#8491a1;margin-top:2px">'+(e.detail||e.label||'')+'</div></div>';
+        }).join('');
+    }
+  }
+  // Auto-open latest day detail
+  if(events.length){
+    const latest=events.slice().sort((a,b)=>b.t-a.t)[0];
+    if(latest&&latest.day) try{ afShowDay(latest.day); }catch(e){}
+  }
 }
 window.afRenderCal=afRenderCal;
 
