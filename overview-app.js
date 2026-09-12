@@ -4260,6 +4260,7 @@ function showAntifomo(on){
     if(mg){mg.style.display='none';}
     if(cp){cp.style.display='none';cp.classList.remove('on');}
     if(p){p.style.display='block';p.classList.add('on');}
+    try{afRestoreState();}catch(e){}
     try{afRenderCal();}catch(e){}
     try{afTickCool();}catch(e){}
   } else {
@@ -4269,15 +4270,62 @@ function showAntifomo(on){
 
 const AF_KEY='af_fomo_events_v1';
 const AF_COOL='af_cool_until_v1';
+const AF_STATE='af_last_state_v1';
 let afPre=null; // true=preplanned, false=reactive, null=unset
 let afQuality=null; // {tag, label, detail, scorePart}
 let afCoolTimer=null;
 
 function afLoadEvents(){
-  try{return JSON.parse(localStorage.getItem(AF_KEY)||'[]');}catch(e){return [];}
+  try{
+    const raw=localStorage.getItem(AF_KEY);
+    const arr=JSON.parse(raw||'[]');
+    return Array.isArray(arr)?arr:[];
+  }catch(e){return [];}
 }
 function afSaveEvents(arr){
-  try{localStorage.setItem(AF_KEY,JSON.stringify(arr.slice(-120)));}catch(e){}
+  try{
+    localStorage.setItem(AF_KEY, JSON.stringify((arr||[]).slice(-200)));
+  }catch(e){ console.warn('afSaveEvents', e); }
+}
+
+function afSaveState(){
+  try{
+    const sc = (afPre!==null && afQuality) ? afScore() : null;
+    localStorage.setItem(AF_STATE, JSON.stringify({
+      t: Date.now(),
+      pre: afPre,
+      quality: afQuality,
+      score: sc
+    }));
+  }catch(e){}
+}
+
+function afRestoreState(){
+  try{
+    const s=JSON.parse(localStorage.getItem(AF_STATE)||'null');
+    if(!s) return;
+    if(s.pre===true||s.pre===false){
+      afPre=s.pre;
+      const el=$('af-pre-status');
+      if(el){
+        el.textContent=afPre?'✅ Pre-planned — setup identified before the move':'❌ Reactive — possible FOMO (interest after the move)';
+        el.style.color=afPre?'#62e3a0':'#ff6f7c';
+      }
+      const y=$('af-pre-yes'), n=$('af-pre-no');
+      if(y) y.style.outline=afPre?'2px solid #62e3a0':'none';
+      if(n) n.style.outline=!afPre?'2px solid #ff6f7c':'none';
+    }
+    if(s.quality && typeof s.quality==='object'){
+      afQuality=s.quality;
+      const box=$('af-quality');
+      if(box && afQuality.label){
+        box.innerHTML='<div style="font-size:16px;font-weight:900;color:'+(afQuality.color||'#c5d0dc')+'">'+afQuality.label+'</div>'
+          +'<div style="margin-top:8px;font-size:12px;color:#c5d0dc;line-height:1.5">'+(afQuality.detail||'')+'</div>'
+          +'<div style="margin-top:8px;font-size:11px;color:#8491a1">Restored from last session · '+(afQuality.asset||'').toUpperCase()+' · '+(afQuality.tf||'').toUpperCase()+'</div>';
+      }
+    }
+    afDecide();
+  }catch(e){}
 }
 
 function afSetPre(yes){
@@ -4290,6 +4338,7 @@ function afSetPre(yes){
   const y=$('af-pre-yes'), n=$('af-pre-no');
   if(y) y.style.outline=yes?'2px solid #62e3a0':'none';
   if(n) n.style.outline=!yes?'2px solid #ff6f7c':'none';
+  afSaveState();
   afDecide();
 }
 window.afSetPre=afSetPre;
@@ -4387,6 +4436,7 @@ async function afAssess(){
         +'<div style="margin-top:8px;font-size:11px;color:#8491a1">'+asset.toUpperCase()+' · '+tf.toUpperCase()+' · closed candles · S/R + EMA50 extension</div>';
     }
     if($('af-source')) $('af-source').textContent='LIVE · '+asset.toUpperCase()+' '+tf.toUpperCase();
+    afSaveState();
     afDecide();
   }catch(e){
     afQuality=null;
@@ -4443,7 +4493,7 @@ function afDecide(){
     +'<div style="margin-top:10px;font-size:13px;color:#c5d0dc;line-height:1.45">'+action+'</div>'
     +'<div style="margin-top:8px;font-size:11px;color:#8491a1">Pre-planned: '+(afPre?'YES':'NO')+' · Entry: '+afQuality.tag+' · '+afQuality.detail+'</div>';
   if(cool) cool.style.display=needCool||hard?'block':'none';
-  if(needCool && !localStorage.getItem(AF_COOL)){
+  if(needCool && !afCoolUntil()){
     // auto-suggest only; user starts timer
   }
 }
@@ -4452,20 +4502,39 @@ window.afDecide=afDecide;
 function afStartCool(mins){
   mins=mins||30;
   const until=Date.now()+mins*60*1000;
-  try{localStorage.setItem(AF_COOL,String(until));}catch(e){}
+  try{
+    localStorage.setItem(AF_COOL, JSON.stringify({until:until, mins:mins, started:Date.now()}));
+  }catch(e){
+    try{localStorage.setItem(AF_COOL,String(until));}catch(e2){}
+  }
   const c=$('af-cooling'); if(c) c.style.display='block';
   afTickCool();
 }
 window.afStartCool=afStartCool;
 function afClearCool(){
   try{localStorage.removeItem(AF_COOL);}catch(e){}
-  const clock=$('af-cooling-clock'); if(clock) clock.textContent='—';
+  const clock=$('af-cooling-clock'); if(clock){ clock.textContent='—'; clock.style.color='#f0a060'; }
 }
 window.afClearCool=afClearCool;
+function afCoolUntil(){
+  try{
+    const raw=localStorage.getItem(AF_COOL);
+    if(!raw) return 0;
+    if(raw[0]==='{'){ const o=JSON.parse(raw); return +o.until||0; }
+    return parseInt(raw,10)||0;
+  }catch(e){ return 0; }
+}
 function afTickCool(){
-  const until=parseInt(localStorage.getItem(AF_COOL)||'0',10);
+  const until=afCoolUntil();
   const clock=$('af-cooling-clock');
-  if(!until||!clock){ if(clock&&!until) clock.textContent='—'; return; }
+  const panel=$('af-cooling');
+  if(!until){
+    if(clock) clock.textContent='—';
+    return;
+  }
+  // Keep cooling UI visible across refresh while timer active
+  if(panel) panel.style.display='block';
+  if(!clock) return;
   const left=until-Date.now();
   if(left<=0){
     clock.textContent='DONE — reassess';
@@ -4504,6 +4573,19 @@ window.afLogEvent=afLogEvent;
 function afRenderCal(){
   const grid=$('af-cal-grid'); if(!grid) return;
   const events=afLoadEvents();
+  // status line under calendar header
+  let statusEl=$('af-cal-status');
+  if(!statusEl && grid.parentNode){
+    statusEl=document.createElement('div');
+    statusEl.id='af-cal-status';
+    statusEl.style.cssText='font-size:11px;color:#8491a1;margin-bottom:8px';
+    grid.parentNode.insertBefore(statusEl, grid);
+  }
+  if(statusEl){
+    statusEl.textContent=events.length
+      ? ('Persistent history · '+events.length+' event(s) saved in this browser')
+      : 'No saved FOMO events yet · Log current event to build history (stays after refresh)';
+  }
   const byDay={};
   events.forEach(e=>{
     if(!byDay[e.day]||e.score>byDay[e.day].score) byDay[e.day]=e;
@@ -4567,7 +4649,7 @@ document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('c
 });
 window.addEventListener('resize',()=>{if(fibChart){const el=$('fib-tv');if(el)fibChart.applyOptions({width:el.clientWidth});}if(macdChart){const el=$('macd-tv');if(el)macdChart.applyOptions({width:el.clientWidth});}if(structW1Chart){const el=$('struct-w1-tv');if(el)structW1Chart.applyOptions({width:el.clientWidth});}if(sigChart){const el=$('sig-tv');if(el)sigChart.applyOptions({width:el.clientWidth});}});
 
-async function tick(){try{wireCoinUI();}catch(e){} await loadMarket();
+async function tick(){try{wireCoinUI();}catch(e){} try{afRenderCal();}catch(e){} try{afTickCool();}catch(e){} try{if((document.querySelector("#tf-tabs .tab.active")||{}).getAttribute&&document.querySelector("#tf-tabs .tab.active").getAttribute("data-tf")==="antifomo")afRestoreState();}catch(e){} await loadMarket();
 try{
   const q=new URLSearchParams(location.search).get('tab');
   if(q){
