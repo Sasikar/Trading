@@ -2503,13 +2503,14 @@ function mgDomModifier(dom){
 
 
 function showCoin(on){
-  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel');
+  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel'),af=$('antifomo-panel');
   if(panels){panels.classList.add('hidden');panels.style.display='none';}
   if(trend){trend.classList.remove('on');trend.style.display='none';}
   if(sp){sp.classList.remove('on');sp.style.display='none';}
   if(mp){mp.classList.remove('on');mp.style.display='none';}
   if(sg){sg.classList.remove('on');sg.style.display='none';}
   if(mg){mg.style.display='none';}
+  if(af){af.style.display='none';af.classList.remove('on');}
   if(cp){
     if(on){ cp.classList.add('on'); cp.style.display='block'; try{wireCoinUI();}catch(e){} }
     else { cp.classList.remove('on'); cp.style.display='none'; }
@@ -3790,12 +3791,15 @@ function wireCoinUI(){
 
 
 function showMemeGate(on){
-  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel');const cp=$('coin-panel');if(cp&&on)cp.style.display='none';
+  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel');
+  const cp=$('coin-panel'), af=$('antifomo-panel');
+  if(cp){cp.style.display='none';cp.classList.remove('on');}
+  if(af){af.style.display='none';af.classList.remove('on');}
   if(panels){panels.classList.add('hidden');panels.style.display='none';}
   if(trend){trend.classList.remove('on');trend.style.display='none';}
   if(sp){sp.classList.remove('on');sp.style.display='none';}
   if(mp){mp.classList.remove('on');mp.style.display='none';}
-  if(sg){sg.classList.remove('on');sg.style.display='none';}const _mg=$('memegate-panel');if(_mg)_mg.style.display='none';
+  if(sg){sg.classList.remove('on');sg.style.display='none';}
   if(mg){mg.style.display=on?'block':'none';}
 }
 
