@@ -491,7 +491,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260912-eventcol1"></script>
+<script src="overview-app.js?v=20260912-carecent1"></script>
 </div>
 
 <div id="memegate-panel" class="trend-panel" style="display:block">
@@ -535,6 +535,16 @@
       <button type="button" id="coin-load" onclick="try{window.loadCoin&&window.loadCoin()}catch(e){alert(e)}">Load</button>
     </div>
     <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
+    <div id="coin-recents-wrap" style="margin:0 0 14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">RECENT CAs</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button type="button" onclick="try{window.coinRecentsSync&&window.coinRecentsSync()}catch(e){}" style="padding:4px 8px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#8491a1;font-size:10px;font-weight:700;cursor:pointer">Sync GitHub</button>
+          <span id="coin-recents-status" style="font-size:10px;color:#8491a1"></span>
+        </div>
+      </div>
+      <div id="coin-recents" style="display:flex;flex-wrap:wrap;gap:6px;max-height:88px;overflow-y:auto"></div>
+    </div>
     <div class="coin-tf" id="coin-tf">
       <button type="button" data-ctf="4h" class="on" onclick="try{window.setCoinTF&&window.setCoinTF('4h')}catch(e){}">4H</button>
       <button type="button" data-ctf="1d" onclick="try{window.setCoinTF&&window.setCoinTF('1d')}catch(e){}">1D</button>
