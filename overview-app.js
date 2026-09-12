@@ -2514,8 +2514,156 @@ function mgDomModifier(dom){
 }
 
 
+
+/* ===== BREAKOUT MEMES TAB (saved CAs only) ===== */
+let breakoutTF='4h';
+let breakoutScanBusy=false;
+
+function showBreakoutMemes(on){
+  const p=$('breakouts-panel');
+  const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel'), sg=$('signal-panel');
+  const mg=$('memegate-panel'), cp=$('coin-panel'), af=$('antifomo-panel');
+  if(on){
+    if(panels){ panels.classList.add('hidden'); panels.style.display='none'; }
+    if(trend){ trend.style.display='none'; trend.classList.remove('on'); }
+    if(sp){ sp.style.display='none'; sp.classList.remove('on'); }
+    if(mp){ mp.style.display='none'; mp.classList.remove('on'); }
+    if(sg){ sg.style.display='none'; sg.classList.remove('on'); }
+    if(mg) mg.style.display='none';
+    if(cp){ cp.style.display='none'; cp.classList.remove('on'); }
+    if(af){ af.style.display='none'; af.classList.remove('on'); }
+    if(p){ p.style.display='block'; p.classList.add('on'); }
+    try{ coinRecentsRender(); }catch(e){}
+    const n=(typeof coinRecentsLoadLocal==='function')?coinRecentsLoadLocal().length:0;
+    if($('bo-status')) $('bo-status').textContent=n? (n+' saved CA(s) ready') : 'No saved CAs — load some on CA tab first';
+  } else {
+    if(p){ p.style.display='none'; p.classList.remove('on'); }
+  }
+}
+window.showBreakoutMemes=showBreakoutMemes;
+
+window.setBreakoutTF=function(tf){
+  breakoutTF=tf||'4h';
+  document.querySelectorAll('.bo-tf-btn').forEach(function(b){
+    const on=b.getAttribute('data-botf')===breakoutTF;
+    b.classList.toggle('on', on);
+    b.style.background=on?'#1a9b6c':'#121a24';
+    b.style.color=on?'#fff':'#c5d0dc';
+  });
+  try{ scanBreakoutMemes(); }catch(e){}
+};
+
+async function scanBreakoutMemes(){
+  if(breakoutScanBusy) return;
+  const list=$('bo-list');
+  const st=$('bo-status');
+  const src=$('bo-source');
+  let recents=[];
+  try{ recents=coinRecentsLoadLocal(); }catch(e){}
+  if(!recents.length){
+    try{ await coinRecentsSync(true); recents=coinRecentsLoadLocal(); }catch(e){}
+  }
+  if(!recents.length){
+    if(list) list.innerHTML='<div style="color:#8491a1;font-size:12px">No saved CAs. Load coins on the CA tab first — they appear here automatically.</div>';
+    if(st) st.textContent='0 saved CAs';
+    return;
+  }
+  breakoutScanBusy=true;
+  if(src) src.textContent='SCANNING';
+  if(st) st.textContent='Scanning 0/'+recents.length+' · '+breakoutTF.toUpperCase();
+  if(list) list.innerHTML='<div style="color:#8491a1;font-size:12px">Scanning saved memes on '+breakoutTF.toUpperCase()+'…</div>';
+
+  const hits=[];
+  const errors=[];
+  for(let i=0;i<recents.length;i++){
+    const e=recents[i];
+    if(st) st.textContent='Scanning '+(i+1)+'/'+recents.length+' · '+(e.name||'…')+' · '+breakoutTF.toUpperCase();
+    try{
+      const chain=(e.chain==='sol'||e.chain==='solana')?'solana':'eth';
+      const pool=await coinResolvePool(chain, e.ca);
+      await new Promise(r=>setTimeout(r, 350)); // rate limit
+      const kl=await coinFetchOHLCV(pool.network, pool.address, breakoutTF);
+      const closed=kl&&kl.length>2?kl.slice(0,-1):kl;
+      if(!closed||closed.length<25){ errors.push(e.name||e.ca); continue; }
+      const gate=coinEntryGate(closed, breakoutTF);
+      const brk=gate.brk||coinBreakoutAge(closed);
+      const stt=gate.state||'WATCH';
+      const isBreak = !!(brk&&(brk.fresh||brk.held)&&(brk.age!=null&&brk.age<99));
+      const interesting = isBreak || stt==='EARLY' || stt==='STRONG CONFIRMED' || stt==='STRETCHED';
+      if(!interesting) continue;
+      const spot=closed[closed.length-1][4];
+      hits.push({
+        name: e.name||pool.base||pool.name||e.ca.slice(0,8),
+        chain: chain,
+        ca: e.ca,
+        state: stt,
+        age: brk&&brk.age!=null?brk.age:null,
+        fresh: !!(brk&&brk.fresh),
+        held: !!(brk&&brk.held),
+        confirms: gate.confirms!=null?gate.confirms:0,
+        sizePct: gate.sizePct||0,
+        spot: spot,
+        event: (brk&&brk.age===0)?'NEW BREAKOUT':(brk&&brk.held?'BREAKOUT HELD':'—')
+      });
+      // live update list
+      if(list) list.innerHTML=_boRenderHits(hits)+'<div style="font-size:11px;color:#8491a1;margin-top:8px">Still scanning… '+(i+1)+'/'+recents.length+'</div>';
+    }catch(err){
+      errors.push((e.name||e.ca.slice(0,6))+': '+(err&&err.message||err));
+    }
+  }
+  breakoutScanBusy=false;
+  if(src) src.textContent='LIVE · '+breakoutTF.toUpperCase();
+  if(st) st.textContent=hits.length+' breakout-related · scanned '+recents.length+(errors.length?' · '+errors.length+' skipped':'');
+  if(list){
+    if(!hits.length){
+      list.innerHTML='<div style="padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#8491a1;font-size:13px">No breakouts among '+recents.length+' saved CA(s) on <b style="color:#c5d0dc">'+breakoutTF.toUpperCase()+'</b> right now.</div>';
+    } else {
+      list.innerHTML=_boRenderHits(hits);
+    }
+  }
+}
+window.scanBreakoutMemes=scanBreakoutMemes;
+
+function _boRenderHits(hits){
+  return hits.map(function(h){
+    const col=h.state==='STRONG CONFIRMED'?'#62e3a0':h.state==='EARLY'?'#e6c878':h.state==='STRETCHED'?'#f0a060':'#c5d0dc';
+    const chainLab=h.chain==='solana'?'SOL':'ETH';
+    const caShort=h.ca.length>12?h.ca.slice(0,6)+'…'+h.ca.slice(-4):h.ca;
+    return '<div style="padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a">'
+      +'<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">'
+      +'<div style="font-weight:900;font-size:15px;color:#e8eef6">'+h.name+' <span style="font-size:11px;color:#8491a1;font-weight:700">'+chainLab+'</span></div>'
+      +'<div style="font-weight:800;color:'+col+'">'+h.state+'</div></div>'
+      +'<div style="margin-top:6px;font-size:12px;color:#c5d0dc;line-height:1.45">'
+      +h.event+' · age '+(h.age!=null?h.age:'—')+' · '+(h.fresh?'Fresh YES':'Fresh NO')
+      +' · confirms '+(h.confirms||0)+'/8'
+      +(h.sizePct?(' · size '+h.sizePct+'%'):'')
+      +'</div>'
+      +'<div style="margin-top:4px;font-size:11px;color:#8491a1">'+caShort+'</div>'
+      +'<button type="button" data-bo-ca="'+h.ca+'" data-bo-chain="'+h.chain+'" class="bo-open-ca" style="margin-top:8px;padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#62e3a0;font-weight:700;font-size:11px;cursor:pointer">Open in CA tab</button>'
+      +'</div>';
+  }).join('') || '';
+}
+
+// delegate open in CA
+document.addEventListener('click', function(ev){
+  const btn=ev.target&&ev.target.closest&&ev.target.closest('.bo-open-ca');
+  if(!btn) return;
+  const ca=btn.getAttribute('data-bo-ca');
+  const chain=btn.getAttribute('data-bo-chain');
+  try{
+    document.querySelectorAll('#tf-tabs .tab').forEach(function(b){ b.classList.remove('active'); });
+    const tab=document.querySelector('#tf-tabs .tab[data-tf="coin"]');
+    if(tab) tab.classList.add('active');
+    showBreakoutMemes(false);
+    showCoin(true);
+    if($('coin-chain')) $('coin-chain').value=chain==='solana'?'solana':'eth';
+    if($('coin-ca')) $('coin-ca').value=ca;
+    if(window.loadCoin) window.loadCoin();
+  }catch(e){ console.warn(e); }
+});
+
 function showCoin(on){
-  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel'),af=$('antifomo-panel');
+  const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel'),af=$('antifomo-panel'),bo=$('breakouts-panel');
   if(panels){panels.classList.add('hidden');panels.style.display='none';}
   if(trend){trend.classList.remove('on');trend.style.display='none';}
   if(sp){sp.classList.remove('on');sp.style.display='none';}
@@ -2523,6 +2671,7 @@ function showCoin(on){
   if(sg){sg.classList.remove('on');sg.style.display='none';}
   if(mg){mg.style.display='none';}
   if(af){af.style.display='none';af.classList.remove('on');}
+  if(on && bo){bo.style.display='none';bo.classList.remove('on');}
   if(cp){
     if(on){ cp.classList.add('on'); cp.style.display='block'; try{wireCoinUI();}catch(e){} }
     else { cp.classList.remove('on'); cp.style.display='none'; }
@@ -4026,9 +4175,10 @@ function wireCoinUI(){
 
 function showMemeGate(on){
   const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel');
-  const cp=$('coin-panel'), af=$('antifomo-panel');
+  const cp=$('coin-panel'), af=$('antifomo-panel'), bo=$('breakouts-panel');
   if(cp){cp.style.display='none';cp.classList.remove('on');}
   if(af){af.style.display='none';af.classList.remove('on');}
+  if(on && bo){bo.style.display='none';bo.classList.remove('on');}
   if(panels){panels.classList.add('hidden');panels.style.display='none';}
   if(trend){trend.classList.remove('on');trend.style.display='none';}
   if(sp){sp.classList.remove('on');sp.style.display='none';}
@@ -5089,7 +5239,7 @@ function afShowDay(day){
 }
 window.afShowDay=afShowDay;
 
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showSignal(false);showTrend(false);showStruct(false);showMacro(false);showMemeGate(true);loadMemeGate();}else if(tf==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else if(tf==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}showCoin(true);}else if(tf==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showAntifomo(true);}else{try{showAntifomo(false);}catch(e){}showCoin(false);showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
+document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showSignal(false);showTrend(false);showStruct(false);showMacro(false);showMemeGate(true);loadMemeGate();}else if(tf==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else if(tf==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}try{showBreakoutMemes(false);}catch(e){}showCoin(true);}else if(tf==='breakouts'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}showBreakoutMemes(true);}else if(tf==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showBreakoutMemes(false);}catch(e){}showAntifomo(true);}else{try{showAntifomo(false);}catch(e){}showCoin(false);showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
 // Signal date controls
 ['sig-mode','sig-is-start','sig-is-end','sig-oos-start','sig-oos-end'].forEach(id=>{
 });
@@ -5108,7 +5258,7 @@ try{
 const act=document.querySelector('#tf-tabs .tab.active');
 const at=(act&&act.getAttribute('data-tf'))||currentTF||'memegate';
 currentTF=at;
-if(at==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);await loadMemeGate();}else if(at==='coin'){showMemeGate(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}else if(at==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showAntifomo(true);}
+if(at==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);await loadMemeGate();}else if(at==='coin'){showMemeGate(false);try{showAntifomo(false);}catch(e){}try{showBreakoutMemes(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}else if(at==='breakouts'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}showBreakoutMemes(true);}else if(at==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showBreakoutMemes(false);}catch(e){}showAntifomo(true);}
 else if(at==='trend'){showMemeGate(false);showStruct(false);showMacro(false);showSignal(false);showTrend(true);await loadTrend();}
 else if(at==='struct'){showMemeGate(false);showTrend(false);showMacro(false);showSignal(false);showStruct(true);await loadStructural();}
 else if(at==='macro'){showMemeGate(false);showTrend(false);showStruct(false);showSignal(false);showMacro(true);await loadMacro();}
