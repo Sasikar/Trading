@@ -4231,7 +4231,318 @@ async function loadMemeGate(){
 
 
 function showTrend(on){const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel');if(panels){panels.classList.toggle('hidden',!!on);panels.style.display=on?'none':'';}if(trend){trend.classList.toggle('on',!!on);trend.style.display=on?'block':'none';}if(sp&&on){sp.classList.remove('on');sp.style.display='none';}if(mp&&on){mp.classList.remove('on');mp.style.display='none';}if(sg&&on){sg.classList.remove('on');sg.style.display='none';}}
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showTrend(false);showStruct(false);showMacro(false);showMemeGate(false);showSignal(true);loadSignal();}else if(tf==='memegate'){showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else if(tf==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}else{showCoin(false);showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
+
+function showAntifomo(on){
+  const p=$('antifomo-panel');
+  if(p){p.style.display=on?'block':'none';p.classList.toggle('on',!!on);}
+  if(on){
+    try{showCoin(false);}catch(e){}
+    try{showMemeGate(false);}catch(e){}
+    try{showTrend(false);}catch(e){}
+    try{showStruct(false);}catch(e){}
+    try{showMacro(false);}catch(e){}
+    try{showSignal(false);}catch(e){}
+    const panels=$('tf-panels');
+    if(panels){panels.classList.add('hidden');panels.style.display='none';}
+    try{afRenderCal();}catch(e){}
+    try{afTickCool();}catch(e){}
+  }
+}
+
+const AF_KEY='af_fomo_events_v1';
+const AF_COOL='af_cool_until_v1';
+let afPre=null; // true=preplanned, false=reactive, null=unset
+let afQuality=null; // {tag, label, detail, scorePart}
+let afCoolTimer=null;
+
+function afLoadEvents(){
+  try{return JSON.parse(localStorage.getItem(AF_KEY)||'[]');}catch(e){return [];}
+}
+function afSaveEvents(arr){
+  try{localStorage.setItem(AF_KEY,JSON.stringify(arr.slice(-120)));}catch(e){}
+}
+
+function afSetPre(yes){
+  afPre=!!yes;
+  const el=$('af-pre-status');
+  if(el){
+    el.textContent=yes?'✅ Pre-planned — setup identified before the move':'❌ Reactive — possible FOMO (interest after the move)';
+    el.style.color=yes?'#62e3a0':'#ff6f7c';
+  }
+  const y=$('af-pre-yes'), n=$('af-pre-no');
+  if(y) y.style.outline=yes?'2px solid #62e3a0':'none';
+  if(n) n.style.outline=!yes?'2px solid #ff6f7c':'none';
+  afDecide();
+}
+window.afSetPre=afSetPre;
+
+async function afGetKl(asset, tf){
+  asset=(asset||'btc').toLowerCase();
+  tf=(tf||'4h').toLowerCase();
+  if(asset==='ca'){
+    if(!coinPool) throw new Error('Load a CA on the CA tab first');
+    return await coinFetchOHLCV(coinPool.network, coinPool.address, tf==='1h'?'4h':tf);
+  }
+  // BTC/ETH via existing TF pipeline if available
+  if(typeof fetchKrakenOHLC==='function'){
+    const pair=asset==='eth'?'ETHUSD':'XBTUSD';
+    const map={ '1h':60,'4h':240,'1d':1440 };
+    try{
+      const rows=await fetchKrakenOHLC(pair, map[tf]||240);
+      if(rows&&rows.length) return rows;
+    }catch(e){}
+  }
+  // Fallback: use last loaded TF candles if BTC
+  if(asset==='btc' && typeof lastKl!=='undefined' && lastKl && lastKl.length) return lastKl;
+  // Gate.io / public try
+  try{
+    const interval=tf==='1d'?'1d':(tf==='1h'?'1h':'4h');
+    const inst=asset==='eth'?'ETH_USDT':'BTC_USDT';
+    const url='https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair='+inst+'&interval='+interval+'&limit=200';
+    const r=await fetch(url);
+    const j=await r.json();
+    // gate: [t,vol,close,high,low,open]
+    return (j||[]).map(x=>[+x[0]*1000,+x[5],+x[3],+x[4],+x[2],+x[1]]).filter(k=>isFinite(k[4])).sort((a,b)=>a[0]-b[0]);
+  }catch(e){
+    throw new Error('Could not load candles: '+(e&&e.message||e));
+  }
+}
+
+function afClassifyQuality(kl){
+  if(!kl||kl.length<30) return {tag:'unknown', label:'Insufficient data', color:'#8491a1', scorePart:30, detail:'Need more closed candles'};
+  const closes=kl.map(k=>+k[4]);
+  const spot=closes[closes.length-1];
+  const rsi=typeof calcRSI==='function'?calcRSI(closes,14):null;
+  const e50=typeof emaArr==='function'?emaArr(closes,Math.min(50,closes.length-1)):[];
+  const a50=e50[e50.length-1];
+  const aboveEma=a50>0?((spot/a50)-1)*100:null;
+  let struct={support:null,resistance:null};
+  try{ if(typeof swingStructure==='function') struct=swingStructure(kl,Math.min(50,kl.length),'1D')||struct; }catch(e){}
+  const sup=struct.support, res=struct.resistance;
+  const nearSup=sup!=null && spot<=sup*1.012 && spot>=sup*0.97;
+  const nearRes=res!=null && spot>=res*0.988 && spot<=res*1.03;
+  const stretched=(rsi!=null&&rsi>=75)||(aboveEma!=null&&aboveEma>=12)||(rsi!=null&&rsi>=70&&aboveEma!=null&&aboveEma>=8);
+  // clean breakout: close above recent range high with not extreme stretch
+  let broke=false;
+  try{
+    if(typeof coinBreakoutAge==='function'){
+      const b=coinBreakoutAge(kl);
+      broke=!!(b.fresh&&b.held&&b.age!=null&&b.age<=2);
+    }
+  }catch(e){}
+
+  let tag, label, color, scorePart, detail;
+  if(stretched){
+    tag='stretched'; label="🔴 Stretched / Extended — Don't chase"; color='#ff6f7c'; scorePart=40;
+    detail='RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · EMA50 '+(aboveEma!=null?((aboveEma>=0?'+':'')+aboveEma.toFixed(1)+'%'):'—')+' · price extended vs baseline';
+  } else if(nearRes && !broke){
+    tag='resistance'; label='🔴 At major Resistance — High caution'; color='#ff6f7c'; scorePart=32;
+    detail='Near resistance $'+(res!=null?res.toPrecision(6):'—')+' · spot $'+spot.toPrecision(6);
+  } else if(nearSup){
+    tag='support'; label='🟢 At Support / Retest — Potentially valid'; color='#62e3a0'; scorePart=8;
+    detail='Near support $'+(sup!=null?sup.toPrecision(6):'—')+' · spot $'+spot.toPrecision(6);
+  } else if(broke){
+    tag='breakout'; label='🟢 Clean Breakout + Confirmation — Potentially valid'; color='#62e3a0'; scorePart=12;
+    detail='Fresh held breakout · RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · not extreme extension';
+  } else {
+    tag='neutral'; label='🟡 Mid-range — no clear edge'; color='#e6c878'; scorePart=20;
+    detail='RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · EMA50 '+(aboveEma!=null?((aboveEma>=0?'+':'')+aboveEma.toFixed(1)+'%'):'—')+' · S $'+(sup!=null?Number(sup).toPrecision(5):'—')+' / R $'+(res!=null?Number(res).toPrecision(5):'—');
+  }
+  return {tag,label,color,scorePart,detail,rsi,aboveEma,sup,res,spot,stretched,nearSup,nearRes,broke};
+}
+
+async function afAssess(){
+  const asset=($('af-asset')&&$('af-asset').value)||'btc';
+  const tf=($('af-tf')&&$('af-tf').value)||'4h';
+  const box=$('af-quality');
+  if(box) box.innerHTML='<div style="color:#8491a1;font-size:12px">Assessing '+asset.toUpperCase()+' '+tf.toUpperCase()+'…</div>';
+  if($('af-source')) $('af-source').textContent='…';
+  try{
+    const kl=await afGetKl(asset, tf);
+    // closed only: drop last if live
+    const closed=kl.length>2?kl.slice(0,-1):kl;
+    afQuality=afClassifyQuality(closed);
+    afQuality.asset=asset; afQuality.tf=tf;
+    if(box){
+      box.innerHTML='<div style="font-size:16px;font-weight:900;color:'+afQuality.color+'">'+afQuality.label+'</div>'
+        +'<div style="margin-top:8px;font-size:12px;color:#c5d0dc;line-height:1.5">'+afQuality.detail+'</div>'
+        +'<div style="margin-top:8px;font-size:11px;color:#8491a1">'+asset.toUpperCase()+' · '+tf.toUpperCase()+' · closed candles · S/R + EMA50 extension</div>';
+    }
+    if($('af-source')) $('af-source').textContent='LIVE · '+asset.toUpperCase()+' '+tf.toUpperCase();
+    afDecide();
+  }catch(e){
+    afQuality=null;
+    if(box) box.innerHTML='<div style="color:#ff6f7c;font-size:12px">'+(e&&e.message||e)+'</div>';
+  }
+}
+window.afAssess=afAssess;
+
+function afScore(){
+  // Base from reactive + quality
+  let s=20;
+  if(afPre===false) s+=35;
+  if(afPre===true) s-=5;
+  if(afQuality) s+=afQuality.scorePart||0;
+  if(afQuality&&afQuality.tag==='stretched'&&afPre===false) s+=15;
+  s=Math.max(0,Math.min(100,Math.round(s)));
+  let band, col;
+  if(s>=80){band='DANGER';col='#ff6f7c';}
+  else if(s>=60){band='HIGH';col='#f0a060';}
+  else if(s>=40){band='CAUTION';col='#e6c878';}
+  else {band='NORMAL';col='#62e3a0';}
+  return {s,band,col};
+}
+
+function afDecide(){
+  const box=$('af-decision');
+  const cool=$('af-cooling');
+  if(!box) return;
+  if(afPre===null||!afQuality){
+    box.innerHTML='<div style="font-size:12px;color:#8491a1">Complete A + B to get Anti-FOMO result</div>';
+    if(cool) cool.style.display='none';
+    return;
+  }
+  const sc=afScore();
+  let result, action, hard=false, needCool=false;
+  const q=afQuality.tag;
+  if(afPre===false && (q==='stretched'||q==='resistance')){
+    result='HARD STOP'; action='Do not enter. Reactive + poor location.'; hard=true;
+  } else if(afPre===false && (q==='support'||q==='breakout'||q==='neutral')){
+    result='30-MIN COOLING → REASSESS'; action='Reactive interest — wait 30 minutes, then reassess. Extend +20–30m if still feels like a chase.'; needCool=true;
+  } else if(afPre===true && q==='stretched'){
+    result="DON'T CHASE"; action='Pre-planned thesis OK, but price is extended — wait for retest / less extension.'; needCool=true;
+  } else if(afPre===true && (q==='support'||q==='breakout')){
+    result='NORMAL EVALUATION'; action='Pre-planned + valid location — proceed with your normal risk rules.';
+  } else {
+    result='CAUTION'; action='Mixed signals — prefer wait or reduce size.'; needCool=true;
+  }
+  box.innerHTML=
+    '<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+    +'<div><div style="font-size:10px;color:#8491a1;font-weight:800;letter-spacing:.08em">ANTI-FOMO RESULT</div>'
+    +'<div style="font-size:20px;font-weight:900;color:'+(hard?'#ff6f7c':(needCool?'#f0a060':'#62e3a0'))+';margin-top:4px">'+result+'</div></div>'
+    +'<div style="text-align:right"><div style="font-size:10px;color:#8491a1;font-weight:800">FOMO SCORE</div>'
+    +'<div style="font-size:22px;font-weight:900;color:'+sc.col+'">'+sc.s+' · '+sc.band+'</div></div></div>'
+    +'<div style="margin-top:10px;font-size:13px;color:#c5d0dc;line-height:1.45">'+action+'</div>'
+    +'<div style="margin-top:8px;font-size:11px;color:#8491a1">Pre-planned: '+(afPre?'YES':'NO')+' · Entry: '+afQuality.tag+' · '+afQuality.detail+'</div>';
+  if(cool) cool.style.display=needCool||hard?'block':'none';
+  if(needCool && !localStorage.getItem(AF_COOL)){
+    // auto-suggest only; user starts timer
+  }
+}
+window.afDecide=afDecide;
+
+function afStartCool(mins){
+  mins=mins||30;
+  const until=Date.now()+mins*60*1000;
+  try{localStorage.setItem(AF_COOL,String(until));}catch(e){}
+  const c=$('af-cooling'); if(c) c.style.display='block';
+  afTickCool();
+}
+window.afStartCool=afStartCool;
+function afClearCool(){
+  try{localStorage.removeItem(AF_COOL);}catch(e){}
+  const clock=$('af-cooling-clock'); if(clock) clock.textContent='—';
+}
+window.afClearCool=afClearCool;
+function afTickCool(){
+  const until=parseInt(localStorage.getItem(AF_COOL)||'0',10);
+  const clock=$('af-cooling-clock');
+  if(!until||!clock){ if(clock&&!until) clock.textContent='—'; return; }
+  const left=until-Date.now();
+  if(left<=0){
+    clock.textContent='DONE — reassess';
+    clock.style.color='#62e3a0';
+    return;
+  }
+  const m=Math.floor(left/60000), s=Math.floor((left%60000)/1000);
+  clock.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  clock.style.color='#f0a060';
+}
+setInterval(afTickCool,1000);
+
+function afLogEvent(){
+  if(afPre===null||!afQuality){ alert('Complete Pre-planned + Assess first'); return; }
+  const sc=afScore();
+  const ev={
+    t:Date.now(),
+    day:new Date().toISOString().slice(0,10),
+    score:sc.s, band:sc.band,
+    pre:afPre,
+    quality:afQuality.tag,
+    label:afQuality.label,
+    detail:afQuality.detail,
+    asset:afQuality.asset, tf:afQuality.tf,
+    decision:($('af-decision')&&$('af-decision').innerText||'').slice(0,200),
+    outcome:null
+  };
+  const arr=afLoadEvents();
+  arr.push(ev);
+  afSaveEvents(arr);
+  afRenderCal();
+  afShowDay(ev.day);
+}
+window.afLogEvent=afLogEvent;
+
+function afRenderCal(){
+  const grid=$('af-cal-grid'); if(!grid) return;
+  const events=afLoadEvents();
+  const byDay={};
+  events.forEach(e=>{
+    if(!byDay[e.day]||e.score>byDay[e.day].score) byDay[e.day]=e;
+  });
+  // last 28 days
+  const days=[];
+  const now=new Date();
+  for(let i=27;i>=0;i--){
+    const d=new Date(now.getTime()-i*86400000);
+    days.push(d.toISOString().slice(0,10));
+  }
+  grid.innerHTML=days.map(day=>{
+    const e=byDay[day];
+    let bg='#121a24', col='#8491a1', sc='';
+    if(e){
+      sc=String(e.score);
+      if(e.score>=80){bg='rgba(255,111,124,.25)';col='#ff6f7c';}
+      else if(e.score>=60){bg='rgba(240,160,96,.25)';col='#f0a060';}
+      else if(e.score>=40){bg='rgba(230,200,120,.2)';col='#e6c878';}
+      else {bg='rgba(98,227,160,.2)';col='#62e3a0';}
+    }
+    const dd=day.slice(8);
+    return '<button type="button" data-day="'+day+'" class="af-day-btn" style="padding:8px 4px;border-radius:10px;border:1px solid #243041;background:'+bg+';color:'+col+';font-weight:800;font-size:11px;cursor:pointer">'
+      +dd+(sc?'<div style="font-size:10px;margin-top:2px">'+sc+'</div>':'')+'</button>';
+  }).join('');
+  grid.querySelectorAll('.af-day-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){ window.afShowDay && window.afShowDay(btn.getAttribute('data-day')); });
+  });
+}
+window.afRenderCal=afRenderCal;
+
+function afShowDay(day){
+  const box=$('af-cal-detail'); if(!box) return;
+  const events=afLoadEvents().filter(e=>e.day===day).reverse();
+  if(!events.length){
+    box.style.display='block';
+    box.innerHTML='<div style="color:#8491a1;font-size:12px">No FOMO events on '+day+'</div>';
+    return;
+  }
+  box.style.display='block';
+  box.innerHTML=events.map(e=>{
+    const col=e.score>=80?'#ff6f7c':e.score>=60?'#f0a060':e.score>=40?'#e6c878':'#62e3a0';
+    return '<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid #1a222c">'
+      +'<div style="font-size:18px;font-weight:900;color:'+col+'">'+e.score+' — '+e.band+'</div>'
+      +'<div style="margin-top:8px;font-size:12px;color:#c5d0dc;line-height:1.55">'
+      +'<b>Why:</b> '+(e.pre===false?'Reactive entry risk':'Pre-planned')+' · '+(e.label||e.quality)+'<br>'
+      +'<b>Pre-planned:</b> '+(e.pre?'YES':'NO')+'<br>'
+      +'<b>Entry quality:</b> '+(e.quality||'—')+'<br>'
+      +'<b>Detail:</b> '+(e.detail||'—')+'<br>'
+      +'<b>Asset:</b> '+String(e.asset||'').toUpperCase()+' · '+(e.tf||'').toUpperCase()+'<br>'
+      +'<b>Logged:</b> '+new Date(e.t).toISOString().replace('T',' ').slice(0,19)+'Z'
+      +'</div></div>';
+  }).join('');
+}
+window.afShowDay=afShowDay;
+
+document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showTrend(false);showStruct(false);showMacro(false);showMemeGate(false);showSignal(true);loadSignal();}else if(tf==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else if(tf==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}showCoin(true);}else if(tf==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showAntifomo(true);}else{try{showAntifomo(false);}catch(e){}showCoin(false);showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
 // Signal date controls
 ['sig-mode','sig-is-start','sig-is-end','sig-oos-start','sig-oos-end'].forEach(id=>{
   const el=$(id); if(el) el.addEventListener('change',()=>{if((document.querySelector('#tf-tabs .tab.active')&&document.querySelector('#tf-tabs .tab.active').getAttribute('data-tf')==='signal')) loadSignal();});
@@ -4251,7 +4562,7 @@ try{
 const act=document.querySelector('#tf-tabs .tab.active');
 const at=(act&&act.getAttribute('data-tf'))||currentTF||'memegate';
 currentTF=at;
-if(at==='memegate'){showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);await loadMemeGate();}else if(at==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}
+if(at==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);await loadMemeGate();}else if(at==='coin'){showMemeGate(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}else if(at==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);showAntifomo(true);}
 else if(at==='trend'){showMemeGate(false);showStruct(false);showMacro(false);showSignal(false);showTrend(true);await loadTrend();}
 else if(at==='struct'){showMemeGate(false);showTrend(false);showMacro(false);showSignal(false);showStruct(true);await loadStructural();}
 else if(at==='macro'){showMemeGate(false);showTrend(false);showStruct(false);showSignal(false);showMacro(true);await loadMacro();}
