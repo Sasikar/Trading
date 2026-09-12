@@ -1,0 +1,44 @@
+name: Breakout meme alerts (ntfy)
+
+# No Cloudflare. Does not deploy or alter GitHub Pages site files.
+on:
+  schedule:
+    # every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Scan saved CAs + ntfy
+        env:
+          NTFY_TOPIC: MyTradingMemeBreakout44
+          BREAKOUT_TFS: '4h,1d'
+          BREAKOUT_SLEEP_MS: '450'
+        run: node scripts/breakout-alert.mjs
+
+      - name: Commit alert state (dedupe)
+        run: |
+          set -e
+          git config user.name "breakout-alerts-bot"
+          git config user.email "actions@github.com"
+          if git diff --quiet -- data/breakout-alert-state.json 2>/dev/null; then
+            echo "No state change"
+          else
+            git add data/breakout-alert-state.json
+            git commit -m "chore: breakout alert state $(date -u +%Y-%m-%dT%H:%MZ)" || echo "nothing to commit"
+            git push || echo "push skipped"
+          fi
