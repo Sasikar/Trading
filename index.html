@@ -376,6 +376,13 @@
       <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">FOMO CALENDAR</div>
       <button type="button" onclick="window.afLogEvent&&window.afLogEvent()" style="padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#c5d0dc;font-weight:700;cursor:pointer">Log current event</button>
     </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:8px;line-height:1.45">Browser keeps a short cache. <b style="color:#c5d0dc">Save month → GitHub</b> writes permanent JSON under <code style="color:#62e3a0">data/fomo/</code> so history is not lost.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <input id="af-git-token" type="password" placeholder="GitHub token (repo scope)" style="flex:1;min-width:180px;padding:8px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#c5d0dc;font-size:12px"/>
+      <button type="button" onclick="window.afGitLoad&&window.afGitLoad()" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;cursor:pointer">Load from GitHub</button>
+      <button type="button" onclick="window.afGitSaveMonth&&window.afGitSaveMonth()" style="padding:8px 12px;border-radius:8px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Save month → GitHub</button>
+    </div>
+    <div id="af-git-status" style="font-size:11px;color:#8491a1;margin-bottom:8px">Token stored only in this browser · same key as other Trading saves if you reuse it</div>
     <div id="af-cal-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px"></div>
     <div id="af-cal-detail" style="margin-top:14px;padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a;display:none"></div>
   </div>
@@ -484,7 +491,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260912-afpersist1"></script>
+<script src="overview-app.js?v=20260912-afgit1"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
