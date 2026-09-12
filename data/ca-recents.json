@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-12T11:24:04.422Z",
+  "updated": "2026-09-12T11:36:03.884Z",
   "count": 7,
   "items": [
     {
@@ -7,7 +7,7 @@
       "ca": "3WPep4ufaToK1aS5s8BL9inzeUrt4DYaQCiic6ZkkC1U",
       "name": "GIKO",
       "base": "GIKO",
-      "t": 1789212192205
+      "t": 1789212253456
     },
     {
       "chain": "solana",
