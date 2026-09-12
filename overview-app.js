@@ -4261,8 +4261,15 @@ function showAntifomo(on){
     if(cp){cp.style.display='none';cp.classList.remove('on');}
     if(p){p.style.display='block';p.classList.add('on');}
     try{afRestoreState();}catch(e){}
+    try{
+      const el=$('af-git-token');
+      const t=localStorage.getItem(AF_TOKEN_KEY)||localStorage.getItem('trading_tax_github_token')||'';
+      if(el&&t) el.value=t;
+    }catch(e){}
     try{afRenderCal();}catch(e){}
     try{afTickCool();}catch(e){}
+    // public raw load (no token) — merge monthly files if present
+    try{ afGitLoadPublic(); }catch(e){}
   } else {
     if(p){p.style.display='none';p.classList.remove('on');}
   }
@@ -4341,7 +4348,182 @@ function afSetPre(yes){
   afSaveState();
   afDecide();
 }
+
 window.afSetPre=afSetPre;
+
+const AF_TOKEN_KEY='trading_github_token';
+const AF_GIT_OWNER='Sasikar';
+const AF_GIT_REPO='Trading';
+let afGitShaMaster=null;
+let afGitShaMonth={};
+
+function afGitToken(){
+  const el=$('af-git-token');
+  let t=(el&&el.value.trim())||localStorage.getItem(AF_TOKEN_KEY)||localStorage.getItem('trading_tax_github_token')||'';
+  if(el&&!el.value&&t) el.value=t;
+  return t;
+}
+function afGitMsg(t){
+  const el=$('af-git-status'); if(el) el.textContent=t;
+}
+
+function afMonthKey(ts){
+  const d=new Date(ts||Date.now());
+  return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0');
+}
+
+function afB64Encode(str){
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function afB64Decode(b64){
+  return decodeURIComponent(escape(atob(b64.replace(/\s/g,''))));
+}
+
+async function afGitGet(path, token){
+  const url='https://api.github.com/repos/'+AF_GIT_OWNER+'/'+AF_GIT_REPO+'/contents/'+path;
+  const headers={Accept:'application/vnd.github+json'};
+  if(token) headers.Authorization='Bearer '+token;
+  const r=await fetch(url+'?ref=master',{headers,cache:'no-store'});
+  if(r.status===404) return {sha:null, data:null};
+  if(!r.ok) throw new Error('GitHub GET '+r.status+' '+path);
+  const j=await r.json();
+  const text=afB64Decode(j.content||'');
+  let data=null;
+  try{data=JSON.parse(text);}catch(e){data=null;}
+  return {sha:j.sha, data};
+}
+
+async function afGitPut(path, obj, token, sha, message){
+  const url='https://api.github.com/repos/'+AF_GIT_OWNER+'/'+AF_GIT_REPO+'/contents/'+path;
+  const body={
+    message: message||('Update '+path),
+    content: afB64Encode(JSON.stringify(obj,null,2)),
+    branch:'master'
+  };
+  if(sha) body.sha=sha;
+  const r=await fetch(url,{
+    method:'PUT',
+    headers:{Authorization:'Bearer '+token, Accept:'application/vnd.github+json','Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok) throw new Error('GitHub PUT '+r.status+' '+await r.text());
+  const j=await r.json();
+  return j.content&&j.content.sha;
+}
+
+function afMergeEvents(a,b){
+  const map=new Map();
+  (a||[]).concat(b||[]).forEach(e=>{
+    if(!e||!e.t) return;
+    const k=String(e.t)+'|'+(e.asset||'')+'|'+(e.quality||'');
+    if(!map.has(k)) map.set(k,e);
+  });
+  return Array.from(map.values()).sort((x,y)=>x.t-y.t).slice(-500);
+}
+
+async function afGitLoad(){
+  const token=afGitToken();
+  if(token) localStorage.setItem(AF_TOKEN_KEY, token);
+  afGitMsg('Loading FOMO history from GitHub…');
+  try{
+    // master log
+    const master=await afGitGet('data/fomo-log.json', token);
+    afGitShaMaster=master.sha;
+    let all=afLoadEvents();
+    if(master.data){
+      if(Array.isArray(master.data)) all=afMergeEvents(all, master.data);
+      else if(Array.isArray(master.data.events)) all=afMergeEvents(all, master.data.events);
+    }
+    // current + previous month files
+    const m0=afMonthKey(Date.now());
+    const prev=new Date(); prev.setUTCMonth(prev.getUTCMonth()-1);
+    const m1=afMonthKey(prev.getTime());
+    for(const m of [m1,m0]){
+      try{
+        const f=await afGitGet('data/fomo/'+m+'.json', token);
+        afGitShaMonth[m]=f.sha;
+        if(f.data&&Array.isArray(f.data.events)) all=afMergeEvents(all, f.data.events);
+        else if(Array.isArray(f.data)) all=afMergeEvents(all, f.data);
+      }catch(e){}
+    }
+    afSaveEvents(all);
+    afRenderCal();
+    afGitMsg('Loaded · '+all.length+' event(s) · GitHub + browser merged');
+  }catch(e){
+    afGitMsg('Load failed: '+(e&&e.message||e)+' · check token (Contents read)');
+  }
+}
+window.afGitLoad=afGitLoad;
+
+async function afGitLoadPublic(){
+  try{
+    const urls=[
+      'data/fomo-log.json',
+      'data/fomo/'+afMonthKey(Date.now())+'.json'
+    ];
+    let all=afLoadEvents();
+    let n=0;
+    for(const path of urls){
+      try{
+        const r=await fetch(path+'?t='+Date.now(),{cache:'no-store'});
+        if(!r.ok) continue;
+        const data=await r.json();
+        const ev=Array.isArray(data)?data:(data&&data.events)||[];
+        if(ev.length){ all=afMergeEvents(all, ev); n+=ev.length; }
+      }catch(e){}
+    }
+    if(n){ afSaveEvents(all); afRenderCal(); afGitMsg('Merged '+n+' from public GitHub Pages JSON'); }
+  }catch(e){}
+}
+
+
+async function afGitSaveMonth(){
+  const token=afGitToken();
+  if(!token){ afGitMsg('Paste a GitHub token with repo Contents: Read and write'); return; }
+  localStorage.setItem(AF_TOKEN_KEY, token);
+  const all=afLoadEvents();
+  if(!all.length){ afGitMsg('No local events to save — log some first'); return; }
+  const month=afMonthKey(Date.now());
+  const monthEvents=all.filter(e=>afMonthKey(e.t)===month);
+  afGitMsg('Saving '+monthEvents.length+' event(s) for '+month+' → GitHub…');
+  try{
+    // refresh sha
+    const cur=await afGitGet('data/fomo/'+month+'.json', token);
+    const payload={
+      month: month,
+      updated: new Date().toISOString(),
+      count: monthEvents.length,
+      events: monthEvents
+    };
+    afGitShaMonth[month]=await afGitPut(
+      'data/fomo/'+month+'.json',
+      payload,
+      token,
+      cur.sha,
+      'FOMO archive '+month+' ('+monthEvents.length+' events)'
+    );
+    // also update rolling master log (merged)
+    const master=await afGitGet('data/fomo-log.json', token);
+    let masterEvents=[];
+    if(master.data){
+      if(Array.isArray(master.data)) masterEvents=master.data;
+      else if(Array.isArray(master.data.events)) masterEvents=master.data.events;
+    }
+    masterEvents=afMergeEvents(masterEvents, all);
+    afGitShaMaster=await afGitPut(
+      'data/fomo-log.json',
+      {updated:new Date().toISOString(), count:masterEvents.length, events:masterEvents},
+      token,
+      master.sha,
+      'FOMO master log update ('+masterEvents.length+' events)'
+    );
+    afGitMsg('Saved · data/fomo/'+month+'.json + data/fomo-log.json · permanent on GitHub');
+  }catch(e){
+    afGitMsg('Save failed: '+(e&&e.message||e));
+  }
+}
+window.afGitSaveMonth=afGitSaveMonth;
+
 
 async function afGetKl(asset, tf){
   asset=(asset||'btc').toLowerCase();
