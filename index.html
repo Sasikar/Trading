@@ -270,6 +270,7 @@
 <div class="tabs" id="tf-tabs">
   <button type="button" class="tab active" data-tf="memegate">MemeGate</button>
   <button type="button" class="tab" data-tf="coin">CA</button>
+  <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
@@ -318,7 +319,71 @@
   </div>
 </section>
 </div>
-<div id="trend-panel" class="trend-panel" style="display:none">
+<div 
+<div id="antifomo-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Anti-FOMO</h2><p>Pre-planned check · entry quality from S/R + extension · cooling · calendar</p></div><span class="source" id="af-source">LOCAL</span></div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:10px">A · PRE-PLANNED CHECK</div>
+    <div style="font-size:12px;color:#c5d0dc;margin-bottom:10px;line-height:1.45">Was this setup identified <b>before</b> the move? If the coin only became interesting after BTC/ETH pumped → Reactive.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" id="af-pre-yes" onclick="window.afSetPre&&window.afSetPre(true)" style="flex:1;min-width:120px;padding:12px;border-radius:12px;border:1px solid #1e4a32;background:#0e1a14;color:#62e3a0;font-weight:800;cursor:pointer">✅ YES — Pre-planned</button>
+      <button type="button" id="af-pre-no" onclick="window.afSetPre&&window.afSetPre(false)" style="flex:1;min-width:120px;padding:12px;border-radius:12px;border:1px solid #5a2030;background:#1a0e12;color:#ff6f7c;font-weight:800;cursor:pointer">❌ NO — Reactive</button>
+    </div>
+    <div id="af-pre-status" style="margin-top:10px;font-size:13px;font-weight:800;color:#8491a1">Select pre-planned status</div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:10px">B · ENTRY QUALITY (auto from chart engine)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <select id="af-asset" style="padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#0b121a;color:#c5d0dc;font-weight:700">
+        <option value="btc">BTC</option>
+        <option value="eth">ETH</option>
+        <option value="ca">CA (loaded coin)</option>
+      </select>
+      <select id="af-tf" style="padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#0b121a;color:#c5d0dc;font-weight:700">
+        <option value="4h">4H</option>
+        <option value="1d">1D</option>
+        <option value="1h">1H</option>
+      </select>
+      <button type="button" onclick="window.afAssess&&window.afAssess()" style="padding:10px 16px;border-radius:10px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Assess now</button>
+    </div>
+    <div id="af-quality" style="padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a">
+      <div style="font-size:12px;color:#8491a1">Click Assess — uses Support / Resistance + EMA50 extension from closed candles.</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:10px">C · DECISION</div>
+    <div id="af-decision" style="padding:16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c);min-height:72px">
+      <div style="font-size:12px;color:#8491a1">Complete A + B to get Anti-FOMO result</div>
+    </div>
+    <div id="af-cooling" style="margin-top:12px;display:none;padding:14px;border-radius:12px;border:1px solid #5a3a20;background:#1a140e">
+      <div style="font-size:11px;font-weight:800;color:#f0a060;letter-spacing:.06em">COOLING TIMER</div>
+      <div id="af-cooling-clock" style="font-size:28px;font-weight:900;color:#f0a060;margin-top:6px">30:00</div>
+      <div style="font-size:12px;color:#c5d0dc;margin-top:6px">30 minutes → reassess. If still a chase → +20–30 minutes again.</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button type="button" onclick="window.afStartCool&&window.afStartCool(30)" style="padding:8px 12px;border-radius:8px;border:0;background:#3a2a18;color:#f0a060;font-weight:700;cursor:pointer">Start 30m</button>
+        <button type="button" onclick="window.afStartCool&&window.afStartCool(20)" style="padding:8px 12px;border-radius:8px;border:0;background:#3a2a18;color:#f0a060;font-weight:700;cursor:pointer">+20m extend</button>
+        <button type="button" onclick="window.afClearCool&&window.afClearCool()" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:transparent;color:#8491a1;font-weight:700;cursor:pointer">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">FOMO CALENDAR</div>
+      <button type="button" onclick="window.afLogEvent&&window.afLogEvent()" style="padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#c5d0dc;font-weight:700;cursor:pointer">Log current event</button>
+    </div>
+    <div id="af-cal-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px"></div>
+    <div id="af-cal-detail" style="margin-top:14px;padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a;display:none"></div>
+  </div>
+
+  <div class="note">Philosophy: don't ask if you're emotional — check pre-planned vs reactive and whether price is stretched or at support. Objective checks from chart engine where possible.</div>
+</section>
+</div>
+id="trend-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head"><div><h2>Trend Context</h2><p>1D+1W EMA · MACD · 4H</p></div><span class="source" id="trend-source">…</span></div>
   <div class="card">
@@ -418,7 +483,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260911-ca-final1"></script>
+<script src="overview-app.js?v=20260912-af1"></script>
 </div>
 
 <div id="signal-panel" class="signal-panel">
@@ -567,5 +632,5 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 
-<script src="site-nav.js?v=20260904-kraken"></script>
+<script src="site-nav.js?v=20260912-af1"></script>
 </body></html>
