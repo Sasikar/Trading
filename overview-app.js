@@ -3818,59 +3818,129 @@ window.coinRecentsRender=coinRecentsRender;
 
 async function coinRecentsSync(silent){
   const st=$('coin-recents-status');
-  const token=localStorage.getItem('trading_github_token')||localStorage.getItem('trading_tax_github_token')||localStorage.getItem(AF_TOKEN_KEY)||'';
-  const local=coinRecentsLoadLocal();
-  // always try public pull
-  try{
-    const r=await fetch(COIN_RECENTS_PATH+'?t='+Date.now(),{cache:'no-store'});
-    if(r.ok){
-      const j=await r.json();
-      const remote=Array.isArray(j)?j:(j&&j.items)||[];
-      // merge by key, prefer newer t
-      const map=new Map();
-      remote.concat(local).forEach(function(e){
-        if(!e||!e.ca) return;
-        const k=coinRecentKey(e);
-        const prev=map.get(k);
-        if(!prev || (e.t||0)>=(prev.t||0)) map.set(k,e);
-      });
-      const merged=Array.from(map.values()).sort((a,b)=>(b.t||0)-(a.t||0));
-      coinRecentsSaveLocal(merged);
-      coinRecentsRender();
-      if(!token){
-        if(st&&!silent) st.textContent='Loaded public · '+merged.length;
-        return;
-      }
-    }
-  }catch(e){}
-  if(!token){
-    if(st&&!silent) st.textContent='Local only · add GitHub token in Anti-FOMO to persist';
-    return;
+  const token=localStorage.getItem('trading_github_token')||localStorage.getItem('trading_tax_github_token')||(typeof AF_TOKEN_KEY!=='undefined'&&localStorage.getItem(AF_TOKEN_KEY))||'';
+  const url='https://api.github.com/repos/Sasikar/Trading/contents/'+COIN_RECENTS_PATH;
+
+  function mergeLists(a,b){
+    const map=new Map();
+    (a||[]).concat(b||[]).forEach(function(e){
+      if(!e||!e.ca) return;
+      const k=coinRecentKey(e);
+      const prev=map.get(k);
+      if(!prev || (e.t||0)>=(prev.t||0)) map.set(k,e);
+    });
+    return Array.from(map.values()).sort(function(x,y){ return (y.t||0)-(x.t||0); });
   }
-  // push merged list (single JSON)
-  try{
-    if(st&&!silent) st.textContent='Saving…';
-    const url='https://api.github.com/repos/Sasikar/Trading/contents/'+COIN_RECENTS_PATH;
-    let sha=coinRecentsSha;
+
+  async function getRemote(){
+    // public pages first (no token needed for read)
     try{
-      const gr=await fetch(url+'?ref=master',{headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json'},cache:'no-store'});
-      if(gr.ok){ const gj=await gr.json(); sha=gj.sha; }
-      else if(gr.status!==404) throw new Error('GET '+gr.status);
-    }catch(e){ if(!String(e).includes('404')) throw e; }
-    const items=coinRecentsLoadLocal();
+      const r=await fetch(COIN_RECENTS_PATH+'?t='+Date.now(),{cache:'no-store'});
+      if(r.ok){
+        const j=await r.json();
+        return { items: Array.isArray(j)?j:(j&&j.items)||[], sha: null };
+      }
+    }catch(e){}
+    if(!token) return { items: [], sha: null };
+    const gr=await fetch(url+'?ref=master',{
+      headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json'},
+      cache:'no-store'
+    });
+    if(gr.status===404) return { items: [], sha: null };
+    if(!gr.ok) throw new Error('GET '+gr.status);
+    const gj=await gr.json();
+    let items=[];
+    try{
+      const text=decodeURIComponent(escape(atob((gj.content||'').replace(/\s/g,''))));
+      const data=JSON.parse(text);
+      items=Array.isArray(data)?data:(data&&data.items)||[];
+    }catch(e){}
+    return { items: items, sha: gj.sha };
+  }
+
+  async function putWithSha(items, sha){
     const body={
-      message:'CA recents update ('+items.length+')',
-      content:btoa(unescape(encodeURIComponent(JSON.stringify({updated:new Date().toISOString(), count:items.length, items:items},null,2)))),
+      message:'CA recents ('+items.length+')',
+      content:btoa(unescape(encodeURIComponent(JSON.stringify({updated:new Date().toISOString(),count:items.length,items:items},null,2)))),
       branch:'master'
     };
     if(sha) body.sha=sha;
-    const pr=await fetch(url,{method:'PUT',headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json','Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!pr.ok) throw new Error(await pr.text());
+    const pr=await fetch(url,{
+      method:'PUT',
+      headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json','Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    return pr;
+  }
+
+  try{
+    const remote=await getRemote();
+    const merged=mergeLists(remote.items, coinRecentsLoadLocal());
+    coinRecentsSaveLocal(merged);
+    coinRecentsRender();
+    if(st) st.textContent=merged.length+' saved';
+
+    if(!token){
+      if(!silent && st) st.textContent=merged.length+' local · token needed to sync';
+      return;
+    }
+
+    // Always re-fetch SHA from API right before write (avoids stale sha race)
+    let sha=null;
+    const gr=await fetch(url+'?ref=master',{
+      headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json'},
+      cache:'no-store'
+    });
+    if(gr.ok){
+      const gj=await gr.json();
+      sha=gj.sha;
+      try{
+        const text=decodeURIComponent(escape(atob((gj.content||'').replace(/\s/g,''))));
+        const data=JSON.parse(text);
+        const apiItems=Array.isArray(data)?data:(data&&data.items)||[];
+        const again=mergeLists(apiItems, coinRecentsLoadLocal());
+        coinRecentsSaveLocal(again);
+        coinRecentsRender();
+      }catch(e){}
+    } else if(gr.status!==404){
+      throw new Error('GET '+gr.status);
+    }
+
+    const items=coinRecentsLoadLocal();
+    let pr=await putWithSha(items, sha);
+    // One retry on SHA mismatch
+    if(pr.status===409 || pr.status===422){
+      const gr2=await fetch(url+'?ref=master',{
+        headers:{Authorization:'Bearer '+token,Accept:'application/vnd.github+json'},
+        cache:'no-store'
+      });
+      let sha2=null, apiItems=[];
+      if(gr2.ok){
+        const gj2=await gr2.json();
+        sha2=gj2.sha;
+        try{
+          const text=decodeURIComponent(escape(atob((gj2.content||'').replace(/\s/g,''))));
+          const data=JSON.parse(text);
+          apiItems=Array.isArray(data)?data:(data&&data.items)||[];
+        }catch(e){}
+      }
+      const merged2=mergeLists(apiItems, coinRecentsLoadLocal());
+      coinRecentsSaveLocal(merged2);
+      coinRecentsRender();
+      pr=await putWithSha(merged2, sha2);
+    }
+    if(!pr.ok){
+      const errTxt=await pr.text();
+      let msg=errTxt;
+      try{ msg=(JSON.parse(errTxt).message)||errTxt; }catch(e){}
+      throw new Error(msg);
+    }
     const pj=await pr.json();
     coinRecentsSha=pj.content&&pj.content.sha;
-    if(st) st.textContent='GitHub · '+items.length+' CAs';
+    if(st) st.textContent=items.length+' on GitHub';
   }catch(e){
-    if(st) st.textContent='Sync fail: '+(e&&e.message||e).toString().slice(0,80);
+    const m=String(e&&e.message||e).slice(0,100);
+    if(st) st.textContent='Sync fail: '+m;
   }
 }
 window.coinRecentsSync=coinRecentsSync;
@@ -3894,8 +3964,6 @@ async function loadCoin(){
         name: coinPool.base || coinPool.name || ca.slice(0,8),
         base: coinPool.base || ''
       });
-      // quiet background persist if token exists
-      try{ coinRecentsSync(true); }catch(e){}
     }catch(e){}
     if($('coin-meta'))$('coin-meta').textContent=coinPool.name+' · liq $'+fmt(coinPool.liq,0)+' · '+String(coinPool.address).slice(0,12)+'…';
     if(coinPool.price && $('coin-spot')){
@@ -3926,7 +3994,7 @@ window.loadCoin=loadCoin; window.loadCoinTF=loadCoinTF;
 window.setCoinTF=function(tf){coinTF=tf||'4h';document.querySelectorAll('#coin-tf button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-ctf')===coinTF);});if($('coin-tf-name'))$('coin-tf-name').textContent=coinTF.toUpperCase();if(coinPool)loadCoinTF();};
 function wireCoinUI(){
   try{coinRecentsRender();}catch(e){}
-  try{coinRecentsSync(true);}catch(e){}
+  try{ if(!window._caRecentsPulled){ window._caRecentsPulled=true; coinRecentsSync(true); } }catch(e){}
 
   if(window.__coinUiWired) return;
   window.__coinUiWired = true;
