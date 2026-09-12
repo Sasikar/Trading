@@ -1,7 +1,14 @@
 {
-  "updated": "2026-09-12T09:23:04.660Z",
-  "count": 1,
+  "updated": "2026-09-12T09:23:19.836Z",
+  "count": 2,
   "items": [
+    {
+      "chain": "eth",
+      "ca": "0x68BbEd6A47194EFf1CF514B50Ea91895597fc91E",
+      "name": "ANDY",
+      "base": "ANDY",
+      "t": 1789204999057
+    },
     {
       "chain": "solana",
       "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
