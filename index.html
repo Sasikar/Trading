@@ -277,6 +277,7 @@
 <div class="tabs" id="tf-tabs">
   <button type="button" class="tab active" data-tf="memegate">MemeGate</button>
   <button type="button" class="tab" data-tf="coin">CA</button>
+  <button type="button" class="tab" data-tf="breakouts">Breakout Memes</button>
   <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
@@ -498,7 +499,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260912-casync2"></script>
+<script src="overview-app.js?v=20260912-bomemes1"></script>
 </div>
 
 <div id="memegate-panel" class="trend-panel" style="display:block">
@@ -532,6 +533,30 @@
 </section>
 </div>
 
+
+<div id="breakouts-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Breakout Memes</h2><p>Your saved CAs · flags fresh/held breakouts on 4H · 1D · 1W</p></div>
+    <span class="source" id="bo-source">—</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+      <div id="bo-tf" style="display:flex;gap:6px">
+        <button type="button" data-botf="4h" class="bo-tf-btn on" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('4h')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">4H</button>
+        <button type="button" data-botf="1d" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1d')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1D</button>
+        <button type="button" data-botf="1w" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1w')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1W</button>
+      </div>
+      <button type="button" onclick="try{window.scanBreakoutMemes&&window.scanBreakoutMemes()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Scan saved CAs</button>
+      <span id="bo-status" style="font-size:12px;color:#8491a1">Uses RECENT CAs from browser / GitHub</span>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:10px;line-height:1.45">Shows coins with <b style="color:#c5d0dc">NEW / HELD breakout</b> or CA state EARLY / STRONG / STRETCHED on the selected TF. Rate-limited to protect APIs.</div>
+    <div id="bo-list" style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#8491a1">Open this tab → Scan saved CAs</div>
+    </div>
+  </div>
+</section>
+</div>
 <div id="coin-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head"><div><h2>Meme CA · Indicators</h2><p>ETH / SOL · GeckoTerminal OHLCV · same stack as BTC TFs</p></div><span class="source" id="coin-source">—</span></div>
