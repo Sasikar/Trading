@@ -1,7 +1,14 @@
 {
-  "updated": "2026-09-12T11:42:03.465Z",
+  "updated": "2026-09-12T11:45:19.422Z",
   "count": 8,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+      "name": "USELESS",
+      "base": "USELESS",
+      "t": 1789213377192
+    },
     {
       "chain": "solana",
       "ca": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
@@ -29,13 +36,6 @@
       "name": "aura",
       "base": "aura",
       "t": 1789212171184
-    },
-    {
-      "chain": "solana",
-      "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
-      "name": "USELESS",
-      "base": "USELESS",
-      "t": 1789212139106
     },
     {
       "chain": "eth",
