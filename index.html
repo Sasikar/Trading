@@ -240,7 +240,14 @@
 .mg-hist .on{color:#62e3a0}.mg-hist .off{color:#ff6f7c}.mg-hist .wait{color:#e6c878}
 .coin-ca{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
 .coin-ca select,.coin-ca input,.coin-ca button{border:1px solid #2a3544;background:#0b121a;color:#e8eef6;border-radius:10px;padding:10px 12px;font:700 13px Inter,system-ui,sans-serif}
-.coin-ca input{flex:1;min-width:180px}
+.coin-ca input{flex:1;min-width:0;width:100%}
+.coin-ca{width:100%;box-sizing:border-box}
+.coin-ca select{flex:0 0 auto;max-width:88px}
+.coin-ca button{flex:0 0 auto}
+#coin-recents-wrap{width:100%;box-sizing:border-box}
+#coin-recents{width:100%;box-sizing:border-box}
+.coin-recent-chip{flex:0 1 auto}
+#coin-recents-status{display:block;width:100%;margin-top:4px;word-break:break-word;line-height:1.35}
 .coin-ca button{background:rgba(98,227,160,.2);border-color:rgba(98,227,160,.4);cursor:pointer;color:#c8f5dc}
 .coin-meta{font-size:12px;color:#8491a1;margin:6px 0 12px;line-height:1.5}
 .coin-tf{display:flex;gap:6px;margin:0 0 12px}
@@ -491,7 +498,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260912-caforever1"></script>
+<script src="overview-app.js?v=20260912-casync2"></script>
 </div>
 
 <div id="memegate-panel" class="trend-panel" style="display:block">
@@ -535,15 +542,13 @@
       <button type="button" id="coin-load" onclick="try{window.loadCoin&&window.loadCoin()}catch(e){alert(e)}">Load</button>
     </div>
     <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
-    <div id="coin-recents-wrap" style="margin:0 0 14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+    <div id="coin-recents-wrap" style="margin:0 0 14px;width:100%;box-sizing:border-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap">
         <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">RECENT CAs</div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <button type="button" onclick="try{window.coinRecentsSync&&window.coinRecentsSync()}catch(e){}" style="padding:4px 8px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#8491a1;font-size:10px;font-weight:700;cursor:pointer">Sync GitHub</button>
-          <span id="coin-recents-status" style="font-size:10px;color:#8491a1"></span>
-        </div>
+        <button type="button" onclick="try{window.coinRecentsSync&&window.coinRecentsSync()}catch(e){}" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">Sync GitHub</button>
       </div>
-      <div id="coin-recents" style="display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto"></div>
+      <div id="coin-recents-status" style="font-size:11px;color:#8491a1;margin:0 0 8px;line-height:1.35;word-break:break-word"></div>
+      <div id="coin-recents" style="display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto;width:100%"></div>
     </div>
     <div class="coin-tf" id="coin-tf">
       <button type="button" data-ctf="4h" class="on" onclick="try{window.setCoinTF&&window.setCoinTF('4h')}catch(e){}">4H</button>
