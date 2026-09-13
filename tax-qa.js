@@ -223,4 +223,15 @@ noteClear.onclick=()=>{ noteText.value=''; nmsg(''); };
 
 load();
 loadNotes();
+try{
+  const tab=(new URLSearchParams(location.search)).get('tab');
+  if(tab==='notes'){
+    document.querySelectorAll('.subtabs button').forEach(b=>b.classList.remove('on'));
+    const nb=document.getElementById('tab-notes');
+    if(nb) nb.classList.add('on');
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+    const pn=document.getElementById('panel-notes');
+    if(pn) pn.classList.add('on');
+  }
+}catch(e){}
 })();
