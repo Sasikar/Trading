@@ -1,0 +1,10 @@
+{
+  "updated": "2026-09-13T09:38:03.239Z",
+  "tokens": {},
+  "lastFindings": [],
+  "cfg": {
+    "scoreThreshold": 62,
+    "minLiqUsd": 15000,
+    "cooldownMs": 1200000
+  }
+}
