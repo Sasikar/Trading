@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-13T16:35:04.985Z",
+  "updated": "2026-09-13T16:36:50.701Z",
   "count": 13,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
+      "name": "ANSEM",
+      "base": "ANSEM",
+      "t": 1789317309458,
+      "poolAddress": "FnzKY6x7entQ1eR3D225dQyT7ybfka4PskBMQhb8L3CC",
+      "poolNetwork": "solana",
+      "poolLiq": 2245105.17,
+      "poolCachedAt": 1789317309457
+    },
     {
       "chain": "solana",
       "ca": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
@@ -45,17 +56,6 @@
       "poolNetwork": "solana",
       "poolLiq": 488132.95,
       "poolCachedAt": 1789313440185
-    },
-    {
-      "chain": "solana",
-      "ca": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
-      "name": "ANSEM",
-      "base": "ANSEM",
-      "t": 1789313249079,
-      "poolAddress": "FnzKY6x7entQ1eR3D225dQyT7ybfka4PskBMQhb8L3CC",
-      "poolNetwork": "solana",
-      "poolLiq": 2247263.77,
-      "poolCachedAt": 1789313249078
     },
     {
       "chain": "solana",
