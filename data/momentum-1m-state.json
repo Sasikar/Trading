@@ -1,22 +1,96 @@
 {
-  "updated": "2026-09-13T09:38:03.239Z",
+  "updated": "2026-09-13T10:10:27.000Z",
   "tokens": {},
   "lastFindings": [],
+  "lastAlert": null,
   "cfg": {
     "scoreThreshold": 62,
     "minLiqUsd": 15000,
     "cooldownMs": 1200000
   },
+  "lastHttp": {
+    "pool": 3,
+    "ohlcv": 14,
+    "total": 17,
+    "at": "2026-09-13T10:10:27.000Z"
+  },
   "ui": {
-    "lastScan": "2026-09-13T09:38:03.239Z",
-    "candidates": 0,
-    "scanned": 0,
-    "errorCount": 0,
+    "lastScan": "2026-09-13T10:10:27.000Z",
+    "candidates": 8,
+    "scanned": 7,
+    "errorCount": 1,
     "alertsThisRun": 0,
-    "health": "WAITING_FIRST_RUN",
-    "topScores": [],
-    "errors": [],
+    "health": "RATE_LIMITED",
+    "topScores": [
+      {
+        "name": "TROLL",
+        "score": 42,
+        "state": "NORMAL",
+        "reason": "below threshold",
+        "ret1": 0.41,
+        "volX": 0.01
+      },
+      {
+        "name": "GIKO",
+        "score": 35,
+        "state": "NORMAL",
+        "reason": "below threshold",
+        "ret1": 0,
+        "volX": 10.5
+      },
+      {
+        "name": "SPX",
+        "score": 34,
+        "state": "NORMAL",
+        "reason": "below threshold",
+        "ret1": 0.05,
+        "volX": 0.37
+      },
+      {
+        "name": "CATE",
+        "score": 29,
+        "state": "NORMAL",
+        "reason": "below threshold",
+        "ret1": -0.09,
+        "volX": 0.01
+      },
+      {
+        "name": "APU",
+        "score": 24,
+        "state": "NORMAL",
+        "reason": "below threshold",
+        "ret1": 0.55,
+        "volX": 1.17
+      },
+      {
+        "name": "USELESS",
+        "score": 22,
+        "state": "NORMAL",
+        "reason": "below threshold",
+        "ret1": -0.27,
+        "volX": 2.36
+      },
+      {
+        "name": "ANDY",
+        "score": 12,
+        "state": "NORMAL",
+        "reason": "below threshold",
+        "ret1": -0.04,
+        "volX": 0.04
+      }
+    ],
+    "errors": [
+      {
+        "name": "aura",
+        "error": "HTTP 429 rate limit"
+      }
+    ],
     "threshold": 62,
-    "http": null
+    "http": {
+      "pool": 3,
+      "ohlcv": 14,
+      "total": 17,
+      "at": "2026-09-13T10:10:27.000Z"
+    }
   }
 }
