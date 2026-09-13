@@ -1,5 +1,10 @@
 {
-  "updated": null,
-  "count": 0,
-  "notes": []
+  "updated": "2026-09-13T09:13:20.105Z",
+  "count": 1,
+  "notes": [
+    {
+      "text": "For Coins Like Cate, we don't see listed under Coingeko or CMC so koinly ll fail to get coin buy price so it ll give warning below saying No market price found and entire price shown as taxable. So go to settings in konily upload custom prices CSV and force it to calculate, after uploading there is link to force else it ll not work..get txn report from solscan using grok give to clade to give price rate CSV and upload that's it",
+      "t": 1789290799379
+    }
+  ]
 }
