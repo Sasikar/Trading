@@ -6,5 +6,17 @@
     "scoreThreshold": 62,
     "minLiqUsd": 15000,
     "cooldownMs": 1200000
+  },
+  "ui": {
+    "lastScan": "2026-09-13T09:38:03.239Z",
+    "candidates": 0,
+    "scanned": 0,
+    "errorCount": 0,
+    "alertsThisRun": 0,
+    "health": "WAITING_FIRST_RUN",
+    "topScores": [],
+    "errors": [],
+    "threshold": 62,
+    "http": null
   }
 }
