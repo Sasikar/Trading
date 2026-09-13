@@ -4232,6 +4232,32 @@ async function loadCoin(){
     if($('coin-source'))$('coin-source').textContent='ERROR';
   }
 }
+
+function clearCoin(){
+  try{
+    if($('coin-ca')){ $('coin-ca').value=''; $('coin-ca').focus(); }
+    coinCA='';
+    coinPool=null;
+    if($('coin-meta'))$('coin-meta').textContent='CA cleared · paste a new address or tap a RECENT chip';
+    if($('coin-source'))$('coin-source').textContent='—';
+    if($('coin-spot'))$('coin-spot').textContent='—';
+    if($('coin-spot-meta'))$('coin-spot-meta').textContent='';
+    if($('coin-vol'))$('coin-vol').textContent='—';
+    if($('coin-rsi'))$('coin-rsi').textContent='—';
+    if($('coin-cvd'))$('coin-cvd').textContent='—';
+    if($('coin-entry-box'))$('coin-entry-box').innerHTML='<div style="color:#8491a1;font-size:12px">Load CA → CA signal (WATCH / EARLY / STRONG / STRETCHED / OFF)</div>';
+    if($('coin-embed'))$('coin-embed').innerHTML='';
+    if($('coin-fib-tv'))$('coin-fib-tv').innerHTML='';
+    if($('coin-macd-tv'))$('coin-macd-tv').innerHTML='';
+    if($('coin-sr-ladder'))$('coin-sr-ladder').innerHTML='';
+    if($('coin-hist-summary'))$('coin-hist-summary').textContent='';
+    if($('coin-hist-table'))$('coin-hist-table').innerHTML='';
+    if($('coin-bt-summary'))$('coin-bt-summary').textContent='';
+    if($('coin-bt-table'))$('coin-bt-table').innerHTML='';
+    try{ coinRecentsRender(); }catch(e){}
+  }catch(e){ console.warn('clearCoin', e); }
+}
+window.clearCoin=clearCoin;
 window.loadCoin=loadCoin; window.loadCoinTF=loadCoinTF;
 window.setCoinTF=function(tf){coinTF=tf||'4h';document.querySelectorAll('#coin-tf button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-ctf')===coinTF);});if($('coin-tf-name'))$('coin-tf-name').textContent=coinTF.toUpperCase();if(coinPool)loadCoinTF();};
 function wireCoinUI(){
