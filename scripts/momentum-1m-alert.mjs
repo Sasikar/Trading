@@ -305,6 +305,10 @@ async function main(){
 
   let sent = 0;
   const findings = [];
+  const scoreboard = [];
+  const errors = [];
+  let rateLimited = false;
+  const healthBase = NTFY_TOPIC ? 'OK' : 'NO_TOPIC';
 
   for (const item of items) {
     const name = item.name || item.base || (item.ca||'').slice(0,6);
@@ -337,6 +341,17 @@ async function main(){
 
       const scored = scoreCandle(kl, pool.liq);
       console.log(`${name}: score=${scored.score} state=${scored.state} ret1=${scored.detail.ret1}% vol=${scored.detail.volX}x forming=${scored.forming}`);
+      scoreboard.push({
+        name,
+        chain: item.chain,
+        ca: item.ca,
+        score: scored.score,
+        state: scored.state,
+        reason: (scored.reasons||[]).slice(0,3).join(' + ') || '—',
+        ret1: scored.detail.ret1,
+        volX: scored.detail.volX,
+        forming: !!scored.forming
+      });
 
       const now = Date.now();
       const inCooldown = (now - (tokState.lastAlert||0)) < CFG.cooldownMs;
@@ -389,7 +404,10 @@ async function main(){
       tokState.updated = now;
       state.tokens[key] = tokState;
     } catch (e) {
-      console.warn(`${name} fail:`, (e && e.message) ? e.message : String(e));
+      const em = (e && e.message) ? e.message : String(e);
+      console.warn(`${name} fail:`, em);
+      errors.push({ name, error: em.slice(0,120) });
+      if (/429|rate limit/i.test(em)) rateLimited = true;
     }
   }
 
@@ -401,8 +419,42 @@ async function main(){
   state.updated = new Date().toISOString();
   state.lastFindings = findings;
   state.lastHttp = { pool: httpPool, ohlcv: httpOhlcv, total: httpRequests, at: new Date().toISOString() };
-
   state.cfg = { scoreThreshold: CFG.scoreThreshold, minLiqUsd: CFG.minLiqUsd, cooldownMs: CFG.cooldownMs };
+
+  const topScores = scoreboard.slice().sort((a,b)=>b.score-a.score).slice(0,8);
+  let health = healthBase;
+  if (rateLimited) health = 'RATE_LIMITED';
+  else if (errors.length && scoreboard.length===0) health = 'ERROR';
+  else if (!items.length) health = 'NO_CANDIDATES';
+
+  // last alert from token states
+  let lastAlert = state.lastAlert || null;
+  if (findings.length) {
+    const top = scoreboard.find(s => findings.some(f => f.startsWith(s.name))) || scoreboard[0];
+    if (top) {
+      lastAlert = {
+        name: top.name,
+        score: top.score,
+        state: top.state,
+        reason: top.reason,
+        at: new Date().toISOString(),
+        kind: findings.find(f => f.startsWith(top.name)) || findings[0]
+      };
+    }
+  }
+  state.lastAlert = lastAlert;
+  state.ui = {
+    lastScan: new Date().toISOString(),
+    candidates: items.length,
+    scanned: scoreboard.length,
+    errorCount: errors.length,
+    alertsThisRun: sent,
+    health,
+    topScores,
+    errors: errors.slice(0,5),
+    threshold: CFG.scoreThreshold,
+    http: state.lastHttp
+  };
   saveJSON(STATE, state);
   const elapsed = ((Date.now() - runStarted)/1000).toFixed(1);
   const rpm = elapsed > 0 ? (httpRequests / (elapsed/60)).toFixed(1) : '0';
