@@ -1,7 +1,29 @@
 {
-  "updated": "2026-09-13T10:51:05.800Z",
+  "updated": "2026-09-13T10:54:48.671Z",
   "count": 8,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+      "name": "USELESS",
+      "base": "USELESS",
+      "t": 1789296834913,
+      "poolAddress": "Q2sPHPdUWFMg7M7wwrQKLrn619cAucfRsmhVJffodSp",
+      "poolNetwork": "solana",
+      "poolLiq": 4600788.47,
+      "poolCachedAt": 1789296834913
+    },
+    {
+      "chain": "eth",
+      "ca": "0xE0f63A424a4439cBE457D80E4f4b51aD25b2c56C",
+      "name": "SPX",
+      "base": "SPX",
+      "t": 1789296687094,
+      "poolAddress": "0x52c77b0CB827aFbAD022E6d6CAF2C44452eDbc39",
+      "poolNetwork": "eth",
+      "poolLiq": 12492653.47,
+      "poolCachedAt": 1789296687093
+    },
     {
       "chain": "solana",
       "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
@@ -12,13 +34,6 @@
       "poolNetwork": "solana",
       "poolLiq": 2383002.42,
       "poolCachedAt": 1789296317467
-    },
-    {
-      "chain": "solana",
-      "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
-      "name": "USELESS",
-      "base": "USELESS",
-      "t": 1789213377192
     },
     {
       "chain": "solana",
@@ -40,13 +55,6 @@
       "name": "aura",
       "base": "aura",
       "t": 1789212171184
-    },
-    {
-      "chain": "eth",
-      "ca": "0xE0f63A424a4439cBE457D80E4f4b51aD25b2c56C",
-      "name": "SPX",
-      "base": "SPX",
-      "t": 1789212097368
     },
     {
       "chain": "eth",
