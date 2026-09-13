@@ -2519,6 +2519,51 @@ function mgDomModifier(dom){
 let breakoutTF='4h';
 let breakoutScanBusy=false;
 
+
+async function loadMomentum1mStatus(force){
+  const healthEl=$('m1m-health'), metaEl=$('m1m-meta'), lastEl=$('m1m-last-alert'), topEl=$('m1m-top');
+  if(!healthEl) return;
+  try{
+    if(force) healthEl.textContent='Refreshing…';
+    const r=await fetch('data/momentum-1m-state.json?t='+Date.now(),{cache:'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    const ui=j.ui||{};
+    const health=ui.health||'UNKNOWN';
+    const col=health==='OK'?'#62e3a0':health==='RATE_LIMITED'?'#f0a060':health==='NO_TOPIC'?'#e6c878':health==='NO_CANDIDATES'?'#8491a1':'#ff6f7c';
+    healthEl.style.color=col;
+    healthEl.textContent=health+(ui.alertsThisRun?(' · alerts this run '+ui.alertsThisRun):'');
+    const scan=ui.lastScan||j.updated||'—';
+    const ago=(()=>{ try{ const ms=Date.now()-new Date(scan).getTime(); if(!isFinite(ms)||ms<0) return ''; const m=Math.round(ms/60000); return m<1?' · just now':(' · '+m+' min ago'); }catch(e){return '';} })();
+    metaEl.textContent='Last scan: '+scan+ago+' · candidates '+(ui.candidates!=null?ui.candidates:'—')+' · scanned '+(ui.scanned!=null?ui.scanned:'—')+(ui.http&&ui.http.total!=null?(' · HTTP '+ui.http.total):'')+(ui.threshold!=null?(' · alert ≥'+ui.threshold):'');
+    const la=j.lastAlert;
+    if(la&&la.name){
+      lastEl.innerHTML='Last alert: <b style="color:#e8eef6">'+la.name+'</b> · '+(la.kind||la.state||'')+' · score '+(la.score!=null?la.score:'—')+'/100'
+        +(la.reason?(' · '+la.reason):'')
+        +(la.at?(' · '+la.at):'');
+    } else {
+      lastEl.textContent='Last alert: none yet (or still below threshold)';
+    }
+    const tops=ui.topScores||[];
+    if(!tops.length){
+      topEl.innerHTML='<div style="color:#8491a1">No scores yet — wait for next Actions pass</div>';
+    } else {
+      topEl.innerHTML='<div style="font-size:10px;letter-spacing:.06em;color:#8491a1;font-weight:800;margin-bottom:4px">TOP SCORES (latest scan)</div>'
+        +tops.map(function(t){
+          const c=t.score>=62?'#62e3a0':t.score>=50?'#e6c878':'#8491a1';
+          return '<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid #1a2430">'
+            +'<span><b style="color:#e8eef6">'+t.name+'</b> <span style="color:#8491a1">'+t.state+'</span></span>'
+            +'<span style="color:'+c+';font-weight:800">'+t.score+'/100</span></div>'
+            +'<div style="font-size:11px;color:#8491a1;margin:0 0 4px">'+((t.reason)||'')+(t.ret1!=null?(' · 1m '+(t.ret1>=0?'+':'')+t.ret1+'%'):'')+'</div>';
+        }).join('');
+    }
+  }catch(e){
+    if(healthEl){ healthEl.style.color='#ff6f7c'; healthEl.textContent='STATUS UNAVAILABLE'; }
+    if(metaEl) metaEl.textContent=String(e&&e.message||e);
+  }
+}
+window.loadMomentum1mStatus=loadMomentum1mStatus;
+
 function showBreakoutMemes(on){
   const p=$('breakouts-panel');
   const panels=$('tf-panels'), trend=$('trend-panel'), sp=$('struct-panel'), mp=$('macro-panel'), sg=$('signal-panel');
@@ -2536,6 +2581,7 @@ function showBreakoutMemes(on){
     try{ coinRecentsRender(); }catch(e){}
     const n=(typeof coinRecentsLoadLocal==='function')?coinRecentsLoadLocal().length:0;
     if($('bo-status')) $('bo-status').textContent=n? (n+' saved CA(s) ready') : 'No saved CAs — load some on CA tab first';
+    try{ loadMomentum1mStatus(false); }catch(e){}
   } else {
     if(p){ p.style.display='none'; p.classList.remove('on'); }
   }
