@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-13T16:29:38.619Z",
-  "count": 12,
+  "updated": "2026-09-13T16:34:24.614Z",
+  "count": 13,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+      "name": "biketyson",
+      "base": "biketyson",
+      "t": 1789316992196,
+      "poolAddress": "41rzTMB7JHPTyMXzrYwdqnBecJRhkb8KHYAjrQ9cYxJx",
+      "poolNetwork": "solana",
+      "poolLiq": 184684.15,
+      "poolCachedAt": 1789316992194
+    },
     {
       "chain": "solana",
       "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
