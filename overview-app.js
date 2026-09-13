@@ -2757,6 +2757,11 @@ async function coinResolvePool(chain, ca){
     dexUrl:''
   };
 }
+function coinDexInterval(tf){
+  tf=String(tf||'4h').toLowerCase();
+  const map={ '1m':1,'5m':5,'10m':5,'15m':15,'30m':30,'1h':60,'2h':120,'4h':240,'1d':1440,'1w':10080 };
+  return map[tf]||240;
+}
 async function coinFetchOHLCV(network, pool, ctf){
   /* GeckoTerminal: day aggregate=7 returns 400. Build 1W from daily.
      15m limit≈500 is only ~5 days — too short for 1D/1W. Prefer day/hour. */
@@ -2777,24 +2782,44 @@ async function coinFetchOHLCV(network, pool, ctf){
     return list.map(x=>[x[0]*1000,+x[1],+x[2],+x[3],+x[4],+x[5]||0]).filter(k=>isFinite(k[4])).sort((a,b)=>a[0]-b[0]);
   }
   const tries=[];
-  if(ctf==='4h'){
+  ctf = String(ctf||'4h').toLowerCase();
+  if(ctf==='1m'){
+    tries.push({tf:'minute',agg:1,limit:500,rs:null});
+  } else if(ctf==='5m'){
+    tries.push({tf:'minute',agg:5,limit:400,rs:null});
+    tries.push({tf:'minute',agg:1,limit:500,rs:5*60*1000});
+  } else if(ctf==='10m'){
+    tries.push({tf:'minute',agg:5,limit:500,rs:10*60*1000});
+    tries.push({tf:'minute',agg:1,limit:600,rs:10*60*1000});
+  } else if(ctf==='15m'){
+    tries.push({tf:'minute',agg:15,limit:400,rs:null});
+    tries.push({tf:'minute',agg:5,limit:500,rs:15*60*1000});
+  } else if(ctf==='30m'){
+    tries.push({tf:'minute',agg:15,limit:400,rs:30*60*1000});
+    tries.push({tf:'minute',agg:5,limit:500,rs:30*60*1000});
+    tries.push({tf:'hour',agg:1,limit:200,rs:30*60*1000});
+  } else if(ctf==='1h'){
+    tries.push({tf:'hour',agg:1,limit:250,rs:null});
+    tries.push({tf:'minute',agg:15,limit:500,rs:60*60*1000});
+  } else if(ctf==='2h'){
+    tries.push({tf:'hour',agg:1,limit:250,rs:2*3600*1000});
+    tries.push({tf:'minute',agg:15,limit:500,rs:2*3600*1000});
+  } else if(ctf==='4h'){
     tries.push({tf:'hour',agg:4,limit:250,rs:null});
     tries.push({tf:'hour',agg:1,limit:500,rs:4*3600*1000});
     tries.push({tf:'minute',agg:15,limit:1000,rs:4*3600*1000});
   } else if(ctf==='1d'){
     tries.push({tf:'day',agg:1,limit:180,rs:null});
     tries.push({tf:'hour',agg:1,limit:500,rs:24*3600*1000});
-    tries.push({tf:'minute',agg:15,limit:1000,rs:24*3600*1000});
   } else if(ctf==='1w'){
-    // NEVER day?aggregate=7 — GT returns 400
     tries.push({tf:'day',agg:1,limit:220,rs:7*24*3600*1000});
     tries.push({tf:'hour',agg:1,limit:1000,rs:7*24*3600*1000});
   } else {
     tries.push({tf:'hour',agg:4,limit:120,rs:null});
-    tries.push({tf:'hour',agg:1,limit:200,rs:4*3600*1000});
   }
   let lastErr=null;
-  const minBars = ctf==='1w' ? 4 : (ctf==='1d' ? 10 : 5);
+  const shortTf = ['1m','5m','10m','15m','30m','1h','2h'].indexOf(ctf)>=0;
+  const minBars = ctf==='1w' ? 4 : (ctf==='1d' ? 10 : (shortTf ? 20 : 5));
   for(const t of tries){
     try{
       const path='/networks/'+network+'/pools/'+encodeURIComponent(pool)+'/ohlcv/'+t.tf+'?aggregate='+t.agg+'&limit='+t.limit+'&currency=usd&token=base';
@@ -3701,19 +3726,27 @@ async function loadCoinTF(){
       console.warn('entry gate', ge);
       coinRenderEntry({state:'WATCH', entry:false, sizePct:0, reason:'Gate failed: '+(ge&&ge.message||ge), detail:{tf:coinTF}});
     }
-    try{
-      const hist = coinStateHistory(kl, coinTF);
-      coinRenderStateHistory(hist);
-    }catch(he){
-      console.warn('ca state history', he);
-      if($('coin-hist-summary')) $('coin-hist-summary').textContent = 'State history error: '+(he&&he.message||he);
-    }
-    try{
-      const bt = coinBacktest(kl, coinTF);
-      coinRenderBacktest(bt);
-    }catch(be){
-      console.warn('ca backtest', be);
-      if($('coin-bt-summary')) $('coin-bt-summary').textContent = 'Backtest error: '+(be&&be.message||be);
+    const _skipHist = ['1m','5m','10m','15m','30m','1h','2h'].indexOf(String(coinTF).toLowerCase())>=0;
+    if(_skipHist){
+      if($('coin-hist-summary')) $('coin-hist-summary').textContent = 'State history skipped on '+String(coinTF).toUpperCase()+' (use 4H / 1D / 1W)';
+      if($('coin-hist-table')) $('coin-hist-table').innerHTML = '';
+      if($('coin-bt-summary')) $('coin-bt-summary').textContent = 'Backtest skipped on short TF';
+      if($('coin-bt-table')) $('coin-bt-table').innerHTML = '';
+    } else {
+      try{
+        const hist = coinStateHistory(kl, coinTF);
+        coinRenderStateHistory(hist);
+      }catch(he){
+        console.warn('ca state history', he);
+        if($('coin-hist-summary')) $('coin-hist-summary').textContent = 'State history error: '+(he&&he.message||he);
+      }
+      try{
+        const bt = coinBacktest(kl, coinTF);
+        coinRenderBacktest(bt);
+      }catch(be){
+        console.warn('ca backtest', be);
+        if($('coin-bt-summary')) $('coin-bt-summary').textContent = 'Backtest error: '+(be&&be.message||be);
+      }
     }
     coinRenderFib(kl, spot, coinTF);
     coinRenderMacd(kl);
@@ -4126,7 +4159,7 @@ async function loadCoin(){
     const emb=$('coin-embed');
     if(emb && coinPool.address){
       const ch=coinPool.network==='solana'?'solana':'ethereum';
-      const iv=coinTF==='1w'?'10080':(coinTF==='1d'?'1440':'240');
+      const iv=String(coinDexInterval(coinTF));
       emb.innerHTML='<iframe title="dex" src="https://dexscreener.com/'+ch+'/'+coinPool.address+'?embed=1&theme=dark&trades=0&info=0&interval='+iv+'" style="width:100%;height:460px;border:0;border-radius:14px;background:#000" loading="eager"></iframe>';
     }
     if($('coin-source'))$('coin-source').textContent='LIVE · Dex pair';
@@ -4159,7 +4192,7 @@ function wireCoinUI(){
       if($('coin-tf-name')) $('coin-tf-name').textContent = coinTF.toUpperCase();
       if(coinPool && coinPool.address && $('coin-embed')){
         const ch = coinPool.network==='solana'?'solana':'ethereum';
-        const iv = coinTF==='1w'?'10080':(coinTF==='1d'?'1440':'240');
+        const iv = String(coinDexInterval(coinTF));
         $('coin-embed').innerHTML='<iframe title="dex" src="https://dexscreener.com/'+ch+'/'+coinPool.address+'?embed=1&theme=dark&trades=0&info=0&interval='+iv+'" style="width:100%;height:460px;border:0;border-radius:14px;background:#000"></iframe>';
       }
       if(coinPool && coinPool.address){
@@ -4911,7 +4944,7 @@ async function afGetKl(asset, tf){
   tf=(tf||'4h').toLowerCase();
   if(asset==='ca'){
     if(!coinPool) throw new Error('Load a CA on the CA tab first');
-    return await coinFetchOHLCV(coinPool.network, coinPool.address, tf==='1h'?'4h':tf);
+    return await coinFetchOHLCV(coinPool.network, coinPool.address, tf);
   }
   // BTC/ETH via existing TF pipeline if available
   if(typeof fetchKrakenOHLC==='function'){
