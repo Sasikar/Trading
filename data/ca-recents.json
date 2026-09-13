@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-13T17:22:19.213Z",
+  "updated": "2026-09-13T17:27:05.755Z",
   "count": 14,
   "items": [
+    {
+      "chain": "eth",
+      "ca": "0x594DaaD7D77592a2b97b725A7AD59D7E188b5bFa",
+      "name": "APU",
+      "base": "APU",
+      "t": 1789320156719,
+      "poolAddress": "0x5CEd44F03ff443BBE14d8eA23bc24425FB89E3ED",
+      "poolNetwork": "eth",
+      "poolLiq": 884426.14,
+      "poolCachedAt": 1789320156717
+    },
     {
       "chain": "solana",
       "ca": "3WPep4ufaToK1aS5s8BL9inzeUrt4DYaQCiic6ZkkC1U",
@@ -125,13 +136,6 @@
       "name": "aura",
       "base": "aura",
       "t": 1789212171184
-    },
-    {
-      "chain": "eth",
-      "ca": "0x594DaaD7D77592a2b97b725A7AD59D7E188b5bFa",
-      "name": "APU",
-      "base": "APU",
-      "t": 1789212055069
     },
     {
       "chain": "eth",
