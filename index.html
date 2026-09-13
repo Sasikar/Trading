@@ -250,7 +250,7 @@
 #coin-recents-status{display:block;width:100%;margin-top:4px;word-break:break-word;line-height:1.35}
 .coin-ca button{background:rgba(98,227,160,.2);border-color:rgba(98,227,160,.4);cursor:pointer;color:#c8f5dc}
 .coin-meta{font-size:12px;color:#8491a1;margin:6px 0 12px;line-height:1.5}
-.coin-tf{display:flex;gap:6px;margin:0 0 12px}
+.coin-tf{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
 .coin-tf button{border:1px solid #2a3544;background:#0b121a;color:#9aa6b5;border-radius:10px;padding:8px 14px;font:800 12px Inter,system-ui,sans-serif;cursor:pointer}
 .coin-tf button.on{background:rgba(98,227,160,.28);color:#f4f7fb;border-color:rgba(98,227,160,.45)}
 .coin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:10px 0}
@@ -499,7 +499,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260912-bomemes1"></script>
+<script src="overview-app.js?v=20260913-catf1"></script>
 </div>
 
 <div id="memegate-panel" class="trend-panel" style="display:block">
@@ -575,7 +575,14 @@
       <div id="coin-recents-status" style="font-size:11px;color:#8491a1;margin:0 0 8px;line-height:1.35;word-break:break-word"></div>
       <div id="coin-recents" style="display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto;width:100%"></div>
     </div>
-    <div class="coin-tf" id="coin-tf">
+    <div class="coin-tf" id="coin-tf" style="flex-wrap:wrap">
+      <button type="button" data-ctf="1m" onclick="try{window.setCoinTF&&window.setCoinTF('1m')}catch(e){}">1m</button>
+      <button type="button" data-ctf="5m" onclick="try{window.setCoinTF&&window.setCoinTF('5m')}catch(e){}">5m</button>
+      <button type="button" data-ctf="10m" onclick="try{window.setCoinTF&&window.setCoinTF('10m')}catch(e){}">10m</button>
+      <button type="button" data-ctf="15m" onclick="try{window.setCoinTF&&window.setCoinTF('15m')}catch(e){}">15m</button>
+      <button type="button" data-ctf="30m" onclick="try{window.setCoinTF&&window.setCoinTF('30m')}catch(e){}">30m</button>
+      <button type="button" data-ctf="1h" onclick="try{window.setCoinTF&&window.setCoinTF('1h')}catch(e){}">1H</button>
+      <button type="button" data-ctf="2h" onclick="try{window.setCoinTF&&window.setCoinTF('2h')}catch(e){}">2H</button>
       <button type="button" data-ctf="4h" class="on" onclick="try{window.setCoinTF&&window.setCoinTF('4h')}catch(e){}">4H</button>
       <button type="button" data-ctf="1d" onclick="try{window.setCoinTF&&window.setCoinTF('1d')}catch(e){}">1D</button>
       <button type="button" data-ctf="1w" onclick="try{window.setCoinTF&&window.setCoinTF('1w')}catch(e){}">1W</button>
