@@ -1,1 +1,98 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tax QA · TRADING</title><link rel="stylesheet" href="style.css"></head><body><main class="taxqa"><div class="tax-head"><div><div class="eyebrow">TRADING.</div><h1>Tax QA</h1><p>Ask a tax question by typing or speaking. Q&A is saved permanently in this repository.</p></div></div><section class="ask"><input id="token" type="password" autocomplete="off" placeholder="GitHub token — stored only on this device"><div class="box"><textarea id="question" placeholder="Ask your tax question…" rows="4"></textarea><button id="mic" class="mic" aria-label="Speak question">🎙️</button></div><textarea id="answer" placeholder="Enter the answer…" rows="5"></textarea><div class="actions"><button id="save" class="primary">Save Q&A</button><button id="clear" class="secondary">Clear</button></div><div id="status" class="status"></div></section><section><div class="section-title"><h2>Historical Q&A</h2></div><div id="history" class="history"></div></section></main><script src="tax-qa.js?v=20260829-3"></script><script src="site-nav.js?v=20260829-taxqa3"></script><style>body{background:#070a0f;color:#f4f7fb;font-family:Inter,system-ui,sans-serif}.taxqa{max-width:900px;margin:0 auto;padding:34px 20px 80px}.eyebrow{letter-spacing:.18em;font-weight:900}.tax-head h1{font-size:38px;margin:28px 0 8px}.tax-head p{color:#8994a4;line-height:1.5}.ask{margin-top:28px;background:#111722;border:1px solid #303746;border-radius:20px;padding:18px}.ask>input{width:100%;box-sizing:border-box;background:#080c12;color:#f4f7fb;border:1px solid #3a4250;border-radius:12px;padding:13px;margin-bottom:12px}.box{position:relative}.box textarea,#answer{width:100%;box-sizing:border-box;background:#080c12;color:#f4f7fb;border:1px solid #3a4250;border-radius:15px;padding:17px;font-size:17px;line-height:1.5;resize:vertical;outline:none}.box textarea{padding-right:62px}.box textarea:focus,#answer:focus,.ask>input:focus{border-color:#62e3a0}#answer{margin-top:12px}.mic{position:absolute;right:12px;top:12px;border:0;border-radius:12px;background:#18231f;color:#62e3a0;font-size:23px;width:46px;height:46px;cursor:pointer}.mic.listening{background:#5b2028;color:#fff}.actions{display:flex;gap:10px;margin-top:12px}.actions button{border:0;border-radius:11px;padding:11px 16px;font-weight:750;cursor:pointer}.primary{background:#62e3a0;color:#07100c}.secondary{background:#252b36;color:#dbe1ea}.status{min-height:20px;color:#7f8b9b;font-size:13px;margin-top:10px}.section-title{display:flex;align-items:center;justify-content:space-between;margin:34px 0 14px}.section-title h2{margin:0;font-size:24px}.history{display:grid;gap:14px}.qa{background:#111722;border:1px solid #303746;border-radius:17px;padding:17px}.qa .date{font-size:12px;color:#778293;margin-bottom:10px}.qa .q{font-weight:750;line-height:1.45;white-space:pre-wrap}.qa .a{margin-top:12px;padding-top:12px;border-top:1px solid #29303c;color:#aeb7c4;line-height:1.5;white-space:pre-wrap}@media(max-width:430px){.taxqa{padding:24px 14px 60px}.tax-head h1{font-size:32px}.actions{flex-wrap:wrap}}</style></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tax · TRADING</title>
+<link rel="stylesheet" href="style.css">
+<style>
+body{background:#070a0f;color:#f4f7fb;font-family:Inter,system-ui,sans-serif}
+.taxqa{max-width:900px;margin:0 auto;padding:34px 20px 80px}
+.eyebrow{letter-spacing:.18em;font-weight:900;color:#8491a1;font-size:12px}
+.tax-head h1{font-size:34px;margin:16px 0 8px}
+.tax-head p{color:#8994a4;line-height:1.5}
+.subtabs{display:flex;gap:8px;margin:20px 0 8px;flex-wrap:wrap}
+.subtabs button{border:1px solid #303746;background:#111722;color:#9aa6b5;border-radius:999px;padding:10px 16px;font-weight:800;cursor:pointer}
+.subtabs button.on{background:rgba(98,227,160,.18);border-color:rgba(98,227,160,.45);color:#e8fef2}
+.panel{display:none}
+.panel.on{display:block}
+.ask{margin-top:16px;background:#111722;border:1px solid #303746;border-radius:20px;padding:18px}
+.ask>input{width:100%;box-sizing:border-box;background:#080c12;color:#f4f7fb;border:1px solid #3a4250;border-radius:12px;padding:13px;margin-bottom:12px}
+.box{position:relative}
+.box textarea,#answer,#note-text{width:100%;box-sizing:border-box;background:#080c12;color:#f4f7fb;border:1px solid #3a4250;border-radius:15px;padding:17px;font-size:16px;line-height:1.5;resize:vertical;outline:none}
+.box textarea{padding-right:62px}
+.box textarea:focus,#answer:focus,#note-text:focus,.ask>input:focus{border-color:#62e3a0}
+#answer{margin-top:12px}
+.mic{position:absolute;right:12px;top:12px;border:0;border-radius:12px;background:#18231f;color:#62e3a0;font-size:23px;width:46px;height:46px;cursor:pointer}
+.mic.listening{background:#5b2028;color:#fff}
+.actions{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.actions button{border:0;border-radius:11px;padding:11px 16px;font-weight:750;cursor:pointer}
+.primary{background:#62e3a0;color:#07100c}
+.secondary{background:#243041;color:#d5dde8}
+.status{margin-top:10px;font-size:13px;color:#8491a1;line-height:1.4}
+.section-title{margin:28px 0 12px}
+.section-title h2{font-size:18px;margin:0}
+.history{display:flex;flex-direction:column;gap:12px}
+.qa,.note-card{background:#111722;border:1px solid #303746;border-radius:16px;padding:14px 16px}
+.qa .date,.note-card .date{font-size:12px;color:#8491a1;margin-bottom:6px}
+.qa .q{font-weight:800;margin-bottom:6px}
+.qa .a,.note-card .body{color:#c5d0dc;line-height:1.5;white-space:pre-wrap}
+.note-card .del{margin-top:10px;border:1px solid #3a4250;background:transparent;color:#ff6f7c;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer;font-size:12px}
+</style>
+</head>
+<body>
+<main class="taxqa">
+  <div class="tax-head">
+    <div class="eyebrow">TRADING.</div>
+    <h1>Tax</h1>
+    <p>Q&amp;A and personal notes — saved permanently in this repository via GitHub JSON.</p>
+  </div>
+
+  <div class="subtabs">
+    <button type="button" class="on" data-panel="qa" id="tab-qa">Tax QA</button>
+    <button type="button" data-panel="notes" id="tab-notes">Notes</button>
+  </div>
+
+  <!-- shared token -->
+  <section class="ask" style="margin-top:12px;padding-bottom:12px">
+    <input id="token" type="password" autocomplete="off" placeholder="GitHub token — stored only on this device (repo Contents read/write)">
+  </section>
+
+  <div id="panel-qa" class="panel on">
+    <section class="ask">
+      <div class="box">
+        <textarea id="question" placeholder="Ask your tax question…" rows="4"></textarea>
+        <button id="mic" class="mic" aria-label="Speak question">🎙️</button>
+      </div>
+      <textarea id="answer" placeholder="Enter the answer…" rows="5"></textarea>
+      <div class="actions">
+        <button id="save" class="primary">Save Q&amp;A</button>
+        <button id="clear" class="secondary">Clear</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+    <section>
+      <div class="section-title"><h2>Historical Q&amp;A</h2></div>
+      <div id="history" class="history"></div>
+    </section>
+  </div>
+
+  <div id="panel-notes" class="panel">
+    <section class="ask">
+      <textarea id="note-text" placeholder="Write a note…" rows="5"></textarea>
+      <div class="actions">
+        <button id="note-save" class="primary">Submit note</button>
+        <button id="note-clear" class="secondary">Clear</button>
+      </div>
+      <div id="note-status" class="status"></div>
+    </section>
+    <section>
+      <div class="section-title"><h2>Saved notes</h2></div>
+      <div id="note-history" class="history"></div>
+    </section>
+  </div>
+</main>
+<script src="tax-qa.js?v=20260913-notes1"></script>
+<script src="site-nav.js?v=20260912-af1"></script>
+</body>
+</html>
