@@ -66,25 +66,3 @@ jobs:
           git add data/widget-prices.json
           git diff --staged --quiet || git commit -m "chore: refresh widget-prices.json"
           git push
-
-  # Runs on same schedule that already fires every ~10m (momentum-only schedule never ran)
-  momentum1m:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    timeout-minutes: 12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: 1m momentum scan + publish state
-        env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          set -e
-          echo "1m momentum via widget-prices schedule · $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          # Single pass — less GT load; status updates every ~10m when this workflow runs
-          node scripts/momentum-1m-alert.mjs
