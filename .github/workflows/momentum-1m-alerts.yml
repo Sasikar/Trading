@@ -1,11 +1,16 @@
 name: 1M Momentum breakout alerts (ntfy)
 
 # Independent of 4H/1D breakout-alerts.yml and CA frozen engine.
-# GitHub schedule minimum is 5 minutes; detector still uses 1m OHLCV.
+# GitHub cannot schedule under 5m, so each job loops ~every 60s for 5 passes
+# ≈ true 1-minute detection without Cloudflare / without touching Pages.
 on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+
+concurrency:
+  group: momentum-1m-alerts
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -13,7 +18,7 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
@@ -21,23 +26,35 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Run 1m momentum detector
+      - name: 1m loop (5 passes × ~60s)
         env:
-          # REQUIRED: set repo secret NTFY_TOPIC = WildMemeMover
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          MOMENTUM_PASSES: '5'
+          MOMENTUM_PASS_SLEEP_SEC: '55'
         run: |
+          set -e
           if [ -z "$NTFY_TOPIC" ]; then
-            echo "WARNING: NTFY_TOPIC secret is empty — scoring still runs, alerts will not send"
+            echo "WARNING: NTFY_TOPIC secret empty — scan runs, alerts skipped"
           else
-            echo "NTFY_TOPIC is set (value not printed)"
+            echo "NTFY_TOPIC is set (value not logged)"
           fi
-          node scripts/momentum-1m-alert.mjs
+          PASSES="${MOMENTUM_PASSES:-5}"
+          SLEEP_SEC="${MOMENTUM_PASS_SLEEP_SEC:-55}"
+          for i in $(seq 1 "$PASSES"); do
+            echo "======== PASS $i / $PASSES · $(date -u +%Y-%m-%dT%H:%M:%SZ) ========"
+            node scripts/momentum-1m-alert.mjs || echo "pass $i non-fatal error"
+            if [ "$i" -lt "$PASSES" ]; then
+              echo "sleep ${SLEEP_SEC}s until next 1m pass"
+              sleep "$SLEEP_SEC"
+            fi
+          done
 
       - name: Commit state
         run: |
           set -e
           git config user.name "momentum-1m-bot"
           git config user.email "actions@github.com"
+          git pull --rebase || true
           if git diff --quiet -- data/momentum-1m-state.json 2>/dev/null; then
             echo "No state change"
           else
