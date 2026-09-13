@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-13T15:44:23.922Z",
-  "count": 11,
+  "updated": "2026-09-13T15:58:04.568Z",
+  "count": 12,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
+      "name": "fone",
+      "base": "fone",
+      "t": 1789315015149,
+      "poolAddress": "3dcwhqJp6JBTJPq8ga335HWgSQVS7uQmdmeX7iGjMNpj",
+      "poolNetwork": "solana",
+      "poolLiq": 521859.78,
+      "poolCachedAt": 1789315015147
+    },
     {
       "chain": "solana",
       "ca": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
