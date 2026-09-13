@@ -289,6 +289,74 @@ function alertKey(item, kind){
   return `${item.chain}|${item.ca}|${kind}`;
 }
 
+
+/** Permanent state publish: GitHub Contents API (no git push races). */
+async function publishStateToGitHub(stateObj){
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+  const repo = process.env.GITHUB_REPOSITORY || 'Sasikar/Trading';
+  if(!token){
+    console.warn('No GITHUB_TOKEN — state saved locally only (UI will not update on Pages)');
+    return false;
+  }
+  const path = 'data/momentum-1m-state.json';
+  const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+  const bodyContent = Buffer.from(JSON.stringify(stateObj, null, 2) + '\n').toString('base64');
+  let sha = null;
+  try{
+    const gr = await fetch(url + '?ref=master', {
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+      cache: 'no-store'
+    });
+    if(gr.ok){
+      const gj = await gr.json();
+      sha = gj.sha;
+    } else if(gr.status !== 404){
+      console.warn('GET state sha', gr.status);
+    }
+  }catch(e){ console.warn('GET state', e.message||e); }
+
+  for(let attempt=0; attempt<5; attempt++){
+    try{
+      const payload = {
+        message: 'chore: 1m momentum state ' + new Date().toISOString().slice(0,16) + 'Z',
+        content: bodyContent,
+        branch: 'master'
+      };
+      if(sha) payload.sha = sha;
+      const pr = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          Authorization: 'Bearer ' + token,
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      if(pr.status === 409 || pr.status === 422){
+        // refresh sha and retry
+        const gr2 = await fetch(url + '?ref=master', {
+          headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
+          cache: 'no-store'
+        });
+        if(gr2.ok){ sha = (await gr2.json()).sha; }
+        await sleep(800 * (attempt+1));
+        continue;
+      }
+      if(!pr.ok){
+        const t = await pr.text();
+        throw new Error('PUT ' + pr.status + ' ' + t.slice(0,150));
+      }
+      console.log('STATE_PUBLISHED via Contents API → ' + path);
+      return true;
+    }catch(e){
+      console.warn('publish attempt', attempt+1, e.message||e);
+      await sleep(1000 * (attempt+1));
+    }
+  }
+  console.error('STATE_PUBLISH_FAILED after retries');
+  return false;
+}
+
 async function main(){
   const recentsDoc = loadJSON(RECENTS, { items: [] });
   let items = Array.isArray(recentsDoc) ? recentsDoc : (recentsDoc.items || []);
@@ -476,6 +544,12 @@ async function main(){
     http: state.lastHttp
   };
   saveJSON(STATE, state);
+  try{
+    const ok = await publishStateToGitHub(state);
+    console.log('state_publish_ok=' + ok);
+  }catch(e){
+    console.warn('state publish error', e.message||e);
+  }
   const elapsed = ((Date.now() - runStarted)/1000).toFixed(1);
   const rpm = elapsed > 0 ? (httpRequests / (elapsed/60)).toFixed(1) : '0';
   console.log(`HTTP_STATS pool=${httpPool} ohlcv=${httpOhlcv} total=${httpRequests} elapsed_sec=${elapsed} theoretical_rpm=${rpm}`);
