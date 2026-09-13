@@ -28,7 +28,7 @@ const CFG = {
   strongScoreBump: 12, // re-alert if score >= last + this
   maxExtendRet5: 0.22, // 5m return already >22% => EXTENDED suppress early
   lookback1m: 30,
-  sleepMs: 2200, // GT free tier ~strict; keep well under 30/min
+  sleepMs: 1800, // GT free tier; pool cache cuts discovery calls
   weights: {
     priceAccel: 25,
     volExpand: 25,
@@ -40,16 +40,23 @@ const CFG = {
 };
 
 const NTFY_TOPIC = (process.env.NTFY_TOPIC || '').trim();
+let httpRequests = 0;
+let httpPool = 0;
+let httpOhlcv = 0;
+
 const NTFY_URL = NTFY_TOPIC ? `https://ntfy.sh/${encodeURIComponent(NTFY_TOPIC)}` : '';
 
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 function loadJSON(p, fb){ try { return JSON.parse(fs.readFileSync(p,'utf8')); } catch { return fb; } }
 function saveJSON(p, o){ fs.mkdirSync(path.dirname(p),{recursive:true}); fs.writeFileSync(p, JSON.stringify(o,null,2)+'\n'); }
 
-async function fetchJSON(url, tries=3){
+async function fetchJSON(url, tries=3, kind='other'){
   let last;
   for (let i=0;i<tries;i++){
     try{
+      httpRequests++;
+      if (kind==='pool') httpPool++;
+      else if (kind==='ohlcv') httpOhlcv++;
       const r = await fetch(url, {
         headers: { Accept:'application/json', 'User-Agent':'TradingMomentum1m/1.0' },
         cache: 'no-store'
@@ -73,7 +80,7 @@ async function fetchJSON(url, tries=3){
 async function resolvePool(chain, ca){
   const net = (chain==='sol'||chain==='solana') ? 'solana' : 'eth';
   const url = `https://api.geckoterminal.com/api/v2/networks/${net}/tokens/${encodeURIComponent(ca)}/pools?page=1`;
-  const j = await fetchJSON(url);
+  const j = await fetchJSON(url, 3, 'pool');
   const rows = j?.data || [];
   if (!rows.length) throw new Error('no pools');
   rows.sort((a,b)=>{
@@ -95,7 +102,7 @@ async function resolvePool(chain, ca){
 /** 1m OHLCV: [ts_ms, o,h,l,c,vol] oldest→newest */
 async function fetchOHLCV1m(network, poolAddress, limit=40){
   const url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${poolAddress}/ohlcv/minute?aggregate=1&limit=${limit}&currency=usd`;
-  const j = await fetchJSON(url);
+  const j = await fetchJSON(url, 3, 'ohlcv');
   let list = j?.data?.attributes?.ohlcv_list || [];
   list = list.map(r => {
     let ts = Number(r[0]);
@@ -291,7 +298,10 @@ async function main(){
   const state = loadJSON(STATE, { tokens: {}, updated: null });
   if (!state.tokens) state.tokens = {};
 
+  const runStarted = Date.now();
+  httpRequests = 0; httpPool = 0; httpOhlcv = 0;
   console.log(`1M momentum · candidates=${items.length} · topic=${NTFY_TOPIC ? '(from secret)' : 'MISSING'} · threshold=${CFG.scoreThreshold}`);
+
 
   let sent = 0;
   const findings = [];
@@ -356,6 +366,10 @@ async function main(){
           `https://sasikar.github.io/Trading/index.html?tab=breakouts`
         ].join('\n');
 
+        const oldestTs = kl[0][0];
+        const newestTs = kl[kl.length-1][0];
+        const lagSec = Math.max(0, Math.round((now - newestTs)/1000));
+        console.log(`ALERT_META ${name} oldest1m=${new Date(oldestTs).toISOString()} newest1m=${new Date(newestTs).toISOString()} lag_vs_newest_candle_sec=${lagSec} forming=${scored.forming}`);
         const res = await sendNtfy(title, body, 'high');
         if (!res.error) {
           sent++;
@@ -364,6 +378,8 @@ async function main(){
           tokState.lastScore = scored.score;
           tokState.lastState = scored.state;
           tokState.lastKind = kind;
+          tokState.lastAlertLagSec = lagSec;
+          tokState.lastNewestCandle = newestTs;
           console.log(`ALERT ${name} ${kind}`);
         }
       }
@@ -384,9 +400,15 @@ async function main(){
   }
   state.updated = new Date().toISOString();
   state.lastFindings = findings;
+  state.lastHttp = { pool: httpPool, ohlcv: httpOhlcv, total: httpRequests, at: new Date().toISOString() };
+
   state.cfg = { scoreThreshold: CFG.scoreThreshold, minLiqUsd: CFG.minLiqUsd, cooldownMs: CFG.cooldownMs };
   saveJSON(STATE, state);
+  const elapsed = ((Date.now() - runStarted)/1000).toFixed(1);
+  const rpm = elapsed > 0 ? (httpRequests / (elapsed/60)).toFixed(1) : '0';
+  console.log(`HTTP_STATS pool=${httpPool} ohlcv=${httpOhlcv} total=${httpRequests} elapsed_sec=${elapsed} theoretical_rpm=${rpm}`);
   console.log(`Done. alerts=${sent} findings=${findings.length}`);
+
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
