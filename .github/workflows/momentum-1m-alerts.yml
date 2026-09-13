@@ -1,0 +1,47 @@
+name: 1M Momentum breakout alerts (ntfy)
+
+# Independent of 4H/1D breakout-alerts.yml and CA frozen engine.
+# GitHub schedule minimum is 5 minutes; detector still uses 1m OHLCV.
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run 1m momentum detector
+        env:
+          # REQUIRED: set repo secret NTFY_TOPIC = WildMemeMover
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          if [ -z "$NTFY_TOPIC" ]; then
+            echo "WARNING: NTFY_TOPIC secret is empty — scoring still runs, alerts will not send"
+          else
+            echo "NTFY_TOPIC is set (value not printed)"
+          fi
+          node scripts/momentum-1m-alert.mjs
+
+      - name: Commit state
+        run: |
+          set -e
+          git config user.name "momentum-1m-bot"
+          git config user.email "actions@github.com"
+          if git diff --quiet -- data/momentum-1m-state.json 2>/dev/null; then
+            echo "No state change"
+          else
+            git add data/momentum-1m-state.json
+            git commit -m "chore: 1m momentum state $(date -u +%Y-%m-%dT%H:%MZ)" || true
+            git push || echo "push skipped"
+          fi
