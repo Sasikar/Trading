@@ -1,7 +1,40 @@
 {
-  "updated": "2026-09-13T15:12:41.165Z",
-  "count": 8,
+  "updated": "2026-09-13T15:44:23.922Z",
+  "count": 11,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
+      "name": "baton",
+      "base": "baton",
+      "t": 1789313440185,
+      "poolAddress": "9NdiyGfthT9Co6cCMZG5t4YZXpf6hiJFAEvWRPSUz7s6",
+      "poolNetwork": "solana",
+      "poolLiq": 488132.95,
+      "poolCachedAt": 1789313440185
+    },
+    {
+      "chain": "solana",
+      "ca": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
+      "name": "ANSEM",
+      "base": "ANSEM",
+      "t": 1789313249079,
+      "poolAddress": "FnzKY6x7entQ1eR3D225dQyT7ybfka4PskBMQhb8L3CC",
+      "poolNetwork": "solana",
+      "poolLiq": 2247263.77,
+      "poolCachedAt": 1789313249078
+    },
+    {
+      "chain": "solana",
+      "ca": "Ge87EtsjwRQbHaqQmKRno69RFTwh9bfSsm99XNxTpump",
+      "name": "Jimothy",
+      "base": "Jimothy",
+      "t": 1789312790502,
+      "poolAddress": "5PGhKctym6odbHGo2tKMST2AjmJsb2uZBQrKkn4ZuFT5",
+      "poolNetwork": "solana",
+      "poolLiq": 527620.89,
+      "poolCachedAt": 1789312790501
+    },
     {
       "chain": "solana",
       "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
