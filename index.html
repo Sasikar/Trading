@@ -499,7 +499,7 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260913-poolopt1"></script>
+<script src="overview-app.js?v=20260913-caclear1"></script>
 </div>
 
 <div id="memegate-panel" class="trend-panel" style="display:block">
@@ -575,6 +575,7 @@
       <select id="coin-chain"><option value="eth">ETH</option><option value="solana">SOL</option></select>
       <input id="coin-ca" type="text" placeholder="Full CA e.g. Ai66LHZG9M…pump" spellcheck="false" autocomplete="off"/>
       <button type="button" id="coin-load" onclick="try{window.loadCoin&&window.loadCoin()}catch(e){alert(e)}">Load</button>
+      <button type="button" id="coin-clear" onclick="try{window.clearCoin&&window.clearCoin()}catch(e){}" style="background:rgba(255,111,124,.12);border-color:rgba(255,111,124,.35);color:#ffb0b8">Clear</button>
     </div>
     <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
     <div id="coin-recents-wrap" style="margin:0 0 14px;width:100%;box-sizing:border-box">
