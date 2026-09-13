@@ -28,7 +28,7 @@ const CFG = {
   strongScoreBump: 12, // re-alert if score >= last + this
   maxExtendRet5: 0.22, // 5m return already >22% => EXTENDED suppress early
   lookback1m: 30,
-  sleepMs: 1800, // GT free tier; pool cache cuts discovery calls
+  sleepMs: 1500, // mostly OHLCV-only when pools stored on CA load
   weights: {
     priceAccel: 25,
     volExpand: 25,
@@ -317,8 +317,27 @@ async function main(){
 
     try {
       let pool;
-      if (tokState.poolAddress && tokState.poolNetwork && (Date.now()-(tokState.poolCachedAt||0) < 6*3600e3)) {
+      // 1) Prefer pool stored on CA load (ca-recents.json) — 0 resolve calls
+      // 2) Else momentum state cache (6h)
+      // 3) Else GT resolve once, then cache on tokState
+      const recPool = item.poolAddress && (item.poolNetwork || item.chain);
+      const stPool = tokState.poolAddress && tokState.poolNetwork && (Date.now()-(tokState.poolCachedAt||0) < 7*24*3600e3);
+      if (recPool) {
+        pool = {
+          network: item.poolNetwork || ((item.chain==='sol'||item.chain==='solana')?'solana':'eth'),
+          address: item.poolAddress,
+          liq: item.poolLiq||tokState.poolLiq||0,
+          name: name,
+          base: name
+        };
+        tokState.poolAddress = pool.address;
+        tokState.poolNetwork = pool.network;
+        tokState.poolLiq = pool.liq;
+        tokState.poolCachedAt = Date.now();
+        console.log(`${name}: pool from ca-recents (no resolve)`);
+      } else if (stPool) {
         pool = { network: tokState.poolNetwork, address: tokState.poolAddress, liq: tokState.poolLiq||0, name: name, base: name };
+        console.log(`${name}: pool from state cache (no resolve)`);
       } else {
         pool = await resolvePool(item.chain, item.ca);
         await sleep(CFG.sleepMs);
@@ -326,6 +345,7 @@ async function main(){
         tokState.poolNetwork = pool.network;
         tokState.poolLiq = pool.liq;
         tokState.poolCachedAt = Date.now();
+        console.log(`${name}: pool resolved via GT`);
       }
       if (pool.liq && pool.liq < CFG.minLiqUsd) {
         console.log(`${name}: liq $${Math.round(pool.liq)} < min — skip`);
