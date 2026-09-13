@@ -1,10 +1,10 @@
 name: 1M Momentum breakout alerts (ntfy)
 
-# Primary cadence: also runs from update-widget-prices.yml (schedule that actually fires).
-# This workflow: manual + backup schedule.
+# Every ~5 min, single pass, ~8 OHLCV when pools cached — under free GT budget.
+# State published via Contents API (GITHUB_TOKEN).
 on:
   schedule:
-    - cron: '5,15,25,35,45,55 * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
   repository_dispatch:
     types: [momentum-1m-scan]
@@ -19,18 +19,18 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Single 1m pass + Contents API state
+      - name: Single 1m pass + publish state
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -e
-          echo "PASS · $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "1m PASS · $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           node scripts/momentum-1m-alert.mjs
