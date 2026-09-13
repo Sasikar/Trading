@@ -3995,7 +3995,17 @@ function coinRecentsUpsert(entry){
   const ca=String(entry.ca).trim();
   const chain=String(entry.chain||'solana');
   const name=String(entry.name||entry.base||ca.slice(0,6)+'…').slice(0,24);
-  const item={ chain, ca, name, base: entry.base||name, t: Date.now() };
+  // Keep prior pool fields if this upsert doesn't include them
+  const prev=(coinRecentsLoadLocal().find(x=>coinRecentKey(x)===coinRecentKey({chain,ca})))||{};
+  const item={
+    chain, ca, name,
+    base: entry.base||prev.base||name,
+    t: Date.now(),
+    poolAddress: entry.poolAddress||prev.poolAddress||null,
+    poolNetwork: entry.poolNetwork||prev.poolNetwork||null,
+    poolLiq: entry.poolLiq!=null?entry.poolLiq:(prev.poolLiq!=null?prev.poolLiq:null),
+    poolCachedAt: entry.poolCachedAt||prev.poolCachedAt||null
+  };
   let arr=coinRecentsLoadLocal().filter(x=>coinRecentKey(x)!==coinRecentKey(item));
   arr.unshift(item);
   coinRecentsSaveLocal(arr);
@@ -4190,7 +4200,11 @@ async function loadCoin(){
         chain: chain,
         ca: ca,
         name: coinPool.base || coinPool.name || ca.slice(0,8),
-        base: coinPool.base || ''
+        base: coinPool.base || '',
+        poolAddress: coinPool.address || null,
+        poolNetwork: coinPool.network || ((chain==='solana'||chain==='sol')?'solana':'eth'),
+        poolLiq: coinPool.liq!=null?coinPool.liq:null,
+        poolCachedAt: Date.now()
       });
     }catch(e){}
     if($('coin-meta'))$('coin-meta').textContent=coinPool.name+' · liq $'+fmt(coinPool.liq,0)+' · '+String(coinPool.address).slice(0,12)+'…';
