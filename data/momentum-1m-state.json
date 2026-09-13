@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-13T10:44:21.763Z",
+  "updated": "2026-09-13T10:44:21.738Z",
   "tokens": {
     "solana|Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
       "lastAlert": 0,
@@ -10,7 +10,7 @@
       "poolNetwork": "solana",
       "poolLiq": 2390628.7872,
       "poolCachedAt": 1789295570072,
-      "updated": 1789296207676
+      "updated": 1789296207644
     },
     "solana|Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk": {
       "lastAlert": 0,
@@ -21,7 +21,7 @@
       "poolNetwork": "solana",
       "poolLiq": 4645987.5566,
       "poolCachedAt": 1789295573115,
-      "updated": 1789296210028
+      "updated": 1789296210001
     },
     "solana|5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2": {
       "lastAlert": 0,
@@ -32,7 +32,7 @@
       "poolNetwork": "solana",
       "poolLiq": 3119714.7522,
       "poolCachedAt": 1789295576362,
-      "updated": 1789296211689
+      "updated": 1789296211653
     },
     "solana|3WPep4ufaToK1aS5s8BL9inzeUrt4DYaQCiic6ZkkC1U": {
       "lastAlert": 0,
@@ -43,7 +43,7 @@
       "poolNetwork": "solana",
       "poolLiq": 109922.4508,
       "poolCachedAt": 1789295597821,
-      "updated": 1789296213303
+      "updated": 1789296213270
     },
     "eth|0xE0f63A424a4439cBE457D80E4f4b51aD25b2c56C": {
       "lastAlert": 0,
@@ -76,7 +76,7 @@
       "poolNetwork": "solana",
       "poolLiq": 1823054.86,
       "poolCachedAt": 1789295752776,
-      "updated": 1789296214983
+      "updated": 1789296214956
     },
     "eth|0x594DaaD7D77592a2b97b725A7AD59D7E188b5bFa": {
       "lastAlert": 0,
@@ -87,7 +87,7 @@
       "poolNetwork": "eth",
       "poolLiq": 880185.2044,
       "poolCachedAt": 1789295783704,
-      "updated": 1789296243726
+      "updated": 1789296243693
     }
   },
   "lastFindings": [],
@@ -101,10 +101,10 @@
     "pool": 0,
     "ohlcv": 14,
     "total": 14,
-    "at": "2026-09-13T10:44:21.763Z"
+    "at": "2026-09-13T10:44:21.738Z"
   },
   "ui": {
-    "lastScan": "2026-09-13T10:44:21.763Z",
+    "lastScan": "2026-09-13T10:44:21.738Z",
     "candidates": 8,
     "scanned": 6,
     "errorCount": 2,
@@ -193,7 +193,7 @@
       "pool": 0,
       "ohlcv": 14,
       "total": 14,
-      "at": "2026-09-13T10:44:21.763Z"
+      "at": "2026-09-13T10:44:21.738Z"
     }
   }
 }
