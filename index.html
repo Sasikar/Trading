@@ -500,7 +500,7 @@
 
 </main></div>
 <script src="overview-app.js?v=20260914-dex1"></script>
-<script src="breakout-tab.js?v=20260914-dex3"></script>
+<script src="breakout-tab.js?v=20260914-ohlcv1"></script>
 </div>
 
 <div id="memegate-panel" class="trend-panel" style="display:block">
@@ -538,12 +538,19 @@
 <div id="breakouts-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Breakout Memes</h2><p>Your saved CAs · DexScreener live 5m/1h/6h/24h · ntfy on fresh breakouts</p></div>
+    <div><h2>Breakout Memes</h2><p>Saved CAs · candles on Cloudflare · this page only reads the API · ntfy from the worker</p></div>
     <span class="source" id="bo-source">—</span>
   </div>
   <div class="card">
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
-      <div id="bo-tf" style="display:flex;gap:6px">
+      <div id="bo-tf" style="display:flex;gap:6px;flex-wrap:wrap">
+        <button type="button" data-botf="1m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1m</button>
+        <button type="button" data-botf="5m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('5m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">5m</button>
+        <button type="button" data-botf="10m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('10m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">10m</button>
+        <button type="button" data-botf="15m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('15m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">15m</button>
+        <button type="button" data-botf="30m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('30m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">30m</button>
+        <button type="button" data-botf="1h" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1h')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1H</button>
+        <button type="button" data-botf="2h" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('2h')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">2H</button>
         <button type="button" data-botf="4h" class="bo-tf-btn on" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('4h')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">4H</button>
         <button type="button" data-botf="1d" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1d')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1D</button>
         <button type="button" data-botf="1w" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1w')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1W</button>
@@ -553,10 +560,18 @@
       <button type="button" onclick="try{window.pingBreakoutNtfy&&window.pingBreakoutNtfy()}catch(e){alert(e)}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">Test ntfy</button>
       <span id="bo-status" style="font-size:12px;color:#8491a1">DexScreener · saved CAs</span>
     </div>
-    <div style="font-size:11px;color:#8491a1;margin-bottom:10px;line-height:1.45">Live DexScreener scan (no GeckoTerminal). Flags <b style="color:#c5d0dc">NEW / HELD breakout</b> or EARLY / STRONG / STRETCHED. Phone alerts use your ntfy topic (same as GitHub Actions).</div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:10px;line-height:1.45">Worker builds 5m–4h candles from Dex snapshots (no Helius). <b style="color:#c5d0dc">1m is focus-only</b>. Phone alerts fire from Cloudflare — keep this tab closed if you want. No login on this page.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+      <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">FOCUS 1m</span>
+      <select id="bo-focus-sel" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:700">
+        <option value="">No 1m focus</option>
+      </select>
+      <button type="button" onclick="try{window.setBreakoutFocus&&window.setBreakoutFocus()}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:800;cursor:pointer">Set focus</button>
+      <button type="button" id="bo-1m-alerts" onclick="try{window.toggleBreakout1mAlerts&&window.toggleBreakout1mAlerts()}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;cursor:pointer">1m alerts off</button>
+    </div>
     <div id="m1m-status" style="margin:0 0 14px;padding:12px 14px;border-radius:14px;border:1px solid #2a3a4c;background:linear-gradient(180deg,#121a24,#0c121a)">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
-        <div style="font-size:11px;letter-spacing:.08em;font-weight:900;color:#8491a1">RUN STATUS · DEXSCREENER + NTFY</div>
+        <div style="font-size:11px;letter-spacing:.08em;font-weight:900;color:#8491a1">RUN STATUS · CLOUDFLARE ENGINE</div>
         <button type="button" onclick="try{window.loadMomentum1mStatus&&window.loadMomentum1mStatus(true)}catch(e){}" style="padding:5px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#c5d0dc;font-size:11px;font-weight:700;cursor:pointer">Refresh</button>
       </div>
       <div id="m1m-health" style="font-size:13px;font-weight:800;color:#e6c878;margin-bottom:6px">Loading status…</div>

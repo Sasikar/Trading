@@ -1,0 +1,29 @@
+{
+  "name": "trading-ohlcv",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-25",
+  "account_id": "7adfceca9b8ca55614a4c8008ab4814d",
+  "workers_dev": true,
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ENGINE",
+        "class_name": "OhlcvEngine"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["OhlcvEngine"]
+    }
+  ],
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "vars": {
+    "WATCHLIST_URL": "https://sasikar.github.io/Trading/data/ca-recents.json",
+    "NTFY_TOPIC": "MyTradingMemeBreakout44"
+  }
+}
