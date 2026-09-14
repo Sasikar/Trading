@@ -102,7 +102,7 @@
     if (!v) {
       if (box)
         box.innerHTML =
-          '<div style="padding:14px;border-radius:12px;border:1px dashed #243041;color:#8491a1;font-size:13px">Pick a saved coin. Short / medium / long each get HOLD or EXIT from the same tape as Breakout.</div>';
+          '<div style="padding:14px;border-radius:12px;border:1px dashed #243041;color:#8491a1;font-size:13px">Pick a saved coin. HOLD only if that horizon still has a live or held break. Early is not a hold. Broke / failed = EXIT.</div>';
       return;
     }
     const chainLab =
@@ -161,7 +161,7 @@
     try {
       window.showHunter(false);
     } catch (e) {}
-    ['tf-panels', 'trend-panel', 'struct-panel', 'macro-panel', 'signal-panel', 'memegate-panel', 'coin-panel', 'antifomo-panel'].forEach(
+    ['tf-panels', 'trend-panel', 'struct-panel', 'macro-panel', 'signal-panel', 'memegate-panel', 'coin-panel', 'antifomo-panel', 'hunter-panel', 'breakouts-panel'].forEach(
       function (id) {
         const el = $(id);
         if (!el) return;
@@ -215,7 +215,8 @@
       setTimeout(function () {
         const act = document.querySelector('#tf-tabs .tab.active');
         const tf = act && act.getAttribute('data-tf');
-        if (tf !== 'verdict') showVerdict(false);
+        if (tf === 'verdict') showVerdict(true);
+        else showVerdict(false);
       }, 0);
     });
   }

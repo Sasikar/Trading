@@ -759,108 +759,78 @@ export function matureStatusFrom(hit, rec) {
 
 export const VERDICT_HZ = [
   { id: 'short', label: 'Short', sub: '5m · 15m · 1h', tfs: ['5m', '15m', '1h'] },
-  { id: 'medium', label: 'Medium', sub: '4h · 1d', tfs: ['4h', '1d'] },
+  { id: 'medium', label: 'Medium', sub: '2h · 4h', tfs: ['2h', '4h'] },
   { id: 'long', label: 'Long', sub: '1d · 1w', tfs: ['1d', '1w'] }
 ];
 
-export function verdictCall(hz, byTf, tick) {
+export function verdictCall(hz, byTf, tick, hist) {
   const xs = (hz.tfs || []).map((tf) => byTf[tf]).filter(Boolean);
-  const tags = xs.map((h) => String(h.tf).toUpperCase() + ' ' + (h.section || h.state || 'WATCH'));
-  const stretched = xs.some((h) => h.state === 'STRETCHED');
-  const under = xs.some((h) => h.level > 0 && h.spot > 0 && h.spot < h.level);
+  const tags = xs.map((h) => {
+    const rec = hist && hist[maturedKey(h)];
+    const st = rec && rec.status && rec.status !== 'held' ? rec.status : h.section || h.state || 'WATCH';
+    return String(h.tf).toUpperCase() + ' ' + String(st).toUpperCase();
+  });
+  const under = xs.find((h) => h.level > 0 && h.spot > 0 && h.spot < h.level);
+  if (under) {
+    return {
+      call: 'EXIT',
+      why:
+        'BROKE: spot back under the breakout level' +
+        (under.levelTxt ? ' (' + under.levelTxt + ')' : '') +
+        ' on ' +
+        String(under.tf).toUpperCase() +
+        '.',
+      reasons: tags
+    };
+  }
+  const failed = xs.filter((h) => {
+    const rec = hist && hist[maturedKey(h)];
+    return rec && (rec.status === 'failed' || rec.status === 'broke');
+  });
   const live = xs.filter((h) => h.section === 'live');
   const held = xs.filter((h) => h.section === 'matured');
   const early = xs.filter((h) => h.section === 'early');
-  if (under) {
-    const h = xs.find((x) => x.level > 0 && x.spot > 0 && x.spot < x.level);
+  const stretched = xs.some((h) => h.state === 'STRETCHED');
+  if (failed.length && !live.length && !held.length) {
     return {
       call: 'EXIT',
       why:
-        'Spot is back under the breakout level' +
-        (h && h.levelTxt ? ' (' + h.levelTxt + ')' : '') +
-        '. That is the exit.',
+        'FAILED: ' +
+        failed.map((h) => String(h.tf).toUpperCase()).join(', ') +
+        ' hold died. Not a hold.',
       reasons: tags
     };
   }
-  if (stretched) {
-    return {
-      call: 'EXIT',
-      why: 'Already stretched on ' + hz.label.toLowerCase() + ' — late, not a hold.',
-      reasons: tags
-    };
-  }
-  if (live.length) {
+  if (live.length || held.length) {
+    const n = live.length + held.length;
+    const bits = live
+      .map((h) => String(h.tf).toUpperCase() + ' live')
+      .concat(held.map((h) => String(h.tf).toUpperCase() + ' held'));
     return {
       call: 'HOLD',
       why:
-        'Live break on ' +
-        live.map((h) => String(h.tf).toUpperCase()).join(', ') +
-        '. Stay until a candle closes back under the level.',
-      reasons: tags
-    };
-  }
-  if (held.length) {
-    const h = held.find((x) => x.levelTxt) || held[0];
-    return {
-      call: 'HOLD',
-      why:
-        'Still holding' +
-        (h.levelTxt ? ' above (' + h.levelTxt + ')' : '') +
-        ' on ' +
-        held.map((x) => String(x.tf).toUpperCase()).join(', ') +
-        '.',
+        (n >= 2 ? n + ' TFs agree. ' : '') +
+        bits.join(' · ') +
+        (stretched ? ' — stretched, late, still above the level.' : '.') +
+        ' Exit if that TF closes back under the printed level.',
       reasons: tags
     };
   }
   if (early.length) {
     return {
-      call: 'HOLD',
+      call: 'EXIT',
       why:
-        'Close to break on ' +
+        'Only EARLY on ' +
         early.map((h) => String(h.tf).toUpperCase()).join(', ') +
-        ' — setup is alive, not an exit.',
+        ' — close to a break, not a hold. Do not treat this as an open trade.',
       reasons: tags
     };
   }
-  const m5 = (tick && tick.m5) || 0;
-  const h1 = (tick && tick.h1) || 0;
-  const h6 = (tick && tick.h6) || 0;
-  const h24 = (tick && tick.h24) || 0;
-  if (hz.id === 'short') {
-    if (h1 > 0 && m5 >= -0.5) {
-      return {
-        call: 'HOLD',
-        why: 'Short tape still green (1h ' + pctStr(h1) + ', 5m ' + pctStr(m5) + ').',
-        reasons: tags
-      };
-    }
-    return {
-      call: 'EXIT',
-      why: 'No short break and 1h is not green (1h ' + pctStr(h1) + ', 5m ' + pctStr(m5) + ').',
-      reasons: tags
-    };
-  }
-  if (hz.id === 'medium') {
-    if (h1 > 0 && h6 >= 8) {
-      return {
-        call: 'HOLD',
-        why: 'Medium still holding on Dex 1h/6h (1h ' + pctStr(h1) + ', 6h ' + pctStr(h6) + ').',
-        reasons: tags
-      };
-    }
-    return {
-      call: 'EXIT',
-      why: 'Medium hold is dead (1h ' + pctStr(h1) + ', 6h ' + pctStr(h6) + ').',
-      reasons: tags
-    };
-  }
-  if (h24 >= 8) {
-    return { call: 'HOLD', why: 'Long tape 24h still up (' + pctStr(h24) + ').', reasons: tags };
-  }
-  if (h24 < 0) {
-    return { call: 'EXIT', why: 'Long tape 24h is red (' + pctStr(h24) + ').', reasons: tags };
-  }
-  return { call: 'EXIT', why: 'No 1d/1w breakout and 24h is flat (' + pctStr(h24) + ').', reasons: tags };
+  return {
+    call: 'EXIT',
+    why: 'No live/held break on ' + hz.label.toLowerCase() + ' (' + hz.sub + ').',
+    reasons: tags
+  };
 }
 
 export function hitFrom(row, tick, det, tf, focus) {
@@ -1447,12 +1417,18 @@ export class Engine {
     if (!row) return { coins, verdict: null, error: 'not a saved coin' };
     const focus = this.store.getMeta('focus_ca') || '';
     const byTf = {};
-    for (const tf of ['5m', '15m', '1h', '4h', '1d', '1w']) {
+    for (const tf of ['5m', '15m', '1h', '2h', '4h', '1d', '1w']) {
       byTf[tf] = this.evaluateRow(row, tf, focus);
+    }
+    let hist = {};
+    try {
+      hist = JSON.parse(this.store.getMeta('matured_hist') || '{}');
+    } catch (e) {
+      hist = {};
     }
     const tick = this.store.getTick(row.ca);
     const horizons = VERDICT_HZ.map((hz) => {
-      const v = verdictCall(hz, byTf, tick);
+      const v = verdictCall(hz, byTf, tick, hist);
       return {
         id: hz.id,
         label: hz.label,
