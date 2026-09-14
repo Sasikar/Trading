@@ -56,10 +56,7 @@
 
   function paintTfButtons() {
     document.querySelectorAll('.bo-tf-btn').forEach(function (b) {
-      const on = b.getAttribute('data-botf') === breakoutTF;
-      b.classList.toggle('on', on);
-      b.style.background = on ? '#1a9b6c' : '#121a24';
-      b.style.color = on ? '#fff' : '#c5d0dc';
+      b.classList.toggle('on', b.getAttribute('data-botf') === breakoutTF);
     });
   }
 

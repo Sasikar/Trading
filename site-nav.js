@@ -6,7 +6,15 @@ if('serviceWorker' in navigator){
 }
 const primary=[['Overview','index.html',true],['Pulse','pulse.html',true],['Hunter','index.html?tab=hunter',true],['Anti-FOMO','index.html?tab=antifomo',true],['Markets','watchlist.html',false],['Memes','memes.html',false],['MemeGate','index.html?tab=memegate',true],['Portfolio','portfolio.html',false],['Catalysts','market-catalysts.html',false],['Process','pre-entry-checklist.html',false],['Scanner','scanner.html',false],['Tax','tax-qa.html',false],['Goals','goals.html',false],['Health','health.html',false]];
 const current=(location.pathname.split('/').pop()||'index.html').toLowerCase();
-const isActive=h=>current===h.split('?')[0].toLowerCase();
+const tabQ=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
+const isActive=h=>{
+  const [path, qs]=h.split('?');
+  if(current!==path.toLowerCase()) return false;
+  if(path.toLowerCase()!=='index.html') return true;
+  const want=(qs&&qs.split('=')[1]||'').toLowerCase();
+  if(want) return tabQ===want;
+  return !tabQ;
+};
 const style=document.createElement('style');
 style.textContent=`html{scroll-padding-top:56px}body{padding-top:56px!important}
 #site-nav{position:fixed;top:0;left:0;right:0;z-index:9999;height:52px;display:flex;align-items:center;gap:6px;padding:0 10px 0 12px;background:rgba(8,12,18,.96);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.08);font-family:Inter,system-ui,sans-serif;box-sizing:border-box}

@@ -3856,10 +3856,10 @@ function coinRecentsRender(){
     const short=e.ca.length>10?(e.ca.slice(0,4)+'…'+e.ca.slice(-4)):e.ca;
     const chainLab=(e.chain==='solana'||e.chain==='sol')?'SOL':'ETH';
     const active=(coinCA&&e.ca.toLowerCase()===String(coinCA).toLowerCase());
-    return '<div class="coin-recent-chip" data-i="'+i+'" style="display:inline-flex;align-items:center;gap:4px;padding:6px 8px 6px 10px;border-radius:999px;border:1px solid '+(active?'rgba(98,227,160,.45)':'#243041')+';background:'+(active?'rgba(98,227,160,.12)':'#0b121a')+';max-width:100%">'
-      +'<button type="button" data-act="load" data-i="'+i+'" style="border:0;background:transparent;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer;padding:0;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+e.ca+'">'
+    return '<div class="coin-recent-chip'+(active?' on':'')+'" data-i="'+i+'" style="border:1px solid '+(active?'rgba(98,227,160,.45)':'#243041')+';background:'+(active?'rgba(98,227,160,.12)':'#0b121a')+'">'
+      +'<button type="button" data-act="load" data-i="'+i+'" style="border:0;background:transparent;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+e.ca+'">'
       +e.name+' <span style="color:#8491a1;font-weight:650;font-size:10px">'+chainLab+'</span></button>'
-      +'<button type="button" data-act="del" data-i="'+i+'" title="Remove" style="border:0;background:transparent;color:#8491a1;font-size:12px;cursor:pointer;padding:0 2px;line-height:1">×</button>'
+      +'<button type="button" data-act="del" data-i="'+i+'" title="Remove" style="border:0;background:transparent;color:#8491a1;font-size:14px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0">×</button>'
       +'</div>';
   }).join('');
   box.querySelectorAll('button[data-act]').forEach(function(btn){

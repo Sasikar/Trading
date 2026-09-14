@@ -16,8 +16,9 @@
 .coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
 .coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
 .change{font-size:11px;font-weight:800;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}
-.tabs{display:flex;gap:5px;padding:5px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.tab{flex:0 0 auto;min-width:max-content;border:0;background:transparent;color:#9aa6b5;font:800 13px Inter,system-ui,sans-serif;padding:11px 14px;border-radius:11px;cursor:pointer;white-space:nowrap;letter-spacing:.02em}
+.tabs{display:flex;gap:4px;padding:4px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:40px;min-width:max-content;border:0;background:transparent;color:#9aa6b5;font:800 12px Inter,system-ui,sans-serif;padding:0 12px;border-radius:10px;cursor:pointer;white-space:nowrap;letter-spacing:.02em}
 .tab.active{background:rgba(98,227,160,.28)!important;color:#f4f7fb!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.45)}
 .tab[data-tf="memegate"].active{background:rgba(98,227,160,.32)!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.55)}
 .price-now{padding:14px 16px;border-bottom:1px solid #ffffff0c;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -238,27 +239,103 @@
 .mg-hist th{position:sticky;top:0;background:#0e151d;text-align:left;color:#8491a1;font-size:10px;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid #1c2633}
 .mg-hist td{padding:8px 10px;border-bottom:1px solid #16202a;font-weight:700;white-space:nowrap}
 .mg-hist .on{color:#62e3a0}.mg-hist .off{color:#ff6f7c}.mg-hist .wait{color:#e6c878}
-.coin-ca{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
-.coin-ca select,.coin-ca input,.coin-ca button{border:1px solid #2a3544;background:#0b121a;color:#e8eef6;border-radius:10px;padding:10px 12px;font:700 13px Inter,system-ui,sans-serif}
-.coin-ca input{flex:1;min-width:0;width:100%}
-.coin-ca{width:100%;box-sizing:border-box}
-.coin-ca select{flex:0 0 auto;max-width:88px}
-.coin-ca button{flex:0 0 auto}
-#coin-recents-wrap{width:100%;box-sizing:border-box}
-#coin-recents{width:100%;box-sizing:border-box}
-.coin-recent-chip{flex:0 1 auto}
-#coin-recents-status{display:block;width:100%;margin-top:4px;word-break:break-word;line-height:1.35}
-.coin-ca button{background:rgba(98,227,160,.2);border-color:rgba(98,227,160,.4);cursor:pointer;color:#c8f5dc}
-.coin-meta{font-size:12px;color:#8491a1;margin:6px 0 12px;line-height:1.5}
-.coin-tf{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
-.coin-tf button{border:1px solid #2a3544;background:#0b121a;color:#9aa6b5;border-radius:10px;padding:8px 14px;font:800 12px Inter,system-ui,sans-serif;cursor:pointer}
-.coin-tf button.on{background:rgba(98,227,160,.28);color:#f4f7fb;border-color:rgba(98,227,160,.45)}
 .coin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:10px 0}
 .coin-stats .st{background:#0b121a;border:1px solid #1c2633;border-radius:12px;padding:10px}
 .coin-stats .lab{font-size:10px;color:#8491a1;font-weight:800;letter-spacing:.06em}
 .coin-stats .val{font-size:16px;font-weight:900;margin-top:4px}
 #coin-fib-tv,#coin-macd-tv{min-height:180px;width:100%}
 #coin-fib-tv{min-height:280px}
+
+.card-pad{padding:14px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card{padding:14px}
+.coin-ca{
+  display:grid;
+  grid-template-columns:92px minmax(0,1fr) auto auto;
+  gap:8px;
+  align-items:stretch;
+  margin:0 0 10px;
+  width:100%;
+}
+.coin-ca select,.coin-ca input,.coin-ca button{
+  height:44px;
+  width:100%;
+  border:1px solid #2a3544;
+  background:#0b121a;
+  color:#e8eef6;
+  border-radius:10px;
+  padding:0 12px;
+  font:700 13px Inter,system-ui,sans-serif;
+  margin:0;
+}
+.coin-ca select{max-width:none}
+.coin-ca input{min-width:0}
+.coin-ca button{flex:none;cursor:pointer;background:rgba(98,227,160,.2);border-color:rgba(98,227,160,.4);color:#c8f5dc;white-space:nowrap;padding:0 14px;width:auto}
+#coin-clear{background:rgba(255,111,124,.12)!important;border-color:rgba(255,111,124,.35)!important;color:#ffb0b8!important}
+@media(max-width:560px){
+  .coin-ca{grid-template-columns:88px 1fr 1fr}
+  .coin-ca input{grid-column:1/-1;grid-row:1}
+  .coin-ca select,.coin-ca button{grid-row:2}
+  .coin-ca button{width:100%}
+}
+.coin-meta{font-size:12px;color:#8491a1;margin:0 0 12px;line-height:1.45}
+#coin-recents-wrap{width:100%;margin:0 0 14px}
+#coin-recents{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(128px,1fr));
+  gap:8px;
+  max-height:168px;
+  overflow-y:auto;
+  width:100%;
+}
+.coin-recent-chip{
+  display:flex!important;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  min-height:40px;
+  width:100%;
+  padding:6px 8px 6px 10px;
+  border-radius:12px;
+  box-sizing:border-box;
+}
+.coin-recent-chip button[data-act="load"]{
+  flex:1;
+  min-width:0;
+  max-width:none!important;
+  text-align:left;
+}
+.tf-grid,.coin-tf,#bo-tf{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:6px;
+  width:100%;
+  margin:0 0 12px;
+}
+.tf-grid button,.coin-tf button,.bo-tf-btn{
+  width:100%;
+  min-width:0;
+  height:40px;
+  padding:0 4px;
+  text-align:center;
+  border:1px solid #2a3544;
+  background:#0b121a;
+  color:#9aa6b5;
+  border-radius:10px;
+  font:800 12px Inter,system-ui,sans-serif;
+  cursor:pointer;
+}
+.tf-grid button.on,.coin-tf button.on,.bo-tf-btn.on{
+  background:rgba(98,227,160,.28)!important;
+  color:#f4f7fb!important;
+  border-color:rgba(98,227,160,.45)!important;
+}
+.tool-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.tool-actions button{height:40px;padding:0 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#e8eef6;font:800 12px Inter,system-ui,sans-serif;cursor:pointer}
+#hu-list,#bo-list{display:flex;flex-direction:column;gap:10px}
+@media(max-width:420px){
+  .tf-grid,.coin-tf,#bo-tf{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .tab{padding:0 10px;font-size:11px;height:36px}
+}
 
 
 
@@ -500,8 +577,8 @@
 
 
 </main></div>
-<script src="overview-app.js?v=20260914-hunt1"></script>
-<script src="breakout-tab.js?v=20260914-al1"></script>
+<script src="overview-app.js?v=20260914-ui1"></script>
+<script src="breakout-tab.js?v=20260914-ui1"></script>
 <script src="hunter-tab.js?v=20260914-h4"></script>
 </div>
 
@@ -544,23 +621,25 @@
     <span class="source" id="bo-source">—</span>
   </div>
   <div class="card">
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
-      <div id="bo-tf" style="display:flex;gap:6px;flex-wrap:wrap">
-        <button type="button" data-botf="1m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1m</button>
-        <button type="button" data-botf="5m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('5m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">5m</button>
-        <button type="button" data-botf="10m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('10m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">10m</button>
-        <button type="button" data-botf="15m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('15m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">15m</button>
-        <button type="button" data-botf="30m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('30m')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">30m</button>
-        <button type="button" data-botf="1h" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1h')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1H</button>
-        <button type="button" data-botf="2h" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('2h')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">2H</button>
-        <button type="button" data-botf="4h" class="bo-tf-btn on" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('4h')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">4H</button>
-        <button type="button" data-botf="1d" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1d')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1D</button>
-        <button type="button" data-botf="1w" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1w')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">1W</button>
+    <div class="tool-stack">
+      <div id="bo-tf" class="tf-grid">
+        <button type="button" data-botf="1m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1m')}catch(e){}">1m</button>
+        <button type="button" data-botf="5m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('5m')}catch(e){}">5m</button>
+        <button type="button" data-botf="10m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('10m')}catch(e){}">10m</button>
+        <button type="button" data-botf="15m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('15m')}catch(e){}">15m</button>
+        <button type="button" data-botf="30m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('30m')}catch(e){}">30m</button>
+        <button type="button" data-botf="1h" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1h')}catch(e){}">1H</button>
+        <button type="button" data-botf="2h" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('2h')}catch(e){}">2H</button>
+        <button type="button" data-botf="4h" class="bo-tf-btn on" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('4h')}catch(e){}">4H</button>
+        <button type="button" data-botf="1d" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1d')}catch(e){}">1D</button>
+        <button type="button" data-botf="1w" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1w')}catch(e){}">1W</button>
       </div>
-      <button type="button" onclick="try{window.scanBreakoutMemes&&window.scanBreakoutMemes()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Scan saved CAs</button>
-      <button type="button" id="bo-live-btn" onclick="try{window.toggleBreakoutLive&&window.toggleBreakoutLive()}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Live watch ON</button>
-      <button type="button" onclick="try{window.pingBreakoutTelegram&&window.pingBreakoutTelegram()}catch(e){alert(e)}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">Test Telegram</button>
+      <div class="tool-actions">
+      <button type="button" onclick="try{window.scanBreakoutMemes&&window.scanBreakoutMemes()}catch(e){alert(e)}">Scan saved CAs</button>
+      <button type="button" id="bo-live-btn" onclick="try{window.toggleBreakoutLive&&window.toggleBreakoutLive()}catch(e){}">Live watch ON</button>
+      <button type="button" onclick="try{window.pingBreakoutTelegram&&window.pingBreakoutTelegram()}catch(e){alert(e)}">Test Telegram</button>
       <span id="bo-status" style="font-size:12px;color:#8491a1">DexScreener · saved CAs</span>
+      </div>
     </div>
     <div style="font-size:11px;color:#8491a1;margin-bottom:10px;line-height:1.45"><b style="color:#e6c878">EARLY</b> = close to a break, not broken. <b style="color:#62e3a0">LIVE</b> = happened now. <b style="color:#6eb6ff">MATURED</b> = already happened. Quiet coins stay off this page. Phone pings only on LIVE.</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
@@ -625,7 +704,7 @@
       <div id="coin-recents-status" style="font-size:11px;color:#8491a1;margin:0 0 8px;line-height:1.35;word-break:break-word"></div>
       <div id="coin-recents" style="display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto;width:100%"></div>
     </div>
-    <div class="coin-tf" id="coin-tf" style="flex-wrap:wrap">
+    <div class="coin-tf" id="coin-tf">
       <button type="button" data-ctf="1m" onclick="try{window.setCoinTF&&window.setCoinTF('1m')}catch(e){}">1m</button>
       <button type="button" data-ctf="5m" onclick="try{window.setCoinTF&&window.setCoinTF('5m')}catch(e){}">5m</button>
       <button type="button" data-ctf="10m" onclick="try{window.setCoinTF&&window.setCoinTF('10m')}catch(e){}">10m</button>
@@ -698,5 +777,5 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 
-<script src="site-nav.js?v=20260912-fix1"></script>
+<script src="site-nav.js?v=20260914-ui1"></script>
 </body></html>
