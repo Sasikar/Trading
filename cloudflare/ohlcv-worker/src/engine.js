@@ -138,35 +138,37 @@ export async function fetchWatchlist(url) {
 
 export async function fetchDexPair(ca) {
   const path = '/latest/dex/tokens/' + encodeURIComponent(ca);
-  try {
-    const j = await fetchJSON('https://api.dexscreener.com' + path, 1);
-    return j.pairs || [];
-  } catch (e) {
-    const j = await fetchJSON(
-      'https://trading-proxy.sasipudi.workers.dev/dex?path=' + encodeURIComponent(path),
-      1
-    );
-    return j.pairs || [];
-  }
+  const j = await fetchJSON('https://api.dexscreener.com' + path, 1);
+  return j.pairs || [];
 }
 
-export async function fetchDexPairsForCas(cas, conc = 2) {
+/** One Dex HTTP call per chunk (not per coin). Proxy is skipped — it 429s. */
+export async function fetchDexPairsForCas(cas, chunkSize = 12) {
   const uniq = [...new Set((cas || []).map((c) => String(c || '').trim()).filter(Boolean))];
   const byCa = new Map();
-  for (let i = 0; i < uniq.length; i += conc) {
-    const chunk = uniq.slice(i, i + conc);
-    const parts = await Promise.all(
-      chunk.map(async (ca) => {
-        try {
-          return [ca, await fetchDexPair(ca)];
-        } catch (e) {
-          return [ca, e];
-        }
-      })
-    );
-    for (const [ca, val] of parts) byCa.set(ca, val);
-    if (i + conc < uniq.length) await sleep(400);
+  let calls = 0;
+  for (let i = 0; i < uniq.length; i += chunkSize) {
+    const chunk = uniq.slice(i, i + chunkSize);
+    const path = '/latest/dex/tokens/' + chunk.map(encodeURIComponent).join(',');
+    calls++;
+    try {
+      const j = await fetchJSON('https://api.dexscreener.com' + path, 1);
+      const pairs = j.pairs || [];
+      for (const ca of chunk) {
+        const caL = ca.toLowerCase();
+        const mine = pairs.filter((p) => {
+          const b = String((p.baseToken && p.baseToken.address) || '').toLowerCase();
+          const q = String((p.quoteToken && p.quoteToken.address) || '').toLowerCase();
+          return b === caL || q === caL;
+        });
+        byCa.set(ca, mine);
+      }
+    } catch (e) {
+      for (const ca of chunk) byCa.set(ca, e);
+    }
+    if (i + chunkSize < uniq.length) await sleep(450);
   }
+  byCa.calls = calls;
   return byCa;
 }
 
@@ -478,38 +480,33 @@ export function hitFrom(row, tick, det, tf, focus) {
   };
 }
 
+export function nextUtcMidnight(now) {
+  const d = new Date(now || Date.now());
+  d.setUTCHours(24, 0, 0, 0);
+  return d.getTime();
+}
+
 export async function sendNtfy(topic, title, message) {
-  const topics = [
-    ...new Set(
-      [topic, NTFY_DEFAULT, ...NTFY_TOPICS_EXTRA]
-        .map((t) => String(t || '').trim())
-        .filter(Boolean)
-    )
-  ];
-  let lastErr = null;
-  let ok = 0;
-  for (let i = 0; i < topics.length; i++) {
-    const t = topics[i];
-    if (i) await sleep(700);
+  const t = String(topic || NTFY_DEFAULT).trim() || NTFY_DEFAULT;
+  const r = await fetch('https://ntfy.sh/' + encodeURIComponent(t), {
+    method: 'POST',
+    headers: {
+      Title: String(title || '').slice(0, 90),
+      Priority: 'high',
+      Tags: 'chart_with_upwards_trend,moneybag'
+    },
+    body: title + '\n' + message
+  });
+  if (r.status === 429) {
+    let extra = '';
     try {
-      const r = await fetch('https://ntfy.sh/' + encodeURIComponent(t), {
-        method: 'POST',
-        headers: {
-          Title: String(title || '').slice(0, 90),
-          Priority: 'high',
-          Tags: 'chart_with_upwards_trend,moneybag'
-        },
-        body: title + '\n' + message
-      });
-      if (r.status === 429) throw new Error('HTTP 429 ntfy.sh');
-      if (!r.ok) throw new Error('HTTP ' + r.status + ' ntfy.sh');
-      ok++;
-    } catch (e) {
-      lastErr = e;
-    }
+      extra = await r.text();
+    } catch (e) {}
+    if (/daily|quota/i.test(extra)) throw new Error('NTFY_DAILY_QUOTA');
+    throw new Error('HTTP 429 ntfy.sh');
   }
-  if (!ok && lastErr) throw lastErr;
-  return { ok };
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' ntfy.sh');
+  return { ok: 1 };
 }
 
 /* ---------- stores ---------- */
@@ -619,9 +616,12 @@ export class Engine {
     // Fresh ticks in the DB means a previous poll worked — don't keep a
     // leftover 429 pause from ntfy or a single Dex blip.
     if (lastScanned > 0 && Date.now() - lastPoll < 180000) this.rateLimitedUntil = 0;
-    if (/ntfy/i.test(this.lastErr)) {
+    if (/ntfy/i.test(this.lastErr) || /NTFY_/.test(this.lastErr)) {
       this.ntfyErr = this.ntfyErr || this.lastErr;
       this.lastErr = '';
+    }
+    if (/quota|daily/i.test(this.ntfyErr) && !this.ntfyPausedUntil()) {
+      this.store.setMeta('ntfy_paused_until', String(nextUtcMidnight()));
     }
   }
 
@@ -630,6 +630,24 @@ export class Engine {
   }
   watchUrl() {
     return this.env.WATCHLIST_URL || WATCHLIST_DEFAULT;
+  }
+  ntfyPausedUntil() {
+    return +this.store.getMeta('ntfy_paused_until') || 0;
+  }
+  ntfyPaused(now) {
+    now = now || Date.now();
+    return now < this.ntfyPausedUntil();
+  }
+  markNtfyFail(err) {
+    const msg = String(err && err.message ? err.message : err);
+    if (msg === 'NTFY_DAILY_QUOTA' || /daily|quota/i.test(msg)) {
+      const until = nextUtcMidnight();
+      this.store.setMeta('ntfy_paused_until', String(until));
+      this.ntfyErr = 'Phone alerts paused until midnight UTC — ntfy.sh free daily limit is used up. Dashboard stays live.';
+    } else {
+      this.ntfyErr = msg;
+    }
+    this.store.setMeta('ntfy_err', this.ntfyErr);
   }
 
   dexCallsLastMin(now) {
@@ -686,14 +704,14 @@ export class Engine {
 
   shouldNtfy(hit, tf, focus) {
     if (hit.state === 'WARMING' || hit.state === 'WATCH') return false;
+    if (this.ntfyPaused()) return false;
     if (tf === '1m') {
       if (!hit.focus) return false;
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
       return hit.fresh && hit.event === 'NEW BREAKOUT';
     }
-    // Live Dex labels are display-only except 5m and 4h — otherwise one hot
-    // coin fires 1h+2h+4h+5m at once and ntfy.sh 429s.
-    if (hit.live && tf !== '5m' && tf !== '4h') return false;
+    // One phone ping per coin — live 4h only. 5m/1h/2h show on the cards.
+    if (hit.live && tf !== '4h') return false;
     if (tf === '5m' || tf === '10m') {
       return hit.fresh && hit.event === 'NEW BREAKOUT' && hit.score >= 55;
     }
@@ -702,14 +720,14 @@ export class Engine {
 
   async maybeAlert(hit, tf) {
     if (!this.shouldNtfy(hit, tf)) return false;
-    const key = hit.ca + '|' + tf + '|' + hit.event;
     const now = Date.now();
-    if (now - this.store.getAlert(key) < this.cooldownMs(tf)) return false;
+    const key = tf === '1m' ? hit.ca.toLowerCase() + '|1m' : hit.ca.toLowerCase() + '|coin';
+    if (now - this.store.getAlert(key) < this.cooldownMs(tf === '1m' ? '1m' : '4h')) return false;
     const title = '🚀 ' + hit.name + ' · ' + String(tf).toUpperCase() + ' breakout';
     const msg = [
       hit.name + ' (' + (hit.chain === 'solana' ? 'SOL' : 'ETH') + ')',
       'Event: ' + hit.event + ' · ' + hit.state + ' · score ' + hit.score,
-      'TF ' + tf + (hit.warming ? ' · warming' : ''),
+      'TF ' + tf,
       '5m ' + hit.m5 + '% · 1h ' + hit.h1 + '% · vol ' + hit.volX + 'x',
       'CA: ' + hit.ca,
       'https://sasikar.github.io/Trading/index.html?tab=breakouts'
@@ -733,11 +751,8 @@ export class Engine {
       );
       return true;
     } catch (e) {
-      // Still cooldown so a 429 does not get retried every 20s (that is what
-      // keeps ntfy.sh angry).
       this.store.setAlert(key, now);
-      this.ntfyErr = String(e && e.message ? e.message : e);
-      this.store.setMeta('ntfy_err', this.ntfyErr);
+      this.markNtfyFail(e);
       return false;
     }
   }
@@ -827,9 +842,12 @@ export class Engine {
       pollMs: now - lastPoll,
       candidates: watch.length,
       dexCallsLastMin: this.dexCallsLastMin(now),
-      dexBudget: 120,
-      error: this.lastErr || this.ntfyErr || '',
-      ntfyError: this.ntfyErr || '',
+      dexBudget: 30,
+      error: this.lastErr || '',
+      ntfyError: this.ntfyPaused(now)
+        ? this.ntfyErr || 'Phone alerts paused until midnight UTC (ntfy free daily limit)'
+        : this.ntfyErr || '',
+      ntfyPaused: this.ntfyPaused(now),
       lastAlert,
       topScores: tops,
       watch: watch.map((w) => ({ ca: w.ca, name: w.name, chain: w.chain }))
@@ -873,7 +891,8 @@ export class Engine {
         return { scanned: 0 };
       }
       const byCa = await fetchDexPairsForCas(targets.map((r) => r.ca));
-      for (let i = 0; i < targets.length; i++) this.dexCallsMin.push(now);
+      const nCalls = byCa.calls || 1;
+      for (let i = 0; i < nCalls; i++) this.dexCallsMin.push(now);
 
       for (const row of targets) {
         const got = byCa.get(row.ca);
@@ -995,8 +1014,25 @@ export async function handleApi(engine, request) {
     return json(out);
   }
   if ((path === '/ping-ntfy' || path === '/api/ping-ntfy') && method === 'POST') {
-    await sendNtfy(engine.topic(), 'Trading · ntfy test', 'Topic ' + engine.topic() + '\nOHLCV engine is live.');
-    return json({ ok: true, topic: engine.topic() });
+    if (engine.ntfyPaused()) {
+      return json({
+        ok: false,
+        paused: true,
+        topic: engine.topic(),
+        error: engine.ntfyErr || 'ntfy daily limit — try after midnight UTC'
+      });
+    }
+    try {
+      await sendNtfy(engine.topic(), 'Trading · ntfy test', 'Topic ' + engine.topic() + '\nOHLCV engine is live.');
+      return json({ ok: true, topic: engine.topic() });
+    } catch (e) {
+      engine.markNtfyFail(e);
+      return json({
+        ok: false,
+        topic: engine.topic(),
+        error: engine.ntfyErr || String(e && e.message ? e.message : e)
+      });
+    }
   }
   if ((path === '/run' || path === '/api/run') && (method === 'POST' || method === 'GET')) {
     const out = await engine.tick('all');

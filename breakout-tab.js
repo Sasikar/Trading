@@ -209,7 +209,11 @@
         (st.focus1mAlerts ? ' · 1m alerts ON' : ' · 1m alerts off') +
         '<br>Candles live in Cloudflare. This page only reads the API.' +
         (ntfyErr
-          ? '<br><span style="color:#f0a060">Phone ping delayed: ' + ntfyErr + ' — Dex is fine, ntfy.sh is busy</span>'
+          ? '<br><span style="color:#f0a060">' +
+            (st.ntfyPaused || /quota|daily|limit/i.test(ntfyErr)
+              ? 'Phone alerts paused until midnight UTC — ntfy.sh free daily limit is used up. Cards still update.'
+              : 'Phone ping delayed: ' + ntfyErr + ' — Dex is fine') +
+            '</span>'
           : '') +
         (lastErr && !/ntfy/i.test(lastErr)
           ? '<br><span style="color:#ff6f7c">' + lastErr + '</span>'
@@ -371,7 +375,11 @@
     const hint = $('bo-ntfy-hint');
     try {
       const j = await api('/ping-ntfy', { method: 'POST' });
-      if (hint) hint.textContent = 'Test ping sent via worker to ' + (j.topic || '');
+      if (hint) {
+        if (j.paused || j.ok === false)
+          hint.textContent = j.error || 'ntfy daily limit — alerts resume after midnight UTC';
+        else hint.textContent = 'Test ping sent via worker to ' + (j.topic || '');
+      }
     } catch (e) {
       if (hint) hint.textContent = 'ntfy failed: ' + (e.message || e);
     }
