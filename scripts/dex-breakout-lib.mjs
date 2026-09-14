@@ -294,17 +294,28 @@ export function tfBreakout(pair, tf) {
 }
 
 export async function sendNtfy(topic, title, message, tags) {
-  const t = (topic || NTFY_DEFAULT_TOPIC).trim();
-  const url = 'https://ntfy.sh/' + encodeURIComponent(t);
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Title: String(title || '').slice(0, 90),
-      Priority: 'high',
-      Tags: tags || 'chart_with_upwards_trend,moneybag'
-    },
-    body: `${title}\n${message}`
-  });
-  if (!r.ok) throw new Error('ntfy HTTP ' + r.status);
-  return r.json().catch(() => ({}));
+  const topics = [...new Set([topic, NTFY_DEFAULT_TOPIC].map((t) => String(t || '').trim()).filter(Boolean))];
+  let lastErr = null;
+  let ok = 0;
+  for (const t of topics) {
+    const url = 'https://ntfy.sh/' + encodeURIComponent(t);
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: {
+          Title: String(title || '').slice(0, 90),
+          Priority: 'high',
+          Tags: tags || 'chart_with_upwards_trend,moneybag'
+        },
+        body: `${title}\n${message}`
+      });
+      if (!r.ok) throw new Error('ntfy HTTP ' + r.status + ' @' + t);
+      ok++;
+    } catch (e) {
+      lastErr = e;
+      console.warn('ntfy', t, e.message || e);
+    }
+  }
+  if (!ok && lastErr) throw lastErr;
+  return { ok };
 }

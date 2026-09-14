@@ -226,16 +226,27 @@
   }
 
   async function sendNtfy(title, message) {
-    const r = await fetch(ntfyUrl(), {
-      method: 'POST',
-      headers: {
-        Title: String(title || '').slice(0, 90),
-        Priority: 'high',
-        Tags: 'chart_with_upwards_trend,moneybag'
-      },
-      body: title + '\n' + message
-    });
-    if (!r.ok) throw new Error('ntfy HTTP ' + r.status);
+    const topics = [...new Set([NTFY_TOPIC, NTFY_FALLBACK].filter(Boolean))];
+    let ok = 0;
+    let lastErr = null;
+    for (let i = 0; i < topics.length; i++) {
+      try {
+        const r = await fetch('https://ntfy.sh/' + encodeURIComponent(topics[i]), {
+          method: 'POST',
+          headers: {
+            Title: String(title || '').slice(0, 90),
+            Priority: 'high',
+            Tags: 'chart_with_upwards_trend,moneybag'
+          },
+          body: title + '\n' + message
+        });
+        if (!r.ok) throw new Error('ntfy HTTP ' + r.status);
+        ok++;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    if (!ok && lastErr) throw lastErr;
     return true;
   }
 
