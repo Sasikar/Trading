@@ -164,6 +164,59 @@
       .join('');
   }
 
+  function emptyNote(text) {
+    return (
+      '<div style="padding:12px 14px;border-radius:12px;border:1px dashed #243041;color:#8491a1;font-size:12px">' +
+      text +
+      '</div>'
+    );
+  }
+
+  function sectionBlock(title, sub, color, items, none) {
+    return (
+      '<div style="margin-bottom:18px">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin:2px 0 8px">' +
+      '<div><span style="font-size:12px;letter-spacing:.1em;font-weight:900;color:' +
+      color +
+      '">' +
+      title +
+      '</span> <span style="font-size:11px;color:#8491a1">' +
+      sub +
+      '</span></div>' +
+      '<span style="font-size:11px;color:#8491a1;font-weight:800">' +
+      (items ? items.length : 0) +
+      '</span></div>' +
+      (items && items.length
+        ? '<div style="display:flex;flex-direction:column;gap:8px">' + renderHits(items) + '</div>'
+        : emptyNote(none)) +
+      '</div>'
+    );
+  }
+
+  function renderBoard(j) {
+    const sec = j.sections || {};
+    const hits = j.hits || [];
+    const early = sec.early || hits.filter(function (h) { return h.section === 'early'; });
+    const live = sec.live || hits.filter(function (h) { return h.section === 'live'; });
+    const matured = sec.matured || hits.filter(function (h) { return h.section === 'matured'; });
+    if (!early.length && !live.length && !matured.length) {
+      return (
+        '<div style="padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#8491a1;font-size:13px">' +
+        (breakoutTF === '1m'
+          ? '1m is focus-only. Pick a saved coin as Focus 1m.'
+          : 'Nothing close, live, or matured on ' +
+            breakoutTF.toUpperCase() +
+            '. Quiet coins are hidden.') +
+        '</div>'
+      );
+    }
+    return (
+      sectionBlock('EARLY', 'Close to break — not broken yet', '#e6c878', early, 'Nothing close to a break on this TF.') +
+      sectionBlock('LIVE', 'Happened now', '#62e3a0', live, 'No live break on this TF.') +
+      sectionBlock('MATURED', 'Already happened', '#6eb6ff', matured, 'No matured break on this TF.')
+    );
+  }
+
   function bindCardButtons() {
     document.querySelectorAll('.bo-open-ca').forEach(function (b) {
       b.onclick = function () {
@@ -291,6 +344,7 @@
                 t.name +
                 '</b> <span style="color:#8491a1">' +
                 (t.state || '') +
+                (t.section ? ' · ' + String(t.section).toUpperCase() : '') +
                 '</span></span>' +
                 '<span style="color:' +
                 c +
@@ -360,18 +414,11 @@
       if (stEl)
         stEl.textContent =
           hits.length +
-          ' coin(s) · ' +
+          ' shown · quiet coins hidden · ' +
           (st.candidates != null ? st.candidates + ' saved' : '') +
           (st.dexCallsLastMin != null ? ' · ' + st.dexCallsLastMin + '/min Dex on worker' : '');
       if (list) {
-        if (!hits.length) {
-          list.innerHTML =
-            '<div style="padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#8491a1;font-size:13px">' +
-            (breakoutTF === '1m'
-              ? '1m is focus-only. Pick a saved coin as Focus 1m.'
-              : 'No rows yet. Worker is warming the tape — 15m needs ~12 closed bars.') +
-            '</div>';
-        } else list.innerHTML = renderHits(hits);
+        list.innerHTML = renderBoard(j);
         bindCardButtons();
       }
       await loadStatus();

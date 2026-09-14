@@ -291,13 +291,21 @@ export function detectTapeBreakout(bars, tf, tick) {
     fresh = age <= 2;
     state = age <= 2 && mom.volX >= 1.3 && mom.buyR >= 0.52 ? 'STRONG CONFIRMED' : 'EARLY';
   }
+  const sittingOnHigh = rangeHigh > 0 && last.c >= rangeHigh * 0.975;
+  const pushing = last.c >= last.o || ret > 0;
+  const volBuilding = medVol > 0 ? last.vol >= 1.1 * medVol : last.vol > 0 || mom.volX >= 1.15;
+  let near = false;
+  if (!broke && !held && sittingOnHigh && pushing && volBuilding && !mom.stretched) {
+    event = 'CLOSE TO BREAK';
+    near = true;
+  }
   if (mom.stretched || runup >= 18 || ret >= 22) {
     if (held || broke) state = 'STRETCHED';
   }
   let score = mom.score;
   if (broke) score = Math.max(score, 58);
   if (state === 'STRETCHED') score = Math.max(0, score - 12);
-  const interesting = state !== 'WATCH' || fresh || held || score >= 55;
+  const interesting = state !== 'WATCH' || fresh || held || near || score >= 55;
   return {
     state,
     event,
@@ -308,6 +316,7 @@ export function detectTapeBreakout(bars, tf, tick) {
     bars: n,
     need,
     interesting,
+    near,
     ret: +ret.toFixed(2),
     runup: +runup.toFixed(2)
   };
@@ -347,6 +356,16 @@ export function detectDexTf(tick, tf) {
     }
     if (h24 >= 120) state = 'STRETCHED';
   }
+  let near = false;
+  if (event === '—' && !mom.stretched) {
+    if (tf === '1d' && h6 >= 4 && h24 >= 2 && h24 < 8 && mom.volX >= 1.1) {
+      event = 'CLOSE TO BREAK';
+      near = true;
+    } else if (tf === '1w' && h24 >= 8 && h24 < 15 && h6 > 0 && mom.volX >= 1.1) {
+      event = 'CLOSE TO BREAK';
+      near = true;
+    }
+  }
   return {
     state,
     event,
@@ -356,7 +375,8 @@ export function detectDexTf(tick, tf) {
     score: mom.score,
     bars: 0,
     need: 0,
-    interesting: state !== 'WATCH' || fresh || held || mom.score >= 55
+    near,
+    interesting: state !== 'WATCH' || fresh || held || near || mom.score >= 55
   };
 }
 
@@ -383,6 +403,11 @@ export function detectLegacy4h(tick) {
     age = h6 >= 25 ? 3 : 1;
     state = h1 >= 6 && mom.volX >= 1.3 && mom.buyR >= 0.52 ? 'STRONG CONFIRMED' : 'EARLY';
   }
+  let near = false;
+  if (event === '—' && m5 >= 1.2 && h1 >= 0 && mom.volX >= 1.15 && !mom.stretched) {
+    event = 'CLOSE TO BREAK';
+    near = true;
+  }
   if (mom.stretched && (h1 > 5 || h6 > 40)) state = 'STRETCHED';
   let score = mom.score;
   if (state === 'STRETCHED') score = Math.max(0, score - 12);
@@ -395,7 +420,8 @@ export function detectLegacy4h(tick) {
     score: Math.max(0, Math.min(100, Math.round(score))),
     bars: 0,
     need: 0,
-    interesting: state !== 'WATCH' || fresh || held || score >= 55,
+    interesting: state !== 'WATCH' || fresh || held || near || score >= 55,
+    near,
     live: true
   };
 }
@@ -422,6 +448,11 @@ export function detectLive5m(tick) {
     age = 1;
     state = mom.volX >= 1.3 && mom.buyR >= 0.52 ? 'STRONG CONFIRMED' : 'EARLY';
   }
+  let near = false;
+  if (event === '—' && m5 >= 1.8 && m5 < 4 && mom.volX >= 1.15 && !mom.stretched) {
+    event = 'CLOSE TO BREAK';
+    near = true;
+  }
   if (mom.stretched && m5 >= 8) state = 'STRETCHED';
   let score = mom.score;
   if (state === 'STRETCHED') score = Math.max(0, score - 12);
@@ -434,7 +465,8 @@ export function detectLive5m(tick) {
     score: Math.max(0, Math.min(100, Math.round(score))),
     bars: 0,
     need: 0,
-    interesting: state !== 'WATCH' || fresh || held || score >= 55,
+    interesting: state !== 'WATCH' || fresh || held || near || score >= 55,
+    near,
     live: true
   };
 }
@@ -474,10 +506,13 @@ export function describeWhy(tf, det, tick) {
     if (tf === '5m') {
       if (m5 >= 4 && mom.volX >= 1.5) reasons.push('Rule hit: Dex 5m ≥ +4% and volume ≥ 1.5x usual 5m');
       else if (m5 >= 2 && h1 > 0) reasons.push('Rule hit: Dex 5m still ≥ +2% and 1h is green — treated as held');
+      else if (det.near) reasons.push('Rule: Dex 5m is lifting but still below +4% / 1.5x — close, not broken');
     } else if (m5 >= 3 && h1 >= 2 && mom.volX >= 1.5) {
       reasons.push('Rule hit: Dex 5m ≥ +3%, 1h ≥ +2%, volume ≥ 1.5x');
     } else if (h1 > 0 && h6 >= 8) {
       reasons.push('Rule hit: 1h still green and 6h ≥ +8% — move is holding, not brand new');
+    } else if (det.near) {
+      reasons.push('Rule: Dex 5m/1h lifting but not a full live break yet — close to break');
     }
   } else if (TF_SEC[tf]) {
     reasons.push('This is our ' + tfu + ' candle vs the recent high — not “Dex 5m is pumping”');
@@ -497,7 +532,12 @@ export function describeWhy(tf, det, tick) {
   else reasons.push('Not stretched yet (6h ' + pctStr(h6) + ' · 24h ' + pctStr(h24) + ')');
 
   let why;
-  if (det.event === 'NEW BREAKOUT' && det.live) {
+  if (det.near || det.event === 'CLOSE TO BREAK') {
+    why =
+      'Not broken yet. Sitting close to the recent ' +
+      tfu +
+      ' high with volume building. This is the EARLY watch list — track it, do not treat as a live break.';
+  } else if (det.event === 'NEW BREAKOUT' && det.live) {
     why =
       'EARLY live read: Dex shows a fresh pop with volume on this timeframe. Not confirmed — first push only.';
   } else if (det.event === 'NEW BREAKOUT') {
@@ -514,6 +554,19 @@ export function describeWhy(tf, det, tick) {
     if (!reasons.length) reasons.push('Dex 5m ' + pctStr(m5) + ' · 1h ' + pctStr(h1) + ' · vol ' + mom.volX + 'x');
   }
   return { why, reasons };
+}
+
+/** Display buckets. Quiet coins get ''. Pages only paint non-empty sections. */
+export function classifySection(det) {
+  if (!det || det.state === 'WARMING') return '';
+  const event = det.event || '';
+  const state = det.state || '';
+  const age = det.age == null ? 99 : det.age;
+  if (det.near || event === 'CLOSE TO BREAK') return 'early';
+  if (state === 'STRETCHED') return 'matured';
+  if (event === 'NEW BREAKOUT' && (det.fresh || age <= 1)) return 'live';
+  if (event === 'BREAKOUT HELD' || state === 'STRONG CONFIRMED' || event === 'NEW BREAKOUT') return 'matured';
+  return '';
 }
 
 export function hitFrom(row, tick, det, tf, focus) {
@@ -549,6 +602,8 @@ export function hitFrom(row, tick, det, tf, focus) {
     dexUrl: tick ? tick.dexUrl : '',
     pairAddress: tick ? tick.pairAddress : row.poolAddress || '',
     live: !!det.live,
+    near: !!det.near,
+    section: classifySection(det),
     why: expl.why,
     reasons: expl.reasons
   };
@@ -887,7 +942,7 @@ export class Engine {
   }
 
   shouldAlert(hit, tf) {
-    if (hit.state === 'WARMING' || hit.state === 'WATCH') return false;
+    if (hit.state === 'WARMING' || hit.state === 'WATCH' || hit.section === 'early') return false;
     if (tf === '1m') {
       if (!hit.focus) return false;
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
@@ -1011,7 +1066,9 @@ export class Engine {
     const rows = this.store.getWatch();
     let hits = rows.map((r) => this.evaluateRow(r, tfn, focus));
     if (tfn === '1m') hits = hits.filter((h) => h.focus);
-    hits.sort((a, b) => (b.score || 0) - (a.score || 0));
+    hits = hits.filter((h) => h.section);
+    const rank = { early: 0, live: 1, matured: 2 };
+    hits.sort((a, b) => (rank[a.section] ?? 9) - (rank[b.section] ?? 9) || (b.score || 0) - (a.score || 0));
     return hits;
   }
 
@@ -1035,6 +1092,7 @@ export class Engine {
     const watch = this.store.getWatch();
     const tops = watch
       .map((r) => this.evaluateRow(r, '4h', this.store.getMeta('focus_ca') || ''))
+      .filter((h) => h.section)
       .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, 8)
       .map((h) => ({
@@ -1043,6 +1101,7 @@ export class Engine {
         state: h.state,
         score: h.score,
         event: h.event,
+        section: h.section,
         ret1: h.m5
       }));
     return {
@@ -1225,11 +1284,17 @@ export async function handleApi(engine, request) {
     const tf = (url.searchParams.get('tf') || '4h').toLowerCase();
     const hits = engine.snapshot(tf);
     const st = engine.status();
+    const sections = {
+      early: hits.filter((h) => h.section === 'early'),
+      live: hits.filter((h) => h.section === 'live'),
+      matured: hits.filter((h) => h.section === 'matured')
+    };
     return json({
       tf,
       updated: new Date().toISOString(),
       status: st,
       hits,
+      sections,
       count: hits.length
     });
   }
