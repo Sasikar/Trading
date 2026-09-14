@@ -40,9 +40,11 @@
     try {
       const ms = Date.now() - new Date(iso).getTime();
       if (!isFinite(ms) || ms < 0) return '';
-      const m = Math.round(ms / 60000);
-      if (m < 1) return 'just now';
-      if (m < 60) return m + ' min ago';
+      const s = Math.round(ms / 1000);
+      if (s < 10) return 'just now';
+      if (s < 60) return s + 's ago';
+      const m = Math.round(s / 60);
+      if (m < 60) return m + 'm ago';
       return Math.round(m / 60) + 'h ago';
     } catch (e) {
       return '';
@@ -310,8 +312,7 @@
     if (metaEl) {
       metaEl.innerHTML =
         'Last poll: ' +
-        (st.lastPoll || '—') +
-        (st.lastPoll ? ' · ' + fmtAgo(st.lastPoll) : '') +
+        (st.lastPoll ? fmtAgo(st.lastPoll) || 'just now' : '—') +
         ' · CAs ' +
         (st.candidates != null ? st.candidates : '—') +
         '<br>Telegram <b style="color:#e8eef6">@' +
