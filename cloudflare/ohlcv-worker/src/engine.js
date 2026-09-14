@@ -221,8 +221,9 @@ export function hunterPass(tick, pair, now) {
     const revival = (tick.m5 || 0) >= 4 && (tick.h1 || 0) >= 2 && mom.volX >= 1.5;
     if (!young && !revival) return false;
   }
-  if ((tick.m5 || 0) <= 0 || (tick.h1 || 0) <= 0) return false;
-  if ((tick.vol5m || 0) < 300) return false;
+  if ((tick.m5 || 0) <= 0.5) return false;
+  if ((tick.h1 || 0) < -3) return false;
+  if ((tick.vol5m || 0) < 150) return false;
   const n = (tick.buys5m || 0) + (tick.sells5m || 0);
   if (n >= 8 && tick.buys5m < tick.sells5m) return false;
   if (mom.stretched) return false;
@@ -1397,11 +1398,18 @@ export class Engine {
     calls += byCa.calls || 0;
     for (let i = 0; i < (byCa.calls || 0); i++) this.dexCallsMin.push(now);
     const hits = [];
+    let miss = 0;
     for (const s of uniq) {
       const got = byCa.get(s.ca);
-      if (!got || got instanceof Error) continue;
+      if (!got || got instanceof Error) {
+        miss++;
+        continue;
+      }
       const pair = pickBestPair(got, s.chain || 'solana', s.ca);
-      if (!pair) continue;
+      if (!pair) {
+        miss++;
+        continue;
+      }
       const row = { ca: s.ca, chain: pair.chainId || 'solana', name: (pair.baseToken && pair.baseToken.symbol) || s.ca.slice(0, 6), poolAddress: pair.pairAddress || '' };
       const tick = pairToTick(pair, row, now);
       if (!hunterPass(tick, pair, now)) continue;
@@ -1433,7 +1441,7 @@ export class Engine {
     this.store.setMeta('hunter_err', '');
     this.dexCallsLastMin(now);
     this.store.setMeta('dex_calls_min', JSON.stringify(this.dexCallsMin));
-    return { hits: top.length, calls, discover: doDiscover };
+    return { hits: top.length, calls, discover: doDiscover, seeded: uniq.length, matched: hits.length, miss };
   }
 
   async tick(mode) {
