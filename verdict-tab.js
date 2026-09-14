@@ -38,18 +38,71 @@
   }
 
   function fillSelect(coins) {
-    const sel = $('vd-ca');
-    if (!sel) return;
-    const cur = selected || sel.value;
-    sel.innerHTML =
-      '<option value="">Pick a saved coin</option>' +
-      (coins || [])
-        .map(function (c) {
-          const lab = (c.name || c.ca.slice(0, 6)) + ' · ' + String(c.chain || '').replace('solana', 'SOL').replace('ethereum', 'ETH').replace('robinhood', 'HOOD');
-          return '<option value="' + esc(c.ca) + '"' + (c.ca === cur ? ' selected' : '') + '>' + esc(lab) + '</option>';
-        })
-        .join('');
-    if (cur) sel.value = cur;
+    const box = $('vd-coins');
+    if (!box) return;
+    const list = coins || [];
+    if (!list.length) {
+      box.innerHTML = '<div style="font-size:12px;color:#8491a1">No saved CAs yet.</div>';
+      return;
+    }
+    box.innerHTML = list
+      .map(function (c) {
+        const chainLab = String(c.chain || '')
+          .replace('solana', 'SOL')
+          .replace('ethereum', 'ETH')
+          .replace('robinhood', 'HOOD')
+          .toUpperCase();
+        const on = selected && c.ca.toLowerCase() === selected.toLowerCase();
+        return (
+          '<button type="button" class="vd-chip' +
+          (on ? ' on' : '') +
+          '" data-vd-ca="' +
+          esc(c.ca) +
+          '">' +
+          esc(c.name || c.ca.slice(0, 6)) +
+          ' <span>' +
+          esc(chainLab || 'SOL') +
+          '</span></button>'
+        );
+      })
+      .join('');
+    box.querySelectorAll('[data-vd-ca]').forEach(function (b) {
+      b.onclick = function () {
+        selected = b.getAttribute('data-vd-ca') || '';
+        load();
+      };
+    });
+  }
+
+  async function localCoins() {
+    const out = [];
+    const seen = new Set();
+    function add(c) {
+      if (!c || !c.ca) return;
+      const k = String(c.ca).toLowerCase();
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push({ ca: c.ca, name: c.name || c.base || c.ca.slice(0, 6), chain: c.chain || 'solana' });
+    }
+    try {
+      const loc = JSON.parse(localStorage.getItem('ca_recents_v1') || '[]');
+      (Array.isArray(loc) ? loc : loc.items || []).forEach(add);
+    } catch (e) {}
+    try {
+      const r = await fetch('data/ca-recents.json', { cache: 'no-store' });
+      const j = await r.json();
+      (j.items || j || []).forEach(add);
+    } catch (e) {}
+    return out;
+  }
+
+  function capMsg() {
+    return 'Engine blocked until 5:30 AM IST — Cloudflare daily write cap. HOLD / EXIT comes back after reset. Saved coins still listed.';
+  }
+
+  function looksBlocked(err) {
+    const s = String(err || '');
+    return /1101|500|Failed to fetch|NetworkError|DO|durable|limit|blocked/i.test(s);
   }
 
   function card(h) {
@@ -142,14 +195,29 @@
     if (busy) return;
     busy = true;
     const st = $('vd-status');
+    const box = $('vd-board');
     try {
       const j = await api('/verdict' + (selected ? '?ca=' + encodeURIComponent(selected) : ''));
-      fillSelect(j.coins || []);
+      fillSelect(j.coins && j.coins.length ? j.coins : await localCoins());
       render(j);
-      if (st) st.textContent = j.verdict ? j.verdict.name + ' · from saved list' : (j.coins || []).length + ' saved coins';
+      if (st) {
+        st.style.color = '';
+        st.textContent = j.verdict ? j.verdict.name + ' · from saved list' : (j.coins || []).length + ' saved coins';
+      }
       if (j.error && st) st.textContent = j.error;
     } catch (e) {
-      if (st) st.textContent = String(e.message || e);
+      const coins = await localCoins();
+      fillSelect(coins);
+      if (st) {
+        st.style.color = '#e6c878';
+        st.textContent = looksBlocked(e) ? 'BLOCKED TILL 5:30 AM IST' : String(e.message || e);
+      }
+      if (box)
+        box.innerHTML =
+          '<div class="vd-banner">' +
+          (looksBlocked(e) ? capMsg() : esc(String(e.message || e))) +
+          (selected ? '<div style="margin-top:8px;color:#c5d0dc">Selected ' + esc(selected.slice(0, 6)) + '… — no live tape until the engine is back.</div>' : '') +
+          '</div>';
     }
     busy = false;
   }
@@ -186,7 +254,7 @@
         const onp = $('verdict-panel');
         if (!onp || onp.style.display === 'none') return;
         load();
-      }, 20000);
+      }, 120000);
     } else {
       if (p) {
         p.style.display = 'none';
@@ -200,12 +268,6 @@
   }
 
   window.showVerdict = showVerdict;
-
-  document.addEventListener('change', function (ev) {
-    if (!ev.target || ev.target.id !== 'vd-ca') return;
-    selected = ev.target.value || '';
-    load();
-  });
 
   const tabs = document.getElementById('tf-tabs');
   if (tabs) {
