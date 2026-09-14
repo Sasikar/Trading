@@ -73,6 +73,15 @@
                   : '#c5d0dc';
         const chainLab = h.chain === 'solana' ? 'SOL' : String(h.chain || '').toUpperCase();
         const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
+        const tfu = String(h.tf || '').toUpperCase();
+        const tfTag =
+          tfu
+            ? ' <b style="color:#e8eef6;font-weight:900">(' +
+              tfu +
+              (h.live ? ' live' : '') +
+              ')</b>'
+            : '';
+        const freshBreak = !!(h.fresh && String(h.event || '').toUpperCase().indexOf('BREAKOUT') >= 0);
         const tape =
           h.warming && h.need
             ? 'tape ' + (h.bars || 0) + '/' + h.need + ' bars'
@@ -93,9 +102,12 @@
           '">' +
           h.state +
           (h.score != null ? ' · ' + h.score : '') +
+          tfTag +
           '</div></div>' +
           '<div style="margin-top:6px;font-size:12px;color:#c5d0dc;line-height:1.45">' +
-          h.event +
+          (freshBreak
+            ? '<b style="color:#e6c878;font-weight:900">' + h.event + ' (' + tfu + (h.live ? ' live' : '') + ')</b>'
+            : h.event + tfTag) +
           ' · age ' +
           (h.age != null ? h.age : '—') +
           ' · ' +
@@ -257,6 +269,7 @@
           (la.tf || '') +
           ' · ' +
           (la.event || la.state || '') +
+          (la.tf ? ' <b style="color:#e6c878">(' + String(la.tf).toUpperCase() + ')</b>' : '') +
           ' · score ' +
           (la.score != null ? la.score : '—') +
           (la.at ? ' · ' + fmtAgo(la.at) : '');

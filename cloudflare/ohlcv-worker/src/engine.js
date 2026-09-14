@@ -911,10 +911,11 @@ export class Engine {
     const now = Date.now();
     const key = tf === '1m' ? hit.ca.toLowerCase() + '|1m' : hit.ca.toLowerCase() + '|coin';
     if (now - this.store.getAlert(key) < this.cooldownMs(tf === '1m' ? '1m' : '4h')) return false;
-    const title = '🚀 ' + hit.name + ' · ' + String(tf).toUpperCase() + ' · ' + hit.event;
+    const tfu = String(tf).toUpperCase() + (hit.live ? ' live' : '');
+    const title = '🚀 ' + hit.name + ' · ' + hit.event + ' (' + tfu + ')';
     const msg = [
       hit.name + ' (' + (hit.chain === 'solana' ? 'SOL' : 'ETH') + ')',
-      hit.state + ' · score ' + hit.score + '/100 · TF ' + String(tf).toUpperCase(),
+      hit.state + ' · score ' + hit.score + '/100 · TF (' + tfu + ')',
       '',
       'Why it fired',
       hit.why || 'Range break on ' + tf,
