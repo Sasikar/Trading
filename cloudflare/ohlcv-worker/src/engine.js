@@ -212,6 +212,7 @@ export function hunterLinks(ca, chain) {
 
 export function hunterPass(tick, pair, now) {
   if ((tick.liq || 0) < 15000) return false;
+  if ((tick.liq || 0) > 3000000) return false;
   const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
   const mom = momentumFromTick(tick);
   if (created) {
@@ -235,32 +236,42 @@ export async function fetchHunterSeeds() {
   const seeds = [];
   const boosted = new Set();
   let calls = 0;
-  const push = (ca, chain, src, isBoost) => {
+  const skipBase = new Set([
+    'so11111111111111111111111111111111111111112',
+    'epjfwdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v',
+    'es9vmfrzacermjfrf4h2fyd4kconky11mcce8benwnyb',
+    'usd1ttgy1n9kd0ha3m4vf4xtw6y9ydefb7niascszpc'
+  ]);
+  const push = (ca, chain, src, isBoost, pair) => {
     const a = String(ca || '').trim();
     if (!a) return;
+    if (skipBase.has(a.toLowerCase())) return;
     if (isBoost) boosted.add(a.toLowerCase());
-    seeds.push({ ca: a, chain: chain || 'solana', boosted: !!isBoost, src });
+    seeds.push({ ca: a, chain: chain || 'solana', boosted: !!isBoost, src, pair: pair || null });
   };
+  for (const q of ['pump', 'SOL']) {
+    try {
+      calls++;
+      const s = await fetchJSON('https://api.dexscreener.com/latest/dex/search?q=' + encodeURIComponent(q), 1);
+      for (const p of s.pairs || []) {
+        if (!p || p.chainId !== 'solana') continue;
+        const ca = p.baseToken && p.baseToken.address;
+        push(ca, 'solana', 'search', false, p);
+      }
+    } catch (e) {}
+  }
   try {
     calls++;
     const prof = await fetchJSON('https://api.dexscreener.com/token-profiles/latest/v1', 1);
     for (const p of prof || []) {
-      if (String(p.chainId || '').toLowerCase() === 'solana') push(p.tokenAddress, 'solana', 'profile', false);
+      if (String(p.chainId || '').toLowerCase() === 'solana') push(p.tokenAddress, 'solana', 'profile', false, null);
     }
   } catch (e) {}
   try {
     calls++;
     const b = await fetchJSON('https://api.dexscreener.com/token-boosts/latest/v1', 1);
     for (const p of b || []) {
-      if (String(p.chainId || '').toLowerCase() === 'solana') push(p.tokenAddress, 'solana', 'boost', true);
-    }
-  } catch (e) {}
-  try {
-    calls++;
-    const s = await fetchJSON('https://api.dexscreener.com/latest/dex/search?q=solana', 1);
-    for (const p of (s.pairs || []).slice(0, 40)) {
-      if (p && p.chainId === 'solana' && p.baseToken && p.baseToken.address)
-        push(p.baseToken.address, 'solana', 'search', false);
+      if (String(p.chainId || '').toLowerCase() === 'solana') push(p.tokenAddress, 'solana', 'boost', true, null);
     }
   } catch (e) {}
   for (const s of seeds) if (boosted.has(s.ca.toLowerCase())) s.boosted = true;
@@ -1394,18 +1405,25 @@ export class Engine {
       seen.add(k);
       uniq.push(s);
     }
-    const byCa = await fetchDexPairsForCas(uniq.map((s) => s.ca), 12);
+    const needFetch = uniq.filter((s) => !s.pair);
+    const byCa = await fetchDexPairsForCas(
+      needFetch.map((s) => s.ca),
+      12
+    );
     calls += byCa.calls || 0;
     for (let i = 0; i < (byCa.calls || 0); i++) this.dexCallsMin.push(now);
     const hits = [];
     let miss = 0;
     for (const s of uniq) {
-      const got = byCa.get(s.ca);
-      if (!got || got instanceof Error) {
-        miss++;
-        continue;
+      let pair = s.pair;
+      if (!pair) {
+        const got = byCa.get(s.ca);
+        if (!got || got instanceof Error) {
+          miss++;
+          continue;
+        }
+        pair = pickBestPair(got, s.chain || 'solana', s.ca);
       }
-      const pair = pickBestPair(got, s.chain || 'solana', s.ca);
       if (!pair) {
         miss++;
         continue;
