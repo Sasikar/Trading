@@ -1,17 +1,28 @@
 {
-  "updated": "2026-09-13T17:47:08.390Z",
+  "updated": "2026-09-14T00:17:02.877Z",
   "count": 14,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+      "name": "CATE",
+      "base": "CATE",
+      "t": 1789344457698,
+      "poolAddress": "HMzvsEEmtzHhvZNw9uwbaG85HCTmFnkbhzUx16cy7ca3",
+      "poolNetwork": "solana",
+      "poolLiq": 2490342.82,
+      "poolCachedAt": 1789344457696
+    },
     {
       "chain": "solana",
       "ca": "Ge87EtsjwRQbHaqQmKRno69RFTwh9bfSsm99XNxTpump",
       "name": "Jimothy",
       "base": "Jimothy",
-      "t": 1789320589736,
+      "t": 1789321635214,
       "poolAddress": "5PGhKctym6odbHGo2tKMST2AjmJsb2uZBQrKkn4ZuFT5",
       "poolNetwork": "solana",
-      "poolLiq": 534614.87,
-      "poolCachedAt": 1789320589734
+      "poolLiq": 529693.68,
+      "poolCachedAt": 1789321635213
     },
     {
       "chain": "eth",
@@ -34,17 +45,6 @@
       "poolNetwork": "solana",
       "poolLiq": 112033.53,
       "poolCachedAt": 1789319850321
-    },
-    {
-      "chain": "solana",
-      "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
-      "name": "CATE",
-      "base": "CATE",
-      "t": 1789319446177,
-      "poolAddress": "HMzvsEEmtzHhvZNw9uwbaG85HCTmFnkbhzUx16cy7ca3",
-      "poolNetwork": "solana",
-      "poolLiq": 2328562.17,
-      "poolCachedAt": 1789319446176
     },
     {
       "chain": "solana",
