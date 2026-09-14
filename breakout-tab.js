@@ -125,6 +125,34 @@
           (tape ? ' · ' + tape : '') +
           (h.live ? ' · Dex live until tape fills' : '') +
           '</div>' +
+          (h.levelTxt
+            ? '<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:#121a24;border:1px solid #2a3a4c">' +
+              '<div style="font-size:10px;letter-spacing:.08em;font-weight:800;color:#8491a1">BREAKOUT LEVEL (' +
+              tfu +
+              ')</div>' +
+              '<div style="margin-top:4px;font-size:16px;font-weight:900;color:#e8eef6">' +
+              h.levelTxt +
+              (h.distPct != null
+                ? ' <span style="font-size:12px;font-weight:800;color:' +
+                  (h.distPct >= 0 ? '#62e3a0' : '#ff6f7c') +
+                  '">(' +
+                  (h.distPct >= 0 ? '+' : '') +
+                  Number(h.distPct).toFixed(1) +
+                  '% vs spot)</span>'
+                : '') +
+              '</div>' +
+              '<div style="margin-top:4px;font-size:12px;color:#c5d0dc">Exit if ' +
+              tfu +
+              ' closes back under <b style="color:#e6c878">(' +
+              h.levelTxt +
+              ')</b></div></div>'
+            : h.section
+              ? '<div style="margin-top:8px;font-size:12px;color:#f0a060">No ' +
+                tfu +
+                ' candle high yet (tape filling). Use DexScreener ' +
+                tfu +
+                ' high as exit until we print a level.</div>'
+              : '') +
           (h.why
             ? '<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:#121a24;border:1px solid #243041">' +
               '<div style="font-size:10px;letter-spacing:.06em;font-weight:800;color:#8491a1">WHY THIS LABEL</div>' +

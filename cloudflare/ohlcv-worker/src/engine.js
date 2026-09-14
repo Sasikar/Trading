@@ -245,6 +245,7 @@ export function detectTapeBreakout(bars, tf, tick) {
   const need = MIN_BARS[tf] || 12;
   const mom = momentumFromTick(tick || {});
   const n = (bars || []).length;
+  const level = rangeHighFromBars(bars);
   if (n < need) {
     return {
       state: 'WARMING',
@@ -255,12 +256,13 @@ export function detectTapeBreakout(bars, tf, tick) {
       score: mom.score,
       bars: n,
       need,
-      interesting: false
+      interesting: false,
+      level
     };
   }
   const last = bars[bars.length - 1];
   const prior = bars.slice(Math.max(0, bars.length - 1 - 20), bars.length - 1);
-  const rangeHigh = Math.max(...prior.map((b) => b.h));
+  const rangeHigh = level || Math.max(...prior.map((b) => b.h));
   const medVol = median(prior.map((b) => b.vol));
   const ret = last.o > 0 ? ((last.c - last.o) / last.o) * 100 : 0;
   const runup = rangeHigh > 0 ? ((last.c - rangeHigh) / rangeHigh) * 100 : 0;
@@ -317,6 +319,7 @@ export function detectTapeBreakout(bars, tf, tick) {
     need,
     interesting,
     near,
+    level: rangeHigh,
     ret: +ret.toFixed(2),
     runup: +runup.toFixed(2)
   };
@@ -483,6 +486,22 @@ function pctStr(n) {
   return (x >= 0 ? '+' : '') + x.toFixed(1) + '%';
 }
 
+export function fmtPx(p) {
+  const x = Number(p);
+  if (!Number.isFinite(x) || x <= 0) return '';
+  if (x >= 1) return String(+x.toFixed(4));
+  if (x >= 0.01) return String(+x.toFixed(6));
+  if (x >= 1e-6) return String(+x.toFixed(8));
+  return x.toExponential(3);
+}
+
+export function rangeHighFromBars(bars) {
+  if (!bars || bars.length < 2) return 0;
+  const prior = bars.slice(Math.max(0, bars.length - 1 - 20), bars.length - 1);
+  if (!prior.length) return 0;
+  return Math.max(...prior.map((b) => b.h));
+}
+
 /** Plain-language reasons. Pages only display this; they do not compute it. */
 export function describeWhy(tf, det, tick) {
   const mom = momentumFromTick(tick || {});
@@ -492,6 +511,13 @@ export function describeWhy(tf, det, tick) {
   const h24 = tick ? tick.h24 : 0;
   const reasons = [];
   const tfu = String(tf || '').toUpperCase();
+  const lvl = fmtPx(det && det.level);
+  const lvlTag = lvl ? ' (' + lvl + ')' : '';
+  const spot = tick && tick.price ? fmtPx(tick.price) : '';
+  let distTxt = '';
+  if (det && det.level > 0 && tick && tick.price > 0) {
+    distTxt = pctStr(((tick.price - det.level) / det.level) * 100) + ' vs level';
+  }
 
   if (det.state === 'WARMING') {
     return {
@@ -518,6 +544,7 @@ export function describeWhy(tf, det, tick) {
     reasons.push('This is our ' + tfu + ' candle vs the recent high — not “Dex 5m is pumping”');
     if (det.ret != null) reasons.push('This ' + tfu + ' bar ' + pctStr(det.ret) + ' from open to close');
     if (det.runup != null) reasons.push('Vs recent ' + tfu + ' high: ' + pctStr(det.runup));
+    if (lvl) reasons.push('Breakout level ' + lvl + (spot ? ' · spot ' + spot : '') + (distTxt ? ' · ' + distTxt : ''));
     reasons.push('Closed ' + tfu + ' bars ' + (det.bars || 0) + '/' + (det.need || 0) + ' needed');
     reasons.push('Dex snapshot: 5m ' + pctStr(m5) + ' · 1h ' + pctStr(h1) + ' · vol ' + mom.volX + 'x usual 5m');
     if ((m5 || 0) < 1 && det.event === 'NEW BREAKOUT') {
@@ -536,23 +563,51 @@ export function describeWhy(tf, det, tick) {
     why =
       'Not broken yet. Sitting close to the recent ' +
       tfu +
-      ' high with volume building. This is the EARLY watch list — track it, do not treat as a live break.';
+      ' high' +
+      lvlTag +
+      '. Volume building — EARLY watch, not a live break.' +
+      (lvl ? ' Breaks if ' + tfu + ' closes above ' + lvl + '.' : '');
   } else if (det.event === 'NEW BREAKOUT' && det.live) {
     why =
-      'EARLY live read: Dex shows a fresh pop with volume on this timeframe. Not confirmed — first push only.';
+      'EARLY live read: Dex shows a fresh pop with volume on this timeframe. Not confirmed — first push only.' +
+      (lvl
+        ? ' Provisional ' + tfu + ' high ' + lvlTag + '. Exit if ' + tfu + ' closes back under ' + lvl + '.'
+        : ' No ' + tfu + ' candle high stored yet — tape still filling.');
   } else if (det.event === 'NEW BREAKOUT') {
     why =
-      'EARLY: the latest ' +
+      'LIVE: the latest ' +
       tfu +
-      ' candle closed above the recent high with extra volume. First push, not a guaranteed runner.';
+      ' candle closed above the recent high' +
+      lvlTag +
+      '. First push, not a guaranteed runner.' +
+      (lvl ? ' Exit if ' + tfu + ' closes back under ' + lvl + '.' : '');
   } else if (det.event === 'BREAKOUT HELD') {
-    why = 'Still holding above the breakout level on ' + tfu + '. Move started; it has not failed yet.';
+    why = lvl
+      ? 'Still holding above the breakout level on ' +
+        tfu +
+        ' (' +
+        lvl +
+        ').' +
+        (spot ? ' Spot now ' + spot + (distTxt ? ' (' + distTxt + ')' : '') + '.' : '') +
+        ' Exit if a ' +
+        tfu +
+        ' candle closes back under (' +
+        lvl +
+        ').'
+      : 'Still holding on Dex 1h/6h. No ' +
+        tfu +
+        ' candle high stored yet (tape filling) — use DexScreener ' +
+        tfu +
+        ' high as your exit until our tape prints a level.';
   } else if (det.state === 'STRETCHED') {
-    why = 'Already extended on higher Dex windows. High chance this is late, not an early break.';
+    why =
+      'Already extended on higher Dex windows. High chance this is late, not an early break.' +
+      (lvl ? ' Invalidation still ' + tfu + ' close back under (' + lvl + ').' : '');
   } else {
-    why = 'No breakout. Price is still inside the recent ' + tfu + ' range.';
+    why = 'No breakout. Price is still inside the recent ' + tfu + ' range' + (lvlTag || '') + '.';
     if (!reasons.length) reasons.push('Dex 5m ' + pctStr(m5) + ' · 1h ' + pctStr(h1) + ' · vol ' + mom.volX + 'x');
   }
+  if (lvl) reasons.push('Exit: ' + tfu + ' close back under ' + lvl);
   return { why, reasons };
 }
 
@@ -604,6 +659,12 @@ export function hitFrom(row, tick, det, tf, focus) {
     live: !!det.live,
     near: !!det.near,
     section: classifySection(det),
+    level: det.level || 0,
+    levelTxt: fmtPx(det.level),
+    distPct:
+      det.level > 0 && tick && tick.price > 0
+        ? +(((tick.price - det.level) / det.level) * 100).toFixed(2)
+        : null,
     why: expl.why,
     reasons: expl.reasons
   };
@@ -978,6 +1039,12 @@ export class Engine {
       ...(hit.reasons && hit.reasons.length ? hit.reasons.map((r) => '• ' + r) : []),
       '',
       'Dex 5m ' + pctStr(hit.m5) + ' · 1h ' + pctStr(hit.h1) + ' · vol ' + hit.volX + 'x',
+      hit.levelTxt
+        ? 'Level (' + String(tf).toUpperCase() + '): ' + hit.levelTxt +
+          (hit.spot ? ' · spot ' + fmtPx(hit.spot) : '') +
+          (hit.distPct != null ? ' · ' + pctStr(hit.distPct) + ' vs level' : '')
+        : 'Level: not stored yet (tape filling)',
+      hit.levelTxt ? 'Exit: ' + String(tf).toUpperCase() + ' close back under ' + hit.levelTxt : '',
       'CA: ' + hit.ca,
       'https://sasikar.github.io/Trading/index.html?tab=breakouts'
     ].join('\n');
@@ -1049,10 +1116,10 @@ export class Engine {
       det = detectTapeBreakout(closed, tf, tick);
       if (det.state === 'WARMING' && (tf === '4h' || tf === '2h' || tf === '1h')) {
         const live = detectLegacy4h(tick);
-        det = Object.assign({}, live, { bars: det.bars, need: det.need });
+        det = Object.assign({}, live, { bars: det.bars, need: det.need, level: det.level || 0 });
       } else if (det.state === 'WARMING' && tf === '5m') {
         const live = detectLive5m(tick);
-        det = Object.assign({}, live, { bars: det.bars, need: det.need });
+        det = Object.assign({}, live, { bars: det.bars, need: det.need, level: det.level || 0 });
       }
     } else {
       det = detectDexTf(tick, tf);
