@@ -502,7 +502,7 @@
 </main></div>
 <script src="overview-app.js?v=20260914-hunt1"></script>
 <script src="breakout-tab.js?v=20260914-ago1"></script>
-<script src="hunter-tab.js?v=20260914-h1"></script>
+<script src="hunter-tab.js?v=20260914-h2"></script>
 </div>
 
 <div id="memegate-panel" class="trend-panel" style="display:block">
@@ -591,7 +591,7 @@
 <div id="hunter-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Hunter</h2><p>New momentum names · you rug-check · no phone pings</p></div>
+    <div><h2>Hunter</h2><p>By liquidity band · you rug-check · no phone pings</p></div>
     <span class="source" id="hu-source">API</span>
   </div>
   <div class="card">
@@ -599,7 +599,7 @@
       <button type="button" onclick="try{window.refreshHunterTab&&window.refreshHunterTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Scan now</button>
       <span id="hu-status" style="font-size:12px;color:#8491a1">Worker finds names every ~5 min</span>
     </div>
-    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45"><b style="color:#c5d0dc">BM</b> Bubblemaps · <b style="color:#c5d0dc">TR</b> Trench Radar · <b style="color:#c5d0dc">RC</b> RugCheck — same links as Scanner. Click to open; icon turns <b style="color:#62e3a0">green</b> when you’ve checked it. Save to Breakout only after you’re good.</div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">Tap the site icons (Bubblemaps, Trench, RugCheck) to scan. Green ring = you already opened it. Save to Breakout only after you’re good. Bands are liquidity, not market cap.</div>
     <div id="hu-list" style="display:flex;flex-direction:column;gap:8px">
       <div style="font-size:12px;color:#8491a1">Open Hunter to load names.</div>
     </div>

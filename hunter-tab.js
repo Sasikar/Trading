@@ -25,98 +25,139 @@
     return Math.round(m / 60) + 'h ago';
   }
   function esc(s) {
-    return String(s || '').replace(/[&<>"]/g, function (c) {
-      return { '&': '&', '<': '<', '>': '>', '"': '"' }[c];
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      if (c === '&') return '&' + 'amp;';
+      if (c === '<') return '&' + 'lt;';
+      if (c === '>') return '&' + 'gt;';
+      return '&' + 'quot;';
     });
   }
-  function toolBtn(label, title, url, on, tool, ca) {
-    const col = on ? '#06281a' : '#121a24';
-    const fg = on ? '#62e3a0' : '#c5d0dc';
+  function money(n) {
+    n = +n || 0;
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 1e5 ? 0 : 1) + 'k';
+    return '$' + Math.round(n);
+  }
+  const TOOLS = [
+    { id: 'bubblemaps', title: 'Bubblemaps', domain: 'bubblemaps.io' },
+    { id: 'trench', title: 'Trench Radar', domain: 'trench.bot' },
+    { id: 'rugcheck', title: 'RugCheck', domain: 'rugcheck.xyz' }
+  ];
+  function toolBtn(tool, url, on, ca) {
     const bd = on ? '#1a9b6c' : '#243041';
+    const bg = on ? '#06281a' : '#121a24';
+    const icon =
+      'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(tool.domain) + '&sz=64';
     return (
       '<button type="button" class="hu-tool" data-hu-tool="' +
-      tool +
+      tool.id +
       '" data-hu-ca="' +
       esc(ca) +
       '" data-hu-url="' +
       esc(url) +
       '" title="' +
-      esc(title) +
-      (on ? ' · verified' : '') +
-      '" style="width:32px;height:32px;border-radius:9px;border:1px solid ' +
+      esc(tool.title) +
+      (on ? ' · verified' : ' · open scan') +
+      '" style="width:36px;height:36px;padding:0;border-radius:10px;border:2px solid ' +
       bd +
       ';background:' +
-      col +
-      ';color:' +
-      fg +
-      ';font-weight:900;font-size:10px;letter-spacing:.04em;cursor:pointer">' +
-      label +
+      bg +
+      ';cursor:pointer;display:inline-flex;align-items:center;justify-content:center">' +
+      '<img src="' +
+      icon +
+      '" alt="' +
+      esc(tool.title) +
+      '" width="20" height="20" style="border-radius:4px;display:block" />' +
       '</button>'
+    );
+  }
+  const BANDS = [
+    { id: 'micro', label: 'Micro', range: '$20k–$100k liq' },
+    { id: 'small', label: 'Small', range: '$100k–$1M liq' },
+    { id: 'mid', label: 'Mid', range: '$1M–$10M liq' },
+    { id: 'large', label: 'Large', range: '$10M–$100M liq' }
+  ];
+
+  function renderCard(h) {
+    const v = h.verified || {};
+    const links = h.links || {};
+    const both = v.bubblemaps && v.trench;
+    const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
+    return (
+      '<div style="padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<div style="font-weight:900;font-size:15px;color:#e8eef6;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      esc(h.name) +
+      (both
+        ? ' <span title="You verified Bubblemaps + Trench" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
+        : '') +
+      (h.boosted ? ' <span style="font-size:10px;color:#f0a060;font-weight:800">PAID BOOST</span>' : '') +
+      (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">SAVED</span>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:6px;align-items:center">' +
+      TOOLS.map(function (t) {
+        return toolBtn(t, links[t.id], v[t.id], h.ca);
+      }).join('') +
+      '</div></div>' +
+      '<div style="margin-top:6px;font-size:12px;color:#c5d0dc;line-height:1.45">' +
+      'Dex 5m ' +
+      (h.m5 >= 0 ? '+' : '') +
+      (h.m5 != null ? Number(h.m5).toFixed(1) : '—') +
+      '% · 1h ' +
+      (h.h1 >= 0 ? '+' : '') +
+      (h.h1 != null ? Number(h.h1).toFixed(1) : '—') +
+      '% · liq ' +
+      money(h.liq) +
+      (h.mcap ? ' · mcap ' + money(h.mcap) : '') +
+      (h.ageMin != null ? ' · age ' + (h.ageMin < 60 ? h.ageMin + 'm' : Math.round(h.ageMin / 60) + 'h') : '') +
+      '</div>' +
+      '<div style="margin-top:4px;font-size:11px;color:#8491a1">' +
+      caShort +
+      ' · tap a site icon to scan — green ring after you open it</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+      '<button type="button" class="hu-save" data-hu-ca="' +
+      esc(h.ca) +
+      '" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:700;font-size:11px;cursor:pointer">' +
+      (h.saved ? 'On watchlist' : 'Save to Breakout') +
+      '</button>' +
+      (links.dex
+        ? '<a href="' +
+          esc(links.dex) +
+          '" target="_blank" rel="noopener" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#6eb6ff;font-weight:700;font-size:11px;text-decoration:none">DexScreener</a>'
+        : '') +
+      '<a href="scanner.html" target="_blank" rel="noopener" class="hu-scanner" data-hu-ca="' +
+      esc(h.ca) +
+      '" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;font-size:11px;text-decoration:none">Full scanner</a>' +
+      '</div></div>'
     );
   }
 
   function renderHits(hits) {
-    if (!hits || !hits.length) {
-      return '<div style="padding:14px;border-radius:12px;border:1px solid #243041;color:#8491a1;font-size:13px">No hunter names right now. Worker looks every ~5 min for organic 5m/1h pops (not Dex Trending). Quiet / low-liq / stretched coins stay hidden.</div>';
-    }
-    return hits
-      .map(function (h) {
-        const v = h.verified || {};
-        const links = h.links || {};
-        const both = v.bubblemaps && v.trench;
-        const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
-        return (
-          '<div style="padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a">' +
-          '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">' +
-          '<div style="font-weight:900;font-size:15px;color:#e8eef6;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-          esc(h.name) +
-          (both
-            ? ' <span title="You verified Bubblemaps + Trench" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
-            : '') +
-          (h.boosted ? ' <span style="font-size:10px;color:#f0a060;font-weight:800">PAID BOOST</span>' : '') +
-          (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">SAVED</span>' : '') +
-          '</div>' +
-          '<div style="display:flex;gap:6px;align-items:center">' +
-          toolBtn('BM', 'Bubblemaps holder clusters', links.bubblemaps, v.bubblemaps, 'bubblemaps', h.ca) +
-          toolBtn('TR', 'Trench Radar bundles / clusters', links.trench, v.trench, 'trench', h.ca) +
-          toolBtn('RC', 'RugCheck.xyz', links.rugcheck, v.rugcheck, 'rugcheck', h.ca) +
-          '</div></div>' +
-          '<div style="margin-top:6px;font-size:12px;color:#c5d0dc;line-height:1.45">' +
-          'score ' +
-          (h.score != null ? h.score : '—') +
-          ' · Dex 5m ' +
-          (h.m5 >= 0 ? '+' : '') +
-          (h.m5 != null ? Number(h.m5).toFixed(1) : '—') +
-          '% · 1h ' +
-          (h.h1 >= 0 ? '+' : '') +
-          (h.h1 != null ? Number(h.h1).toFixed(1) : '—') +
-          '% · vol ' +
-          (h.volX || '—') +
-          'x · liq $' +
-          (h.liq ? Math.round(h.liq).toLocaleString() : '—') +
-          (h.ageMin != null ? ' · age ' + (h.ageMin < 60 ? h.ageMin + 'm' : Math.round(h.ageMin / 60) + 'h') : '') +
-          '</div>' +
-          '<div style="margin-top:4px;font-size:11px;color:#8491a1">' +
-          caShort +
-          ' · click BM / TR / RC to scan — icon turns green after you open it</div>' +
-          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
-          '<button type="button" class="hu-save" data-hu-ca="' +
-          esc(h.ca) +
-          '" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:700;font-size:11px;cursor:pointer">' +
-          (h.saved ? 'On watchlist' : 'Save to Breakout') +
-          '</button>' +
-          (links.dex
-            ? '<a href="' +
-              esc(links.dex) +
-              '" target="_blank" rel="noopener" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#6eb6ff;font-weight:700;font-size:11px;text-decoration:none">DexScreener</a>'
-            : '') +
-          '<a href="scanner.html" target="_blank" rel="noopener" class="hu-scanner" data-hu-ca="' +
-          esc(h.ca) +
-          '" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;font-size:11px;text-decoration:none">Full scanner</a>' +
-          '</div></div>'
-        );
-      })
-      .join('');
+    const by = { micro: [], small: [], mid: [], large: [] };
+    (hits || []).forEach(function (h) {
+      const b = h.band || '';
+      if (by[b]) by[b].push(h);
+    });
+    return BANDS.map(function (band) {
+      const rows = by[band.id] || [];
+      const body = rows.length
+        ? rows.map(renderCard).join('')
+        : '<div style="padding:10px 12px;border-radius:10px;border:1px dashed #243041;color:#8491a1;font-size:12px">None moving in this band right now.</div>';
+      return (
+        '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">' +
+        '<div style="font-size:13px;font-weight:900;color:#e8eef6">' +
+        band.label +
+        '</div>' +
+        '<div style="font-size:11px;color:#8491a1">' +
+        band.range +
+        ' · top ' +
+        rows.length +
+        '</div></div>' +
+        body +
+        '</div>'
+      );
+    }).join('');
   }
 
   async function api(path, opt) {

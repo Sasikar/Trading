@@ -210,9 +210,18 @@ export function hunterLinks(ca, chain) {
   };
 }
 
+export function hunterBand(liq) {
+  const x = +liq || 0;
+  if (x >= 20000 && x < 100000) return 'micro';
+  if (x >= 100000 && x < 1000000) return 'small';
+  if (x >= 1000000 && x < 10000000) return 'mid';
+  if (x >= 10000000 && x <= 100000000) return 'large';
+  return '';
+}
+
 export function hunterPass(tick, pair, now) {
-  if ((tick.liq || 0) < 8000) return false;
-  if ((tick.liq || 0) > 2500000) return false;
+  const band = hunterBand(tick.liq);
+  if (!band) return false;
   const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
   if (created && now - created < 5 * 60e3) return false;
   if ((tick.m5 || 0) < 0) return false;
@@ -239,7 +248,7 @@ export async function fetchHunterSeeds() {
     if (isBoost) boosted.add(a.toLowerCase());
     seeds.push({ ca: a, chain: chain || 'solana', boosted: !!isBoost, src, pair: pair || null });
   };
-  for (const q of ['pump', 'SOL']) {
+  for (const q of ['pump', 'SOL', 'bonk', 'wif']) {
     try {
       calls++;
       const s = await fetchJSON('https://api.dexscreener.com/latest/dex/search?q=' + encodeURIComponent(q), 1);
@@ -1423,10 +1432,12 @@ export class Engine {
       if (!hunterPass(tick, pair, now)) continue;
       const mom = momentumFromTick(tick);
       const created = pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
+      const band = hunterBand(tick.liq);
       hits.push({
         name: tick.name,
         ca: s.ca,
         chain: tick.chain || 'solana',
+        band,
         score: mom.score,
         m5: tick.m5,
         h1: tick.h1,
@@ -1434,6 +1445,7 @@ export class Engine {
         volX: mom.volX,
         buyR: mom.buyR,
         liq: tick.liq,
+        mcap: +(pair.marketCap || pair.fdv || 0) || null,
         spot: tick.price,
         ageMin: created ? Math.max(0, Math.round((now - created) / 60000)) : null,
         boosted: !!s.boosted,
@@ -1442,8 +1454,16 @@ export class Engine {
         pairAddress: tick.pairAddress
       });
     }
-    hits.sort((a, b) => (b.m5 || 0) - (a.m5 || 0) || (b.score || 0) - (a.score || 0));
-    const top = hits.slice(0, 10);
+    const per = { micro: 3, small: 3, mid: 3, large: 3 };
+    const buckets = { micro: [], small: [], mid: [], large: [] };
+    for (const h of hits) {
+      if (buckets[h.band]) buckets[h.band].push(h);
+    }
+    const top = [];
+    for (const k of ['micro', 'small', 'mid', 'large']) {
+      buckets[k].sort((a, b) => (b.m5 || 0) - (a.m5 || 0) || (b.score || 0) - (a.score || 0));
+      top.push.apply(top, buckets[k].slice(0, per[k]));
+    }
     this.store.setMeta('hunter_hits', JSON.stringify(top));
     this.store.setMeta('hunter_at', String(now));
     this.store.setMeta('hunter_err', '');
