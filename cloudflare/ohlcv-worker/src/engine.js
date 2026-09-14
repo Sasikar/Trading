@@ -224,11 +224,16 @@ export function hunterPass(tick, pair, now) {
   if (!band) return false;
   const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
   if (created && now - created < 5 * 60e3) return false;
-  if ((tick.m5 || 0) < 0) return false;
-  if ((tick.vol5m || 0) < 80) return false;
   const mom = momentumFromTick(tick);
   if (mom.stretched) return false;
-  return true;
+  const m5 = tick.m5 || 0;
+  const h1 = tick.h1 || 0;
+  const vol = tick.vol5m || 0;
+  if (band === 'micro') return m5 >= 1 && vol >= 50;
+  if (band === 'small') return (m5 >= 0.4 || h1 >= 1) && vol >= 150;
+  if (band === 'mid') return (m5 >= 0.2 || h1 >= 0.6) && vol >= 400;
+  if (band === 'large') return (m5 >= 0.1 || h1 >= 0.4) && vol >= 800;
+  return false;
 }
 
 export async function fetchHunterSeeds() {
