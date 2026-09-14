@@ -2,7 +2,7 @@
 
 **Read this first** before changing Breakout, Telegram, Verdict-on-breakouts, or candles.
 
-Last updated: 2026-09-14 (IST)
+Last updated: 2026-09-14 (IST) — live card prints canonical breakout level + spot + +20% target
 
 | Status | What |
 |---|---|
@@ -315,7 +315,9 @@ Each hit includes: `name, chain, ca, tf, section, state, event, score, why, reas
 
 - Polls ~20s for **display** (does not write DO except via GET snapshot → `syncMatured` skip-if-same).
 - Three sections + ALIGNED on top.
-- Bold `(4H)` on fresh, level in brackets, “Xm ago” not wall-clock.
+- Bold `(4H)` on fresh, “Xm ago” not wall-clock.
+- Canonical **breakout level** box (not entry price): level · spot · distance % · backtest +20% target · exit = this TF close under that level. Same number HIT/FAIL uses later.
+- Dex 1D screenshots are **market cap**; engine level is **token USD**. The **%** matches.
 - No Dex from the browser.
 
 ---

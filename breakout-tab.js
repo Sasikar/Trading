@@ -20,6 +20,7 @@
   let lastErr = '';
   const LIVE_MS = 20000;
   const TFS = ['1m', '5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w'];
+  const HIT_PCT = 20;
 
   const $ = (id) => document.getElementById(id);
 
@@ -34,6 +35,15 @@
     }
     if (!r.ok) throw new Error((j && (j.error || j.message)) || 'HTTP ' + r.status);
     return j;
+  }
+
+  function fmtPx(p) {
+    const x = Number(p);
+    if (!Number.isFinite(x) || x <= 0) return '—';
+    if (x >= 1) return String(+x.toFixed(4));
+    if (x >= 0.01) return String(+x.toFixed(6));
+    if (x >= 1e-6) return String(+x.toFixed(8));
+    return x.toExponential(3);
   }
 
   function fmtAgo(isoOrMs) {
@@ -153,23 +163,32 @@
             ? '<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:#121a24;border:1px solid #2a3a4c">' +
               '<div style="font-size:10px;letter-spacing:.08em;font-weight:800;color:#8491a1">BREAKOUT LEVEL (' +
               tfu +
-              ')</div>' +
-              '<div style="margin-top:4px;font-size:16px;font-weight:900;color:#e8eef6">' +
+              ') · NOT ENTRY PRICE</div>' +
+              '<div style="margin-top:6px;font-size:18px;font-weight:900;color:#e8eef6">' +
               h.levelTxt +
+              '</div>' +
+              '<div style="margin-top:6px;font-size:12px;color:#c5d0dc;line-height:1.5">' +
+              'Spot <b style="color:#e8eef6">' +
+              (h.spot ? fmtPx(h.spot) : '—') +
+              '</b>' +
               (h.distPct != null
-                ? ' <span style="font-size:12px;font-weight:800;color:' +
+                ? ' · Distance <b style="color:' +
                   (h.distPct >= 0 ? '#62e3a0' : '#ff6f7c') +
-                  '">(' +
+                  '">' +
                   (h.distPct >= 0 ? '+' : '') +
                   Number(h.distPct).toFixed(1) +
-                  '% vs spot)</span>'
+                  '%</b>'
                 : '') +
-              '</div>' +
-              '<div style="margin-top:4px;font-size:12px;color:#c5d0dc">Exit if ' +
+              '<br>Backtest +' +
+              HIT_PCT +
+              '% <b style="color:#e6c878">' +
+              (h.level ? fmtPx(h.level * (1 + HIT_PCT / 100)) : '—') +
+              '</b>' +
+              '<br>Exit: ' +
               tfu +
-              ' closes back under <b style="color:#e6c878">(' +
+              ' close under <b style="color:#e6c878">' +
               h.levelTxt +
-              ')</b></div></div>'
+              '</b></div></div>'
             : h.section
               ? '<div style="margin-top:8px;font-size:12px;color:#f0a060">No ' +
                 tfu +
