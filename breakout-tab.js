@@ -36,16 +36,19 @@
     return j;
   }
 
-  function fmtAgo(iso) {
+  function fmtAgo(isoOrMs) {
     try {
-      const ms = Date.now() - new Date(iso).getTime();
+      const t = typeof isoOrMs === 'number' ? isoOrMs : new Date(isoOrMs).getTime();
+      const ms = Date.now() - t;
       if (!isFinite(ms) || ms < 0) return '';
       const s = Math.round(ms / 1000);
       if (s < 10) return 'just now';
       if (s < 60) return s + 's ago';
       const m = Math.round(s / 60);
       if (m < 60) return m + 'm ago';
-      return Math.round(m / 60) + 'h ago';
+      const h = Math.round(m / 60);
+      if (h < 48) return h + 'h ago';
+      return Math.round(h / 24) + 'd ago';
     } catch (e) {
       return '';
     }
@@ -64,15 +67,19 @@
     return (hits || [])
       .map(function (h) {
         const col =
-          h.state === 'STRONG CONFIRMED'
-            ? '#62e3a0'
-            : h.state === 'EARLY'
-              ? '#e6c878'
-              : h.state === 'STRETCHED'
-                ? '#f0a060'
-                : h.state === 'WARMING'
-                  ? '#8491a1'
-                  : '#c5d0dc';
+          h.matureStatus === 'broke' || h.state === 'BROKE'
+            ? '#ff6f7c'
+            : h.matureStatus === 'failed' || h.state === 'FAILED'
+              ? '#ff8d7a'
+              : h.state === 'STRONG CONFIRMED'
+                ? '#62e3a0'
+                : h.state === 'EARLY'
+                  ? '#e6c878'
+                  : h.state === 'STRETCHED'
+                    ? '#f0a060'
+                    : h.state === 'WARMING'
+                      ? '#8491a1'
+                      : '#c5d0dc';
         const chainLab = h.chain === 'solana' ? 'SOL' : String(h.chain || '').toUpperCase();
         const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
         const tfu = String(h.tf || '').toUpperCase();
@@ -102,10 +109,18 @@
           '<div style="font-weight:800;color:' +
           col +
           '">' +
-          h.state +
-          (h.score != null ? ' · ' + h.score : '') +
+          (h.section === 'matured' && h.matureStatus
+            ? String(h.matureStatus).toUpperCase()
+            : h.state) +
+          (h.score != null && !h.history ? ' · ' + h.score : '') +
           tfTag +
           '</div></div>' +
+          (h.section === 'matured' && h.maturedAt
+            ? '<div style="margin-top:4px;font-size:11px;font-weight:800;color:#8491a1">since ' +
+              fmtAgo(h.maturedAt) +
+              (h.history ? ' · history' : '') +
+              '</div>'
+            : '') +
           '<div style="margin-top:6px;font-size:12px;color:#c5d0dc;line-height:1.45">' +
           (freshBreak
             ? '<b style="color:#e6c878;font-weight:900">' + h.event + ' (' + tfu + (h.live ? ' live' : '') + ')</b>'
@@ -243,7 +258,7 @@
     return (
       sectionBlock('EARLY', 'Close to break — not broken yet', '#e6c878', early, 'Nothing close to a break on this TF.') +
       sectionBlock('LIVE', 'Happened now', '#62e3a0', live, 'No live break on this TF.') +
-      sectionBlock('MATURED', 'Already happened', '#6eb6ff', matured, 'No matured break on this TF.')
+      sectionBlock('MATURED', 'Held now · Failed/Broke kept as history', '#6eb6ff', matured, 'No matured break on this TF.')
     );
   }
 

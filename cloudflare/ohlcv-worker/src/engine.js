@@ -729,6 +729,32 @@ export function classifySection(det) {
   return '';
 }
 
+export function maturedKey(h) {
+  return (
+    String(h.chain || 'solana').toLowerCase() +
+    ':' +
+    String(h.ca || '').toLowerCase() +
+    ':' +
+    String(h.tf || '').toLowerCase()
+  );
+}
+
+export function maturedTtlMs(tf) {
+  const t = String(tf || '').toLowerCase();
+  if (t === '1m') return 6 * 3600e3;
+  if (t === '5m' || t === '10m' || t === '15m') return 24 * 3600e3;
+  if (t === '30m' || t === '1h' || t === '2h') return 2 * 86400e3;
+  return 3 * 86400e3;
+}
+
+export function matureStatusFrom(hit, rec) {
+  if (hit && hit.section === 'matured') return 'held';
+  const level = (hit && hit.level) || (rec && rec.level) || 0;
+  const spot = hit && hit.spot;
+  if (level > 0 && spot > 0 && spot < level) return 'broke';
+  return 'failed';
+}
+
 export function hitFrom(row, tick, det, tf, focus) {
   const mom = momentumFromTick(tick || {});
   const expl = describeWhy(tf, det, tick);
@@ -1233,15 +1259,124 @@ export class Engine {
   }
 
   snapshot(tf) {
+    const now = Date.now();
     const focus = this.store.getMeta('focus_ca') || '';
     const tfn = String(tf || '4h').toLowerCase();
-    const rows = this.store.getWatch();
-    let hits = rows.map((r) => this.evaluateRow(r, tfn, focus));
-    if (tfn === '1m') hits = hits.filter((h) => h.focus);
-    hits = hits.filter((h) => h.section);
+    let all = this.store.getWatch().map((r) => this.evaluateRow(r, tfn, focus));
+    if (tfn === '1m') all = all.filter((h) => h.focus);
+    const extra = this.syncMatured(tfn, all, now);
+    const live = all.filter((h) => h.section);
+    const held = new Set(live.filter((h) => h.section === 'matured').map((h) => String(h.ca).toLowerCase()));
+    const hits = live.concat(extra.filter((h) => !held.has(String(h.ca).toLowerCase())));
     const rank = { early: 0, live: 1, matured: 2 };
-    hits.sort((a, b) => (rank[a.section] ?? 9) - (rank[b.section] ?? 9) || (b.score || 0) - (a.score || 0));
+    const stRank = { held: 0, failed: 1, broke: 2 };
+    hits.sort(
+      (a, b) =>
+        (rank[a.section] ?? 9) - (rank[b.section] ?? 9) ||
+        (stRank[a.matureStatus] ?? 9) - (stRank[b.matureStatus] ?? 9) ||
+        (b.maturedAt || 0) - (a.maturedAt || 0) ||
+        (b.score || 0) - (a.score || 0)
+    );
     return hits;
+  }
+
+  syncMatured(tf, all, now) {
+    let map = {};
+    try {
+      map = JSON.parse(this.store.getMeta('matured_hist') || '{}');
+    } catch (e) {
+      map = {};
+    }
+    const ttl = maturedTtlMs(tf);
+    for (const h of all) {
+      if (h.section !== 'matured') continue;
+      const k = maturedKey(h);
+      const prev = map[k];
+      const newCycle = prev && prev.status && prev.status !== 'held';
+      const maturedAt = !prev || newCycle ? now : prev.maturedAt || now;
+      map[k] = {
+        ca: h.ca,
+        chain: h.chain,
+        name: h.name,
+        tf,
+        maturedAt,
+        lastHeldAt: now,
+        failedAt: null,
+        level: h.level || (prev && prev.level) || 0,
+        status: 'held',
+        dexUrl: h.dexUrl || (prev && prev.dexUrl) || '',
+        pairAddress: h.pairAddress || ''
+      };
+      h.matureStatus = 'held';
+      h.maturedAt = maturedAt;
+      h.history = false;
+    }
+    const extra = [];
+    for (const k of Object.keys(map)) {
+      const rec = map[k];
+      if (String(rec.tf || '').toLowerCase() !== tf) continue;
+      if (now - (rec.maturedAt || 0) > ttl) {
+        delete map[k];
+        continue;
+      }
+      const live = all.find((h) => String(h.ca).toLowerCase() === String(rec.ca || '').toLowerCase());
+      if (live && live.section === 'matured') continue;
+      const status = matureStatusFrom(live, rec);
+      rec.status = status;
+      rec.failedAt = rec.failedAt || now;
+      rec.level = (live && live.level) || rec.level || 0;
+      const tfu = String(tf).toUpperCase();
+      const lvl = rec.level ? fmtPx(rec.level) : '';
+      const why =
+        status === 'broke'
+          ? 'BROKE: spot back under the breakout level' +
+            (lvl ? ' (' + lvl + ')' : '') +
+            '. Old matured cycle kept as history.'
+          : 'FAILED: no longer a hold on ' +
+            tfu +
+            '. Old matured cycle kept as history' +
+            (lvl ? ' — last level (' + lvl + ')' : '') +
+            '.';
+      const base = live
+        ? Object.assign({}, live)
+        : {
+            name: rec.name,
+            ca: rec.ca,
+            chain: rec.chain,
+            tf,
+            state: 'WATCH',
+            event: '—',
+            score: 0,
+            spot: 0,
+            level: rec.level || 0,
+            levelTxt: lvl,
+            dexUrl: rec.dexUrl || '',
+            m5: 0,
+            h1: 0,
+            h6: 0,
+            reasons: [],
+            liq: 0
+          };
+      extra.push(
+        Object.assign({}, base, {
+          section: 'matured',
+          history: true,
+          matureStatus: status,
+          maturedAt: rec.maturedAt,
+          failedAt: rec.failedAt,
+          event: status === 'broke' ? 'BROKE' : 'FAILED',
+          state: status === 'broke' ? 'BROKE' : 'FAILED',
+          why,
+          reasons: [
+            'First matured then — still showing as history',
+            status === 'broke' ? 'Price lost the printed level' : 'Hold rule died (1h/6h or back in range)'
+          ]
+        })
+      );
+    }
+    this.store.setMeta('matured_hist', JSON.stringify(map));
+    extra.sort((a, b) => (b.maturedAt || 0) - (a.maturedAt || 0));
+    return extra;
   }
 
   status(now) {
