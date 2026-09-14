@@ -21,6 +21,8 @@ export const TF_SEC = {
 export const TAPE_TFS = Object.keys(TF_SEC);
 export const DEX_TFS = ['1d', '1w'];
 export const ALL_TFS = [...TAPE_TFS, ...DEX_TFS];
+export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w'];
+export const ALIGN_MIN = 2;
 
 /** Closed bars required before NEW BREAKOUT is allowed. */
 export const MIN_BARS = {
@@ -1277,7 +1279,57 @@ export class Engine {
         (b.maturedAt || 0) - (a.maturedAt || 0) ||
         (b.score || 0) - (a.score || 0)
     );
+    const am = this.alignMap(focus);
+    for (const h of hits) {
+      const a = am[String(h.ca || '').toLowerCase()];
+      if (!a) continue;
+      h.align = a.n;
+      h.alignTfs = a.tfs;
+      h.alignParts = a.parts;
+    }
     return hits;
+  }
+
+  alignMap(focus) {
+    const map = {};
+    const rows = this.store.getWatch();
+    for (const row of rows) {
+      const tfs = [];
+      const parts = [];
+      let best = null;
+      for (const tf of ALIGN_TFS) {
+        const h = this.evaluateRow(row, tf, focus);
+        if (h.section !== 'early' && h.section !== 'live' && h.section !== 'matured') continue;
+        tfs.push(tf);
+        parts.push({ tf, section: h.section, state: h.state, event: h.event, score: h.score });
+        if (
+          !best ||
+          (h.section === 'live' && best.section !== 'live') ||
+          (h.section === 'early' && best.section === 'matured') ||
+          (h.score || 0) > (best.score || 0)
+        )
+          best = h;
+      }
+      map[String(row.ca).toLowerCase()] = { n: tfs.length, tfs, parts, hit: best, name: row.name, ca: row.ca };
+    }
+    return map;
+  }
+
+  snapshotAlign() {
+    const focus = this.store.getMeta('focus_ca') || '';
+    const m = this.alignMap(focus);
+    return Object.keys(m)
+      .map((k) => m[k])
+      .filter((x) => x.n >= ALIGN_MIN && x.hit)
+      .map((x) =>
+        Object.assign({}, x.hit, {
+          section: 'align',
+          align: x.n,
+          alignTfs: x.tfs,
+          alignParts: x.parts
+        })
+      )
+      .sort((a, b) => (b.align || 0) - (a.align || 0) || (b.score || 0) - (a.score || 0));
   }
 
   syncMatured(tf, all, now) {
@@ -1792,12 +1844,14 @@ export async function handleApi(engine, request) {
       live: hits.filter((h) => h.section === 'live'),
       matured: hits.filter((h) => h.section === 'matured')
     };
+    const align = engine.snapshotAlign();
     return json({
       tf,
       updated: new Date().toISOString(),
       status: st,
       hits,
       sections,
+      align,
       count: hits.length
     });
   }

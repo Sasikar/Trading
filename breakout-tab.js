@@ -142,6 +142,16 @@
           (tape ? ' · ' + tape : '') +
           (h.live ? ' · Dex live until tape fills' : '') +
           '</div>' +
+          (h.align >= 2 && h.alignTfs && h.alignTfs.length
+            ? '<div style="margin-top:6px;font-size:11px;color:#c5d0dc">also ' +
+              h.alignTfs
+                .map(function (t) {
+                  return '<b style="color:#e8eef6">' + String(t).toUpperCase() + '</b>';
+                })
+                .join(' · ') +
+              (h.align >= 3 ? ' <span style="color:#62e3a0;font-weight:800">' + h.align + ' TFs</span>' : '') +
+              '</div>'
+            : '') +
           (h.levelTxt
             ? '<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:#121a24;border:1px solid #2a3a4c">' +
               '<div style="font-size:10px;letter-spacing:.08em;font-weight:800;color:#8491a1">BREAKOUT LEVEL (' +
@@ -238,24 +248,103 @@
     );
   }
 
+  function renderAlign(items) {
+    if (!items || !items.length) {
+      return sectionBlock(
+        'ALIGNED',
+        '5m → 1w · needs 2+ timeframes',
+        '#c4a0ff',
+        [],
+        'No coin is printing on 2+ timeframes right now.'
+      );
+    }
+    const cards = items
+      .map(function (h) {
+        const chainLab = h.chain === 'solana' ? 'SOL' : String(h.chain || '').toUpperCase();
+        const parts = h.alignParts || [];
+        const pills = parts
+          .map(function (p) {
+            const c =
+              p.section === 'live' ? '#62e3a0' : p.section === 'early' ? '#e6c878' : '#6eb6ff';
+            return (
+              '<span style="display:inline-block;padding:3px 7px;border-radius:999px;border:1px solid ' +
+              c +
+              '55;color:' +
+              c +
+              ';font-size:10px;font-weight:800">' +
+              String(p.tf).toUpperCase() +
+              ' ' +
+              p.section +
+              '</span>'
+            );
+          })
+          .join('');
+        const strong = (h.align || 0) >= 3;
+        return (
+          '<div style="padding:12px 14px;border-radius:12px;border:1px solid ' +
+          (strong ? '#6a4cad' : '#243041') +
+          ';background:#0b121a">' +
+          '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">' +
+          '<div style="font-weight:900;font-size:15px;color:#e8eef6">' +
+          h.name +
+          ' <span style="font-size:11px;color:#8491a1;font-weight:700">' +
+          chainLab +
+          '</span></div>' +
+          '<div style="font-weight:900;color:' +
+          (strong ? '#c4a0ff' : '#e8eef6') +
+          '">' +
+          (h.align || 0) +
+          ' TFs</div></div>' +
+          '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">' +
+          pills +
+          '</div>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">' +
+          '<button type="button" data-bo-ca="' +
+          h.ca +
+          '" class="bo-open-ca" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#62e3a0;font-weight:700;font-size:11px;cursor:pointer">Open in CA tab</button>' +
+          '<button type="button" data-focus-ca="' +
+          h.ca +
+          '" class="bo-focus-ca" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:700;font-size:11px;cursor:pointer">Focus 1m</button>' +
+          (h.dexUrl
+            ? '<a href="' +
+              h.dexUrl +
+              '" target="_blank" rel="noopener" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#6eb6ff;font-weight:700;font-size:11px;text-decoration:none">DexScreener</a>'
+            : '') +
+          '</div></div>'
+        );
+      })
+      .join('');
+    return (
+      '<div style="margin-bottom:18px">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin:2px 0 8px">' +
+      '<div><span style="font-size:12px;letter-spacing:.1em;font-weight:900;color:#c4a0ff">ALIGNED</span> <span style="font-size:11px;color:#8491a1">5m → 1w · 2+ TFs (3+ stronger)</span></div>' +
+      '<span style="font-size:11px;color:#8491a1;font-weight:800">' +
+      items.length +
+      '</span></div>' +
+      '<div style="display:flex;flex-direction:column;gap:8px">' +
+      cards +
+      '</div></div>'
+    );
+  }
+
   function renderBoard(j) {
     const sec = j.sections || {};
     const hits = j.hits || [];
+    const align = j.align || [];
     const early = sec.early || hits.filter(function (h) { return h.section === 'early'; });
     const live = sec.live || hits.filter(function (h) { return h.section === 'live'; });
     const matured = sec.matured || hits.filter(function (h) { return h.section === 'matured'; });
-    if (!early.length && !live.length && !matured.length) {
+    if (!align.length && !early.length && !live.length && !matured.length) {
       return (
         '<div style="padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#8491a1;font-size:13px">' +
         (breakoutTF === '1m'
           ? '1m is focus-only. Pick a saved coin as Focus 1m.'
-          : 'Nothing close, live, or matured on ' +
-            breakoutTF.toUpperCase() +
-            '. Quiet coins are hidden.') +
+          : 'Nothing close, live, matured, or aligned 5m→1w.') +
         '</div>'
       );
     }
     return (
+      renderAlign(align) +
       sectionBlock('EARLY', 'Close to break — not broken yet', '#e6c878', early, 'Nothing close to a break on this TF.') +
       sectionBlock('LIVE', 'Happened now', '#62e3a0', live, 'No live break on this TF.') +
       sectionBlock('MATURED', 'Held now · Failed/Broke kept as history', '#6eb6ff', matured, 'No matured break on this TF.')
