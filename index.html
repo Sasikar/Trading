@@ -16,9 +16,9 @@
 .coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
 .coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
 .change{font-size:11px;font-weight:800;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}
-.tabs{display:flex;gap:4px;padding:4px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:6px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 16px}
 .tabs::-webkit-scrollbar{display:none}
-.tab{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:40px;min-width:max-content;border:0;background:transparent;color:#9aa6b5;font:800 12px Inter,system-ui,sans-serif;padding:0 12px;border-radius:10px;cursor:pointer;white-space:nowrap;letter-spacing:.02em}
+.tab{flex:1 1 calc(33.333% - 6px);min-width:0;display:inline-flex;align-items:center;justify-content:center;height:38px;border:0;background:transparent;color:#9aa6b5;font:800 11px Inter,system-ui,sans-serif;padding:0 8px;border-radius:10px;cursor:pointer;white-space:nowrap;letter-spacing:.02em}
 .tab.active{background:rgba(98,227,160,.28)!important;color:#f4f7fb!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.45)}
 .tab[data-tf="memegate"].active{background:rgba(98,227,160,.32)!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.55)}
 .price-now{padding:14px 16px;border-bottom:1px solid #ffffff0c;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -247,7 +247,8 @@
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card{padding:14px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card > *,#breakouts-panel .card > *,#hunter-panel .card > *{margin-left:0;margin-right:0}
 .vd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 14px;flex-wrap:wrap}
 .vd-name{font-size:18px;font-weight:900}
 .vd-name span{font-size:11px;color:#8491a1;font-weight:700}
@@ -268,10 +269,9 @@
 @media(max-width:720px){.vd-grid{grid-template-columns:1fr}}
 .coin-ca{
   display:grid;
-  grid-template-columns:92px minmax(0,1fr) auto auto;
+  grid-template-columns:88px minmax(0,1fr) 72px 72px;
   gap:8px;
   align-items:stretch;
-  margin:0 0 10px;
   width:100%;
 }
 .coin-ca select,.coin-ca input,.coin-ca button{
@@ -281,25 +281,25 @@
   background:#0b121a;
   color:#e8eef6;
   border-radius:10px;
-  padding:0 12px;
+  padding:0 10px;
   font:700 13px Inter,system-ui,sans-serif;
   margin:0;
 }
-.coin-ca select{max-width:none}
-.coin-ca input{min-width:0}
-.coin-ca button{flex:none;cursor:pointer;background:rgba(98,227,160,.2);border-color:rgba(98,227,160,.4);color:#c8f5dc;white-space:nowrap;padding:0 14px;width:auto}
+.coin-ca input{min-width:0;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.coin-ca button{cursor:pointer;background:rgba(98,227,160,.2);border-color:rgba(98,227,160,.4);color:#c8f5dc;white-space:nowrap;padding:0 8px}
 #coin-clear{background:rgba(255,111,124,.12)!important;border-color:rgba(255,111,124,.35)!important;color:#ffb0b8!important}
-@media(max-width:560px){
-  .coin-ca{grid-template-columns:88px 1fr 1fr}
+@media(max-width:720px){
+  .coin-ca{grid-template-columns:repeat(3,minmax(0,1fr))}
   .coin-ca input{grid-column:1/-1;grid-row:1}
-  .coin-ca select,.coin-ca button{grid-row:2}
-  .coin-ca button{width:100%}
+  .coin-ca select{grid-column:1;grid-row:2}
+  #coin-load{grid-column:2;grid-row:2}
+  #coin-clear{grid-column:3;grid-row:2}
 }
-.coin-meta{font-size:12px;color:#8491a1;margin:0 0 12px;line-height:1.45}
-#coin-recents-wrap{width:100%;margin:0 0 14px}
+.coin-meta{font-size:12px;color:#8491a1;line-height:1.45;word-break:break-word}
+#coin-recents-wrap{width:100%}
 #coin-recents{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(128px,1fr));
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
   gap:8px;
   max-height:168px;
   overflow-y:auto;
@@ -309,31 +309,35 @@
   display:flex!important;
   align-items:center;
   justify-content:space-between;
-  gap:6px;
+  gap:4px;
   min-height:40px;
   width:100%;
-  padding:6px 8px 6px 10px;
+  padding:0 8px 0 10px;
   border-radius:12px;
   box-sizing:border-box;
+  overflow:hidden;
 }
+.coin-recent-chip.on{border-color:rgba(98,227,160,.45)!important;background:rgba(98,227,160,.12)!important}
 .coin-recent-chip button[data-act="load"]{
   flex:1;
   min-width:0;
   max-width:none!important;
   text-align:left;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 .tf-grid,.coin-tf,#bo-tf{
   display:grid;
-  grid-template-columns:repeat(5,minmax(0,1fr));
+  grid-template-columns:repeat(10,minmax(0,1fr));
   gap:6px;
   width:100%;
-  margin:0 0 12px;
 }
 .tf-grid button,.coin-tf button,.bo-tf-btn{
   width:100%;
   min-width:0;
   height:40px;
-  padding:0 4px;
+  padding:0 2px;
   text-align:center;
   border:1px solid #2a3544;
   background:#0b121a;
@@ -347,17 +351,22 @@
   color:#f4f7fb!important;
   border-color:rgba(98,227,160,.45)!important;
 }
-.tool-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.tool-stack{display:flex;flex-direction:column;gap:10px;width:100%}
+.tool-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .tool-actions button{height:40px;padding:0 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#e8eef6;font:800 12px Inter,system-ui,sans-serif;cursor:pointer}
-#hu-list,#bo-list{display:flex;flex-direction:column;gap:10px}
-@media(max-width:420px){
+#hu-list,#bo-list{display:flex;flex-direction:column;gap:10px;width:100%}
+.recents-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.recents-head .lab{font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800}
+.recents-head button{height:32px;padding:0 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+@media(max-width:720px){
   .tf-grid,.coin-tf,#bo-tf{grid-template-columns:repeat(5,minmax(0,1fr))}
-  .tab{padding:0 10px;font-size:11px;height:36px}
+  .tab{font-size:11px;height:36px}
+  .shell{width:min(960px,calc(100% - 20px))}
 }
-
-
-
-
+@media(min-width:900px){
+  .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tab{flex:0 0 auto;padding:0 12px;font-size:12px;height:40px}
+}
 </style></head><body>
 <div class="shell"><main>
 <section class="section">
@@ -730,13 +739,13 @@
       <button type="button" id="coin-clear" onclick="try{window.clearCoin&&window.clearCoin()}catch(e){}" style="background:rgba(255,111,124,.12);border-color:rgba(255,111,124,.35);color:#ffb0b8">Clear</button>
     </div>
     <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
-    <div id="coin-recents-wrap" style="margin:0 0 14px;width:100%;box-sizing:border-box">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-        <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">RECENT CAs</div>
-        <button type="button" onclick="try{window.coinRecentsSync&&window.coinRecentsSync()}catch(e){}" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">Sync GitHub</button>
+    <div id="coin-recents-wrap">
+      <div class="recents-head">
+        <div class="lab">RECENT CAs</div>
+        <button type="button" onclick="try{window.coinRecentsSync&&window.coinRecentsSync()}catch(e){}">Sync GitHub</button>
       </div>
-      <div id="coin-recents-status" style="font-size:11px;color:#8491a1;margin:0 0 8px;line-height:1.35;word-break:break-word"></div>
-      <div id="coin-recents" style="display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto;width:100%"></div>
+      <div id="coin-recents-status" class="coin-meta"></div>
+      <div id="coin-recents"></div>
     </div>
     <div class="coin-tf" id="coin-tf">
       <button type="button" data-ctf="1m" onclick="try{window.setCoinTF&&window.setCoinTF('1m')}catch(e){}">1m</button>
