@@ -1,7 +1,29 @@
 {
-  "updated": "2026-09-14T02:41:09.347Z",
-  "count": 15,
+  "updated": "2026-09-14T02:55:46.149Z",
+  "count": 16,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump",
+      "name": "LMAO!",
+      "base": "LMAO!",
+      "t": 1789354134055,
+      "poolAddress": "AFaYrFH7hUYnkv5mbvbnRHwX29M9JzUL3ySGtQz69AUv",
+      "poolNetwork": "solana",
+      "poolLiq": 261314.88,
+      "poolCachedAt": 1789354134054
+    },
+    {
+      "chain": "solana",
+      "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+      "name": "USELESS",
+      "base": "USELESS",
+      "t": 1789353674190,
+      "poolAddress": "Q2sPHPdUWFMg7M7wwrQKLrn619cAucfRsmhVJffodSp",
+      "poolNetwork": "solana",
+      "poolLiq": 4503310,
+      "poolCachedAt": 1789353674189
+    },
     {
       "chain": "solana",
       "ca": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
@@ -67,17 +89,6 @@
       "poolNetwork": "solana",
       "poolLiq": 112033.53,
       "poolCachedAt": 1789319850321
-    },
-    {
-      "chain": "solana",
-      "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
-      "name": "USELESS",
-      "base": "USELESS",
-      "t": 1789319308906,
-      "poolAddress": "Q2sPHPdUWFMg7M7wwrQKLrn619cAucfRsmhVJffodSp",
-      "poolNetwork": "solana",
-      "poolLiq": 4568003.83,
-      "poolCachedAt": 1789319308905
     },
     {
       "chain": "solana",
