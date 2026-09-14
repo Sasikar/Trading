@@ -652,6 +652,9 @@
       try {
         window.showHunter(false);
       } catch (e) {}
+      try {
+        window.showVerdict(false);
+      } catch (e) {}
       if (panels) {
         panels.classList.add('hidden');
         panels.style.display = 'none';

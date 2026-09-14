@@ -757,6 +757,112 @@ export function matureStatusFrom(hit, rec) {
   return 'failed';
 }
 
+export const VERDICT_HZ = [
+  { id: 'short', label: 'Short', sub: '5m · 15m · 1h', tfs: ['5m', '15m', '1h'] },
+  { id: 'medium', label: 'Medium', sub: '4h · 1d', tfs: ['4h', '1d'] },
+  { id: 'long', label: 'Long', sub: '1d · 1w', tfs: ['1d', '1w'] }
+];
+
+export function verdictCall(hz, byTf, tick) {
+  const xs = (hz.tfs || []).map((tf) => byTf[tf]).filter(Boolean);
+  const tags = xs.map((h) => String(h.tf).toUpperCase() + ' ' + (h.section || h.state || 'WATCH'));
+  const stretched = xs.some((h) => h.state === 'STRETCHED');
+  const under = xs.some((h) => h.level > 0 && h.spot > 0 && h.spot < h.level);
+  const live = xs.filter((h) => h.section === 'live');
+  const held = xs.filter((h) => h.section === 'matured');
+  const early = xs.filter((h) => h.section === 'early');
+  if (under) {
+    const h = xs.find((x) => x.level > 0 && x.spot > 0 && x.spot < x.level);
+    return {
+      call: 'EXIT',
+      why:
+        'Spot is back under the breakout level' +
+        (h && h.levelTxt ? ' (' + h.levelTxt + ')' : '') +
+        '. That is the exit.',
+      reasons: tags
+    };
+  }
+  if (stretched) {
+    return {
+      call: 'EXIT',
+      why: 'Already stretched on ' + hz.label.toLowerCase() + ' — late, not a hold.',
+      reasons: tags
+    };
+  }
+  if (live.length) {
+    return {
+      call: 'HOLD',
+      why:
+        'Live break on ' +
+        live.map((h) => String(h.tf).toUpperCase()).join(', ') +
+        '. Stay until a candle closes back under the level.',
+      reasons: tags
+    };
+  }
+  if (held.length) {
+    const h = held.find((x) => x.levelTxt) || held[0];
+    return {
+      call: 'HOLD',
+      why:
+        'Still holding' +
+        (h.levelTxt ? ' above (' + h.levelTxt + ')' : '') +
+        ' on ' +
+        held.map((x) => String(x.tf).toUpperCase()).join(', ') +
+        '.',
+      reasons: tags
+    };
+  }
+  if (early.length) {
+    return {
+      call: 'HOLD',
+      why:
+        'Close to break on ' +
+        early.map((h) => String(h.tf).toUpperCase()).join(', ') +
+        ' — setup is alive, not an exit.',
+      reasons: tags
+    };
+  }
+  const m5 = (tick && tick.m5) || 0;
+  const h1 = (tick && tick.h1) || 0;
+  const h6 = (tick && tick.h6) || 0;
+  const h24 = (tick && tick.h24) || 0;
+  if (hz.id === 'short') {
+    if (h1 > 0 && m5 >= -0.5) {
+      return {
+        call: 'HOLD',
+        why: 'Short tape still green (1h ' + pctStr(h1) + ', 5m ' + pctStr(m5) + ').',
+        reasons: tags
+      };
+    }
+    return {
+      call: 'EXIT',
+      why: 'No short break and 1h is not green (1h ' + pctStr(h1) + ', 5m ' + pctStr(m5) + ').',
+      reasons: tags
+    };
+  }
+  if (hz.id === 'medium') {
+    if (h1 > 0 && h6 >= 8) {
+      return {
+        call: 'HOLD',
+        why: 'Medium still holding on Dex 1h/6h (1h ' + pctStr(h1) + ', 6h ' + pctStr(h6) + ').',
+        reasons: tags
+      };
+    }
+    return {
+      call: 'EXIT',
+      why: 'Medium hold is dead (1h ' + pctStr(h1) + ', 6h ' + pctStr(h6) + ').',
+      reasons: tags
+    };
+  }
+  if (h24 >= 8) {
+    return { call: 'HOLD', why: 'Long tape 24h still up (' + pctStr(h24) + ').', reasons: tags };
+  }
+  if (h24 < 0) {
+    return { call: 'EXIT', why: 'Long tape 24h is red (' + pctStr(h24) + ').', reasons: tags };
+  }
+  return { call: 'EXIT', why: 'No 1d/1w breakout and 24h is flat (' + pctStr(h24) + ').', reasons: tags };
+}
+
 export function hitFrom(row, tick, det, tf, focus) {
   const mom = momentumFromTick(tick || {});
   const expl = describeWhy(tf, det, tick);
@@ -1332,6 +1438,59 @@ export class Engine {
       .sort((a, b) => (b.align || 0) - (a.align || 0) || (b.score || 0) - (a.score || 0));
   }
 
+  verdictFor(ca) {
+    const want = String(ca || '').toLowerCase();
+    const watch = this.store.getWatch();
+    const coins = watch.map((w) => ({ ca: w.ca, name: w.name, chain: w.chain }));
+    if (!want) return { coins, verdict: null };
+    const row = watch.find((w) => String(w.ca).toLowerCase() === want);
+    if (!row) return { coins, verdict: null, error: 'not a saved coin' };
+    const focus = this.store.getMeta('focus_ca') || '';
+    const byTf = {};
+    for (const tf of ['5m', '15m', '1h', '4h', '1d', '1w']) {
+      byTf[tf] = this.evaluateRow(row, tf, focus);
+    }
+    const tick = this.store.getTick(row.ca);
+    const horizons = VERDICT_HZ.map((hz) => {
+      const v = verdictCall(hz, byTf, tick);
+      return {
+        id: hz.id,
+        label: hz.label,
+        sub: hz.sub,
+        call: v.call,
+        why: v.why,
+        reasons: v.reasons,
+        tfs: hz.tfs.map((tf) => {
+          const h = byTf[tf] || {};
+          return {
+            tf,
+            section: h.section || '',
+            state: h.state,
+            event: h.event,
+            levelTxt: h.levelTxt || '',
+            distPct: h.distPct
+          };
+        })
+      };
+    });
+    return {
+      coins,
+      verdict: {
+        name: (tick && tick.name) || row.name,
+        ca: row.ca,
+        chain: row.chain,
+        spot: tick && tick.price,
+        liq: tick && tick.liq,
+        m5: tick && tick.m5,
+        h1: tick && tick.h1,
+        h6: tick && tick.h6,
+        h24: tick && tick.h24,
+        dexUrl: tick && tick.dexUrl,
+        horizons
+      }
+    };
+  }
+
   syncMatured(tf, all, now) {
     let map = {};
     try {
@@ -1854,6 +2013,10 @@ export async function handleApi(engine, request) {
       align,
       count: hits.length
     });
+  }
+  if (path === '/verdict' || path === '/api/verdict') {
+    const ca = url.searchParams.get('ca') || '';
+    return json(engine.verdictFor(ca));
   }
   if (path === '/hunter' || path === '/api/hunter') {
     if (method === 'POST') {
