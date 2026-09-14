@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-14T03:39:59.290Z",
+  "updated": "2026-09-14T04:10:20.669Z",
   "count": 16,
   "items": [
     {
@@ -7,11 +7,22 @@
       "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
       "name": "CATE",
       "base": "CATE",
-      "t": 1789355172236,
+      "t": 1789357542230,
       "poolAddress": "HMzvsEEmtzHhvZNw9uwbaG85HCTmFnkbhzUx16cy7ca3",
       "poolNetwork": "solana",
-      "poolLiq": 2799667.08,
-      "poolCachedAt": 1789355172236
+      "poolLiq": 2857857.77,
+      "poolCachedAt": 1789357542230
+    },
+    {
+      "chain": "solana",
+      "ca": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
+      "name": "biketyson",
+      "base": "biketyson",
+      "t": 1789357539226,
+      "poolAddress": "41rzTMB7JHPTyMXzrYwdqnBecJRhkb8KHYAjrQ9cYxJx",
+      "poolNetwork": "solana",
+      "poolLiq": 203042.1,
+      "poolCachedAt": 1789357539226
     },
     {
       "chain": "solana",
@@ -34,17 +45,6 @@
       "poolNetwork": "solana",
       "poolLiq": 4503310,
       "poolCachedAt": 1789353674189
-    },
-    {
-      "chain": "solana",
-      "ca": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
-      "name": "biketyson",
-      "base": "biketyson",
-      "t": 1789351290010,
-      "poolAddress": "41rzTMB7JHPTyMXzrYwdqnBecJRhkb8KHYAjrQ9cYxJx",
-      "poolNetwork": "solana",
-      "poolLiq": 188229.44,
-      "poolCachedAt": 1789351290009
     },
     {
       "chain": "solana",
