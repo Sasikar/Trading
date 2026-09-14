@@ -38,6 +38,7 @@ export function chainIdOf(chain) {
   const c = String(chain || '').toLowerCase();
   if (c === 'sol' || c === 'solana') return 'solana';
   if (c === 'eth' || c === 'ethereum') return 'ethereum';
+  if (c === 'robinhood' || c === 'hood' || c === 'rh') return 'robinhood';
   if (c === 'base') return 'base';
   if (c === 'bsc' || c === 'bnb') return 'bsc';
   return c || 'solana';
@@ -198,17 +199,19 @@ export function pairToTick(pair, row, now) {
 }
 
 export function hunterLinks(ca, chain) {
-  const c = String(chain || 'solana').toLowerCase();
-  const sol = c === 'solana' || c === 'sol';
-  const bm = sol ? 'solana' : 'ethereum';
+  const ch = chainIdOf(chain);
+  const dexChain = ch === 'solana' ? 'solana' : ch === 'robinhood' ? 'robinhood' : 'ethereum';
+  const bm = dexChain;
   const links = {
     bubblemaps: 'https://app.bubblemaps.io/' + bm + '/token/' + ca,
     scanner: 'https://sasikar.github.io/Trading/scanner.html',
-    dex: 'https://dexscreener.com/' + (sol ? 'solana' : 'ethereum') + '/' + ca
+    dex: 'https://dexscreener.com/' + dexChain + '/' + ca
   };
-  if (sol) {
+  if (ch === 'solana') {
     links.trench = 'https://trench.bot/clusters/' + encodeURIComponent(ca);
     links.rugcheck = 'https://rugcheck.xyz/tokens/' + encodeURIComponent(ca);
+  } else if (ch === 'robinhood') {
+    links.tokensniffer = 'https://tokensniffer.com/';
   } else {
     links.honeypot = 'https://honeypot.is/ethereum?address=' + encodeURIComponent(ca);
     links.goplus = 'https://gopluslabs.io/token-security/1/' + ca;
@@ -260,19 +263,24 @@ export async function fetchHunterSeeds() {
     const a = String(ca || '').trim();
     if (!a) return;
     if (skipBase.has(a.toLowerCase())) return;
-    const ch = String(chain || 'solana').toLowerCase();
-    if (ch !== 'solana' && ch !== 'ethereum') return;
+    const ch = chainIdOf(chain);
+    if (ch !== 'solana' && ch !== 'ethereum' && ch !== 'robinhood') return;
     if (isBoost) boosted.add(a.toLowerCase());
     seeds.push({ ca: a, chain: ch, boosted: !!isBoost, src, pair: pair || null });
   };
-  for (const q of ['pump', 'SOL', 'pepe', 'ETH']) {
+  const skipSym = new Set(['weth', 'usdg', 'usdc', 'usdt', 'sol', 'eth', 'wbtc']);
+  for (const q of ['pump', 'SOL', 'pepe', 'ETH', 'robinhood']) {
     try {
       calls++;
       const s = await fetchJSON('https://api.dexscreener.com/latest/dex/search?q=' + encodeURIComponent(q), 1);
       for (const p of s.pairs || []) {
-        if (!p || (p.chainId !== 'solana' && p.chainId !== 'ethereum')) continue;
+        if (!p) continue;
+        const ch = chainIdOf(p.chainId);
+        if (ch !== 'solana' && ch !== 'ethereum' && ch !== 'robinhood') continue;
+        const sym = String((p.baseToken && p.baseToken.symbol) || '').toLowerCase();
+        if (skipSym.has(sym)) continue;
         const ca = p.baseToken && p.baseToken.address;
-        push(ca, p.chainId, 'search', false, p);
+        push(ca, ch, 'search', false, p);
       }
     } catch (e) {}
   }
@@ -1334,7 +1342,7 @@ export class Engine {
   }
   markHunterVerified(ca, tool) {
     const t = String(tool || '').toLowerCase();
-    if (!/^(bubblemaps|trench|rugcheck|honeypot|goplus)$/.test(t)) throw new Error('bad tool');
+    if (!/^(bubblemaps|trench|rugcheck|honeypot|goplus|tokensniffer|dex)$/.test(t)) throw new Error('bad tool');
     const m = this.hunterVerifiedMap();
     const k = String(ca || '').toLowerCase();
     if (!k) throw new Error('no ca');
@@ -1373,11 +1381,16 @@ export class Engine {
     return (hits || []).map((h) => {
       const v = vmap[String(h.ca).toLowerCase()] || {};
       const links = hunterLinks(h.ca, h.chain);
+      if (h.dexUrl) links.dex = h.dexUrl;
       return Object.assign({}, h, {
         verified: {
           bubblemaps: !!v.bubblemaps,
           trench: !!v.trench,
-          rugcheck: !!v.rugcheck
+          rugcheck: !!v.rugcheck,
+          honeypot: !!v.honeypot,
+          goplus: !!v.goplus,
+          tokensniffer: !!v.tokensniffer,
+          dex: !!v.dex
         },
         saved: watch.has(String(h.ca).toLowerCase()),
         links

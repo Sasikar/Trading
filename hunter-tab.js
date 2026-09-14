@@ -48,16 +48,29 @@
     { id: 'honeypot', title: 'Honeypot.is', domain: 'honeypot.is' },
     { id: 'goplus', title: 'GoPlus', domain: 'gopluslabs.io' }
   ];
+  const TOOLS_RH = [
+    { id: 'bubblemaps', title: 'Bubblemaps', domain: 'bubblemaps.io' },
+    { id: 'tokensniffer', title: 'Token Sniffer', domain: 'tokensniffer.com' },
+    { id: 'dex', title: 'DexScreener', domain: 'dexscreener.com' }
+  ];
+  function chainKind(chain) {
+    const c = String(chain || '').toLowerCase();
+    if (c === 'ethereum' || c === 'eth') return 'eth';
+    if (c === 'robinhood' || c === 'hood' || c === 'rh') return 'rh';
+    return 'sol';
+  }
   function isSol(chain) {
-    const c = String(chain || 'solana').toLowerCase();
-    return c === 'solana' || c === 'sol';
+    return chainKind(chain) === 'sol';
   }
   function chainBadge(chain) {
-    const sol = isSol(chain);
-    const src = sol
-      ? 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png'
-      : 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png';
-    const label = sol ? 'SOL' : 'ETH';
+    const kind = chainKind(chain);
+    const src =
+      kind === 'eth'
+        ? 'https://cdn.dexscreener.com/cms/chain/ethereum.png'
+        : kind === 'rh'
+          ? 'https://cdn.dexscreener.com/cms/chain/robinhood.png'
+          : 'https://cdn.dexscreener.com/cms/chain/solana.png';
+    const label = kind === 'eth' ? 'ETH' : kind === 'rh' ? 'HOOD' : 'SOL';
     return (
       '<img src="' +
       src +
@@ -65,7 +78,7 @@
       label +
       '" title="' +
       label +
-      '" width="16" height="16" style="width:16px;height:16px;border-radius:50%;flex-shrink:0" />'
+      '" width="16" height="16" style="width:16px;height:16px;border-radius:50%;flex-shrink:0;background:#121a24" />'
     );
   }
   function toolBtn(tool, url, on, ca) {
@@ -106,9 +119,10 @@
   function renderCard(h) {
     const v = h.verified || {};
     const links = h.links || {};
-    const sol = isSol(h.chain);
-    const both = sol ? v.bubblemaps && v.trench : v.bubblemaps && v.honeypot;
-    const tools = sol ? TOOLS_SOL : TOOLS_ETH;
+    const kind = chainKind(h.chain);
+    const both =
+      kind === 'sol' ? v.bubblemaps && v.trench : kind === 'rh' ? v.bubblemaps : v.bubblemaps && v.honeypot;
+    const tools = kind === 'sol' ? TOOLS_SOL : kind === 'rh' ? TOOLS_RH : TOOLS_ETH;
     const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
     return (
       '<div style="padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a">' +
@@ -156,7 +170,7 @@
       '<a href="scanner.html" target="_blank" rel="noopener" class="hu-scanner" data-hu-ca="' +
       esc(h.ca) +
       '" data-hu-chain="' +
-      (sol ? 'sol' : '1') +
+      (kind === 'sol' ? 'sol' : kind === 'rh' ? 'robinhood' : '1') +
       '" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;font-size:11px;text-decoration:none">Full scanner</a>' +
       '</div></div>'
     );
