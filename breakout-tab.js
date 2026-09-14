@@ -111,6 +111,7 @@
           'x' +
           (h.sizePct ? ' · size ' + h.sizePct + '%' : '') +
           (tape ? ' · ' + tape : '') +
+          (h.live ? ' · Dex live until tape fills' : '') +
           '</div>' +
           '<div style="margin-top:4px;font-size:11px;color:#8491a1">' +
           caShort +

@@ -3,6 +3,7 @@
  * DexScreener is the quote tape. We own the candles.
  */
 export const NTFY_DEFAULT = 'MyTradingMemeBreakout44';
+export const NTFY_TOPICS_EXTRA = ['WildMemeMover'];
 export const WATCHLIST_DEFAULT = 'https://sasikar.github.io/Trading/data/ca-recents.json';
 export const WATCHLIST_FALLBACK =
   'https://raw.githubusercontent.com/Sasikar/Trading/master/data/ca-recents.json';
@@ -389,6 +390,45 @@ export function detectLegacy4h(tick) {
   };
 }
 
+/** Immediate 5m label from Dex m5 while our 5m tape is still filling. */
+export function detectLive5m(tick) {
+  const mom = momentumFromTick(tick);
+  const m5 = tick.m5 || 0,
+    h1 = tick.h1 || 0;
+  let event = '—',
+    state = 'WATCH',
+    fresh = false,
+    held = false,
+    age = 99;
+  if (m5 >= 4 && mom.volX >= 1.5 && !mom.stretched) {
+    event = 'NEW BREAKOUT';
+    fresh = true;
+    held = true;
+    age = 0;
+    state = 'EARLY';
+  } else if (m5 >= 2 && h1 > 0) {
+    event = 'BREAKOUT HELD';
+    held = true;
+    age = 1;
+    state = mom.volX >= 1.3 && mom.buyR >= 0.52 ? 'STRONG CONFIRMED' : 'EARLY';
+  }
+  if (mom.stretched && m5 >= 8) state = 'STRETCHED';
+  let score = mom.score;
+  if (state === 'STRETCHED') score = Math.max(0, score - 12);
+  return {
+    state,
+    event,
+    fresh,
+    held,
+    age,
+    score: Math.max(0, Math.min(100, Math.round(score))),
+    bars: 0,
+    need: 0,
+    interesting: state !== 'WATCH' || fresh || held || score >= 55,
+    live: true
+  };
+}
+
 export function sizePctOf(state) {
   if (state === 'STRONG CONFIRMED') return 80;
   if (state === 'EARLY') return 35;
@@ -425,12 +465,19 @@ export function hitFrom(row, tick, det, tf, focus) {
     volX: mom.volX,
     buyR: mom.buyR,
     dexUrl: tick ? tick.dexUrl : '',
-    pairAddress: tick ? tick.pairAddress : row.poolAddress || ''
+    pairAddress: tick ? tick.pairAddress : row.poolAddress || '',
+    live: !!det.live
   };
 }
 
 export async function sendNtfy(topic, title, message) {
-  const topics = [...new Set([topic, NTFY_DEFAULT].map((t) => String(t || '').trim()).filter(Boolean))];
+  const topics = [
+    ...new Set(
+      [topic, NTFY_DEFAULT, ...NTFY_TOPICS_EXTRA]
+        .map((t) => String(t || '').trim())
+        .filter(Boolean)
+    )
+  ];
   let lastErr = null;
   let ok = 0;
   for (const t of topics) {
@@ -548,6 +595,12 @@ export class Engine {
     this.lastErr = '';
     this.dexCallsMin = [];
     this.rateLimitedUntil = 0;
+    try {
+      const saved = JSON.parse(store.getMeta('dex_calls_min') || '[]');
+      if (Array.isArray(saved)) this.dexCallsMin = saved.filter((t) => Number.isFinite(+t)).map(Number);
+    } catch (e) {}
+    this.rateLimitedUntil = +store.getMeta('rate_limited_until') || 0;
+    this.lastErr = store.getMeta('last_err') || '';
   }
 
   topic() {
@@ -617,8 +670,10 @@ export class Engine {
       return hit.fresh && hit.event === 'NEW BREAKOUT';
     }
     if (tf === '5m' || tf === '10m') {
+      if (hit.live && tf !== '5m') return false;
       return hit.fresh && hit.event === 'NEW BREAKOUT' && hit.score >= 55;
     }
+    if (hit.live && (tf === '15m' || tf === '30m')) return false;
     return hit.fresh && hit.held && hit.age <= 2 && (hit.score >= 55 || hit.event === 'NEW BREAKOUT');
   }
 
@@ -679,6 +734,9 @@ export class Engine {
       det = detectTapeBreakout(closed, tf, tick);
       if (det.state === 'WARMING' && (tf === '4h' || tf === '2h' || tf === '1h')) {
         const live = detectLegacy4h(tick);
+        det = Object.assign({}, live, { bars: det.bars, need: det.need });
+      } else if (det.state === 'WARMING' && tf === '5m') {
+        const live = detectLive5m(tick);
         det = Object.assign({}, live, { bars: det.bars, need: det.need });
       }
     } else {
@@ -820,12 +878,18 @@ export class Engine {
       this.store.setMeta('last_n_alert', String(nAlert));
       this.store.setMeta('last_scanned', String(scanned));
       this.store.setMeta('last_errors', String(errors));
+      this.dexCallsLastMin(now);
+      this.store.setMeta('dex_calls_min', JSON.stringify(this.dexCallsMin));
+      this.store.setMeta('rate_limited_until', String(this.rateLimitedUntil || 0));
+      this.store.setMeta('last_err', this.lastErr || '');
       if (now % 3600000 < 30000) this.store.prune(now);
       this.lastErr = errors && !scanned ? this.lastErr : errors ? errors + ' without pool' : '';
       return { scanned, errors, nAlert, doAll, targets: targets.length };
     } catch (e) {
       this.lastErr = String(e && e.message ? e.message : e);
       if (/429/.test(this.lastErr)) this.rateLimitedUntil = now + 60000;
+      this.store.setMeta('rate_limited_until', String(this.rateLimitedUntil || 0));
+      this.store.setMeta('last_err', this.lastErr || '');
       return { error: this.lastErr };
     } finally {
       this.busy = false;

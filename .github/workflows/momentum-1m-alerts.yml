@@ -1,37 +1,19 @@
-name: 1M Momentum breakout alerts (ntfy)
+name: 1M Momentum breakout alerts (ntfy) — DISABLED
 
-# DexScreener 5m/1h — 1–2 HTTP calls, no GeckoTerminal.
-# State published via Contents API (GITHUB_TOKEN).
+# Replaced by Cloudflare OHLCV worker focus-1m (off by default).
+# Kept as manual-only so it cannot duplicate ntfy.
+
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
-  repository_dispatch:
-    types: [momentum-1m-scan]
-
-concurrency:
-  group: momentum-1m-alerts
-  cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  scan:
+  skipped:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: DexScreener momentum pass + publish state
-        env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
+      - name: Disabled
         run: |
-          set -e
-          export NTFY_TOPIC="${NTFY_TOPIC:-MyTradingMemeBreakout44}"
-          echo "momentum PASS · topic=$NTFY_TOPIC · $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          node scripts/momentum-1m-alert.mjs
+          echo "This scanner is retired. 1m alerts are focus-only on the OHLCV worker."
+          echo "https://trading-ohlcv.sasipudi.workers.dev/status"

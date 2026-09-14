@@ -1,35 +1,19 @@
-name: Breakout meme alerts (ntfy)
+name: Breakout meme alerts (ntfy) — DISABLED
 
-# DexScreener-only. Publishes scan JSON + ntfy. Does not deploy the site.
+# Replaced by Cloudflare OHLCV worker (trading-ohlcv.sasipudi.workers.dev).
+# Kept as manual-only so it cannot duplicate ntfy.
+
 on:
-  schedule:
-    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  scan:
+  skipped:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Scan saved CAs + ntfy (DexScreener)
-        env:
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          GITHUB_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          BREAKOUT_TFS: '4h,1d'
+      - name: Disabled
         run: |
-          set -e
-          export NTFY_TOPIC="${NTFY_TOPIC:-MyTradingMemeBreakout44}"
-          echo "breakout PASS · topic=$NTFY_TOPIC · $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          node scripts/breakout-alert.mjs
+          echo "This scanner is retired. Alerts now come from the OHLCV worker."
+          echo "https://trading-ohlcv.sasipudi.workers.dev/status"
