@@ -445,8 +445,80 @@ export function sizePctOf(state) {
   return 0;
 }
 
+function pctStr(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return '—';
+  return (x >= 0 ? '+' : '') + x.toFixed(1) + '%';
+}
+
+/** Plain-language reasons. Pages only display this; they do not compute it. */
+export function describeWhy(tf, det, tick) {
+  const mom = momentumFromTick(tick || {});
+  const m5 = tick ? tick.m5 : 0;
+  const h1 = tick ? tick.h1 : 0;
+  const h6 = tick ? tick.h6 : 0;
+  const h24 = tick ? tick.h24 : 0;
+  const reasons = [];
+  const tfu = String(tf || '').toUpperCase();
+
+  if (det.state === 'WARMING') {
+    return {
+      why: 'Not a breakout yet. Need more ' + tfu + ' candles first (' + (det.bars || 0) + '/' + (det.need || 0) + ').',
+      reasons: ['We only call a ' + tfu + ' break after enough closed candles, so one noisy print does not count.']
+    };
+  }
+
+  if (det.live) {
+    reasons.push('Tape for ' + tfu + ' is still filling, so this label uses Dex’s last 5m / 1h / 6h windows');
+    reasons.push('Dex 5m ' + pctStr(m5) + ' · 1h ' + pctStr(h1) + ' · 6h ' + pctStr(h6) + ' · vol ' + mom.volX + 'x');
+    if (tf === '5m') {
+      if (m5 >= 4 && mom.volX >= 1.5) reasons.push('Rule hit: Dex 5m ≥ +4% and volume ≥ 1.5x usual 5m');
+      else if (m5 >= 2 && h1 > 0) reasons.push('Rule hit: Dex 5m still ≥ +2% and 1h is green — treated as held');
+    } else if (m5 >= 3 && h1 >= 2 && mom.volX >= 1.5) {
+      reasons.push('Rule hit: Dex 5m ≥ +3%, 1h ≥ +2%, volume ≥ 1.5x');
+    } else if (h1 > 0 && h6 >= 8) {
+      reasons.push('Rule hit: 1h still green and 6h ≥ +8% — move is holding, not brand new');
+    }
+  } else if (TF_SEC[tf]) {
+    reasons.push('This is our ' + tfu + ' candle vs the recent high — not “Dex 5m is pumping”');
+    if (det.ret != null) reasons.push('This ' + tfu + ' bar ' + pctStr(det.ret) + ' from open to close');
+    if (det.runup != null) reasons.push('Vs recent ' + tfu + ' high: ' + pctStr(det.runup));
+    reasons.push('Closed ' + tfu + ' bars ' + (det.bars || 0) + '/' + (det.need || 0) + ' needed');
+    reasons.push('Dex snapshot: 5m ' + pctStr(m5) + ' · 1h ' + pctStr(h1) + ' · vol ' + mom.volX + 'x usual 5m');
+    if ((m5 || 0) < 1 && det.event === 'NEW BREAKOUT') {
+      reasons.push('Dex last 5m is weak (' + pctStr(m5) + ') — this fired on a range break, not a 5m pump. Treat as noisy');
+    }
+  } else {
+    reasons.push('Daily/weekly read from Dex 6h/24h windows');
+    reasons.push('Dex 6h ' + pctStr(h6) + ' · 24h ' + pctStr(h24) + ' · vol ' + mom.volX + 'x');
+  }
+
+  if (mom.stretched) reasons.push('Caution: already stretched (6h ' + pctStr(h6) + ' · 24h ' + pctStr(h24) + ') — often late');
+  else reasons.push('Not stretched yet (6h ' + pctStr(h6) + ' · 24h ' + pctStr(h24) + ')');
+
+  let why;
+  if (det.event === 'NEW BREAKOUT' && det.live) {
+    why =
+      'EARLY live read: Dex shows a fresh pop with volume on this timeframe. Not confirmed — first push only.';
+  } else if (det.event === 'NEW BREAKOUT') {
+    why =
+      'EARLY: the latest ' +
+      tfu +
+      ' candle closed above the recent high with extra volume. First push, not a guaranteed runner.';
+  } else if (det.event === 'BREAKOUT HELD') {
+    why = 'Still holding above the breakout level on ' + tfu + '. Move started; it has not failed yet.';
+  } else if (det.state === 'STRETCHED') {
+    why = 'Already extended on higher Dex windows. High chance this is late, not an early break.';
+  } else {
+    why = 'No breakout. Price is still inside the recent ' + tfu + ' range.';
+    if (!reasons.length) reasons.push('Dex 5m ' + pctStr(m5) + ' · 1h ' + pctStr(h1) + ' · vol ' + mom.volX + 'x');
+  }
+  return { why, reasons };
+}
+
 export function hitFrom(row, tick, det, tf, focus) {
   const mom = momentumFromTick(tick || {});
+  const expl = describeWhy(tf, det, tick);
   return {
     name: (tick && tick.name) || row.name || row.ca.slice(0, 8),
     chain: (tick && tick.chain) || row.chain,
@@ -476,7 +548,9 @@ export function hitFrom(row, tick, det, tf, focus) {
     buyR: mom.buyR,
     dexUrl: tick ? tick.dexUrl : '',
     pairAddress: tick ? tick.pairAddress : row.poolAddress || '',
-    live: !!det.live
+    live: !!det.live,
+    why: expl.why,
+    reasons: expl.reasons
   };
 }
 
@@ -837,12 +911,17 @@ export class Engine {
     const now = Date.now();
     const key = tf === '1m' ? hit.ca.toLowerCase() + '|1m' : hit.ca.toLowerCase() + '|coin';
     if (now - this.store.getAlert(key) < this.cooldownMs(tf === '1m' ? '1m' : '4h')) return false;
-    const title = '🚀 ' + hit.name + ' · ' + String(tf).toUpperCase() + ' breakout';
+    const title = '🚀 ' + hit.name + ' · ' + String(tf).toUpperCase() + ' · ' + hit.event;
     const msg = [
       hit.name + ' (' + (hit.chain === 'solana' ? 'SOL' : 'ETH') + ')',
-      'Event: ' + hit.event + ' · ' + hit.state + ' · score ' + hit.score,
-      'TF ' + tf,
-      '5m ' + hit.m5 + '% · 1h ' + hit.h1 + '% · vol ' + hit.volX + 'x',
+      hit.state + ' · score ' + hit.score + '/100 · TF ' + String(tf).toUpperCase(),
+      '',
+      'Why it fired',
+      hit.why || 'Range break on ' + tf,
+      '',
+      ...(hit.reasons && hit.reasons.length ? hit.reasons.map((r) => '• ' + r) : []),
+      '',
+      'Dex 5m ' + pctStr(hit.m5) + ' · 1h ' + pctStr(hit.h1) + ' · vol ' + hit.volX + 'x',
       'CA: ' + hit.ca,
       'https://sasikar.github.io/Trading/index.html?tab=breakouts'
     ].join('\n');
@@ -884,6 +963,8 @@ export class Engine {
         event: hit.event,
         state: hit.state,
         score: hit.score,
+        why: hit.why || '',
+        reasons: hit.reasons || [],
         via,
         at: new Date(now).toISOString()
       })

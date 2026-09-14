@@ -113,6 +113,23 @@
           (tape ? ' · ' + tape : '') +
           (h.live ? ' · Dex live until tape fills' : '') +
           '</div>' +
+          (h.why
+            ? '<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:#121a24;border:1px solid #243041">' +
+              '<div style="font-size:10px;letter-spacing:.06em;font-weight:800;color:#8491a1">WHY THIS LABEL</div>' +
+              '<div style="margin-top:4px;font-size:12px;color:#e8eef6;line-height:1.45">' +
+              h.why +
+              '</div>' +
+              (h.reasons && h.reasons.length
+                ? '<div style="margin-top:6px;font-size:11px;color:#c5d0dc;line-height:1.45">' +
+                  h.reasons
+                    .map(function (r) {
+                      return '• ' + r;
+                    })
+                    .join('<br>') +
+                  '</div>'
+                : '') +
+              '</div>'
+            : '') +
           '<div style="margin-top:4px;font-size:11px;color:#8491a1">' +
           caShort +
           (h.liq ? ' · liq $' + Math.round(h.liq).toLocaleString() : '') +
