@@ -197,6 +197,73 @@ export function pairToTick(pair, row, now) {
   };
 }
 
+export function hunterLinks(ca, chain) {
+  const c = String(chain || 'solana').toLowerCase();
+  const sol = c === 'solana' || c === 'sol';
+  const bm = sol ? 'solana' : c === 'ethereum' || c === 'eth' ? 'ethereum' : c === 'bsc' ? 'bsc' : 'base';
+  return {
+    bubblemaps: 'https://app.bubblemaps.io/' + bm + '/token/' + ca,
+    trench: 'https://trench.bot/clusters/' + encodeURIComponent(ca),
+    rugcheck: 'https://rugcheck.xyz/tokens/' + encodeURIComponent(ca),
+    scanner: 'https://sasikar.github.io/Trading/scanner.html',
+    dex: 'https://dexscreener.com/' + (sol ? 'solana' : bm) + '/' + ca
+  };
+}
+
+export function hunterPass(tick, pair, now) {
+  if ((tick.liq || 0) < 25000) return false;
+  const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
+  if (created) {
+    const age = now - created;
+    if (age < 15 * 60e3) return false;
+    if (age > 5 * 86400e3) return false;
+  }
+  if ((tick.m5 || 0) <= 0 || (tick.h1 || 0) <= 0) return false;
+  if ((tick.vol5m || 0) < 500) return false;
+  const n = (tick.buys5m || 0) + (tick.sells5m || 0);
+  if (n >= 8 && tick.buys5m < tick.sells5m) return false;
+  const mom = momentumFromTick(tick);
+  if (mom.stretched) return false;
+  if (mom.score < 28) return false;
+  return true;
+}
+
+export async function fetchHunterSeeds() {
+  const seeds = [];
+  const boosted = new Set();
+  let calls = 0;
+  const push = (ca, chain, src, isBoost) => {
+    const a = String(ca || '').trim();
+    if (!a) return;
+    if (isBoost) boosted.add(a.toLowerCase());
+    seeds.push({ ca: a, chain: chain || 'solana', boosted: !!isBoost, src });
+  };
+  try {
+    calls++;
+    const prof = await fetchJSON('https://api.dexscreener.com/token-profiles/latest/v1', 1);
+    for (const p of prof || []) {
+      if (String(p.chainId || '').toLowerCase() === 'solana') push(p.tokenAddress, 'solana', 'profile', false);
+    }
+  } catch (e) {}
+  try {
+    calls++;
+    const b = await fetchJSON('https://api.dexscreener.com/token-boosts/latest/v1', 1);
+    for (const p of b || []) {
+      if (String(p.chainId || '').toLowerCase() === 'solana') push(p.tokenAddress, 'solana', 'boost', true);
+    }
+  } catch (e) {}
+  try {
+    calls++;
+    const s = await fetchJSON('https://api.dexscreener.com/latest/dex/search?q=solana', 1);
+    for (const p of (s.pairs || []).slice(0, 40)) {
+      if (p && p.chainId === 'solana' && p.baseToken && p.baseToken.address)
+        push(p.baseToken.address, 'solana', 'search', false);
+    }
+  } catch (e) {}
+  for (const s of seeds) if (boosted.has(s.ca.toLowerCase())) s.boosted = true;
+  return { seeds, calls };
+}
+
 function volXOf(tick) {
   const vh1 = tick.vol1h || 0;
   const vm5 = tick.vol5m || 0;
@@ -1202,8 +1269,169 @@ export class Engine {
 
   async refreshWatch() {
     const rows = await fetchWatchlist(this.watchUrl());
+    let extra = [];
+    try {
+      extra = JSON.parse(this.store.getMeta('watch_extra') || '[]');
+    } catch (e) {}
+    const seen = new Set(rows.map((r) => r.ca.toLowerCase()));
+    for (const e of extra) {
+      if (!e || !e.ca || seen.has(String(e.ca).toLowerCase())) continue;
+      rows.push({
+        chain: e.chain || 'solana',
+        ca: e.ca,
+        name: e.name || '',
+        poolAddress: e.poolAddress || ''
+      });
+      seen.add(String(e.ca).toLowerCase());
+    }
     this.store.setWatch(rows);
     return rows;
+  }
+
+  hunterHits() {
+    try {
+      return JSON.parse(this.store.getMeta('hunter_hits') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+  hunterVerifiedMap() {
+    try {
+      return JSON.parse(this.store.getMeta('hunter_verified') || '{}');
+    } catch (e) {
+      return {};
+    }
+  }
+  markHunterVerified(ca, tool) {
+    const t = String(tool || '').toLowerCase();
+    if (!/^(bubblemaps|trench|rugcheck)$/.test(t)) throw new Error('bad tool');
+    const m = this.hunterVerifiedMap();
+    const k = String(ca || '').toLowerCase();
+    if (!k) throw new Error('no ca');
+    m[k] = m[k] || {};
+    m[k][t] = Date.now();
+    this.store.setMeta('hunter_verified', JSON.stringify(m));
+    return { ca: k, verified: m[k] };
+  }
+  saveHunterCa(ca) {
+    const hits = this.hunterHits();
+    const h = hits.find((x) => String(x.ca).toLowerCase() === String(ca || '').toLowerCase());
+    if (!h) throw new Error('not on hunter list');
+    let extra = [];
+    try {
+      extra = JSON.parse(this.store.getMeta('watch_extra') || '[]');
+    } catch (e) {}
+    if (!extra.some((e) => String(e.ca).toLowerCase() === h.ca.toLowerCase())) {
+      extra.push({ ca: h.ca, chain: h.chain || 'solana', name: h.name, poolAddress: h.pairAddress || '' });
+      this.store.setMeta('watch_extra', JSON.stringify(extra));
+    }
+    const rows = this.store.getWatch();
+    if (!rows.some((r) => r.ca.toLowerCase() === h.ca.toLowerCase())) {
+      rows.push({
+        ca: h.ca,
+        chain: h.chain || 'solana',
+        name: h.name || h.ca.slice(0, 8),
+        poolAddress: h.pairAddress || ''
+      });
+      this.store.setWatch(rows);
+    }
+    return { ok: true, ca: h.ca, name: h.name };
+  }
+  decorateHunter(hits) {
+    const vmap = this.hunterVerifiedMap();
+    const watch = new Set(this.store.getWatch().map((w) => w.ca.toLowerCase()));
+    return (hits || []).map((h) => {
+      const v = vmap[String(h.ca).toLowerCase()] || {};
+      const links = hunterLinks(h.ca, h.chain);
+      return Object.assign({}, h, {
+        verified: {
+          bubblemaps: !!v.bubblemaps,
+          trench: !!v.trench,
+          rugcheck: !!v.rugcheck
+        },
+        saved: watch.has(String(h.ca).toLowerCase()),
+        links
+      });
+    });
+  }
+  async refreshHunter(now) {
+    now = now || Date.now();
+    if (now < this.rateLimitedUntil) return { skipped: true, rateLimited: true };
+    if (this.dexCallsLastMin(now) >= 22) return { skipped: true, budget: true };
+    const lastDisc = +this.store.getMeta('hunter_discover') || 0;
+    const lastScore = +this.store.getMeta('hunter_at') || 0;
+    const doDiscover = now - lastDisc >= 5 * 60e3;
+    const doScore = doDiscover || now - lastScore >= 90e3;
+    if (!doScore) return { skipped: true };
+    let seeds = [];
+    let calls = 0;
+    if (doDiscover) {
+      try {
+        const got = await fetchHunterSeeds();
+        seeds = got.seeds || [];
+        calls += got.calls || 0;
+        this.store.setMeta('hunter_discover', String(now));
+      } catch (e) {
+        this.store.setMeta('hunter_err', String(e && e.message ? e.message : e));
+        seeds = this.hunterHits().map((h) => ({ ca: h.ca, chain: h.chain, boosted: h.boosted }));
+      }
+    } else {
+      seeds = this.hunterHits().map((h) => ({ ca: h.ca, chain: h.chain, boosted: h.boosted, src: h.src }));
+    }
+    if (!seeds.length) {
+      this.store.setMeta('hunter_at', String(now));
+      return { hits: 0, calls };
+    }
+    const watch = new Set(this.store.getWatch().map((w) => w.ca.toLowerCase()));
+    const uniq = [];
+    const seen = new Set();
+    for (const s of seeds) {
+      const k = String(s.ca || '').toLowerCase();
+      if (!k || seen.has(k) || watch.has(k)) continue;
+      seen.add(k);
+      uniq.push(s);
+    }
+    const byCa = await fetchDexPairsForCas(uniq.map((s) => s.ca), 12);
+    calls += byCa.calls || 0;
+    for (let i = 0; i < (byCa.calls || 0); i++) this.dexCallsMin.push(now);
+    const hits = [];
+    for (const s of uniq) {
+      const got = byCa.get(s.ca);
+      if (!got || got instanceof Error) continue;
+      const pair = pickBestPair(got, s.chain || 'solana', s.ca);
+      if (!pair) continue;
+      const row = { ca: s.ca, chain: pair.chainId || 'solana', name: (pair.baseToken && pair.baseToken.symbol) || s.ca.slice(0, 6), poolAddress: pair.pairAddress || '' };
+      const tick = pairToTick(pair, row, now);
+      if (!hunterPass(tick, pair, now)) continue;
+      const mom = momentumFromTick(tick);
+      const created = pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
+      hits.push({
+        name: tick.name,
+        ca: s.ca,
+        chain: tick.chain || 'solana',
+        score: mom.score,
+        m5: tick.m5,
+        h1: tick.h1,
+        h6: tick.h6,
+        volX: mom.volX,
+        buyR: mom.buyR,
+        liq: tick.liq,
+        spot: tick.price,
+        ageMin: created ? Math.max(0, Math.round((now - created) / 60000)) : null,
+        boosted: !!s.boosted,
+        src: s.src || '',
+        dexUrl: tick.dexUrl,
+        pairAddress: tick.pairAddress
+      });
+    }
+    hits.sort((a, b) => (a.boosted === b.boosted ? 0 : a.boosted ? 1 : -1) || (b.score || 0) - (a.score || 0));
+    const top = hits.slice(0, 10);
+    this.store.setMeta('hunter_hits', JSON.stringify(top));
+    this.store.setMeta('hunter_at', String(now));
+    this.store.setMeta('hunter_err', '');
+    this.dexCallsLastMin(now);
+    this.store.setMeta('dex_calls_min', JSON.stringify(this.dexCallsMin));
+    return { hits: top.length, calls, discover: doDiscover };
   }
 
   async tick(mode) {
@@ -1289,6 +1517,11 @@ export class Engine {
       this.store.setMeta('dex_calls_min', JSON.stringify(this.dexCallsMin));
       this.store.setMeta('rate_limited_until', String(this.rateLimitedUntil || 0));
       this.store.setMeta('last_err', this.lastErr || '');
+      try {
+        await this.refreshHunter(now);
+      } catch (e) {
+        this.store.setMeta('hunter_err', String(e && e.message ? e.message : e));
+      }
       if (now % 3600000 < 30000) this.store.prune(now);
       return { scanned, errors, n429, nAlert, doAll, targets: targets.length };
     } catch (e) {
@@ -1364,6 +1597,47 @@ export async function handleApi(engine, request) {
       sections,
       count: hits.length
     });
+  }
+  if (path === '/hunter' || path === '/api/hunter') {
+    if (method === 'POST') {
+      try {
+        const out = await engine.refreshHunter(Date.now());
+        return json({
+          ok: true,
+          ...out,
+          hits: engine.decorateHunter(engine.hunterHits()),
+          scannedAt: engine.store.getMeta('hunter_at') || null,
+          error: engine.store.getMeta('hunter_err') || ''
+        });
+      } catch (e) {
+        return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
+      }
+    }
+    return json({
+      hits: engine.decorateHunter(engine.hunterHits()),
+      scannedAt: engine.store.getMeta('hunter_at') || null,
+      discoveredAt: engine.store.getMeta('hunter_discover') || null,
+      error: engine.store.getMeta('hunter_err') || '',
+      status: engine.status()
+    });
+  }
+  if ((path === '/hunter/verify' || path === '/api/hunter/verify') && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    try {
+      const out = engine.markHunterVerified(body.ca || '', body.tool || '');
+      return json({ ok: true, ...out });
+    } catch (e) {
+      return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
+    }
+  }
+  if ((path === '/hunter/save' || path === '/api/hunter/save') && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    try {
+      const out = engine.saveHunterCa(body.ca || '');
+      return json(out);
+    } catch (e) {
+      return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
+    }
   }
   if ((path === '/focus' || path === '/api/focus') && method === 'POST') {
     const body = await request.json().catch(() => ({}));
