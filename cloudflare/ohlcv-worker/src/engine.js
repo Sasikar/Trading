@@ -349,6 +349,46 @@ export function detectDexTf(tick, tf) {
   };
 }
 
+/** Immediate 4h/1h/2h label from Dex windows while our tape is still warming. */
+export function detectLegacy4h(tick) {
+  const mom = momentumFromTick(tick);
+  const m5 = tick.m5 || 0,
+    h1 = tick.h1 || 0,
+    h6 = tick.h6 || 0;
+  let event = '—',
+    state = 'WATCH',
+    fresh = false,
+    held = false,
+    age = 99;
+  if (m5 >= 3 && h1 >= 2 && mom.volX >= 1.5 && !mom.stretched) {
+    event = 'NEW BREAKOUT';
+    fresh = true;
+    held = true;
+    age = 0;
+    state = 'EARLY';
+  } else if (h1 > 0 && h6 >= 8) {
+    event = 'BREAKOUT HELD';
+    held = true;
+    age = h6 >= 25 ? 3 : 1;
+    state = h1 >= 6 && mom.volX >= 1.3 && mom.buyR >= 0.52 ? 'STRONG CONFIRMED' : 'EARLY';
+  }
+  if (mom.stretched && (h1 > 5 || h6 > 40)) state = 'STRETCHED';
+  let score = mom.score;
+  if (state === 'STRETCHED') score = Math.max(0, score - 12);
+  return {
+    state,
+    event,
+    fresh,
+    held,
+    age,
+    score: Math.max(0, Math.min(100, Math.round(score))),
+    bars: 0,
+    need: 0,
+    interesting: state !== 'WATCH' || fresh || held || score >= 55,
+    live: true
+  };
+}
+
 export function sizePctOf(state) {
   if (state === 'STRONG CONFIRMED') return 80;
   if (state === 'EARLY') return 35;
@@ -637,6 +677,10 @@ export class Engine {
     if (TF_SEC[tf]) {
       const closed = this.store.bars(row.ca, tf, 40);
       det = detectTapeBreakout(closed, tf, tick);
+      if (det.state === 'WARMING' && (tf === '4h' || tf === '2h' || tf === '1h')) {
+        const live = detectLegacy4h(tick);
+        det = Object.assign({}, live, { bars: det.bars, need: det.need });
+      }
     } else {
       det = detectDexTf(tick, tf);
     }
