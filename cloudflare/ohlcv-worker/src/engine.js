@@ -1843,7 +1843,7 @@ export class Engine {
     try {
       let rows = this.store.getWatch();
       const lastWatch = +this.store.getMeta('last_watch') || 0;
-      if (!rows.length || now - lastWatch > 60000) {
+      if (!rows.length || now - lastWatch > 300000) {
         try {
           rows = await this.refreshWatch();
           this.store.setMeta('last_watch', String(now));
@@ -1907,6 +1907,9 @@ export class Engine {
       this.store.setMeta('dex_calls_min', JSON.stringify(this.dexCallsMin));
       this.store.setMeta('rate_limited_until', String(this.rateLimitedUntil || 0));
       this.store.setMeta('last_err', this.lastErr || '');
+      try {
+        if (this.store.flushOpens) this.store.flushOpens(now);
+      } catch (e) {}
       try {
         await this.refreshHunter(now);
       } catch (e) {

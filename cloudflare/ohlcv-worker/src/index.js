@@ -34,25 +34,54 @@ function storeFromSql(sql) {
     return null;
   };
   const all = (q, ...b) => [...sql.exec(q, ...b)];
+  const metaMem = new Map();
+  const tickMem = new Map();
+  const openMem = new Map();
+  let watchJson = null;
+  let lastOpenFlush = 0;
 
   return {
     getMeta(k) {
+      if (metaMem.has(k)) return metaMem.get(k);
       const r = one('SELECT v FROM meta WHERE k = ?', k);
-      return r ? r.v : undefined;
+      const v = r ? r.v : undefined;
+      if (v !== undefined) metaMem.set(k, v);
+      return v;
     },
     setMeta(k, v) {
-      sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', k, String(v ?? ''));
+      const s = String(v ?? '');
+      if (metaMem.get(k) === s) return;
+      metaMem.set(k, s);
+      sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', k, s);
     },
     getTick(ca) {
-      const r = one('SELECT * FROM ticks WHERE ca = ?', ca.toLowerCase());
+      const k = ca.toLowerCase();
+      if (tickMem.has(k)) return tickMem.get(k);
+      const r = one('SELECT * FROM ticks WHERE ca = ?', k);
+      if (r) tickMem.set(k, r);
       return r || undefined;
     },
     setTick(ca, tick) {
+      const k = ca.toLowerCase();
+      const prev = tickMem.get(k);
+      if (
+        prev &&
+        prev.price === tick.price &&
+        prev.m5 === tick.m5 &&
+        prev.h1 === tick.h1 &&
+        prev.h6 === tick.h6 &&
+        prev.liq === tick.liq &&
+        prev.vol5m === tick.vol5m
+      ) {
+        tickMem.set(k, tick);
+        return;
+      }
+      tickMem.set(k, tick);
       sql.exec(
         `INSERT OR REPLACE INTO ticks
          (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        ca.toLowerCase(),
+        k,
         tick.t,
         tick.price,
         tick.vol5m,
@@ -75,6 +104,9 @@ function storeFromSql(sql) {
       return all('SELECT * FROM ticks');
     },
     setWatch(rows) {
+      const j = JSON.stringify(rows || []);
+      if (j === watchJson) return;
+      watchJson = j;
       sql.exec('DELETE FROM watch');
       for (const r of rows || []) {
         sql.exec(
@@ -90,26 +122,18 @@ function storeFromSql(sql) {
       return all('SELECT ca, chain, name, poolAddress FROM watch');
     },
     openBar(ca, tf) {
-      return one('SELECT * FROM open_bar WHERE ca = ? AND tf = ?', ca.toLowerCase(), tf) || undefined;
+      const k = ca.toLowerCase() + '|' + tf;
+      if (openMem.has(k)) return openMem.get(k);
+      const r = one('SELECT * FROM open_bar WHERE ca = ? AND tf = ?', ca.toLowerCase(), tf) || undefined;
+      if (r) openMem.set(k, r);
+      return r;
     },
     setOpenBar(ca, tf, bar) {
-      sql.exec(
-        `INSERT OR REPLACE INTO open_bar (ca,tf,t,o,h,l,c,vol,buys,sells,n)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        ca.toLowerCase(),
-        tf,
-        bar.t,
-        bar.o,
-        bar.h,
-        bar.l,
-        bar.c,
-        bar.vol,
-        bar.buys,
-        bar.sells,
-        bar.n
-      );
+      openMem.set(ca.toLowerCase() + '|' + tf, bar);
     },
     closeBar(ca, tf, bar) {
+      const k = ca.toLowerCase() + '|' + tf;
+      openMem.delete(k);
       sql.exec(
         `INSERT OR REPLACE INTO ohlcv (ca,tf,t,o,h,l,c,vol,buys,sells,n)
          VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
@@ -126,6 +150,29 @@ function storeFromSql(sql) {
         bar.n
       );
       sql.exec('DELETE FROM open_bar WHERE ca = ? AND tf = ?', ca.toLowerCase(), tf);
+    },
+    flushOpens(now) {
+      now = now || Date.now();
+      if (now - lastOpenFlush < 5 * 60e3) return;
+      lastOpenFlush = now;
+      for (const [k, bar] of openMem) {
+        const i = k.indexOf('|');
+        sql.exec(
+          `INSERT OR REPLACE INTO open_bar (ca,tf,t,o,h,l,c,vol,buys,sells,n)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          k.slice(0, i),
+          k.slice(i + 1),
+          bar.t,
+          bar.o,
+          bar.h,
+          bar.l,
+          bar.c,
+          bar.vol,
+          bar.buys,
+          bar.sells,
+          bar.n
+        );
+      }
     },
     bars(ca, tf, limit) {
       return all(
@@ -147,6 +194,8 @@ function storeFromSql(sql) {
       return r ? r.t : 0;
     },
     setAlert(key, t) {
+      const r = one('SELECT t FROM alerts WHERE k = ?', key);
+      if (r && r.t === t) return;
       sql.exec('INSERT OR REPLACE INTO alerts (k, t) VALUES (?, ?)', key, t);
     }
   };
@@ -172,7 +221,7 @@ export class OhlcvEngine {
     } catch (e) {
       this.engine.lastErr = String(e && e.message ? e.message : e);
     }
-    await this.ctx.storage.setAlarm(Date.now() + 20000);
+    await this.ctx.storage.setAlarm(Date.now() + 60000);
   }
 
   async fetch(request) {
@@ -195,9 +244,7 @@ export default {
     return env.ENGINE.get(id).fetch(stubReq);
   },
   async scheduled(event, env, ctx) {
-    // Kick the Durable Object alarm. Do NOT force a full Dex poll — alarm
-    // already polls saved CAs ~60s and the focus coin ~20s. A cron /run
-    // doubled Dex traffic and made 18 coins look rate-limited.
+    // Kick the Durable Object alarm. Alarm polls saved CAs ~60s.
     const id = env.ENGINE.idFromName('main');
     ctx.waitUntil(env.ENGINE.get(id).fetch(new Request('https://ohlcv.local/status')));
   }
