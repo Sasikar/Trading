@@ -1,7 +1,29 @@
 {
-  "updated": "2026-09-14T04:47:07.238Z",
-  "count": 16,
+  "updated": "2026-09-14T05:13:13.914Z",
+  "count": 18,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "9AvytnUKsLxPxFHFqS6VLxaxt5p6BhYNr53SD2Chpump",
+      "name": "67",
+      "base": "67",
+      "t": 1789361385109,
+      "poolAddress": "DMAFL613XTipuA3jFNYczavWT7XsiYf9cR3qmRMZQhB6",
+      "poolNetwork": "solana",
+      "poolLiq": 333840.37,
+      "poolCachedAt": 1789361385108
+    },
+    {
+      "chain": "solana",
+      "ca": "GkyPYa7NnCFbduLknCfBfP7p8564X1VZhwZYJ6CZpump",
+      "name": "CHILLHOUSE",
+      "base": "CHILLHOUSE",
+      "t": 1789361323605,
+      "poolAddress": "35TqQMeiRwEbK6FR5qiPwastuAAvo32VjnULJpxVSxUK",
+      "poolNetwork": "solana",
+      "poolLiq": 526720.8,
+      "poolCachedAt": 1789361323604
+    },
     {
       "chain": "solana",
       "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
