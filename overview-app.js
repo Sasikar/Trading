@@ -2700,7 +2700,7 @@ document.addEventListener('click', function(ev){
     document.querySelectorAll('#tf-tabs .tab').forEach(function(b){ b.classList.remove('active'); });
     const tab=document.querySelector('#tf-tabs .tab[data-tf="coin"]');
     if(tab) tab.classList.add('active');
-    showBreakoutMemes(false);
+    window.showBreakoutMemes(false);
     showCoin(true);
     if($('coin-chain')) $('coin-chain').value=chain==='solana'?'solana':'eth';
     if($('coin-ca')) $('coin-ca').value=ca;
@@ -4053,6 +4053,7 @@ function coinRecentsRender(){
   });
 }
 window.coinRecentsRender=coinRecentsRender;
+window.coinRecentsLoadLocal=coinRecentsLoadLocal;
 
 async function coinRecentsSync(silent){
   const st=$('coin-recents-status');
@@ -5358,7 +5359,7 @@ function afShowDay(day){
 }
 window.afShowDay=afShowDay;
 
-document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showSignal(false);showTrend(false);showStruct(false);showMacro(false);showMemeGate(true);loadMemeGate();}else if(tf==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else if(tf==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}try{showBreakoutMemes(false);}catch(e){}showCoin(true);}else if(tf==='breakouts'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}showBreakoutMemes(true);}else if(tf==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showBreakoutMemes(false);}catch(e){}showAntifomo(true);}else{try{showAntifomo(false);}catch(e){}showCoin(false);showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
+document.querySelectorAll('#tf-tabs .tab').forEach(btn=>{btn.addEventListener('click',()=>{document.querySelectorAll('#tf-tabs .tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const tf=btn.getAttribute('data-tf');if(tf==='trend'){showMacro(false);showStruct(false);showSignal(false);showTrend(true);loadTrend();}else if(tf==='struct'){showMacro(false);showTrend(false);showSignal(false);showStruct(true);loadStructural();}else if(tf==='macro'){showTrend(false);showStruct(false);showSignal(false);showMacro(true);loadMacro();}else if(tf==='signal'){showSignal(false);showTrend(false);showStruct(false);showMacro(false);showMemeGate(true);loadMemeGate();}else if(tf==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);loadMemeGate();}else if(tf==='coin'){showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}try{window.showBreakoutMemes(false);}catch(e){}showCoin(true);}else if(tf==='breakouts'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}window.showBreakoutMemes(true);}else if(tf==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{window.showBreakoutMemes(false);}catch(e){}showAntifomo(true);}else{try{showAntifomo(false);}catch(e){}showCoin(false);showMemeGate(false);showMacro(false);showStruct(false);showSignal(false);showTrend(false);currentTF=tf;const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}loadTF(currentTF);}});});
 // Signal date controls
 ['sig-mode','sig-is-start','sig-is-end','sig-oos-start','sig-oos-end'].forEach(id=>{
 });
@@ -5377,7 +5378,7 @@ try{
 const act=document.querySelector('#tf-tabs .tab.active');
 const at=(act&&act.getAttribute('data-tf'))||currentTF||'memegate';
 currentTF=at;
-if(at==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);await loadMemeGate();}else if(at==='coin'){showMemeGate(false);try{showAntifomo(false);}catch(e){}try{showBreakoutMemes(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}else if(at==='breakouts'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}showBreakoutMemes(true);}else if(at==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showBreakoutMemes(false);}catch(e){}showAntifomo(true);}
+if(at==='memegate'){showCoin(false);try{showAntifomo(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showMemeGate(true);await loadMemeGate();}else if(at==='coin'){showMemeGate(false);try{showAntifomo(false);}catch(e){}try{window.showBreakoutMemes(false);}catch(e){}showTrend(false);showStruct(false);showMacro(false);showSignal(false);showCoin(true);}else if(at==='breakouts'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{showAntifomo(false);}catch(e){}window.showBreakoutMemes(true);}else if(at==='antifomo'){showMemeGate(false);showCoin(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);try{window.showBreakoutMemes(false);}catch(e){}showAntifomo(true);}
 else if(at==='trend'){showMemeGate(false);showStruct(false);showMacro(false);showSignal(false);showTrend(true);await loadTrend();}
 else if(at==='struct'){showMemeGate(false);showTrend(false);showMacro(false);showSignal(false);showStruct(true);await loadStructural();}
 else if(at==='macro'){showMemeGate(false);showTrend(false);showStruct(false);showSignal(false);showMacro(true);await loadMacro();}

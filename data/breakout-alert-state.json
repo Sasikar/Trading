@@ -1,5 +1,18 @@
 {
-  "updated": "2026-09-14T01:32:35.240Z",
+  "updated": "2026-09-14T05:14:56.180Z",
   "sent": {},
-  "lastFindings": []
+  "lastFindings": [],
+  "source": "dexscreener",
+  "ui": {
+    "lastScan": "2026-09-14T05:14:56.180Z",
+    "health": "OK",
+    "source": "DexScreener",
+    "candidates": 16,
+    "scanned": 16,
+    "hits": 6,
+    "alertsThisRun": 0,
+    "errorCount": 0,
+    "errors": [],
+    "topic": "MyTradingMemeBreakout44"
+  }
 }

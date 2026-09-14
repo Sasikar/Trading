@@ -1,49 +1,53 @@
 {
-  "updated": "2026-09-14T05:10:03.577Z",
+  "updated": "2026-09-14T05:14:18.344Z",
   "tokens": {
     "solana|Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump": {
       "lastAlert": 0,
-      "lastScore": 42,
+      "lastScore": 19,
       "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "HMzvsEEmtzHhvZNw9uwbaG85HCTmFnkbhzUx16cy7ca3",
       "poolNetwork": "solana",
-      "poolLiq": 2825455.28,
-      "poolCachedAt": 1789362479846,
-      "updated": 1789362481590
+      "poolLiq": 2799620.34,
+      "poolCachedAt": 1789344943367,
+      "updated": 1789362858343,
+      "lastPrice": 0.07292
     },
     "solana|Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk": {
       "lastAlert": 0,
-      "lastScore": 67,
-      "lastState": "EARLY_BREAKOUT",
+      "lastScore": 10,
+      "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "Q2sPHPdUWFMg7M7wwrQKLrn619cAucfRsmhVJffodSp",
       "poolNetwork": "solana",
-      "poolLiq": 4503310,
-      "poolCachedAt": 1789362488136,
-      "updated": 1789362489799
+      "poolLiq": 4444941.51,
+      "poolCachedAt": 1789344946602,
+      "updated": 1789362858343,
+      "lastPrice": 0.2038
     },
     "solana|5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2": {
       "lastAlert": 0,
-      "lastScore": 68,
-      "lastState": "EARLY_BREAKOUT",
+      "lastScore": 10,
+      "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "4w2cysotX6czaUGmmWg13hDpY4QEMG2CzeKYEQyK9Ama",
       "poolNetwork": "solana",
-      "poolLiq": 3119714.7522,
+      "poolLiq": 3088352.39,
       "poolCachedAt": 1789295576362,
-      "updated": 1789362587794
+      "updated": 1789362858344,
+      "lastPrice": 0.04557
     },
     "solana|3WPep4ufaToK1aS5s8BL9inzeUrt4DYaQCiic6ZkkC1U": {
       "lastAlert": 0,
-      "lastScore": 39,
+      "lastScore": 7,
       "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "A1wy7BBM3vaNbTFg9sQSXmYJPf17T3Y1UGwLMd35NKXZ",
       "poolNetwork": "solana",
-      "poolLiq": 112033.53,
-      "poolCachedAt": 1789362513807,
-      "updated": 1789344943367
+      "poolLiq": 114406.66,
+      "poolCachedAt": 1789344941692,
+      "updated": 1789362858344,
+      "lastPrice": 0.04396
     },
     "eth|0xE0f63A424a4439cBE457D80E4f4b51aD25b2c56C": {
       "lastAlert": 0,
@@ -53,7 +57,7 @@
       "poolAddress": "0x52c77b0CB827aFbAD022E6d6CAF2C44452eDbc39",
       "poolNetwork": "eth",
       "poolLiq": 12492653.47,
-      "poolCachedAt": 1789362567648,
+      "poolCachedAt": 1789345002951,
       "updated": 1789345013644
     },
     "eth|0x68BbEd6A47194EFf1CF514B50Ea91895597fc91E": {
@@ -65,18 +69,19 @@
       "poolNetwork": "eth",
       "poolLiq": 1343198.9325,
       "poolCachedAt": 1789295663557,
-      "updated": 1789362603577
+      "updated": 1789345049120
     },
     "solana|DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2": {
       "lastAlert": 0,
-      "lastScore": 37,
+      "lastScore": 10,
       "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "9ViX1VductEoC2wERTSp2TuDxXPwAf69aeET8ENPJpsN",
       "poolNetwork": "solana",
-      "poolLiq": 1823054.86,
+      "poolLiq": 1828060.56,
       "poolCachedAt": 1789295752776,
-      "updated": 1789362592806
+      "updated": 1789362858344,
+      "lastPrice": 0.01536
     },
     "eth|0x594DaaD7D77592a2b97b725A7AD59D7E188b5bFa": {
       "lastAlert": 0,
@@ -86,96 +91,101 @@
       "poolAddress": "0x5CEd44F03ff443BBE14d8eA23bc24425FB89E3ED",
       "poolNetwork": "eth",
       "poolLiq": 884426.14,
-      "poolCachedAt": 1789362495755,
+      "poolCachedAt": 1789344937514,
       "updated": 1789344939255
     },
     "solana|Ge87EtsjwRQbHaqQmKRno69RFTwh9bfSsm99XNxTpump": {
       "lastAlert": 0,
-      "lastScore": 42,
+      "lastScore": 10,
       "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "5PGhKctym6odbHGo2tKMST2AjmJsb2uZBQrKkn4ZuFT5",
       "poolNetwork": "solana",
-      "poolLiq": 501193.58,
-      "poolCachedAt": 1789362492202,
-      "updated": 1789362493858
+      "poolLiq": 513999.99,
+      "poolCachedAt": 1789344935653,
+      "updated": 1789362858343,
+      "lastPrice": 0.004028
     },
     "solana|CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump": {
       "lastAlert": 0,
-      "lastScore": 19,
+      "lastScore": 23,
       "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "3dcwhqJp6JBTJPq8ga335HWgSQVS7uQmdmeX7iGjMNpj",
       "poolNetwork": "solana",
-      "poolLiq": 532239.62,
-      "poolCachedAt": 1789362549909,
-      "updated": 1789362551579
+      "poolLiq": 511569.09,
+      "poolCachedAt": 1789344968272,
+      "updated": 1789362858344,
+      "lastPrice": 0.005898
     },
     "solana|9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump": {
       "lastAlert": 0,
-      "lastScore": 78,
+      "lastScore": 10,
       "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "FnzKY6x7entQ1eR3D225dQyT7ybfka4PskBMQhb8L3CC",
       "poolNetwork": "solana",
-      "poolLiq": 2245105.17,
-      "poolCachedAt": 1789362551579,
-      "updated": 1789362556912
+      "poolLiq": 2252848.03,
+      "poolCachedAt": 1789344979089,
+      "updated": 1789362858344,
+      "lastPrice": 0.1512
     },
     "solana|Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump": {
       "lastAlert": 0,
-      "lastScore": 38,
+      "lastScore": 10,
       "lastState": "NORMAL",
       "lastKind": "",
-      "poolAddress": "9NdiyGfthT9Co6cCMZG5t4YZXpf6hiJFAEvWRPSUz7s6",
+      "poolAddress": "Cb7ZRgPLhji3Th7htXyKEqbXvNjPpeTvckXuWakBUhXu",
       "poolNetwork": "solana",
-      "poolLiq": 488132.95,
-      "poolCachedAt": 1789362556912,
-      "updated": 1789362567648
+      "poolLiq": 399687.8,
+      "poolCachedAt": 1789344992191,
+      "updated": 1789362858344,
+      "lastPrice": 0.008066
     },
     "solana|Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump": {
       "lastAlert": 0,
-      "lastScore": 37,
+      "lastScore": 10,
       "lastState": "NORMAL",
       "lastKind": "",
       "poolAddress": "5wNu5QhdpRGrL37ffcd6TMMqZugQgxwafgz477rShtHy",
       "poolNetwork": "solana",
-      "poolLiq": 1684642.17,
-      "poolCachedAt": 1789362531856,
-      "updated": 1789344968272
+      "poolLiq": 1636904.26,
+      "poolCachedAt": 1789344966329,
+      "updated": 1789362858344,
+      "lastPrice": 0.02773
     },
     "solana|CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump": {
       "lastAlert": 0,
-      "lastScore": 71,
-      "lastState": "RETEST/RECLAIM",
+      "lastScore": 46,
+      "lastState": "EXTENDED",
       "lastKind": "",
+      "lastPrice": 0.003913,
       "poolAddress": "41rzTMB7JHPTyMXzrYwdqnBecJRhkb8KHYAjrQ9cYxJx",
       "poolNetwork": "solana",
-      "poolLiq": 203042.1,
-      "poolCachedAt": 1789362481590,
-      "updated": 1789362483648
+      "poolLiq": 218061.92,
+      "updated": 1789362858343
     },
     "solana|H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump": {
       "lastAlert": 0,
-      "lastScore": 33,
+      "lastScore": 10,
       "lastState": "NORMAL",
       "lastKind": "",
+      "lastPrice": 0.002112,
       "poolAddress": "AFaYrFH7hUYnkv5mbvbnRHwX29M9JzUL3ySGtQz69AUv",
       "poolNetwork": "solana",
-      "poolLiq": 261314.88,
-      "poolCachedAt": 1789362486097,
-      "updated": 1789362488136
+      "poolLiq": 254210.83,
+      "updated": 1789362858343
     },
     "solana|BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump": {
       "lastAlert": 0,
-      "lastScore": 28,
+      "lastScore": 12,
       "lastState": "NORMAL",
       "lastKind": "",
+      "lastPrice": 0.001219,
       "poolAddress": "AKQyQgEifBBhQmANuKzrRuRGoKSkKBv8NVdccc87FrR8",
       "poolNetwork": "solana",
-      "poolLiq": 182285.93,
-      "poolCachedAt": 1789362493858,
-      "updated": 1789362495755
+      "poolLiq": 184058.62,
+      "updated": 1789362858343
     }
   },
   "lastFindings": [],
@@ -187,131 +197,132 @@
   },
   "lastHttp": {
     "pool": 0,
-    "ohlcv": 29,
-    "total": 29,
-    "at": "2026-09-14T05:10:03.577Z"
+    "ohlcv": 0,
+    "total": 1,
+    "source": "dexscreener",
+    "at": "2026-09-14T05:14:18.344Z"
   },
   "ui": {
-    "lastScan": "2026-09-14T05:10:03.577Z",
+    "lastScan": "2026-09-14T05:14:18.344Z",
     "candidates": 16,
-    "scanned": 12,
-    "errorCount": 4,
+    "scanned": 13,
+    "errorCount": 3,
     "alertsThisRun": 0,
-    "health": "RATE_LIMITED",
+    "health": "OK",
+    "source": "DexScreener",
+    "topic": "MyTradingMemeBreakout44",
     "topScores": [
       {
         "name": "biketyson",
         "chain": "solana",
         "ca": "CbyTNf7UPzvewHh4Zp6umogM2RWahhmGRJWLJnPwpump",
-        "score": 71,
-        "state": "RETEST/RECLAIM",
-        "reason": "price accel + vol expand 4.3x + reclaim after flush",
-        "ret1": 3.36,
-        "volX": 4.3,
+        "score": 46,
+        "state": "EXTENDED",
+        "reason": "5m +9.2% + vol 1.9x + 1h held +26.0%",
+        "ret1": 9.24,
+        "volX": 1.87,
         "forming": false
       },
       {
-        "name": "USELESS",
+        "name": "fone",
         "chain": "solana",
-        "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
-        "score": 67,
-        "state": "EARLY_BREAKOUT",
-        "reason": "price accel + vol expand 7.3x + 2 green 1m",
-        "ret1": 0.42,
-        "volX": 7.26,
-        "forming": false
-      },
-      {
-        "name": "TROLL",
-        "chain": "solana",
-        "ca": "5UUH9RTDiSpq6HKS6bp4NdU9PNJpXRXuiw6ShBTBhgH2",
-        "score": 67,
-        "state": "EARLY_BREAKOUT",
-        "reason": "price accel + vol expand 4.5x + 2 green 1m",
-        "ret1": 0.57,
-        "volX": 4.52,
-        "forming": false
-      },
-      {
-        "name": "ANSEM",
-        "chain": "solana",
-        "ca": "9cRCn9rGT8V2imeM2BaKs13yhMEais3ruM3rPvTGpump",
-        "score": 42,
+        "ca": "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
+        "score": 23,
         "state": "NORMAL",
-        "reason": "price accel + 2 green 1m",
-        "ret1": 0.49,
-        "volX": 0.14,
+        "reason": "vol 1.8x + 5m+1h aligned",
+        "ret1": 1.39,
+        "volX": 1.84,
         "forming": false
       },
       {
-        "name": "baton",
+        "name": "CATE",
         "chain": "solana",
-        "ca": "Hg5Ja55T5wESq4vyFoiVCMeHXtGyVA69X2UHq8hgpump",
-        "score": 38,
+        "ca": "Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump",
+        "score": 19,
         "state": "NORMAL",
-        "reason": "vol expand 4.1x",
-        "ret1": -3.2,
-        "volX": 4.09,
-        "forming": false
-      },
-      {
-        "name": "aura",
-        "chain": "solana",
-        "ca": "DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2",
-        "score": 36,
-        "state": "NORMAL",
-        "reason": "price accel + 2 green 1m",
-        "ret1": 0.44,
-        "volX": 0.03,
-        "forming": true
-      },
-      {
-        "name": "LMAO!",
-        "chain": "solana",
-        "ca": "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump",
-        "score": 33,
-        "state": "NORMAL",
-        "reason": "vol expand 6.9x",
-        "ret1": -0.68,
-        "volX": 6.92,
+        "reason": "buys 63%",
+        "ret1": -1.45,
+        "volX": 0.22,
         "forming": false
       },
       {
         "name": "Jotchua",
         "chain": "solana",
         "ca": "BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump",
-        "score": 28,
+        "score": 12,
         "state": "NORMAL",
-        "reason": "vol expand 2.6x",
-        "ret1": -1.13,
-        "volX": 2.62,
+        "reason": "5m+1h aligned",
+        "ret1": 0.44,
+        "volX": 0.43,
+        "forming": false
+      },
+      {
+        "name": "LMAO!",
+        "chain": "solana",
+        "ca": "H74CYmXgMkYHYuSRsZt6RJb4NYp2u72Vw8BS5huApump",
+        "score": 10,
+        "state": "NORMAL",
+        "reason": "—",
+        "ret1": -0.17,
+        "volX": 0.14,
+        "forming": false
+      },
+      {
+        "name": "USELESS",
+        "chain": "solana",
+        "ca": "Dz9mQ9NzkBcCsuGPFJ3r1bS4wgqKMHBPiVuniW8Mbonk",
+        "score": 10,
+        "state": "NORMAL",
+        "reason": "—",
+        "ret1": -0.03,
+        "volX": 0.01,
+        "forming": false
+      },
+      {
+        "name": "Jimothy",
+        "chain": "solana",
+        "ca": "Ge87EtsjwRQbHaqQmKRno69RFTwh9bfSsm99XNxTpump",
+        "score": 10,
+        "state": "NORMAL",
+        "reason": "—",
+        "ret1": -0.57,
+        "volX": 0.58,
+        "forming": false
+      },
+      {
+        "name": "neet",
+        "chain": "solana",
+        "ca": "Ce2gx9KGXJ6C9Mp5b5x1sn9Mg87JwEbrQby4Zqo3pump",
+        "score": 10,
+        "state": "NORMAL",
+        "reason": "—",
+        "ret1": -0.1,
+        "volX": 0.1,
         "forming": false
       }
     ],
     "errors": [
       {
         "name": "APU",
-        "error": "HTTP 429 rate limit {\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Ple"
-      },
-      {
-        "name": "GIKO",
-        "error": "HTTP 429 rate limit {\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Ple"
-      },
-      {
-        "name": "neet",
-        "error": "HTTP 429 rate limit {\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Ple"
+        "error": "no DexScreener pair"
       },
       {
         "name": "SPX",
-        "error": "HTTP 429 rate limit {\"status\":{\"error_code\":429,\"error_message\":\"You've exceeded the Rate Limit. Ple"
+        "error": "no DexScreener pair"
+      },
+      {
+        "name": "ANDY",
+        "error": "no DexScreener pair"
       }
     ],
     "threshold": 62,
     "http": {
       "pool": 0,
-      "ohlcv": 29,
-      "total": 29,
-      "at": "2026-09-14T05:10:03.577Z"
+      "ohlcv": 0,
+      "total": 1,
+      "source": "dexscreener",
+      "at": "2026-09-14T05:14:18.344Z"
     }
-  }
+  },
+  "source": "dexscreener"
 }

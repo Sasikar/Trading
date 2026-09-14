@@ -1,6 +1,6 @@
 name: 1M Momentum breakout alerts (ntfy)
 
-# Every ~5 min, single pass, ~8 OHLCV when pools cached — under free GT budget.
+# DexScreener 5m/1h — 1–2 HTTP calls, no GeckoTerminal.
 # State published via Contents API (GITHUB_TOKEN).
 on:
   schedule:
@@ -19,18 +19,19 @@ permissions:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Single 1m pass + publish state
+      - name: DexScreener momentum pass + publish state
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           set -e
-          echo "1m PASS · $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          export NTFY_TOPIC="${NTFY_TOPIC:-MyTradingMemeBreakout44}"
+          echo "momentum PASS · topic=$NTFY_TOPIC · $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           node scripts/momentum-1m-alert.mjs

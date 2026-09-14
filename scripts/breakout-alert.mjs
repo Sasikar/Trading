@@ -1,25 +1,29 @@
 #!/usr/bin/env node
 /**
  * Breakout alert scanner for saved CAs (data/ca-recents.json).
- * Sends ntfy when a NEW/held fresh breakout appears.
- * No Cloudflare — run via GitHub Actions cron.
+ * DexScreener-only (no GeckoTerminal — that 429s). ntfy on NEW/held breakouts.
  */
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import {
+  NTFY_DEFAULT_TOPIC,
+  fetchDexPairsForCas,
+  pickBestPair,
+  tfBreakout,
+  sendNtfy,
+  chainIdOf
+} from './dex-breakout-lib.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const RECENTS = path.join(ROOT, 'data', 'ca-recents.json');
 const STATE = path.join(ROOT, 'data', 'breakout-alert-state.json');
-const NTFY_TOPIC = process.env.NTFY_TOPIC || 'MyTradingMemeBreakout44';
-const NTFY_URL = process.env.NTFY_URL || `https://ntfy.sh/${NTFY_TOPIC}`;
-const TFS = (process.env.BREAKOUT_TFS || '4h,1d').split(',').map(s => s.trim()).filter(Boolean);
-const SLEEP_MS = Number(process.env.BREAKOUT_SLEEP_MS || 400);
+const SCAN = path.join(ROOT, 'data', 'breakout-scan.json');
+const NTFY_TOPIC = process.env.NTFY_TOPIC || NTFY_DEFAULT_TOPIC;
+const TFS = (process.env.BREAKOUT_TFS || '4h,1d').split(',').map((s) => s.trim()).filter(Boolean);
 
-function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-
-function loadJSON(p, fallback){
+function loadJSON(p, fallback) {
   try {
     if (!fs.existsSync(p)) return fallback;
     return JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -27,202 +31,174 @@ function loadJSON(p, fallback){
     return fallback;
   }
 }
-
-function saveJSON(p, obj){
+function saveJSON(p, obj) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify(obj, null, 2) + '\n');
 }
 
-async function fetchJSON(url, tries = 3){
-  let last;
-  for (let i = 0; i < tries; i++) {
-    try {
-      const r = await fetch(url, {
-        headers: { Accept: 'application/json', 'User-Agent': 'TradingBreakoutAlert/1.0' },
-        cache: 'no-store'
+async function publishViaContents(relPath, obj) {
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
+  const repo = process.env.GITHUB_REPOSITORY || 'Sasikar/Trading';
+  if (!token) {
+    saveJSON(path.join(ROOT, relPath), obj);
+    console.warn('No GITHUB_TOKEN — wrote local ' + relPath);
+    return false;
+  }
+  const url = `https://api.github.com/repos/${repo}/contents/${relPath}`;
+  const bodyContent = Buffer.from(JSON.stringify(obj, null, 2) + '\n').toString('base64');
+  let sha = null;
+  try {
+    const gr = await fetch(url + '?ref=master', {
+      headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' }
+    });
+    if (gr.ok) sha = (await gr.json()).sha;
+  } catch (e) {
+    console.warn('GET sha', e.message || e);
+  }
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const payload = {
+      message: 'chore: breakout scan ' + new Date().toISOString().slice(0, 16) + 'Z',
+      content: bodyContent,
+      branch: 'master'
+    };
+    if (sha) payload.sha = sha;
+    const pr = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        Accept: 'application/vnd.github+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    if (pr.status === 409 || pr.status === 422) {
+      const gr2 = await fetch(url + '?ref=master', {
+        headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' }
       });
-      if (r.status === 429) {
-        await sleep(1500 * (i + 1));
-        continue;
-      }
-      if (!r.ok) throw new Error(`HTTP ${r.status} ${url}`);
-      return await r.json();
-    } catch (e) {
-      last = e;
-      await sleep(500 * (i + 1));
+      if (gr2.ok) sha = (await gr2.json()).sha;
+      await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+      continue;
     }
+    if (!pr.ok) throw new Error('PUT ' + pr.status + ' ' + (await pr.text()).slice(0, 160));
+    console.log('PUBLISHED ' + relPath);
+    return true;
   }
-  throw last || new Error('fetch failed');
+  return false;
 }
 
-async function resolvePool(chain, ca){
-  const net = chain === 'sol' || chain === 'solana' ? 'solana' : 'eth';
-  const url = `https://api.geckoterminal.com/api/v2/networks/${net}/tokens/${encodeURIComponent(ca)}/pools?page=1`;
-  const j = await fetchJSON(url);
-  const rows = (j && j.data) || [];
-  if (!rows.length) throw new Error('no pools');
-  // pick highest reserve / liquidity-ish
-  rows.sort((a, b) => {
-    const ra = Number(a.attributes?.reserve_in_usd || a.attributes?.volume_usd?.h24 || 0);
-    const rb = Number(b.attributes?.reserve_in_usd || b.attributes?.volume_usd?.h24 || 0);
-    return rb - ra;
-  });
-  const top = rows[0];
-  return {
-    network: net,
-    address: top.attributes?.address || top.id?.split('_').pop(),
-    name: top.attributes?.name || ca.slice(0, 8),
-    base: top.attributes?.name?.split(' / ')[0] || ca.slice(0, 8)
-  };
-}
-
-async function fetchOHLCV(network, poolAddress, tf){
-  // GT: day, hour, minute — map 4h/1d/1w
-  const map = {
-    '4h': { timeframe: 'hour', aggregate: 4 },
-    '1d': { timeframe: 'day', aggregate: 1 },
-    '1w': { timeframe: 'day', aggregate: 7 },
-    '1h': { timeframe: 'hour', aggregate: 1 }
-  };
-  const m = map[tf] || map['4h'];
-  const url = `https://api.geckoterminal.com/api/v2/networks/${network}/pools/${poolAddress}/ohlcv/${m.timeframe}?aggregate=${m.aggregate}&limit=100&currency=usd`;
-  const j = await fetchJSON(url);
-  // list is [ts, o, h, l, c, vol] sometimes newest first
-  let list = j?.data?.attributes?.ohlcv_list || [];
-  list = list.map(r => [Number(r[0]) * (String(r[0]).length < 13 ? 1000 : 1), +r[1], +r[2], +r[3], +r[4], +r[5]])
-    .filter(k => isFinite(k[4]) && k[4] > 0)
-    .sort((a, b) => a[0] - b[0]);
-  return list;
-}
-
-/** Same idea as site coinBreakoutAge — first held close above prior range high */
-function breakoutInfo(kl){
-  const n = kl.length;
-  if (n < 25) return { age: 99, fresh: false, held: false, level: null };
-  const closes = kl.map(k => +k[4]);
-  const highs = kl.map(k => +k[2]);
-  let rh = -Infinity;
-  for (let i = n - 22; i <= n - 3; i++) if (i >= 0) rh = Math.max(rh, highs[i]);
-  if (!isFinite(rh)) rh = highs[n - 3];
-  const c0 = closes[n - 1];
-  const heldRolling = c0 >= rh * 0.997;
-  let firstIdx = null, breakLevel = null;
-  const lookStart = Math.max(22, n - 20);
-  for (let i = lookStart; i < n; i++) {
-    let prevH = -Infinity;
-    for (let j = i - 21; j <= i - 2; j++) if (j >= 0) prevH = Math.max(prevH, highs[j]);
-    if (!isFinite(prevH)) continue;
-    if (closes[i] > prevH && c0 >= prevH * 0.997) {
-      if (firstIdx == null) { firstIdx = i; breakLevel = prevH; }
-    }
-  }
-  const age = firstIdx != null ? (n - 1 - firstIdx) : 99;
-  const fresh = heldRolling && firstIdx != null && age <= 2;
-  return { age, fresh, held: heldRolling, level: breakLevel != null ? breakLevel : rh, firstIdx };
-}
-
-function alertKey(item, tf, brk){
-  // one alert per coin+tf+firstBreak index window
-  return `${item.chain}|${item.ca}|${tf}|age0-${brk.firstIdx != null ? brk.firstIdx : 'x'}`;
-}
-
-async function sendNtfy(title, message){
-  const body = `${title}\n${message}`;
-  const r = await fetch(NTFY_URL, {
-    method: 'POST',
-    headers: {
-      'Title': title.slice(0, 80),
-      'Priority': 'high',
-      'Tags': 'chart_with_upwards_trend,moneybag'
-    },
-    body
-  });
-  if (!r.ok) throw new Error(`ntfy HTTP ${r.status}`);
-  return r.json().catch(() => ({}));
-}
-
-async function main(){
+async function main() {
   const recentsDoc = loadJSON(RECENTS, { items: [] });
-  const items = Array.isArray(recentsDoc) ? recentsDoc : (recentsDoc.items || []);
+  const items = Array.isArray(recentsDoc) ? recentsDoc : recentsDoc.items || [];
   const state = loadJSON(STATE, { sent: {}, updated: null });
   if (!state.sent || typeof state.sent !== 'object') state.sent = {};
 
-  console.log(`CAs: ${items.length} · TFs: ${TFS.join(',')} · ntfy: ${NTFY_TOPIC}`);
+  console.log(`CAs: ${items.length} · TFs: ${TFS.join(',')} · ntfy: ${NTFY_TOPIC} · source: DexScreener`);
   if (!items.length) {
     console.log('No saved CAs — nothing to scan');
     return;
   }
 
+  const pairs = await fetchDexPairsForCas(items.map((i) => i.ca));
+  console.log('DexScreener pairs returned:', pairs.length);
+
   let sentCount = 0;
   const findings = [];
+  const hits = [];
+  const errors = [];
+  const scanned = [];
 
   for (const item of items) {
-    const chain = item.chain || 'solana';
-    const ca = item.ca;
-    const name = item.name || item.base || ca.slice(0, 8);
-    let pool;
-    try {
-      pool = await resolvePool(chain, ca);
-      await sleep(SLEEP_MS);
-    } catch (e) {
-      console.warn(`resolve fail ${name}:`, e.message || e);
+    const name = item.name || item.base || String(item.ca || '').slice(0, 8);
+    const pair = pickBestPair(pairs, item.chain, item.ca);
+    if (!pair) {
+      errors.push({ name, error: 'no DexScreener pair' });
+      console.warn(name + ': no pair');
       continue;
     }
-
+    scanned.push(name);
     for (const tf of TFS) {
+      const brk = tfBreakout(pair, tf);
+      brk.name = name;
+      brk.ca = item.ca;
+      brk.chain = chainIdOf(item.chain);
+      brk.tf = tf;
+      if (brk.interesting) hits.push(brk);
+      const interesting = brk.fresh && brk.held && brk.age != null && brk.age <= 2;
+      if (!interesting) {
+        console.log(`${name} ${tf}: no fresh breakout (state=${brk.state} age=${brk.age} 5m=${brk.m5} 1h=${brk.h1})`);
+        continue;
+      }
+      const key = `${item.chain}|${item.ca}|${tf}|${brk.event}|${brk.age}`;
+      if (state.sent[key] && Date.now() - (state.sent[key].t || 0) < 3 * 3600e3) {
+        console.log(`${name} ${tf}: already alerted`);
+        continue;
+      }
+      const title = `🚀 ${name} · ${tf.toUpperCase()} breakout`;
+      const msg = [
+        `${name} (${brk.chain === 'solana' ? 'SOL' : 'ETH'})`,
+        `TF: ${tf.toUpperCase()}`,
+        `Event: ${brk.event} · ${brk.state} · age ${brk.age} · Fresh ${brk.fresh ? 'YES' : 'NO'}`,
+        `5m ${brk.m5}% · 1h ${brk.h1}% · 6h ${brk.h6}% · 24h ${brk.h24}%`,
+        `Vol ${brk.volX}x · buys ${Math.round((brk.buyR || 0) * 100)}% · liq $${Math.round(brk.liq || 0).toLocaleString()}`,
+        `CA: ${item.ca}`,
+        `Dex: ${brk.dexUrl || ''}`,
+        `Site: https://sasikar.github.io/Trading/index.html?tab=breakouts`
+      ].join('\n');
       try {
-        const klRaw = await fetchOHLCV(pool.network, pool.address, tf);
-        await sleep(SLEEP_MS);
-        // drop forming candle
-        const kl = klRaw.length > 2 ? klRaw.slice(0, -1) : klRaw;
-        const brk = breakoutInfo(kl);
-        const interesting = brk.fresh && brk.held && brk.age != null && brk.age <= 2;
-        if (!interesting) {
-          console.log(`${name} ${tf}: no fresh breakout (age=${brk.age}, fresh=${brk.fresh})`);
-          continue;
-        }
-        const key = alertKey(item, tf, brk);
-        // Only ping on age 0 (true NEW) or first time we see this breakout run
-        const isNew = brk.age === 0 || !state.sent[key];
-        if (!isNew) {
-          console.log(`${name} ${tf}: already alerted ${key}`);
-          continue;
-        }
-        // Prefer age 0; still alert age 1-2 once if never sent
-        if (brk.age > 2) continue;
-
-        const title = `🚀 ${name} · ${tf.toUpperCase()} breakout`;
-        const msg = [
-          `${name} (${chain === 'solana' || chain === 'sol' ? 'SOL' : 'ETH'})`,
-          `TF: ${tf.toUpperCase()}`,
-          `Event: ${brk.age === 0 ? 'NEW BREAKOUT' : 'BREAKOUT HELD'} · age ${brk.age} · Fresh YES`,
-          `CA: ${ca}`,
-          `Site: https://sasikar.github.io/Trading/index.html?tab=breakouts`
-        ].join('\n');
-
-        await sendNtfy(title, msg);
-        state.sent[key] = { t: Date.now(), name, tf, age: brk.age };
+        await sendNtfy(NTFY_TOPIC, title, msg);
+        state.sent[key] = { t: Date.now(), name, tf, age: brk.age, event: brk.event };
         sentCount++;
-        findings.push(`${name} ${tf} age ${brk.age}`);
-        console.log(`ALERT sent: ${name} ${tf}`);
-        await sleep(300);
+        findings.push(`${name} ${tf} ${brk.event} age ${brk.age}`);
+        console.log('ALERT sent: ' + name + ' ' + tf);
       } catch (e) {
-        console.warn(`scan fail ${name} ${tf}:`, e.message || e);
+        console.warn('ntfy fail', e.message || e);
+        errors.push({ name, error: String(e.message || e).slice(0, 120) });
       }
     }
   }
 
-  // prune very old keys (keep last 200)
-  const entries = Object.entries(state.sent).sort((a, b) => (b[1].t || 0) - (a[1].t || 0)).slice(0, 200);
+  const entries = Object.entries(state.sent)
+    .sort((a, b) => (b[1].t || 0) - (a[1].t || 0))
+    .slice(0, 200);
   state.sent = Object.fromEntries(entries);
   state.updated = new Date().toISOString();
   state.lastFindings = findings;
+  state.source = 'dexscreener';
+  state.ui = {
+    lastScan: state.updated,
+    health: errors.length && !scanned.length ? 'ERROR' : 'OK',
+    source: 'DexScreener',
+    candidates: items.length,
+    scanned: scanned.length,
+    hits: hits.length,
+    alertsThisRun: sentCount,
+    errorCount: errors.length,
+    errors: errors.slice(0, 5),
+    topic: NTFY_TOPIC
+  };
   saveJSON(STATE, state);
 
-  console.log(`Done. Alerts sent: ${sentCount}. Findings: ${findings.length}`);
+  const scanDoc = {
+    updated: state.updated,
+    source: 'dexscreener',
+    tfs: TFS,
+    count: hits.length,
+    items: hits,
+    ui: state.ui
+  };
+  saveJSON(SCAN, scanDoc);
+
+  try {
+    await publishViaContents('data/breakout-alert-state.json', state);
+    await publishViaContents('data/breakout-scan.json', scanDoc);
+  } catch (e) {
+    console.warn('publish', e.message || e);
+  }
+
+  console.log(`Done. Alerts sent: ${sentCount}. Findings: ${findings.length}. Hits: ${hits.length}`);
 }
 
-main().catch(e => {
+main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
