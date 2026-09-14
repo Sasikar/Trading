@@ -509,6 +509,44 @@ export async function sendNtfy(topic, title, message) {
   return { ok: 1 };
 }
 
+export async function sendTelegram(token, chatId, text) {
+  const r = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: String(text || '').slice(0, 3900),
+      disable_web_page_preview: true
+    })
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok) throw new Error(j.description || 'telegram HTTP ' + r.status);
+  return j;
+}
+
+export async function telegramGetMe(token) {
+  const r = await fetch('https://api.telegram.org/bot' + token + '/getMe');
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok) throw new Error(j.description || 'bad telegram token');
+  return j.result;
+}
+
+export async function telegramGetUpdates(token) {
+  await fetch('https://api.telegram.org/bot' + token + '/deleteWebhook').catch(() => {});
+  const r = await fetch('https://api.telegram.org/bot' + token + '/getUpdates?limit=20');
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok) throw new Error(j.description || 'telegram getUpdates failed');
+  return j.result || [];
+}
+
+export function firstPrivateChatId(updates) {
+  for (const u of updates || []) {
+    const chat = (u.message || u.edited_message || u.my_chat_member || {}).chat;
+    if (chat && chat.type === 'private' && chat.id) return String(chat.id);
+  }
+  return '';
+}
+
 /* ---------- stores ---------- */
 
 export class MemoryStore {
@@ -602,6 +640,7 @@ export class Engine {
     this.busy = false;
     this.lastErr = '';
     this.ntfyErr = '';
+    this.telegramErr = '';
     this.dexCallsMin = [];
     this.rateLimitedUntil = 0;
     try {
@@ -611,6 +650,7 @@ export class Engine {
     this.rateLimitedUntil = +store.getMeta('rate_limited_until') || 0;
     this.lastErr = store.getMeta('last_err') || '';
     this.ntfyErr = store.getMeta('ntfy_err') || '';
+    this.telegramErr = store.getMeta('telegram_err') || '';
     const lastPoll = +store.getMeta('last_poll') || 0;
     const lastScanned = +store.getMeta('last_scanned') || 0;
     // Fresh ticks in the DB means a previous poll worked — don't keep a
@@ -651,6 +691,73 @@ export class Engine {
       this.ntfyErr = msg;
     }
     this.store.setMeta('ntfy_err', this.ntfyErr);
+  }
+
+  telegramWantedUsername() {
+    return String(this.env.TELEGRAM_BOT_USERNAME || 'MyTradingBreakoutBot').replace(/^@/, '');
+  }
+  telegramToken() {
+    return String(this.env.TELEGRAM_BOT_TOKEN || this.store.getMeta('telegram_bot_token') || '').trim();
+  }
+  telegramChatId() {
+    return String(this.env.TELEGRAM_CHAT_ID || this.store.getMeta('telegram_chat_id') || '').trim();
+  }
+  markTelegramFail(err) {
+    this.telegramErr = String(err && err.message ? err.message : err);
+    this.store.setMeta('telegram_err', this.telegramErr);
+  }
+  async resolveTelegramChat() {
+    const saved = this.telegramChatId();
+    if (saved) return saved;
+    const token = this.telegramToken();
+    if (!token) return '';
+    const updates = await telegramGetUpdates(token);
+    const id = firstPrivateChatId(updates);
+    if (id) this.store.setMeta('telegram_chat_id', id);
+    return id;
+  }
+  async bindTelegram(tokenIn) {
+    const incoming = String(tokenIn || '').trim();
+    const token = incoming || this.telegramToken();
+    if (!token) throw new Error('no telegram token');
+    const me = await telegramGetMe(token);
+    const want = this.telegramWantedUsername();
+    if (String(me.username || '') !== want) throw new Error('bot username mismatch');
+    this.store.setMeta('telegram_bot_token', token);
+    this.store.setMeta('telegram_bot_username', me.username || want);
+    const chat = await this.resolveTelegramChat();
+    this.telegramErr = chat ? '' : 'Open t.me/' + want + ' and tap Start, then send hi';
+    this.store.setMeta('telegram_err', this.telegramErr);
+    if (chat && this.store.getMeta('telegram_welcome_sent') !== '1') {
+      try {
+        await sendTelegram(
+          token,
+          chat,
+          'Trading Breakouts linked.\nYou will get NEW BREAKOUT alerts here as a private DM.\nMute other Telegram groups — this chat is the only one that needs sound.'
+        );
+        this.store.setMeta('telegram_welcome_sent', '1');
+      } catch (e) {
+        this.markTelegramFail(e);
+      }
+    }
+    return {
+      ok: true,
+      username: me.username || want,
+      chatBound: !!chat,
+      needStart: !chat
+    };
+  }
+  async pingTelegram() {
+    if (!this.telegramToken()) throw new Error('telegram token not stored yet');
+    const chat = await this.resolveTelegramChat();
+    if (!chat) {
+      const want = this.telegramWantedUsername();
+      throw new Error('Open t.me/' + want + ' and tap Start, then send hi');
+    }
+    await sendTelegram(this.telegramToken(), chat, 'Test ping from your trading worker. Alerts will arrive in this chat.');
+    this.telegramErr = '';
+    this.store.setMeta('telegram_err', '');
+    return { ok: true, chatBound: true, username: this.telegramWantedUsername() };
   }
 
   dexCallsLastMin(now) {
@@ -705,9 +812,8 @@ export class Engine {
     return 30 * 60e3;
   }
 
-  shouldNtfy(hit, tf, focus) {
+  shouldAlert(hit, tf) {
     if (hit.state === 'WARMING' || hit.state === 'WATCH') return false;
-    if (this.ntfyPaused()) return false;
     if (tf === '1m') {
       if (!hit.focus) return false;
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
@@ -721,8 +827,13 @@ export class Engine {
     return hit.fresh && hit.held && hit.age <= 2 && (hit.score >= 55 || hit.event === 'NEW BREAKOUT');
   }
 
+  shouldNtfy(hit, tf, focus) {
+    if (this.ntfyPaused()) return false;
+    return this.shouldAlert(hit, tf, focus);
+  }
+
   async maybeAlert(hit, tf) {
-    if (!this.shouldNtfy(hit, tf)) return false;
+    if (!this.shouldAlert(hit, tf)) return false;
     const now = Date.now();
     const key = tf === '1m' ? hit.ca.toLowerCase() + '|1m' : hit.ca.toLowerCase() + '|coin';
     if (now - this.store.getAlert(key) < this.cooldownMs(tf === '1m' ? '1m' : '4h')) return false;
@@ -735,29 +846,49 @@ export class Engine {
       'CA: ' + hit.ca,
       'https://sasikar.github.io/Trading/index.html?tab=breakouts'
     ].join('\n');
-    try {
-      await sendNtfy(this.topic(), title, msg);
-      this.store.setAlert(key, now);
-      this.ntfyErr = '';
-      this.store.setMeta('ntfy_err', '');
-      this.store.setMeta(
-        'last_alert',
-        JSON.stringify({
-          name: hit.name,
-          ca: hit.ca,
-          tf,
-          event: hit.event,
-          state: hit.state,
-          score: hit.score,
-          at: new Date(now).toISOString()
-        })
-      );
-      return true;
-    } catch (e) {
-      this.store.setAlert(key, now);
-      this.markNtfyFail(e);
-      return false;
+    let via = '';
+    const token = this.telegramToken();
+    if (token) {
+      try {
+        let chat = this.telegramChatId();
+        if (!chat) chat = await this.resolveTelegramChat();
+        if (!chat) throw new Error('Open t.me/' + this.telegramWantedUsername() + ' and tap Start, then send hi');
+        await sendTelegram(token, chat, title + '\n' + msg);
+        this.telegramErr = '';
+        this.store.setMeta('telegram_err', '');
+        via = 'telegram';
+      } catch (e) {
+        this.markTelegramFail(e);
+        const m = String(e && e.message ? e.message : e);
+        if (/tap Start|not stored|no telegram token/i.test(m)) return false;
+      }
     }
+    if (!via && !this.ntfyPaused()) {
+      try {
+        await sendNtfy(this.topic(), title, msg);
+        this.ntfyErr = '';
+        this.store.setMeta('ntfy_err', '');
+        via = 'ntfy';
+      } catch (e) {
+        this.markNtfyFail(e);
+      }
+    }
+    if (!via) return false;
+    this.store.setAlert(key, now);
+    this.store.setMeta(
+      'last_alert',
+      JSON.stringify({
+        name: hit.name,
+        ca: hit.ca,
+        tf,
+        event: hit.event,
+        state: hit.state,
+        score: hit.score,
+        via,
+        at: new Date(now).toISOString()
+      })
+    );
+    return true;
   }
 
   evaluateRow(row, tf, focus) {
@@ -851,6 +982,10 @@ export class Engine {
         ? this.ntfyErr || 'Phone alerts paused until midnight UTC (ntfy free daily limit)'
         : this.ntfyErr || '',
       ntfyPaused: this.ntfyPaused(now),
+      telegramBot: this.telegramWantedUsername(),
+      telegramBound: !!this.telegramChatId(),
+      telegramError: this.telegramErr || '',
+      telegramReady: !!(this.telegramToken() && this.telegramChatId()),
       lastAlert,
       topScores: tops,
       watch: watch.map((w) => ({ ca: w.ca, name: w.name, chain: w.chain }))
@@ -870,6 +1005,11 @@ export class Engine {
       return { skipped: true, rateLimited: true };
     }
     this.busy = true;
+    try {
+      if (this.telegramToken() && !this.telegramChatId()) {
+        await this.resolveTelegramChat().catch(() => {});
+      }
+    } catch (e) {}
     let nAlert = 0;
     let scanned = 0;
     let errors = 0;
@@ -1015,6 +1155,28 @@ export async function handleApi(engine, request) {
     const body = await request.json().catch(() => ({}));
     const out = engine.setFocus(body.ca || '', body.alerts1m);
     return json(out);
+  }
+  if ((path === '/ping-telegram' || path === '/api/ping-telegram') && method === 'POST') {
+    try {
+      const out = await engine.pingTelegram();
+      return json(out);
+    } catch (e) {
+      engine.markTelegramFail(e);
+      return json({
+        ok: false,
+        needStart: /tap Start/i.test(String(e && e.message ? e.message : e)),
+        error: String(e && e.message ? e.message : e)
+      });
+    }
+  }
+  if ((path === '/bind-telegram' || path === '/api/bind-telegram') && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    try {
+      const out = await engine.bindTelegram(body.token || '');
+      return json(out);
+    } catch (e) {
+      return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
+    }
   }
   if ((path === '/ping-ntfy' || path === '/api/ping-ntfy') && method === 'POST') {
     if (engine.ntfyPaused()) {

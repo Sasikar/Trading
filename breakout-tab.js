@@ -178,6 +178,9 @@
       return;
     }
     lastErr = st.error || '';
+    const tgBound = !!st.telegramReady || !!st.telegramBound;
+    const tgBot = st.telegramBot || 'MyTradingBreakoutBot';
+    const tgErr = st.telegramError || '';
     const ntfyErr = st.ntfyError || (/ntfy/i.test(lastErr) ? lastErr : '');
     const col =
       st.health === 'LIVE' || st.health === 'OK'
@@ -201,18 +204,26 @@
         (st.lastPoll ? ' · ' + fmtAgo(st.lastPoll) : '') +
         ' · CAs ' +
         (st.candidates != null ? st.candidates : '—') +
-        '<br>ntfy <b style="color:#e8eef6">' +
-        (st.topic || '') +
-        '</b> · focus <b style="color:#e8eef6">' +
+        '<br>Telegram <b style="color:#e8eef6">@' +
+        tgBot +
+        '</b> · ' +
+        (tgBound ? '<span style="color:#62e3a0">linked · private DM</span>' : '<span style="color:#e6c878">open the bot, tap Start, send hi</span>') +
+        ' · focus <b style="color:#e8eef6">' +
         (st.focusName || st.focus || 'none') +
         '</b>' +
         (st.focus1mAlerts ? ' · 1m alerts ON' : ' · 1m alerts off') +
         '<br>Candles live in Cloudflare. This page only reads the API.' +
-        (ntfyErr
+        (!tgBound
+          ? '<br><span style="color:#e6c878">Phone alerts via Telegram. Open t.me/' +
+            tgBot +
+            ' → Start → send hi, then tap Test Telegram.</span>'
+          : '') +
+        (tgBound && tgErr ? '<br><span style="color:#f0a060">' + tgErr + '</span>' : '') +
+        (ntfyErr && !tgBound
           ? '<br><span style="color:#f0a060">' +
             (st.ntfyPaused || /quota|daily|limit/i.test(ntfyErr)
-              ? 'Phone alerts paused until midnight UTC — ntfy.sh free daily limit is used up. Cards still update.'
-              : 'Phone ping delayed: ' + ntfyErr + ' — Dex is fine') +
+              ? 'ntfy is paused (daily limit). Using Telegram instead.'
+              : 'Phone ping delayed: ' + ntfyErr) +
             '</span>'
           : '') +
         (lastErr && !/ntfy/i.test(lastErr)
@@ -232,7 +243,7 @@
           ' · score ' +
           (la.score != null ? la.score : '—') +
           (la.at ? ' · ' + fmtAgo(la.at) : '');
-      } else lastEl.textContent = 'Last alert: none yet — worker ntfy fires on NEW BREAKOUT (tab can be closed)';
+      } else lastEl.textContent = 'Last alert: none yet — worker Telegram fires on NEW BREAKOUT (tab can be closed)';
     }
     if (topEl) {
       const tops = st.topScores || [];
@@ -266,7 +277,10 @@
       }
     }
     const hint = $('bo-ntfy-hint');
-    if (hint) hint.textContent = 'Subscribe in ntfy to ' + (st.topic || '') + ' · alerts come from the worker, not this page';
+    if (hint) {
+      if (tgBound) hint.textContent = 'Alerts go to Telegram @' + tgBot + ' as a private DM. Mute other groups.';
+      else hint.textContent = 'Open t.me/' + tgBot + ' → Start → send hi, then tap Test Telegram.';
+    }
     paintFocusRow(st);
   }
 
@@ -371,17 +385,17 @@
     await loadStatus();
   }
 
-  async function pingNtfy() {
+  async function pingTelegram() {
     const hint = $('bo-ntfy-hint');
     try {
-      const j = await api('/ping-ntfy', { method: 'POST' });
+      const j = await api('/ping-telegram', { method: 'POST' });
       if (hint) {
-        if (j.paused || j.ok === false)
-          hint.textContent = j.error || 'ntfy daily limit — alerts resume after midnight UTC';
-        else hint.textContent = 'Test ping sent via worker to ' + (j.topic || '');
+        if (j.ok === false || j.needStart)
+          hint.textContent = j.error || 'Open t.me/MyTradingBreakoutBot, tap Start, send hi, then test again';
+        else hint.textContent = 'Test ping sent to Telegram @' + (j.username || 'MyTradingBreakoutBot');
       }
     } catch (e) {
-      if (hint) hint.textContent = 'ntfy failed: ' + (e.message || e);
+      if (hint) hint.textContent = String(e.message || e);
     }
   }
 
@@ -485,7 +499,8 @@
       scanBreakoutMemes(true);
     } else stopLive();
   };
-  window.pingBreakoutNtfy = pingNtfy;
+  window.pingBreakoutNtfy = pingTelegram;
+  window.pingBreakoutTelegram = pingTelegram;
   window.setBreakoutFocus = function () {
     const sel = $('bo-focus-sel');
     return setFocus(sel ? sel.value : '');

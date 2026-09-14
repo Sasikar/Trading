@@ -500,7 +500,7 @@
 
 </main></div>
 <script src="overview-app.js?v=20260914-ohlcv2"></script>
-<script src="breakout-tab.js?v=20260914-ohlcv4"></script>
+<script src="breakout-tab.js?v=20260914-tg1"></script>
 </div>
 
 <div id="memegate-panel" class="trend-panel" style="display:block">
@@ -538,7 +538,7 @@
 <div id="breakouts-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Breakout Memes</h2><p>Saved CAs · candles on Cloudflare · this page only reads the API · ntfy from the worker</p></div>
+    <div><h2>Breakout Memes</h2><p>Saved CAs · candles on Cloudflare · this page only reads the API · Telegram DM from the worker</p></div>
     <span class="source" id="bo-source">—</span>
   </div>
   <div class="card">
@@ -557,7 +557,7 @@
       </div>
       <button type="button" onclick="try{window.scanBreakoutMemes&&window.scanBreakoutMemes()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Scan saved CAs</button>
       <button type="button" id="bo-live-btn" onclick="try{window.toggleBreakoutLive&&window.toggleBreakoutLive()}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Live watch ON</button>
-      <button type="button" onclick="try{window.pingBreakoutNtfy&&window.pingBreakoutNtfy()}catch(e){alert(e)}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">Test ntfy</button>
+      <button type="button" onclick="try{window.pingBreakoutTelegram&&window.pingBreakoutTelegram()}catch(e){alert(e)}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">Test Telegram</button>
       <span id="bo-status" style="font-size:12px;color:#8491a1">DexScreener · saved CAs</span>
     </div>
     <div style="font-size:11px;color:#8491a1;margin-bottom:10px;line-height:1.45">Worker builds 5m–4h candles from Dex snapshots (no Helius). <b style="color:#c5d0dc">1m is focus-only</b>. Phone alerts fire from Cloudflare — keep this tab closed if you want. No login on this page.</div>
@@ -577,7 +577,7 @@
       <div id="m1m-health" style="font-size:13px;font-weight:800;color:#e6c878;margin-bottom:6px">Loading status…</div>
       <div id="m1m-meta" style="font-size:12px;color:#8491a1;line-height:1.45;margin-bottom:8px">—</div>
       <div id="m1m-last-alert" style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:8px">Last alert: —</div>
-      <div id="bo-ntfy-hint" style="font-size:11px;color:#8491a1;margin-bottom:8px">Subscribe in the ntfy app to the topic shown after the first scan</div>
+      <div id="bo-ntfy-hint" style="font-size:11px;color:#8491a1;margin-bottom:8px">Open t.me/MyTradingBreakoutBot → Start → send hi, then tap Test Telegram</div>
       <div id="m1m-top" style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#c5d0dc"></div>
     </div>
     <div id="bo-list" style="display:flex;flex-direction:column;gap:8px">
