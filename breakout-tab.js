@@ -2,8 +2,17 @@
    Overrides window.showBreakoutMemes / scanBreakoutMemes / setBreakoutTF / loadMomentum1mStatus.
    Does not use GeckoTerminal (rate-limited). */
 (function () {
-  const NTFY_TOPIC = 'MyTradingMemeBreakout44';
-  const NTFY_URL = 'https://ntfy.sh/' + encodeURIComponent(NTFY_TOPIC);
+  const NTFY_FALLBACK = 'MyTradingMemeBreakout44';
+  let NTFY_TOPIC = (function () {
+    try {
+      return localStorage.getItem('bo_ntfy_topic') || NTFY_FALLBACK;
+    } catch (e) {
+      return NTFY_FALLBACK;
+    }
+  })();
+  function ntfyUrl() {
+    return 'https://ntfy.sh/' + encodeURIComponent(NTFY_TOPIC);
+  }
   const SENT_KEY = 'bo_ntfy_sent_v2';
   const SNAP_KEY = 'bo_price_snap_v1';
   const LIVE_MS = 45000;
@@ -217,7 +226,7 @@
   }
 
   async function sendNtfy(title, message) {
-    const r = await fetch(NTFY_URL, {
+    const r = await fetch(ntfyUrl(), {
       method: 'POST',
       headers: {
         Title: String(title || '').slice(0, 90),
@@ -392,6 +401,12 @@
       const r = await fetch('data/breakout-alert-state.json?t=' + Date.now(), { cache: 'no-store' });
       if (r.ok) bo = await r.json();
     } catch (e) {}
+    if (bo && bo.ui && bo.ui.topic) {
+      NTFY_TOPIC = bo.ui.topic;
+      try {
+        localStorage.setItem('bo_ntfy_topic', NTFY_TOPIC);
+      } catch (e) {}
+    }
     try {
       const r = await fetch(
         'https://api.github.com/repos/Sasikar/Trading/actions/runs?per_page=8',
