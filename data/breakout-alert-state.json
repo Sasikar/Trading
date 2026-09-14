@@ -1,18 +1,18 @@
 {
-  "updated": "2026-09-14T05:14:56.180Z",
+  "updated": "2026-09-14T05:16:47.003Z",
   "sent": {},
   "lastFindings": [],
   "source": "dexscreener",
   "ui": {
-    "lastScan": "2026-09-14T05:14:56.180Z",
+    "lastScan": "2026-09-14T05:16:47.003Z",
     "health": "OK",
     "source": "DexScreener",
-    "candidates": 16,
-    "scanned": 16,
-    "hits": 6,
+    "candidates": 18,
+    "scanned": 18,
+    "hits": 5,
     "alertsThisRun": 0,
     "errorCount": 0,
     "errors": [],
-    "topic": "MyTradingMemeBreakout44"
+    "topic": "WildMemeMover"
   }
 }
