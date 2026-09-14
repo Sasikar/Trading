@@ -200,14 +200,20 @@ export function pairToTick(pair, row, now) {
 export function hunterLinks(ca, chain) {
   const c = String(chain || 'solana').toLowerCase();
   const sol = c === 'solana' || c === 'sol';
-  const bm = sol ? 'solana' : c === 'ethereum' || c === 'eth' ? 'ethereum' : c === 'bsc' ? 'bsc' : 'base';
-  return {
+  const bm = sol ? 'solana' : 'ethereum';
+  const links = {
     bubblemaps: 'https://app.bubblemaps.io/' + bm + '/token/' + ca,
-    trench: 'https://trench.bot/clusters/' + encodeURIComponent(ca),
-    rugcheck: 'https://rugcheck.xyz/tokens/' + encodeURIComponent(ca),
     scanner: 'https://sasikar.github.io/Trading/scanner.html',
-    dex: 'https://dexscreener.com/' + (sol ? 'solana' : bm) + '/' + ca
+    dex: 'https://dexscreener.com/' + (sol ? 'solana' : 'ethereum') + '/' + ca
   };
+  if (sol) {
+    links.trench = 'https://trench.bot/clusters/' + encodeURIComponent(ca);
+    links.rugcheck = 'https://rugcheck.xyz/tokens/' + encodeURIComponent(ca);
+  } else {
+    links.honeypot = 'https://honeypot.is/ethereum?address=' + encodeURIComponent(ca);
+    links.goplus = 'https://gopluslabs.io/token-security/1/' + ca;
+  }
+  return links;
 }
 
 export function hunterBand(liq) {
@@ -244,23 +250,29 @@ export async function fetchHunterSeeds() {
     'so11111111111111111111111111111111111111112',
     'epjfwdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v',
     'es9vmfrzacermjfrf4h2fyd4kconky11mcce8benwnyb',
-    'usd1ttgy1n9kd0ha3m4vf4xtw6y9ydefb7niascszpc'
+    'usd1ttgy1n9kd0ha3m4vf4xtw6y9ydefb7niascszpc',
+    '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2',
+    '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+    '0xdac17f958d2ee523a2206206994597c13d831ec7',
+    '0x2260fac5e5542a773aa44fbcfedf7c193bc2c599'
   ]);
   const push = (ca, chain, src, isBoost, pair) => {
     const a = String(ca || '').trim();
     if (!a) return;
     if (skipBase.has(a.toLowerCase())) return;
+    const ch = String(chain || 'solana').toLowerCase();
+    if (ch !== 'solana' && ch !== 'ethereum') return;
     if (isBoost) boosted.add(a.toLowerCase());
-    seeds.push({ ca: a, chain: chain || 'solana', boosted: !!isBoost, src, pair: pair || null });
+    seeds.push({ ca: a, chain: ch, boosted: !!isBoost, src, pair: pair || null });
   };
-  for (const q of ['pump', 'SOL', 'bonk', 'wif']) {
+  for (const q of ['pump', 'SOL', 'pepe', 'ETH']) {
     try {
       calls++;
       const s = await fetchJSON('https://api.dexscreener.com/latest/dex/search?q=' + encodeURIComponent(q), 1);
       for (const p of s.pairs || []) {
-        if (!p || p.chainId !== 'solana') continue;
+        if (!p || (p.chainId !== 'solana' && p.chainId !== 'ethereum')) continue;
         const ca = p.baseToken && p.baseToken.address;
-        push(ca, 'solana', 'search', false, p);
+        push(ca, p.chainId, 'search', false, p);
       }
     } catch (e) {}
   }
@@ -268,14 +280,14 @@ export async function fetchHunterSeeds() {
     calls++;
     const prof = await fetchJSON('https://api.dexscreener.com/token-profiles/latest/v1', 1);
     for (const p of prof || []) {
-      if (String(p.chainId || '').toLowerCase() === 'solana') push(p.tokenAddress, 'solana', 'profile', false, null);
+      push(p.tokenAddress, p.chainId, 'profile', false, null);
     }
   } catch (e) {}
   try {
     calls++;
     const b = await fetchJSON('https://api.dexscreener.com/token-boosts/latest/v1', 1);
     for (const p of b || []) {
-      if (String(p.chainId || '').toLowerCase() === 'solana') push(p.tokenAddress, 'solana', 'boost', true, null);
+      push(p.tokenAddress, p.chainId, 'boost', true, null);
     }
   } catch (e) {}
   for (const s of seeds) if (boosted.has(s.ca.toLowerCase())) s.boosted = true;
@@ -1322,7 +1334,7 @@ export class Engine {
   }
   markHunterVerified(ca, tool) {
     const t = String(tool || '').toLowerCase();
-    if (!/^(bubblemaps|trench|rugcheck)$/.test(t)) throw new Error('bad tool');
+    if (!/^(bubblemaps|trench|rugcheck|honeypot|goplus)$/.test(t)) throw new Error('bad tool');
     const m = this.hunterVerifiedMap();
     const k = String(ca || '').toLowerCase();
     if (!k) throw new Error('no ca');

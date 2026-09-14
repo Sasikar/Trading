@@ -38,11 +38,36 @@
     if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 1e5 ? 0 : 1) + 'k';
     return '$' + Math.round(n);
   }
-  const TOOLS = [
+  const TOOLS_SOL = [
     { id: 'bubblemaps', title: 'Bubblemaps', domain: 'bubblemaps.io' },
     { id: 'trench', title: 'Trench Radar', domain: 'trench.bot' },
     { id: 'rugcheck', title: 'RugCheck', domain: 'rugcheck.xyz' }
   ];
+  const TOOLS_ETH = [
+    { id: 'bubblemaps', title: 'Bubblemaps', domain: 'bubblemaps.io' },
+    { id: 'honeypot', title: 'Honeypot.is', domain: 'honeypot.is' },
+    { id: 'goplus', title: 'GoPlus', domain: 'gopluslabs.io' }
+  ];
+  function isSol(chain) {
+    const c = String(chain || 'solana').toLowerCase();
+    return c === 'solana' || c === 'sol';
+  }
+  function chainBadge(chain) {
+    const sol = isSol(chain);
+    const src = sol
+      ? 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png'
+      : 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png';
+    const label = sol ? 'SOL' : 'ETH';
+    return (
+      '<img src="' +
+      src +
+      '" alt="' +
+      label +
+      '" title="' +
+      label +
+      '" width="16" height="16" style="width:16px;height:16px;border-radius:50%;flex-shrink:0" />'
+    );
+  }
   function toolBtn(tool, url, on, ca) {
     const bd = on ? '#1a9b6c' : '#243041';
     const bg = on ? '#06281a' : '#121a24';
@@ -81,21 +106,24 @@
   function renderCard(h) {
     const v = h.verified || {};
     const links = h.links || {};
-    const both = v.bubblemaps && v.trench;
+    const sol = isSol(h.chain);
+    const both = sol ? v.bubblemaps && v.trench : v.bubblemaps && v.honeypot;
+    const tools = sol ? TOOLS_SOL : TOOLS_ETH;
     const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
     return (
       '<div style="padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a">' +
       '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">' +
       '<div style="font-weight:900;font-size:15px;color:#e8eef6;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+      chainBadge(h.chain) +
       esc(h.name) +
       (both
-        ? ' <span title="You verified Bubblemaps + Trench" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
+        ? ' <span title="You verified the chain scanners" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
         : '') +
       (h.boosted ? ' <span style="font-size:10px;color:#f0a060;font-weight:800">PAID BOOST</span>' : '') +
       (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">SAVED</span>' : '') +
       '</div>' +
       '<div style="display:flex;gap:6px;align-items:center">' +
-      TOOLS.map(function (t) {
+      tools.map(function (t) {
         return toolBtn(t, links[t.id], v[t.id], h.ca);
       }).join('') +
       '</div></div>' +
@@ -127,6 +155,8 @@
         : '') +
       '<a href="scanner.html" target="_blank" rel="noopener" class="hu-scanner" data-hu-ca="' +
       esc(h.ca) +
+      '" data-hu-chain="' +
+      (sol ? 'sol' : '1') +
       '" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;font-size:11px;text-decoration:none">Full scanner</a>' +
       '</div></div>'
     );
@@ -208,7 +238,7 @@
       a.onclick = function () {
         try {
           localStorage.setItem('scannerCA', a.getAttribute('data-hu-ca') || '');
-          localStorage.setItem('scannerChain', 'sol');
+          localStorage.setItem('scannerChain', a.getAttribute('data-hu-chain') || 'sol');
         } catch (e) {}
       };
     });
