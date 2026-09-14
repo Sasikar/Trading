@@ -178,6 +178,7 @@
       return;
     }
     lastErr = st.error || '';
+    const ntfyErr = st.ntfyError || (/ntfy/i.test(lastErr) ? lastErr : '');
     const col =
       st.health === 'LIVE' || st.health === 'OK'
         ? '#62e3a0'
@@ -207,7 +208,12 @@
         '</b>' +
         (st.focus1mAlerts ? ' · 1m alerts ON' : ' · 1m alerts off') +
         '<br>Candles live in Cloudflare. This page only reads the API.' +
-        (lastErr ? '<br><span style="color:#ff6f7c">' + lastErr + '</span>' : '');
+        (ntfyErr
+          ? '<br><span style="color:#f0a060">Phone ping delayed: ' + ntfyErr + ' — Dex is fine, ntfy.sh is busy</span>'
+          : '') +
+        (lastErr && !/ntfy/i.test(lastErr)
+          ? '<br><span style="color:#ff6f7c">' + lastErr + '</span>'
+          : '');
     }
     const la = st.lastAlert;
     if (lastEl) {

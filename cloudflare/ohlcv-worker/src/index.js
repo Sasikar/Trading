@@ -195,10 +195,11 @@ export default {
     return env.ENGINE.get(id).fetch(stubReq);
   },
   async scheduled(event, env, ctx) {
+    // Kick the Durable Object alarm. Do NOT force a full Dex poll — alarm
+    // already polls saved CAs ~60s and the focus coin ~20s. A cron /run
+    // doubled Dex traffic and made 18 coins look rate-limited.
     const id = env.ENGINE.idFromName('main');
-    ctx.waitUntil(
-      env.ENGINE.get(id).fetch(new Request('https://ohlcv.local/run', { method: 'POST' }))
-    );
+    ctx.waitUntil(env.ENGINE.get(id).fetch(new Request('https://ohlcv.local/status')));
   }
 };
 

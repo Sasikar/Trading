@@ -58,8 +58,15 @@ export function median(nums) {
   return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
 }
 
-export async function fetchJSON(url, tries = 3) {
+export async function fetchJSON(url, tries = 2) {
   let last;
+  const host = (() => {
+    try {
+      return new URL(url).host;
+    } catch (e) {
+      return 'fetch';
+    }
+  })();
   for (let i = 0; i < tries; i++) {
     try {
       const r = await fetch(url, {
@@ -67,18 +74,19 @@ export async function fetchJSON(url, tries = 3) {
         cache: 'no-store'
       });
       if (r.status === 429) {
-        await sleep(900 * (i + 1));
-        last = new Error('HTTP 429 DexScreener');
+        last = new Error('HTTP 429 ' + host);
+        // Do not retry-storm 429s — that is how 18 coins turns into a ban.
+        if (i + 1 < tries) await sleep(1600);
         continue;
       }
-      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + host);
       return await r.json();
     } catch (e) {
       last = e;
-      await sleep(280 * (i + 1));
+      if (i + 1 < tries) await sleep(280 * (i + 1));
     }
   }
-  throw last || new Error('fetch failed');
+  throw last || new Error('fetch failed ' + host);
 }
 
 export function pickBestPair(pairs, chain, ca) {
@@ -131,18 +139,18 @@ export async function fetchWatchlist(url) {
 export async function fetchDexPair(ca) {
   const path = '/latest/dex/tokens/' + encodeURIComponent(ca);
   try {
-    const j = await fetchJSON('https://api.dexscreener.com' + path, 2);
+    const j = await fetchJSON('https://api.dexscreener.com' + path, 1);
     return j.pairs || [];
   } catch (e) {
     const j = await fetchJSON(
       'https://trading-proxy.sasipudi.workers.dev/dex?path=' + encodeURIComponent(path),
-      2
+      1
     );
     return j.pairs || [];
   }
 }
 
-export async function fetchDexPairsForCas(cas, conc = 3) {
+export async function fetchDexPairsForCas(cas, conc = 2) {
   const uniq = [...new Set((cas || []).map((c) => String(c || '').trim()).filter(Boolean))];
   const byCa = new Map();
   for (let i = 0; i < uniq.length; i += conc) {
@@ -157,7 +165,7 @@ export async function fetchDexPairsForCas(cas, conc = 3) {
       })
     );
     for (const [ca, val] of parts) byCa.set(ca, val);
-    if (i + conc < uniq.length) await sleep(220);
+    if (i + conc < uniq.length) await sleep(400);
   }
   return byCa;
 }
@@ -480,7 +488,9 @@ export async function sendNtfy(topic, title, message) {
   ];
   let lastErr = null;
   let ok = 0;
-  for (const t of topics) {
+  for (let i = 0; i < topics.length; i++) {
+    const t = topics[i];
+    if (i) await sleep(700);
     try {
       const r = await fetch('https://ntfy.sh/' + encodeURIComponent(t), {
         method: 'POST',
@@ -491,7 +501,8 @@ export async function sendNtfy(topic, title, message) {
         },
         body: title + '\n' + message
       });
-      if (!r.ok) throw new Error('ntfy HTTP ' + r.status);
+      if (r.status === 429) throw new Error('HTTP 429 ntfy.sh');
+      if (!r.ok) throw new Error('HTTP ' + r.status + ' ntfy.sh');
       ok++;
     } catch (e) {
       lastErr = e;
@@ -593,6 +604,7 @@ export class Engine {
     this.env = env || {};
     this.busy = false;
     this.lastErr = '';
+    this.ntfyErr = '';
     this.dexCallsMin = [];
     this.rateLimitedUntil = 0;
     try {
@@ -601,6 +613,16 @@ export class Engine {
     } catch (e) {}
     this.rateLimitedUntil = +store.getMeta('rate_limited_until') || 0;
     this.lastErr = store.getMeta('last_err') || '';
+    this.ntfyErr = store.getMeta('ntfy_err') || '';
+    const lastPoll = +store.getMeta('last_poll') || 0;
+    const lastScanned = +store.getMeta('last_scanned') || 0;
+    // Fresh ticks in the DB means a previous poll worked — don't keep a
+    // leftover 429 pause from ntfy or a single Dex blip.
+    if (lastScanned > 0 && Date.now() - lastPoll < 180000) this.rateLimitedUntil = 0;
+    if (/ntfy/i.test(this.lastErr)) {
+      this.ntfyErr = this.ntfyErr || this.lastErr;
+      this.lastErr = '';
+    }
   }
 
   topic() {
@@ -669,11 +691,12 @@ export class Engine {
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
       return hit.fresh && hit.event === 'NEW BREAKOUT';
     }
+    // Live Dex labels are display-only except 5m and 4h — otherwise one hot
+    // coin fires 1h+2h+4h+5m at once and ntfy.sh 429s.
+    if (hit.live && tf !== '5m' && tf !== '4h') return false;
     if (tf === '5m' || tf === '10m') {
-      if (hit.live && tf !== '5m') return false;
       return hit.fresh && hit.event === 'NEW BREAKOUT' && hit.score >= 55;
     }
-    if (hit.live && (tf === '15m' || tf === '30m')) return false;
     return hit.fresh && hit.held && hit.age <= 2 && (hit.score >= 55 || hit.event === 'NEW BREAKOUT');
   }
 
@@ -694,6 +717,8 @@ export class Engine {
     try {
       await sendNtfy(this.topic(), title, msg);
       this.store.setAlert(key, now);
+      this.ntfyErr = '';
+      this.store.setMeta('ntfy_err', '');
       this.store.setMeta(
         'last_alert',
         JSON.stringify({
@@ -708,7 +733,11 @@ export class Engine {
       );
       return true;
     } catch (e) {
-      this.lastErr = 'ntfy ' + (e.message || e);
+      // Still cooldown so a 429 does not get retried every 20s (that is what
+      // keeps ntfy.sh angry).
+      this.store.setAlert(key, now);
+      this.ntfyErr = String(e && e.message ? e.message : e);
+      this.store.setMeta('ntfy_err', this.ntfyErr);
       return false;
     }
   }
@@ -763,10 +792,11 @@ export class Engine {
     } catch (e) {}
     const lastPoll = +this.store.getMeta('last_poll') || 0;
     const lastAll = +this.store.getMeta('last_all') || 0;
+    const fresh = lastPoll && now - lastPoll < 120000;
     const health =
-      this.rateLimitedUntil > now
+      !fresh && this.rateLimitedUntil > now
         ? 'RATE_LIMITED'
-        : lastPoll && now - lastPoll < 90000
+        : fresh
           ? 'LIVE'
           : lastPoll
             ? 'STALE'
@@ -798,7 +828,8 @@ export class Engine {
       candidates: watch.length,
       dexCallsLastMin: this.dexCallsLastMin(now),
       dexBudget: 120,
-      error: this.lastErr || '',
+      error: this.lastErr || this.ntfyErr || '',
+      ntfyError: this.ntfyErr || '',
       lastAlert,
       topScores: tops,
       watch: watch.map((w) => ({ ca: w.ca, name: w.name, chain: w.chain }))
@@ -815,13 +846,13 @@ export class Engine {
     const now = Date.now();
     if (this.busy) return { skipped: true };
     if (now < this.rateLimitedUntil) {
-      this.lastErr = 'DexScreener 429 backoff';
       return { skipped: true, rateLimited: true };
     }
     this.busy = true;
     let nAlert = 0;
     let scanned = 0;
     let errors = 0;
+    let n429 = 0;
     try {
       let rows = this.store.getWatch();
       const lastWatch = +this.store.getMeta('last_watch') || 0;
@@ -848,10 +879,7 @@ export class Engine {
         const got = byCa.get(row.ca);
         if (!got || got instanceof Error) {
           errors++;
-          if (got instanceof Error && /429/.test(got.message || '') && scanned === 0) {
-            this.rateLimitedUntil = now + 45000;
-            this.lastErr = 'DexScreener 429';
-          }
+          if (got instanceof Error && /429/.test(got.message || '')) n429++;
           continue;
         }
         const pair = pickBestPair(got, row.chain, row.ca);
@@ -873,6 +901,15 @@ export class Engine {
           if (await this.maybeAlert(hit, tf)) nAlert++;
         }
       }
+      if (scanned > 0) {
+        this.rateLimitedUntil = 0;
+        this.lastErr = errors ? errors + ' without pool' : '';
+      } else if (n429 && n429 >= Math.max(1, Math.ceil(targets.length / 2))) {
+        this.rateLimitedUntil = now + 20000;
+        this.lastErr = 'DexScreener 429 on ' + n429 + '/' + targets.length + ' (paused 20s)';
+      } else {
+        this.lastErr = errors ? errors + ' without pool' : this.lastErr;
+      }
       this.store.setMeta('last_poll', String(now));
       if (doAll) this.store.setMeta('last_all', String(now));
       this.store.setMeta('last_n_alert', String(nAlert));
@@ -883,11 +920,11 @@ export class Engine {
       this.store.setMeta('rate_limited_until', String(this.rateLimitedUntil || 0));
       this.store.setMeta('last_err', this.lastErr || '');
       if (now % 3600000 < 30000) this.store.prune(now);
-      this.lastErr = errors && !scanned ? this.lastErr : errors ? errors + ' without pool' : '';
-      return { scanned, errors, nAlert, doAll, targets: targets.length };
+      return { scanned, errors, n429, nAlert, doAll, targets: targets.length };
     } catch (e) {
       this.lastErr = String(e && e.message ? e.message : e);
-      if (/429/.test(this.lastErr)) this.rateLimitedUntil = now + 60000;
+      const dex429 = /429/.test(this.lastErr) && !/ntfy/i.test(this.lastErr);
+      if (dex429) this.rateLimitedUntil = now + 20000;
       this.store.setMeta('rate_limited_until', String(this.rateLimitedUntil || 0));
       this.store.setMeta('last_err', this.lastErr || '');
       return { error: this.lastErr };
