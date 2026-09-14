@@ -211,24 +211,14 @@ export function hunterLinks(ca, chain) {
 }
 
 export function hunterPass(tick, pair, now) {
-  if ((tick.liq || 0) < 15000) return false;
-  if ((tick.liq || 0) > 3000000) return false;
+  if ((tick.liq || 0) < 8000) return false;
+  if ((tick.liq || 0) > 2500000) return false;
   const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
+  if (created && now - created < 5 * 60e3) return false;
+  if ((tick.m5 || 0) < 0) return false;
+  if ((tick.vol5m || 0) < 80) return false;
   const mom = momentumFromTick(tick);
-  if (created) {
-    const age = now - created;
-    if (age < 10 * 60e3) return false;
-    const young = age <= 14 * 86400e3;
-    const revival = (tick.m5 || 0) >= 4 && (tick.h1 || 0) >= 2 && mom.volX >= 1.5;
-    if (!young && !revival) return false;
-  }
-  if ((tick.m5 || 0) <= 0.5) return false;
-  if ((tick.h1 || 0) < -3) return false;
-  if ((tick.vol5m || 0) < 150) return false;
-  const n = (tick.buys5m || 0) + (tick.sells5m || 0);
-  if (n >= 8 && tick.buys5m < tick.sells5m) return false;
   if (mom.stretched) return false;
-  if (mom.score < 22) return false;
   return true;
 }
 
@@ -1452,7 +1442,7 @@ export class Engine {
         pairAddress: tick.pairAddress
       });
     }
-    hits.sort((a, b) => (a.boosted === b.boosted ? 0 : a.boosted ? 1 : -1) || (b.score || 0) - (a.score || 0));
+    hits.sort((a, b) => (b.m5 || 0) - (a.m5 || 0) || (b.score || 0) - (a.score || 0));
     const top = hits.slice(0, 10);
     this.store.setMeta('hunter_hits', JSON.stringify(top));
     this.store.setMeta('hunter_at', String(now));
