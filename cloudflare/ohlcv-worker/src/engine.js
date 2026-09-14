@@ -620,8 +620,11 @@ export class Engine {
       this.ntfyErr = this.ntfyErr || this.lastErr;
       this.lastErr = '';
     }
-    if (/quota|daily/i.test(this.ntfyErr) && !this.ntfyPausedUntil()) {
+    if ((/ntfy/i.test(this.ntfyErr) || /429/.test(this.ntfyErr) || /quota|daily/i.test(this.ntfyErr)) && !this.ntfyPausedUntil()) {
       this.store.setMeta('ntfy_paused_until', String(nextUtcMidnight()));
+      this.ntfyErr =
+        'Phone alerts paused until midnight UTC — ntfy.sh free daily limit is used up. Dashboard stays live.';
+      this.store.setMeta('ntfy_err', this.ntfyErr);
     }
   }
 
