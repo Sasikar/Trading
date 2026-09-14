@@ -7,7 +7,7 @@
 :root{--bg:#070a0f;--line:#263341;--text:#f4f7fb;--muted:#8491a1;--green:#62e3a0;--red:#ff6f7c;--gold:#e6c878;--blue:#6eb6ff}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
 .shell{width:min(960px,calc(100% - 28px));margin:auto;padding-bottom:40px}
-.section{padding:16px 0}.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.section{padding:12px 0}.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:8px;flex-wrap:wrap}
 .head h2{font-size:18px;margin:0;font-weight:900}.head p{color:var(--muted);font-size:12px;margin:4px 0 0}
 .source{color:var(--green);font-size:10px;letter-spacing:.1em;font-weight:800}
 .card{border:1px solid var(--line);border-radius:18px;background:#0e151d;overflow:hidden}
@@ -16,9 +16,9 @@
 .coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
 .coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
 .change{font-size:11px;font-weight:800;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}
-.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:6px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 16px}
+.tabs{display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:4px;padding:4px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 10px;overflow:visible}
 .tabs::-webkit-scrollbar{display:none}
-.tab{flex:1 1 calc(33.333% - 6px);min-width:0;display:inline-flex;align-items:center;justify-content:center;height:38px;border:0;background:transparent;color:#9aa6b5;font:800 11px Inter,system-ui,sans-serif;padding:0 8px;border-radius:10px;cursor:pointer;white-space:nowrap;letter-spacing:.02em}
+.tab{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:36px;min-width:auto;border:0;background:transparent;color:#9aa6b5;font:800 12px Inter,system-ui,sans-serif;padding:0 10px;border-radius:10px;cursor:pointer;white-space:nowrap;letter-spacing:.02em}
 .tab.active{background:rgba(98,227,160,.28)!important;color:#f4f7fb!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.45)}
 .tab[data-tf="memegate"].active{background:rgba(98,227,160,.32)!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.55)}
 .price-now{padding:14px 16px;border-bottom:1px solid #ffffff0c;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -36,7 +36,7 @@
 .tech-card .lab{font-size:11px;font-weight:800;color:#8491a1}.tech-card .val{font-size:22px;font-weight:900;margin-top:6px}.tech-card .sub{font-size:11px;margin-top:4px;color:#8491a1}
 .tag{display:inline-block;margin-top:8px;font-size:10px;font-weight:800;padding:3px 8px;border-radius:99px}
 .tag-bull{background:rgba(98,227,160,.15);color:#62e3a0}.tag-bear{background:rgba(255,111,124,.15);color:#ff6f7c}.tag-neut{background:rgba(230,200,120,.12);color:#e6c878}
-#tf-panels.hidden{display:none!important}.trend-panel{display:none}.trend-panel.on{display:block!important}
+#tf-panels.hidden{display:none!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important}.trend-panel{display:none}.trend-panel.on{display:block!important}
 .trend-badges{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}.trend-badges.row2{padding-top:0}
 .trend-badge{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px;text-align:center}
 .trend-badge .lab{font-size:10px;font-weight:800;color:#8491a1}.trend-badge .val{font-size:15px;font-weight:900;margin-top:8px}
@@ -360,12 +360,8 @@
 .recents-head button{height:32px;padding:0 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
 @media(max-width:720px){
   .tf-grid,.coin-tf,#bo-tf{grid-template-columns:repeat(5,minmax(0,1fr))}
-  .tab{font-size:11px;height:36px}
+  .tab{font-size:11px;height:34px;padding:0 8px}
   .shell{width:min(960px,calc(100% - 20px))}
-}
-@media(min-width:900px){
-  .tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .tab{flex:0 0 auto;padding:0 12px;font-size:12px;height:40px}
 }
 </style></head><body>
 <div class="shell"><main>
