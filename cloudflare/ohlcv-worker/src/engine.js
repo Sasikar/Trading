@@ -211,20 +211,22 @@ export function hunterLinks(ca, chain) {
 }
 
 export function hunterPass(tick, pair, now) {
-  if ((tick.liq || 0) < 25000) return false;
+  if ((tick.liq || 0) < 15000) return false;
   const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
+  const mom = momentumFromTick(tick);
   if (created) {
     const age = now - created;
-    if (age < 15 * 60e3) return false;
-    if (age > 5 * 86400e3) return false;
+    if (age < 10 * 60e3) return false;
+    const young = age <= 14 * 86400e3;
+    const revival = (tick.m5 || 0) >= 4 && (tick.h1 || 0) >= 2 && mom.volX >= 1.5;
+    if (!young && !revival) return false;
   }
   if ((tick.m5 || 0) <= 0 || (tick.h1 || 0) <= 0) return false;
-  if ((tick.vol5m || 0) < 500) return false;
+  if ((tick.vol5m || 0) < 300) return false;
   const n = (tick.buys5m || 0) + (tick.sells5m || 0);
   if (n >= 8 && tick.buys5m < tick.sells5m) return false;
-  const mom = momentumFromTick(tick);
   if (mom.stretched) return false;
-  if (mom.score < 28) return false;
+  if (mom.score < 22) return false;
   return true;
 }
 
@@ -1354,13 +1356,13 @@ export class Engine {
       });
     });
   }
-  async refreshHunter(now) {
+  async refreshHunter(now, force) {
     now = now || Date.now();
-    if (now < this.rateLimitedUntil) return { skipped: true, rateLimited: true };
-    if (this.dexCallsLastMin(now) >= 22) return { skipped: true, budget: true };
+    if (!force && now < this.rateLimitedUntil) return { skipped: true, rateLimited: true };
+    if (!force && this.dexCallsLastMin(now) >= 22) return { skipped: true, budget: true };
     const lastDisc = +this.store.getMeta('hunter_discover') || 0;
     const lastScore = +this.store.getMeta('hunter_at') || 0;
-    const doDiscover = now - lastDisc >= 5 * 60e3;
+    const doDiscover = force || now - lastDisc >= 5 * 60e3;
     const doScore = doDiscover || now - lastScore >= 90e3;
     if (!doScore) return { skipped: true };
     let seeds = [];
@@ -1601,7 +1603,7 @@ export async function handleApi(engine, request) {
   if (path === '/hunter' || path === '/api/hunter') {
     if (method === 'POST') {
       try {
-        const out = await engine.refreshHunter(Date.now());
+        const out = await engine.refreshHunter(Date.now(), true);
         return json({
           ok: true,
           ...out,
