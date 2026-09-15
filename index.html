@@ -283,6 +283,9 @@
 .st-row span{color:#8491a1;font-size:12px;text-align:right}
 .st-find{color:#e8eef6;font-size:13px;line-height:1.45}
 .st-note{font-size:11px;color:#8491a1;line-height:1.45;margin-top:8px}
+.st-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.st-chip{display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#e8eef6;text-decoration:none;font-weight:800;font-size:13px}
+.st-chip img{width:18px;height:18px;border-radius:4px;background:#121a24}
 #st-log{font-size:12px;line-height:1.5;color:#dce5ee;background:#080d13;border:1px solid #1c2633;border-radius:10px;padding:10px 12px}
 #st-log b{color:#62e3a0}
 .vd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 14px;flex-wrap:wrap}
@@ -768,7 +771,7 @@
 <div id="sentiment-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Sentiment</h2><p>Pick a coin → X live search opens · you read it</p></div>
+    <div><h2>Sentiment</h2><p>Pick a coin · X · LunarCrush · TweetScout</p></div>
     <span class="source" id="st-status">API</span>
   </div>
   <div class="card">
@@ -777,7 +780,7 @@
       <select id="st-hunter"><option value="">Hunter CAs — pick one</option></select>
       <button type="button" onclick="try{window.refreshSentimentTab&&window.refreshSentimentTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Reload lists</button>
     </div>
-    <div id="st-board"><div class="st-note">Pick a saved or hunter coin. X Live search opens. No scoring.</div></div>
+    <div id="st-board"><div class="st-note">Pick a saved or hunter coin. Opens X Live. LunarCrush + TweetScout links sit under it.</div></div>
   </div>
 </section>
 </div>
@@ -927,7 +930,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="holders-tab.js?v=20260915-h5"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260915-im1"></script>
-<script src="sentiment-tab.js?v=20260915-s4"></script>
+<script src="sentiment-tab.js?v=20260915-s5"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
 <script src="site-nav.js?v=20260914-ui1"></script>
 </body></html>

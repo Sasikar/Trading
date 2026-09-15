@@ -41,6 +41,35 @@
     const q = '$' + n + ' OR ' + n + ' solana';
     return 'https://x.com/search?q=' + encodeURIComponent(q) + '&src=typed_query&f=live';
   }
+  function slug(name) {
+    return String(name || '')
+      .replace(/^\$/, '')
+      .trim()
+      .toLowerCase();
+  }
+  function socialLinks(name) {
+    const n = String(name || '').replace(/^\$/, '').trim() || 'solana';
+    const s = slug(n);
+    return {
+      x: xUrlFor(n),
+      lunar: 'https://lunarcrush.com/en/topic/' + encodeURIComponent(s),
+      scout: 'https://app.tweetscout.io/search?q=' + encodeURIComponent(n)
+    };
+  }
+  function ico(host) {
+    return 'https://www.google.com/s2/favicons?domain=' + encodeURIComponent(host) + '&sz=64';
+  }
+  function chip(href, host, label) {
+    return (
+      '<a class="st-chip" href="' +
+      esc(href) +
+      '" target="_blank" rel="noopener"><img src="' +
+      esc(ico(host)) +
+      '" alt="" width="18" height="18">' +
+      esc(label) +
+      '</a>'
+    );
+  }
   function nameOf(ca) {
     const k = String(ca || '').toLowerCase();
     const all = (lists.saved || []).concat(lists.hunter || []);
@@ -67,18 +96,17 @@
   function paintLink(name) {
     const box = $('st-board');
     if (!box) return;
-    const url = xUrlFor(name);
+    const L = socialLinks(name);
     box.innerHTML =
-      '<a id="st-go" href="' +
-      esc(url) +
-      '" target="_blank" rel="noopener" style="display:block;text-align:center;padding:16px;border-radius:12px;background:#62e3a0;color:#06120b;font-weight:900;text-decoration:none">Open ' +
+      '<div class="st-head"><div class="st-name">' +
       esc(name) +
-      ' on X</a>' +
-      '<div class="st-note">Live search · $' +
-      esc(name) +
-      ' OR ' +
-      esc(name) +
-      ' solana · you read it</div>';
+      '</div><div class="st-meta">X · LunarCrush · TweetScout · you read them</div></div>' +
+      '<div class="st-chips">' +
+      chip(L.x, 'x.com', 'X Live') +
+      chip(L.lunar, 'lunarcrush.com', 'LunarCrush') +
+      chip(L.scout, 'tweetscout.io', 'TweetScout') +
+      '</div>' +
+      '<div class="st-note">LunarCrush / TweetScout may have no page if this meme is too new. X always has search.</div>';
   }
   async function loadLists() {
     const stEl = $('st-status');
