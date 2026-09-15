@@ -283,6 +283,8 @@
 .st-row span{color:#8491a1;font-size:12px;text-align:right}
 .st-find{color:#e8eef6;font-size:13px;line-height:1.45}
 .st-note{font-size:11px;color:#8491a1;line-height:1.45;margin-top:8px}
+#st-log{font-size:12px;line-height:1.5;color:#dce5ee;background:#080d13;border:1px solid #1c2633;border-radius:10px;padding:10px 12px}
+#st-log b{color:#62e3a0}
 .vd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 14px;flex-wrap:wrap}
 .vd-name{font-size:18px;font-weight:900}
 .vd-name span{font-size:11px;color:#8491a1;font-weight:700}
@@ -775,7 +777,15 @@
       <select id="st-hunter"><option value="">Hunter CAs — pick one</option></select>
       <button type="button" onclick="try{window.refreshSentimentTab&&window.refreshSentimentTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
     </div>
-    <div style="font-size:11px;color:#8491a1;line-height:1.45">Reads live X search from this phone. Vote-farm / claim links are tagged SPAM, not hype. CoinGecko is not used. Empty posts = X blocked login wall — tap Open live X.</div>
+    <div style="font-size:12px;color:#c5d0dc;line-height:1.5">
+      <b style="color:#e8eef6">When you pick a coin, this is the only path:</b><br>
+      1. This phone sends the CA to the worker.<br>
+      2. Worker matches Binance “New Listing” titles. No CoinGecko. No X from Cloudflare (X blocks it).<br>
+      3. This phone searches X Live for <code>$TICKER OR TICKER solana</code>.<br>
+      4. Vote-farm / claim links → SPAM, not hype. Rest → bull / bear / mixed from the words in the post.<br>
+      5. If X shows a login wall, posts stay empty — tap Open live X. We do not invent a score.
+    </div>
+    <div id="st-log">Pick a coin. Steps print here.</div>
     <div id="st-board"></div>
   </div>
 </section>
@@ -926,7 +936,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="holders-tab.js?v=20260915-h5"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260915-im1"></script>
-<script src="sentiment-tab.js?v=20260915-s2"></script>
+<script src="sentiment-tab.js?v=20260915-s3"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
 <script src="site-nav.js?v=20260914-ui1"></script>
 </body></html>

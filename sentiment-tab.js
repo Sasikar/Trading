@@ -12,6 +12,8 @@
   }
   const $ = (id) => document.getElementById(id);
   let selected = '';
+  let lock = false;
+  const steps = [];
   const BULL = /\b(moon|pump|bullish|breakout|listing|listed|send it|cook|cooking|gem|accumulate|ath|break ?out|going up|momentum feels real)\b/i;
   const BEAR = /\b(rug|dump|scam|dead|exit|jeet|fake|honeypot|sell[- ]off|going to zero)\b/i;
   const SPAM = /pump-voting|netlify\.app\/vote|claim airdrop|free mint|connect wallet to claim/i;
@@ -24,25 +26,37 @@
       return '&' + 'quot;';
     });
   }
+  function logStep(line) {
+    steps.push(String(line || ''));
+    const el = $('st-log');
+    if (!el) return;
+    el.innerHTML = steps
+      .map(function (s, i) {
+        return '<div><b>' + (i + 1) + '.</b> ' + esc(s) + '</div>';
+      })
+      .join('');
+  }
+  function startLog(name) {
+    steps.length = 0;
+    logStep('You picked ' + (name || '—') + ' on this phone.');
+    logStep('Cloudflare does not call X (search is logged-in) and does not call CoinGecko.');
+  }
   function fillSelect(sel, rows, label) {
     if (!sel) return;
+    const list = rows || [];
+    if (sel.dataset.len === String(list.length) && sel.options.length > 1) {
+      return;
+    }
     sel.innerHTML =
       '<option value="">' +
       esc(label) +
       '</option>' +
-      (rows || [])
+      list
         .map(function (r) {
-          return (
-            '<option value="' +
-            esc(r.ca) +
-            '"' +
-            (selected && r.ca.toLowerCase() === selected.toLowerCase() ? ' selected' : '') +
-            '>' +
-            esc(r.name || r.ca.slice(0, 6)) +
-            '</option>'
-          );
+          return '<option value="' + esc(r.ca) + '">' + esc(r.name || r.ca.slice(0, 6)) + '</option>';
         })
         .join('');
+    sel.dataset.len = String(list.length);
   }
   function scorePosts(posts, name) {
     let bull = 0,
@@ -153,6 +167,15 @@
     const stEl = $('st-status');
     fillSelect($('st-saved'), j.saved, 'Saved CAs — pick one');
     fillSelect($('st-hunter'), j.hunter, 'Hunter CAs — pick one');
+    lock = true;
+    const saved = $('st-saved');
+    const hunter = $('st-hunter');
+    const inSaved = (j.saved || []).some(function (r) {
+      return selected && r.ca.toLowerCase() === selected.toLowerCase();
+    });
+    if (saved) saved.value = inSaved ? selected : '';
+    if (hunter) hunter.value = selected && !inSaved ? selected : '';
+    lock = false;
     const r = j.report;
     if (stEl)
       stEl.textContent =
@@ -255,7 +278,9 @@
     const box = $('st-board');
     const stEl = $('st-status');
     try {
-      if (stEl) stEl.textContent = selected ? 'Reading X…' : 'Loading lists…';
+      if (!steps.length) startLog(selected ? selected.slice(0, 8) : 'lists only');
+      if (stEl) stEl.textContent = selected ? 'Running…' : 'Loading lists…';
+      logStep(selected ? 'Ask worker for Binance listing match on this CA.' : 'Ask worker for saved + hunter dropdowns only.');
       const q = selected
         ? '/sentiment?ca=' + encodeURIComponent(selected) + (force ? '&force=1' : '')
         : '/sentiment';
@@ -264,12 +289,37 @@
         return {};
       });
       if (!res.ok) j.error = j.error || 'HTTP ' + res.status;
+      if (j.error && !j.report) logStep('Worker error: ' + j.error);
+      else if (j.report) {
+        logStep(
+          'Worker ok · ' +
+            (j.report.name || '') +
+            ' · X query ' +
+            (j.report.xQuery || '') +
+            ' · Binance matches ' +
+            ((j.report.upcoming || []).length)
+        );
+      } else logStep('Dropdowns loaded. Pick a coin — nothing scored yet.');
       paint(j, null);
       if (j.report && j.report.xUrl) {
+        logStep('This phone reads X live search (not the worker).');
         const x = await fetchX(j.report);
+        if (x.err && !(x.posts || []).length) logStep('X read failed: ' + x.err + ' · tap Open live X.');
+        else {
+          logStep(
+            'Parsed ' +
+              ((x.posts || []).length) +
+              ' posts · ' +
+              ((x.score && x.score.label) || '?') +
+              ' · ' +
+              ((x.score && x.score.why) || '')
+          );
+        }
         paint(j, x);
       }
+      if (stEl) stEl.textContent = selected ? 'Done' : (j.saved || []).length + ' saved';
     } catch (e) {
+      logStep('Failed: ' + (e && e.message ? e.message : e));
       if (stEl) stEl.textContent = 'load failed';
       if (box) box.innerHTML = '<div class="st-find">' + esc(e && e.message ? e.message : e) + '</div>';
     }
@@ -327,17 +377,23 @@
   function bind() {
     const saved = $('st-saved');
     const hunter = $('st-hunter');
+    function pick(from, other, listLabel) {
+      if (lock) return;
+      selected = from.value || '';
+      const name = from.options[from.selectedIndex] ? from.options[from.selectedIndex].text : selected;
+      lock = true;
+      if (other) other.value = '';
+      lock = false;
+      startLog(name + ' (' + listLabel + ')');
+      load(false);
+    }
     if (saved)
       saved.onchange = function () {
-        selected = saved.value || '';
-        if (hunter) hunter.value = '';
-        load(false);
+        pick(saved, hunter, 'saved CA');
       };
     if (hunter)
       hunter.onchange = function () {
-        selected = hunter.value || '';
-        if (saved) saved.value = '';
-        load(false);
+        pick(hunter, saved, 'hunter CA');
       };
   }
   const tabs = document.getElementById('tf-tabs');
