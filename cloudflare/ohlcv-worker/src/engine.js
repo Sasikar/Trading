@@ -382,6 +382,16 @@ export const HOLDER_TIERS = [
   { id: 'shrimp', icon: '🦐', label: 'Shrimp', minUsd: 0 }
 ];
 
+export function usdBand(minUsd) {
+  const x = +minUsd || 0;
+  if (x >= 1e6) return '≥$1M';
+  if (x >= 1e5) return '≥$100k';
+  if (x >= 1e4) return '≥$10k';
+  if (x >= 1e3) return '≥$1k';
+  if (x >= 100) return '≥$100';
+  return '<$100';
+}
+
 export function holderMixFromTop(top, price) {
   const px = +price;
   const list = Array.isArray(top) ? top : [];
@@ -389,6 +399,8 @@ export function holderMixFromTop(top, price) {
     id: tier.id,
     icon: tier.icon,
     label: tier.label,
+    minUsd: tier.minUsd,
+    band: usdBand(tier.minUsd),
     n: 0,
     pct: 0
   }));
@@ -413,10 +425,39 @@ export function holderMixFromTop(top, price) {
   const round2 = (x) => Math.round(x * 100) / 100;
   const tiers = buckets
     .filter((b) => b.n > 0)
-    .map((b) => ({ id: b.id, icon: b.icon, label: b.label, n: b.n, pct: round2(b.pct) }));
+    .map((b) => ({
+      id: b.id,
+      icon: b.icon,
+      label: b.label,
+      minUsd: b.minUsd,
+      band: b.band,
+      n: b.n,
+      pct: round2(b.pct)
+    }));
+  const depth = [];
+  let accN = 0;
+  let accPct = 0;
+  for (let k = 0; k < buckets.length; k++) {
+    const b = buckets[k];
+    if (!(b.minUsd > 0)) continue;
+    accN += b.n;
+    accPct += b.pct;
+    if (!accN) continue;
+    const last = depth[depth.length - 1];
+    if (last && last.n === accN) continue;
+    depth.push({
+      id: b.id,
+      icon: b.icon,
+      band: b.band,
+      minUsd: b.minUsd,
+      n: accN,
+      pct: round2(accPct)
+    });
+  }
   const top10Pct = list.slice(0, 10).reduce((s, h) => s + (+(h && h.pct) || 0), 0);
   return {
     tiers,
+    depth,
     top10Pct: round2(top10Pct),
     top20Pct: round2(covered),
     restPct: round2(Math.max(0, 100 - covered)),

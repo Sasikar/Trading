@@ -25,7 +25,7 @@
     '- MemeGate / CA / Breakout Memes / Hunter / Holders / Failures / InMemory / G-Trade Notes / Verdict / Anti-FOMO / TF charts',
     '- Breakout: EARLY / LIVE / MATURED only (quiet coins hidden). Print canonical breakout LEVEL, spot, dist%. LIVE ≠ buy.',
     '- Hunter: Dex discover every 20 min (Scan now = force). Hunter watch is a PIN LIST only — hunter_watch meta. NEVER merge into getWatch / ca-recents / breakout tape / Telegram.',
-    '- Holders: SOL only. Jupiter 1h/6h/24h. Mix 🐋🦈🐬 from Rugcheck largest-20 using Solscan USD bands (not Solscan paid analytics). 4h/1w/1M from our snapshots. No fake Solscan growth API.',
+    '- Holders: SOL only. Jupiter 1h/6h/24h. Mix + wallet depth by threshold (cumulative ≥$1M/100k/10k…) from Rugcheck largest-20, Solscan USD bands. Not Solscan paid analytics. 4h/1w/1M from our snapshots. No fake Solscan growth API.',
     '- Failures: last hour of REAL errors only (Dex/Gecko 429, retries, hunter skip, nopool, telegram, stale alarm). Empty hour = none. Do not invent OK rows.',
     '- InMemory: this handoff prompt + Copy. Keep it updated when architecture changes.',
     '- G-Trade Notes (tab label G-Trade + small Notes): one keep.google.com link on the phone. Opens Keep. No Google API, no notes inside the PWA.',

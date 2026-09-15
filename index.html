@@ -272,6 +272,8 @@
 .hd-chip .n{font-size:10px;color:#8491a1}
 .hd-chip-top{border-color:#3a4a22;background:#10180c}
 .hd-chip-rest{opacity:.85}
+.hd-depth{margin-top:8px}
+.hd-depth-lab{font-size:10px;font-weight:800;letter-spacing:.08em;color:#8491a1;margin:0 0 6px}
 .fl-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #243041;background:#0b121a;font-size:11px;font-weight:800;color:#c5d0dc}
 .fl-chip b{color:#ff6f7c}
 .fl-row{padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#0b121a}
@@ -763,7 +765,7 @@
 <div id="holders-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Holders</h2><p>SOL · growth + 🐋 whale mix · ETH skipped</p></div>
+    <div><h2>Holders</h2><p>SOL · growth + 🐋 mix + wallet depth · ETH skipped</p></div>
     <span class="source" id="hd-source">JUPITER</span>
   </div>
   <div class="card">
@@ -771,7 +773,7 @@
       <button type="button" onclick="try{window.refreshHoldersTab&&window.refreshHoldersTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
       <span id="hd-status" style="font-size:12px;color:#8491a1">Open this tab to load</span>
     </div>
-    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">1H and 1D come from Jupiter. 🐋 whale / shark / dolphin chips are Solscan-style USD bands on the largest 20 wallets (not Solscan’s paid full-holder analytics). 4H / 1W / 1M we build from our snaps. Open analytics for Solscan’s full dashboard.</div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">1H and 1D come from Jupiter. Mix is exclusive USD bands on the largest 20. Wallet depth is cumulative (≥$1M, ≥$100k, ≥$10k…). Not Solscan’s paid full-holder analytics. 4H / 1W / 1M from our snaps.</div>
     <div id="hd-list" style="display:flex;flex-direction:column;gap:8px">
       <div style="font-size:12px;color:#8491a1">Open Holders to load SOL coins.</div>
     </div>
@@ -959,9 +961,9 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="overview-app.js?v=20260915-k1"></script>
 <script src="breakout-tab.js?v=20260915-eq4"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
-<script src="holders-tab.js?v=20260915-h6"></script>
+<script src="holders-tab.js?v=20260915-h7"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
-<script src="inmemory-tab.js?v=20260915-im4"></script>
+<script src="inmemory-tab.js?v=20260915-im5"></script>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260915-s5"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>

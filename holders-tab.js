@@ -70,9 +70,43 @@
       '</div></div>'
     );
   }
+  function depthFromTiers(tiers) {
+    const order = [
+      { id: 'whale', icon: '🐋', minUsd: 1e6, band: '≥$1M' },
+      { id: 'shark', icon: '🦈', minUsd: 1e5, band: '≥$100k' },
+      { id: 'dolphin', icon: '🐬', minUsd: 1e4, band: '≥$10k' },
+      { id: 'fish', icon: '🐟', minUsd: 1e3, band: '≥$1k' },
+      { id: 'crab', icon: '🦀', minUsd: 100, band: '≥$100' }
+    ];
+    const by = {};
+    (tiers || []).forEach(function (t) {
+      if (t && t.id) by[t.id] = t;
+    });
+    const depth = [];
+    let n = 0;
+    let pct = 0;
+    order.forEach(function (o) {
+      const t = by[o.id];
+      if (t) {
+        n += +t.n || 0;
+        pct += +t.pct || 0;
+      }
+      if (!n) return;
+      const last = depth[depth.length - 1];
+      if (last && last.n === n) return;
+      depth.push({
+        id: o.id,
+        icon: (t && t.icon) || o.icon,
+        band: (t && t.band) || o.band,
+        n: n,
+        pct: pct
+      });
+    });
+    return depth;
+  }
   function mixRow(h) {
     const m = h.mix;
-    if (!m || (!(m.tiers && m.tiers.length) && m.top10Pct == null)) return '';
+    if (!m || (!(m.tiers && m.tiers.length) && m.top10Pct == null && !(m.depth && m.depth.length))) return '';
     const chips = [];
     const top = m.top10Pct != null && Number.isFinite(+m.top10Pct) ? +m.top10Pct : h.topHoldPct;
     if (top != null && Number.isFinite(+top)) {
@@ -85,12 +119,14 @@
     (m.tiers || []).forEach(function (tier) {
       chips.push(
         '<span class="hd-chip" title="' +
-          esc(tier.label) +
+          esc(tier.label || '') +
+          ' ' +
+          esc(tier.band || '') +
           '">' +
           '<span class="ico">' +
           esc(tier.icon || '') +
           '</span><span class="lab">' +
-          esc(tier.label) +
+          esc(tier.band || tier.label || '') +
           '</span><span class="pct">' +
           Number(tier.pct).toFixed(1) +
           '%</span><span class="n">' +
@@ -105,8 +141,30 @@
           '%</span></span>'
       );
     }
-    if (!chips.length) return '';
-    return '<div class="hd-mix">' + chips.join('') + '</div>';
+    const depth = m.depth && m.depth.length ? m.depth : depthFromTiers(m.tiers);
+    const dchips = (depth || []).map(function (x) {
+      return (
+        '<span class="hd-chip" title="largest 20 wallets at or above this USD of this token">' +
+        '<span class="ico">' +
+        esc(x.icon || '') +
+        '</span><span class="lab">' +
+        esc(x.band || '') +
+        '</span><span class="n">' +
+        esc(String(x.n)) +
+        '</span><span class="pct">' +
+        Number(x.pct).toFixed(1) +
+        '%</span></span>'
+      );
+    });
+    let html = '';
+    if (chips.length) html += '<div class="hd-mix">' + chips.join('') + '</div>';
+    if (dchips.length) {
+      html +=
+        '<div class="hd-depth"><div class="hd-depth-lab">Wallet depth · largest 20</div><div class="hd-mix">' +
+        dchips.join('') +
+        '</div></div>';
+    }
+    return html;
   }
   function renderCard(h) {
     const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
