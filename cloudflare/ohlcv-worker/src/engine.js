@@ -287,6 +287,8 @@ export function hunterLinks(ca, chain) {
   if (ch === 'solana') {
     links.trench = 'https://trench.bot/clusters/' + encodeURIComponent(ca);
     links.rugcheck = 'https://rugcheck.xyz/tokens/' + encodeURIComponent(ca);
+    links.defade = 'https://defade.org/token/' + encodeURIComponent(ca);
+    links.solsniffer = 'https://solsniffer.com/tokens/' + encodeURIComponent(ca);
   } else if (ch === 'robinhood') {
     links.tokensniffer = 'https://tokensniffer.com/';
   } else {
@@ -2317,7 +2319,7 @@ export class Engine {
   }
   markHunterVerified(ca, tool) {
     const t = String(tool || '').toLowerCase();
-    if (!/^(bubblemaps|trench|rugcheck|honeypot|goplus|tokensniffer|dex)$/.test(t)) throw new Error('bad tool');
+    if (!/^(bubblemaps|trench|rugcheck|defade|solsniffer|honeypot|goplus|tokensniffer|dex)$/.test(t)) throw new Error('bad tool');
     const m = this.hunterVerifiedMap();
     const k = String(ca || '').toLowerCase();
     if (!k) throw new Error('no ca');
@@ -2368,6 +2370,8 @@ export class Engine {
           bubblemaps: !!v.bubblemaps,
           trench: !!v.trench,
           rugcheck: !!v.rugcheck,
+          defade: !!v.defade,
+          solsniffer: !!v.solsniffer,
           honeypot: !!v.honeypot,
           goplus: !!v.goplus,
           tokensniffer: !!v.tokensniffer,

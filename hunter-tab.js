@@ -41,7 +41,9 @@
   const TOOLS_SOL = [
     { id: 'bubblemaps', title: 'Bubblemaps', domain: 'bubblemaps.io' },
     { id: 'trench', title: 'Trench Radar', domain: 'trench.bot' },
-    { id: 'rugcheck', title: 'RugCheck', domain: 'rugcheck.xyz' }
+    { id: 'rugcheck', title: 'RugCheck', domain: 'rugcheck.xyz' },
+    { id: 'defade', title: 'DeFade', domain: 'defade.org' },
+    { id: 'solsniffer', title: 'SolSniffer', domain: 'solsniffer.com' }
   ];
   const TOOLS_ETH = [
     { id: 'bubblemaps', title: 'Bubblemaps', domain: 'bubblemaps.io' },
