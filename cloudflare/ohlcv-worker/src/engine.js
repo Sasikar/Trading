@@ -1823,6 +1823,51 @@ export class Engine {
     return { ca, name: row.name, n1d, n1w, n1M, days: days.length };
   }
 
+  importGeckoDays(ca, list, now, name) {
+    now = now || Date.now();
+    ca = String(ca || '').toLowerCase();
+    const watch = (this.store.getWatch() || []).some((r) => String(r.ca).toLowerCase() === ca);
+    if (!watch) return { error: 'not on watch' };
+    const cutoff = now - KEEP_LONG_MS;
+    const today = utcDay(now);
+    const days = (list || [])
+      .map((x) => ({
+        t: +x[0] * (x[0] > 1e12 ? 1 : 1000),
+        o: +x[1],
+        h: +x[2],
+        l: +x[3],
+        c: +x[4],
+        vol: +x[5] || 0,
+        buys: 0,
+        sells: 0,
+        n: 1
+      }))
+      .filter((b) => b.t >= cutoff && b.t < today && b.c > 0)
+      .sort((a, b) => a.t - b.t);
+    if (!this.store.insertBar) return { error: 'no insertBar' };
+    let n1d = 0;
+    for (const b of days) if (this.store.insertBar(ca, '1d', b)) n1d++;
+    let n1w = 0;
+    for (const b of resampleBars(days, '1w')) {
+      if (b.t < utcWeekMon(now) && this.store.insertBar(ca, '1w', b)) n1w++;
+    }
+    let n1M = 0;
+    for (const b of resampleBars(days, '1M')) {
+      if (b.t < utcMonth(now) && this.store.insertBar(ca, '1M', b)) n1M++;
+    }
+    let map = {};
+    try {
+      map = JSON.parse(this.store.getMeta('bf_long') || '{}') || {};
+    } catch (e) {
+      map = {};
+    }
+    map[ca] = { status: days.length ? 'done' : 'err', n1d, n1w, n1M, at: now, days: days.length, via: 'import' };
+    if (!days.length) map[ca].why = 'empty 1d';
+    this.store.setMeta('bf_long', JSON.stringify(map));
+    this.store.setMeta('bf_last', JSON.stringify({ ca, name, n1d, n1w, n1M, days: days.length, at: now, via: 'import' }));
+    return { ok: true, ca, name, n1d, n1w, n1M, days: days.length };
+  }
+
   persistEntry(hit) {
     const e = hit && hit.entry;
     if (!e || !e.state || e.state === 'n/a') return;
@@ -2628,10 +2673,26 @@ export async function handleApi(engine, request) {
     const out = await engine.tick('all');
     return json({ ok: true, ...out, status: engine.status() });
   }
+  if ((path === '/backfill' || path === '/api/backfill') && method === 'POST') {
+    let body = {};
+    try {
+      body = await request.json();
+    } catch (e) {
+      return json({ error: 'bad json' }, 400);
+    }
+    const ca = body.ca || body.token || '';
+    const list = body.ohlcv_list || body.days || body.bars || [];
+    if (!ca || !Array.isArray(list) || !list.length) return json({ error: 'ca + ohlcv_list required' }, 400);
+    try {
+      return json(engine.importGeckoDays(ca, list, Date.now(), body.name || ''));
+    } catch (e) {
+      return json({ error: String(e && e.message ? e.message : e) }, 500);
+    }
+  }
   if (path === '/candles' || path === '/api/candles') {
     const ca = url.searchParams.get('ca') || '';
     const tf = (url.searchParams.get('tf') || '15m').toLowerCase();
-    const n = Math.min(200, Math.max(5, +(url.searchParams.get('n') || 50)));
+    const n = Math.min(800, Math.max(5, +(url.searchParams.get('n') || 50)));
     return json({ ca, tf, bars: engine.store.bars(ca, tf, n) });
   }
   return json({ error: 'not found', path }, 404);
