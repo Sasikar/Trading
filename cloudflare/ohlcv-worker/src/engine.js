@@ -1740,7 +1740,10 @@ export class Engine {
       const st = map[String(r.ca || '').toLowerCase()];
       if (!st) return true;
       if (st.status === 'done') return false;
-      if (st.status === 'err' && now - (st.at || 0) < 6 * 3600e3) return false;
+      if (st.status === 'err' && now - (st.at || 0) < 6 * 3600e3) {
+        if (/429/.test(st.why || '')) return true;
+        return false;
+      }
       return true;
     });
     if (!row) return { skipped: 'all_done' };
@@ -1758,16 +1761,25 @@ export class Engine {
       encodeURIComponent(net) +
       '/pools/' +
       encodeURIComponent(pool) +
-      '/ohlcv/day?aggregate=1&limit=1000&currency=usd&token=base';
+      '/ohlcv/day?aggregate=1&limit=180&currency=usd&token=base';
     let j;
     try {
       j = await fetchJSON(url, 1);
     } catch (e) {
       const m = String(e && e.message ? e.message : e);
-      if (/429/.test(m)) this.geckoUntil = now + 60000;
+      if (/429/.test(m)) {
+        this.geckoUntil = now + 5 * 60e3;
+        this.store.setMeta('bf_last', JSON.stringify({ ca, at: now, error: '429', waitMs: 300000 }));
+        return { ca, skipped: '429' };
+      }
       map[ca] = { status: 'err', why: m.slice(0, 100), at: now };
       this.store.setMeta('bf_long', JSON.stringify(map));
       return { ca, error: m };
+    }
+    if (j && j.status && (j.status.error_code === 429 || /rate limit/i.test(String(j.status.error_message || '')))) {
+      this.geckoUntil = now + 5 * 60e3;
+      this.store.setMeta('bf_last', JSON.stringify({ ca, at: now, error: '429-json', waitMs: 300000 }));
+      return { ca, skipped: '429' };
     }
     const list = (((j || {}).data || {}).attributes || {}).ohlcv_list || [];
     const cutoff = now - KEEP_LONG_MS;
@@ -1804,6 +1816,10 @@ export class Engine {
     map[ca] = { status: days.length ? 'done' : 'err', n1d, n1w, n1M, at: now, pool, days: days.length };
     if (!days.length) map[ca].why = 'empty gecko 1d';
     this.store.setMeta('bf_long', JSON.stringify(map));
+    this.store.setMeta(
+      'bf_last',
+      JSON.stringify({ ca, name: row.name, n1d, n1w, n1M, days: days.length, at: now })
+    );
     return { ca, name: row.name, n1d, n1w, n1M, days: days.length };
   }
 
@@ -2116,6 +2132,13 @@ export class Engine {
       candidates: watch.length,
       backfillDone: bfVals.filter((x) => x && x.status === 'done').length,
       backfillErr: bfVals.filter((x) => x && x.status === 'err').length,
+      backfillLast: (() => {
+        try {
+          return JSON.parse(this.store.getMeta('bf_last') || 'null');
+        } catch (e) {
+          return null;
+        }
+      })(),
       dexCallsLastMin: this.dexCallsLastMin(now),
       dexBudget: 30,
       error: this.lastErr || '',
