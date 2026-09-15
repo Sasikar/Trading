@@ -82,30 +82,34 @@
     for (let i = 0; i < MIX_ORDER.length; i++) if (MIX_ORDER[i].id === id) return MIX_ORDER[i].color;
     return '#8491a1';
   }
-  function depthChartRows(tiers) {
+  function distChartRows(tiers, restPct) {
     const by = {};
     (tiers || []).forEach(function (t) {
       if (t && t.id) by[t.id] = t;
     });
-    let n = 0;
-    let pct = 0;
     const rows = [];
     MIX_ORDER.forEach(function (o) {
-      if (o.id === 'shrimp') return;
       const t = by[o.id];
-      if (t) {
-        n += +t.n || 0;
-        pct += +t.pct || 0;
-      }
+      if (!t || !(+t.n > 0) || !(+t.pct > 0)) return;
       rows.push({
         id: o.id,
-        icon: o.icon,
-        band: o.band,
+        icon: t.icon || o.icon,
+        band: t.band || o.band,
         color: o.color,
-        n: n,
-        pct: pct
+        n: +t.n,
+        pct: +t.pct
       });
     });
+    if (restPct != null && +restPct > 0.4) {
+      rows.push({
+        id: 'rest',
+        icon: '',
+        band: 'rest',
+        color: '#3a4654',
+        n: null,
+        pct: +restPct
+      });
+    }
     return rows;
   }
   function donutStyle(slices) {
@@ -169,25 +173,20 @@
         rest.toFixed(1) +
         '%</span></div>'
       : '';
-    const depth = depthChartRows(m.tiers);
-    const maxPct = Math.max.apply(
-      null,
-      depth.map(function (d) {
-        return +d.pct || 0;
-      }).concat([1])
-    );
+    const depth = distChartRows(m.tiers, rest);
     const bars = depth
       .map(function (d) {
-        const w = Math.max(0, Math.min(100, ((+d.pct || 0) / maxPct) * 100));
+        const w = Math.max(0, Math.min(100, +d.pct || 0));
+        const nStr = d.n == null ? '' : String(d.n);
         return (
           '<div class="hd-bar">' +
           '<div class="hd-bar-meta">' +
           '<span class="ico">' +
-          esc(d.icon) +
+          esc(d.icon || '') +
           '</span><span class="lab">' +
           esc(d.band) +
           '</span><span class="n">' +
-          esc(String(d.n)) +
+          esc(nStr) +
           '</span><span class="pct">' +
           (+d.pct || 0).toFixed(1) +
           '%</span></div>' +
@@ -202,7 +201,7 @@
     return (
       '<div class="hd-split">' +
       '<div class="hd-pane">' +
-      '<div class="hd-pane-lab">Mix</div>' +
+      '<div class="hd-pane-lab">Mix · largest 20</div>' +
       '<div class="hd-donut-wrap">' +
       '<div class="hd-donut" style="background:' +
       donutStyle(slices) +
@@ -217,7 +216,7 @@
       restHtml +
       '</div></div>' +
       '<div class="hd-pane">' +
-      '<div class="hd-pane-lab">Wallet depth</div>' +
+      '<div class="hd-pane-lab">Distribution · largest 20</div>' +
       '<div class="hd-bars">' +
       bars +
       '</div></div></div>'
