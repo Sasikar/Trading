@@ -264,6 +264,14 @@
 .hd-cell .sub{font-size:10px;color:#8491a1;margin-top:2px;min-height:14px}
 .hd-foot{margin-top:8px;font-size:11px;color:#8491a1;line-height:1.45}
 .hd-foot a{color:#6eb6ff;text-decoration:none;font-weight:700}
+.hd-mix{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.hd-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px;border:1px solid #243041;background:#080d13;font-size:11px;font-weight:800;color:#c5d0dc;line-height:1}
+.hd-chip .ico{font-size:14px;line-height:1}
+.hd-chip .lab{font-size:10px;letter-spacing:.04em;color:#8491a1}
+.hd-chip .pct{color:#e8eef6}
+.hd-chip .n{font-size:10px;color:#8491a1}
+.hd-chip-top{border-color:#3a4a22;background:#10180c}
+.hd-chip-rest{opacity:.85}
 .fl-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #243041;background:#0b121a;font-size:11px;font-weight:800;color:#c5d0dc}
 .fl-chip b{color:#ff6f7c}
 .fl-row{padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#0b121a}
@@ -755,7 +763,7 @@
 <div id="holders-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Holders</h2><p>SOL memes · 1h / 4h / 1d / 1w / 1M · ETH skipped</p></div>
+    <div><h2>Holders</h2><p>SOL · growth + 🐋 whale mix · ETH skipped</p></div>
     <span class="source" id="hd-source">JUPITER</span>
   </div>
   <div class="card">
@@ -763,7 +771,7 @@
       <button type="button" onclick="try{window.refreshHoldersTab&&window.refreshHoldersTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
       <span id="hd-status" style="font-size:12px;color:#8491a1">Open this tab to load</span>
     </div>
-    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">1H and 1D come from Jupiter. 4H / 1W / 1M we build ourselves by saving holder counts (30 min at first, then daily). Those longer windows stay “warming” until we have enough days. Solscan is the holders-list link — their growth API is paid.</div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">1H and 1D come from Jupiter. 🐋 whale / shark / dolphin chips are Solscan-style USD bands on the largest 20 wallets (not Solscan’s paid full-holder analytics). 4H / 1W / 1M we build from our snaps. Open analytics for Solscan’s full dashboard.</div>
     <div id="hd-list" style="display:flex;flex-direction:column;gap:8px">
       <div style="font-size:12px;color:#8491a1">Open Holders to load SOL coins.</div>
     </div>
@@ -951,9 +959,9 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="overview-app.js?v=20260915-k1"></script>
 <script src="breakout-tab.js?v=20260915-eq4"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
-<script src="holders-tab.js?v=20260915-h5"></script>
+<script src="holders-tab.js?v=20260915-h6"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
-<script src="inmemory-tab.js?v=20260915-im3"></script>
+<script src="inmemory-tab.js?v=20260915-im4"></script>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260915-s5"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>

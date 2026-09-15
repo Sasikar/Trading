@@ -70,11 +70,50 @@
       '</div></div>'
     );
   }
+  function mixRow(h) {
+    const m = h.mix;
+    if (!m || (!(m.tiers && m.tiers.length) && m.top10Pct == null)) return '';
+    const chips = [];
+    const top = m.top10Pct != null && Number.isFinite(+m.top10Pct) ? +m.top10Pct : h.topHoldPct;
+    if (top != null && Number.isFinite(+top)) {
+      chips.push(
+        '<span class="hd-chip hd-chip-top">Top10 <span class="pct">' +
+          Number(top).toFixed(1) +
+          '%</span></span>'
+      );
+    }
+    (m.tiers || []).forEach(function (tier) {
+      chips.push(
+        '<span class="hd-chip" title="' +
+          esc(tier.label) +
+          '">' +
+          '<span class="ico">' +
+          esc(tier.icon || '') +
+          '</span><span class="lab">' +
+          esc(tier.label) +
+          '</span><span class="pct">' +
+          Number(tier.pct).toFixed(1) +
+          '%</span><span class="n">' +
+          esc(String(tier.n)) +
+          '</span></span>'
+      );
+    });
+    if (m.restPct != null && +m.restPct > 0.4) {
+      chips.push(
+        '<span class="hd-chip hd-chip-rest">rest <span class="pct">' +
+          Number(m.restPct).toFixed(1) +
+          '%</span></span>'
+      );
+    }
+    if (!chips.length) return '';
+    return '<div class="hd-mix">' + chips.join('') + '</div>';
+  }
   function renderCard(h) {
     const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
     const four = h.ready4h
       ? cell('4H', h.net4h, h.pct4h, true)
       : cell('4H / 6H', h.net6h, h.pct6h, h.net6h != null, '6h Jupiter · 4h tape filling');
+    const analytics = h.solscanAnalytics || (h.ca ? 'https://solscan.io/token/' + h.ca + '#analytics' : '');
     return (
       '<div class="hd-card">' +
       '<div class="hd-top">' +
@@ -96,14 +135,19 @@
         ? cell('1M', h.net1M, h.pct1M, true)
         : cell('1M', null, null, false, 'need ~30d of our snaps')) +
       '</div>' +
+      mixRow(h) +
       '<div class="hd-foot">' +
-      (h.topHoldPct != null ? 'Top wallets ' + Number(h.topHoldPct).toFixed(1) + '% · ' : '') +
       esc(caShort) +
       (h.error ? ' · ' + esc(h.error) : '') +
       (h.solscan
         ? ' · <a href="' +
           esc(h.solscan) +
           '" target="_blank" rel="noopener">Solscan holders</a>'
+        : '') +
+      (analytics
+        ? ' · <a href="' +
+          esc(analytics) +
+          '" target="_blank" rel="noopener">analytics</a>'
         : '') +
       '</div></div>'
     );

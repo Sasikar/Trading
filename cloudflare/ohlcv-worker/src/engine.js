@@ -371,6 +371,59 @@ export function holderDeltaFromSnaps(snaps, now, windowMs, nowN) {
   return { net, pct, ready: true, from: +best.t };
 }
 
+
+/** Solscan-style token-value bands. USD of THIS token, not portfolio. Largest-N only. */
+export const HOLDER_TIERS = [
+  { id: 'whale', icon: '🐋', label: 'Whale', minUsd: 1e6 },
+  { id: 'shark', icon: '🦈', label: 'Shark', minUsd: 1e5 },
+  { id: 'dolphin', icon: '🐬', label: 'Dolphin', minUsd: 1e4 },
+  { id: 'fish', icon: '🐟', label: 'Fish', minUsd: 1e3 },
+  { id: 'crab', icon: '🦀', label: 'Crab', minUsd: 100 },
+  { id: 'shrimp', icon: '🦐', label: 'Shrimp', minUsd: 0 }
+];
+
+export function holderMixFromTop(top, price) {
+  const px = +price;
+  const list = Array.isArray(top) ? top : [];
+  const buckets = HOLDER_TIERS.map((tier) => ({
+    id: tier.id,
+    icon: tier.icon,
+    label: tier.label,
+    n: 0,
+    pct: 0
+  }));
+  let covered = 0;
+  for (let i = 0; i < list.length; i++) {
+    const h = list[i] || {};
+    const pct = +h.pct;
+    if (!Number.isFinite(pct)) continue;
+    covered += pct;
+    const amt = +h.uiAmount;
+    const usd = Number.isFinite(px) && px > 0 && Number.isFinite(amt) ? amt * px : 0;
+    let idx = buckets.length - 1;
+    for (let k = 0; k < HOLDER_TIERS.length; k++) {
+      if (usd >= HOLDER_TIERS[k].minUsd) {
+        idx = k;
+        break;
+      }
+    }
+    buckets[idx].n += 1;
+    buckets[idx].pct += pct;
+  }
+  const round2 = (x) => Math.round(x * 100) / 100;
+  const tiers = buckets
+    .filter((b) => b.n > 0)
+    .map((b) => ({ id: b.id, icon: b.icon, label: b.label, n: b.n, pct: round2(b.pct) }));
+  const top10Pct = list.slice(0, 10).reduce((s, h) => s + (+(h && h.pct) || 0), 0);
+  return {
+    tiers,
+    top10Pct: round2(top10Pct),
+    top20Pct: round2(covered),
+    restPct: round2(Math.max(0, 100 - covered)),
+    nTop: list.length
+  };
+}
+
 /** Keep 30m samples for 48h, 6h samples to 10d, daily to 35d. */
 export function compactHolderSnaps(snaps, now) {
   const cut = now - 35 * 86400e3;
@@ -1669,9 +1722,34 @@ export class Engine {
           topHoldPct: tok.audit && tok.audit.topHoldersPercentage,
           mcap: tok.mcap,
           solscan: 'https://solscan.io/token/' + row.ca + '#holders',
+          solscanAnalytics: 'https://solscan.io/token/' + row.ca + '#analytics',
           snaps,
           error: ''
         };
+        let mix = prev.mix || null;
+        try {
+          const rc = await fetchJSON(
+            'https://api.rugcheck.xyz/v1/tokens/' + encodeURIComponent(row.ca) + '/report',
+            1
+          );
+          mix = holderMixFromTop(rc && rc.topHolders, +tok.usdPrice || +(rc && rc.price) || 0);
+          mix.source = 'rugcheck-top20';
+        } catch (eMix) {
+          mix = prev.mix || null;
+        }
+        if (mix && (mix.top10Pct == null || !Number.isFinite(+mix.top10Pct)) && tok.audit && tok.audit.topHoldersPercentage != null) {
+          mix.top10Pct = +tok.audit.topHoldersPercentage;
+        }
+        if (!mix && tok.audit && tok.audit.topHoldersPercentage != null) {
+          mix = {
+            tiers: [],
+            top10Pct: +tok.audit.topHoldersPercentage,
+            restPct: null,
+            nTop: 0,
+            source: 'jupiter-top'
+          };
+        }
+        map[ca].mix = mix;
       } catch (e) {
         map[ca] = Object.assign({}, map[ca] || {}, {
           ca,
@@ -1721,7 +1799,9 @@ export class Engine {
           ready1M: !!h.ready1M,
           topHoldPct: h.topHoldPct,
           mcap: h.mcap,
+          mix: h.mix || null,
           solscan: h.solscan || 'https://solscan.io/token/' + r.ca + '#holders',
+          solscanAnalytics: h.solscanAnalytics || 'https://solscan.io/token/' + r.ca + '#analytics',
           error: h.error || ''
         };
       })
@@ -1731,7 +1811,7 @@ export class Engine {
       cards,
       scannedAt: +this.store.getMeta('holders_at') || 0,
       ethSkipped: ethN,
-      source: 'Jupiter 1h/6h/24h. 4h / 1w / 1M from our holder snapshots (35d). Solscan is the list link, not the growth feed.'
+      source: 'Jupiter 1h/6h/24h. Mix 🐋🦈 from Rugcheck largest-20 using Solscan USD bands. 4h / 1w / 1M from our snaps. Solscan analytics is the full dashboard — their growth API is paid.'
     };
   }
 
