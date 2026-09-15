@@ -1,5 +1,5 @@
 /* Breakout Memes tab — display only.
-   All Dex polling, candles, scoring, ntfy live in the Cloudflare OHLCV worker.
+   All Dex polling, candles, scoring, Telegram alerts live in the Cloudflare OHLCV worker.
    This file only GETs the API and paints cards. No DexScreener. No ntfy. No login. */
 (function () {
   function apiBase() {
@@ -439,7 +439,6 @@
     const tgBound = !!st.telegramReady || !!st.telegramBound;
     const tgBot = st.telegramBot || 'MyTradingBreakoutBot';
     const tgErr = st.telegramError || '';
-    const ntfyErr = st.ntfyError || (/ntfy/i.test(lastErr) ? lastErr : '');
     const col =
       st.health === 'LIVE' || st.health === 'OK'
         ? '#62e3a0'
@@ -476,13 +475,6 @@
             ' → Start → send hi, then tap Test Telegram.</span>'
           : '') +
         (tgBound && tgErr ? '<br><span style="color:#f0a060">' + tgErr + '</span>' : '') +
-        (ntfyErr && !tgBound
-          ? '<br><span style="color:#f0a060">' +
-            (st.ntfyPaused || /quota|daily|limit/i.test(ntfyErr)
-              ? 'ntfy is paused (daily limit). Using Telegram instead.'
-              : 'Phone ping delayed: ' + ntfyErr) +
-            '</span>'
-          : '') +
         (lastErr && !/ntfy/i.test(lastErr)
           ? '<br><span style="color:#ff6f7c">' + lastErr + '</span>'
           : '');

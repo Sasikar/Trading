@@ -97,7 +97,7 @@ Writes are skipped when a row is unchanged. Open candles stay in memory and flus
      - Else update high/low/close on the forming bar **in memory**.
 6. Evaluate each target on needed TFs → maybe Telegram.
 7. Hunter refresh (**every 20 min**, discover + score together) — separate from the 60s saved-CA tape. **Scan now** forces it.
-8. Failures log: real 429 / skip / ntfy / telegram / stale only (`fail_log`, last 24h, Failures tab shows last hour). Empty hour = none logged.
+8. Failures log: real 429 / skip / telegram / stale only (`fail_log`, last 24h, Failures tab shows last hour). Empty hour = none logged.
 8. Prune old 1m/5m…30m hourly; **1d / 1w / 1M kept 730 days**.
 9. **Gecko 1D backfill** — one saved CA per alarm. Writes closed 1d (and resampled 1w / 1M). Never overwrites today.
 
@@ -267,7 +267,7 @@ Private DM only (`MyTradingBreakoutBot`). Not groups.
 
 Message includes: event, TF, why, reasons, Dex 5m/1h/vol, **level in brackets**, “exit = this TF close back under level”, CA, Pages link.
 
-ntfy is fallback only; daily ntfy quota was already burned earlier — Telegram is primary.
+Alerts are Telegram only. ntfy.sh is not used.
 
 ---
 
@@ -450,7 +450,7 @@ Do **not** add a fourth board. Keep EARLY / LIVE / MATURED / ALIGNED.
 
 - **DO 100k writes:** don’t persist every open 1m bar. Skip unchanged meta/ticks. Alarm **60s**.
 - **Dex 429:** worker pauses ~20s; don’t retry-storm.
-- **ntfy daily cap:** Telegram only for phone.
+- **Alerts:** Telegram only. ntfy.sh is not used.
 - **4h WARMING:** needs 6 closed 4H bars. Cards stay empty on that TF until then. No Dex-% fake LIVE.
 - **Verdict/Hunter/Breakout all die on 1101.** Market + BTC fib on Pages do not.
 

@@ -2,8 +2,6 @@
  * Candle + breakout engine. Works in Cloudflare Workers and Node.
  * DexScreener is the quote tape. We own the candles.
  */
-export const NTFY_DEFAULT = 'MyTradingMemeBreakout44';
-export const NTFY_TOPICS_EXTRA = ['WildMemeMover'];
 export const WATCHLIST_DEFAULT = 'https://sasikar.github.io/Trading/data/ca-recents.json';
 export const WATCHLIST_FALLBACK =
   'https://raw.githubusercontent.com/Sasikar/Trading/master/data/ca-recents.json';
@@ -1053,33 +1051,6 @@ export function hitFrom(row, tick, det, tf, focus) {
   };
 }
 
-export function nextUtcMidnight(now) {
-  const d = new Date(now || Date.now());
-  d.setUTCHours(24, 0, 0, 0);
-  return d.getTime();
-}
-
-export async function sendNtfy(topic, title, message) {
-  const t = String(topic || NTFY_DEFAULT).trim() || NTFY_DEFAULT;
-  const r = await fetch('https://ntfy.sh/' + encodeURIComponent(t), {
-    method: 'POST',
-    headers: {
-      Title: String(title || '').slice(0, 90),
-      Priority: 'high',
-      Tags: 'chart_with_upwards_trend,moneybag'
-    },
-    body: title + '\n' + message
-  });
-  if (r.status === 429) {
-    let extra = '';
-    try {
-      extra = await r.text();
-    } catch (e) {}
-    if (/daily|quota/i.test(extra)) throw new Error('NTFY_DAILY_QUOTA');
-    throw new Error('HTTP 429 ntfy.sh');
-  }
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' ntfy.sh');
-  return { ok: 1 };
 }
 
 export async function sendTelegram(token, chatId, text) {
@@ -1232,7 +1203,6 @@ export class Engine {
     this.env = env || {};
     this.busy = false;
     this.lastErr = '';
-    this.ntfyErr = '';
     this.telegramErr = '';
     this.dexCallsMin = [];
     this.rateLimitedUntil = 0;
@@ -1245,51 +1215,16 @@ export class Engine {
     } catch (e) {}
     this.rateLimitedUntil = +store.getMeta('rate_limited_until') || 0;
     this.lastErr = store.getMeta('last_err') || '';
-    this.ntfyErr = store.getMeta('ntfy_err') || '';
     this.telegramErr = store.getMeta('telegram_err') || '';
     const lastPoll = +store.getMeta('last_poll') || 0;
     const lastScanned = +store.getMeta('last_scanned') || 0;
-    // Fresh ticks in the DB means a previous poll worked — don't keep a
-    // leftover 429 pause from ntfy or a single Dex blip.
     if (lastScanned > 0 && Date.now() - lastPoll < 180000) this.rateLimitedUntil = 0;
-    if (/ntfy/i.test(this.lastErr) || /NTFY_/.test(this.lastErr)) {
-      this.ntfyErr = this.ntfyErr || this.lastErr;
-      this.lastErr = '';
-    }
-    if ((/ntfy/i.test(this.ntfyErr) || /429/.test(this.ntfyErr) || /quota|daily/i.test(this.ntfyErr)) && !this.ntfyPausedUntil()) {
-      this.store.setMeta('ntfy_paused_until', String(nextUtcMidnight()));
-      this.ntfyErr =
-        'Phone alerts paused until midnight UTC — ntfy.sh free daily limit is used up. Dashboard stays live.';
-      this.store.setMeta('ntfy_err', this.ntfyErr);
-    }
+    if (/ntfy/i.test(this.lastErr) || /NTFY_/.test(this.lastErr)) this.lastErr = '';
   }
 
-  topic() {
-    return this.env.NTFY_TOPIC || NTFY_DEFAULT;
-  }
   watchUrl() {
     return this.env.WATCHLIST_URL || WATCHLIST_DEFAULT;
   }
-  ntfyPausedUntil() {
-    return +this.store.getMeta('ntfy_paused_until') || 0;
-  }
-  ntfyPaused(now) {
-    now = now || Date.now();
-    return now < this.ntfyPausedUntil();
-  }
-  markNtfyFail(err) {
-    const msg = String(err && err.message ? err.message : err);
-    if (msg === 'NTFY_DAILY_QUOTA' || /daily|quota/i.test(msg)) {
-      const until = nextUtcMidnight();
-      this.store.setMeta('ntfy_paused_until', String(until));
-      this.ntfyErr = 'Phone alerts paused until midnight UTC — ntfy.sh free daily limit is used up. Dashboard stays live.';
-    } else {
-      this.ntfyErr = msg;
-    }
-    this.store.setMeta('ntfy_err', this.ntfyErr);
-    this.logFail('ntfy', this.ntfyErr);
-  }
-
   telegramWantedUsername() {
     return String(this.env.TELEGRAM_BOT_USERNAME || 'MyTradingBreakoutBot').replace(/^@/, '');
   }
@@ -1401,8 +1336,8 @@ export class Engine {
     now = now || Date.now();
     const hourCut = now - 3600e3;
     const all = this.failLog();
-    const hour = all.filter((x) => +x.t >= hourCut);
-    const older = all.filter((x) => +x.t < hourCut);
+    const hour = all.filter((x) => +x.t >= hourCut && x.k !== 'ntfy');
+    const older = all.filter((x) => +x.t < hourCut && x.k !== 'ntfy');
     const countsHour = {};
     for (const x of hour) countsHour[x.k] = (countsHour[x.k] || 0) + 1;
     const st = this.status();
@@ -1413,7 +1348,6 @@ export class Engine {
         lastPoll: st.lastPoll,
         pollMs: st.pollMs,
         error: st.error || '',
-        ntfyError: st.ntfyError || '',
         telegramError: st.telegramError || '',
         dexCallsLastMin: st.dexCallsLastMin,
         rateLimitedUntil: this.rateLimitedUntil || 0,
@@ -1490,11 +1424,6 @@ export class Engine {
     return hit.fresh && hit.held && hit.age <= 2 && (hit.score >= 55 || hit.event === 'NEW BREAKOUT');
   }
 
-  shouldNtfy(hit, tf, focus) {
-    if (this.ntfyPaused()) return false;
-    return this.shouldAlert(hit, tf, focus);
-  }
-
   async maybeAlert(hit, tf) {
     if (!this.shouldAlert(hit, tf)) return false;
     const now = Date.now();
@@ -1536,16 +1465,6 @@ export class Engine {
         this.markTelegramFail(e);
         const m = String(e && e.message ? e.message : e);
         if (/tap Start|not stored|no telegram token/i.test(m)) return false;
-      }
-    }
-    if (!via && !this.ntfyPaused()) {
-      try {
-        await sendNtfy(this.topic(), title, msg);
-        this.ntfyErr = '';
-        this.store.setMeta('ntfy_err', '');
-        via = 'ntfy';
-      } catch (e) {
-        this.markNtfyFail(e);
       }
     }
     if (!via) return false;
@@ -1609,16 +1528,6 @@ export class Engine {
         this.markTelegramFail(err);
         const m = String(err && err.message ? err.message : err);
         if (/tap Start|not stored|no telegram token/i.test(m)) return false;
-      }
-    }
-    if (!via && !this.ntfyPaused()) {
-      try {
-        await sendNtfy(this.topic(), title, msg);
-        this.ntfyErr = '';
-        this.store.setMeta('ntfy_err', '');
-        via = 'ntfy';
-      } catch (err) {
-        this.markNtfyFail(err);
       }
     }
     if (!via) return false;
@@ -2310,7 +2219,6 @@ export class Engine {
       health,
       engine: 'cloudflare-ohlcv',
       source: 'DexScreener tape → our candles (1D/1W/1M from Gecko backfill + UTC close)',
-      topic: this.topic(),
       focus: this.store.getMeta('focus_ca') || '',
       focusName: this.store.getMeta('focus_name') || '',
       focus1mAlerts: this.store.getMeta('focus_1m_alerts') === 'on',
@@ -2336,10 +2244,6 @@ export class Engine {
       dexCallsLastMin: this.dexCallsLastMin(now),
       dexBudget: 30,
       error: this.lastErr || '',
-      ntfyError: this.ntfyPaused(now)
-        ? this.ntfyErr || 'Phone alerts paused until midnight UTC (ntfy free daily limit)'
-        : this.ntfyErr || '',
-      ntfyPaused: this.ntfyPaused(now),
       telegramBot: this.telegramWantedUsername(),
       telegramBound: !!this.telegramChatId(),
       telegramError: this.telegramErr || '',
@@ -2713,7 +2617,7 @@ export class Engine {
       return { scanned, errors, n429, nAlert, doAll, targets: targets.length };
     } catch (e) {
       this.lastErr = String(e && e.message ? e.message : e);
-      const dex429 = /429/.test(this.lastErr) && !/ntfy/i.test(this.lastErr);
+      const dex429 = /429/.test(this.lastErr);
       if (dex429) this.rateLimitedUntil = now + 20000;
       this.store.setMeta('rate_limited_until', String(this.rateLimitedUntil || 0));
       this.store.setMeta('last_err', this.lastErr || '');
@@ -2877,27 +2781,6 @@ export async function handleApi(engine, request) {
       return json(out);
     } catch (e) {
       return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
-    }
-  }
-  if ((path === '/ping-ntfy' || path === '/api/ping-ntfy') && method === 'POST') {
-    if (engine.ntfyPaused()) {
-      return json({
-        ok: false,
-        paused: true,
-        topic: engine.topic(),
-        error: engine.ntfyErr || 'ntfy daily limit — try after midnight UTC'
-      });
-    }
-    try {
-      await sendNtfy(engine.topic(), 'Trading · ntfy test', 'Topic ' + engine.topic() + '\nOHLCV engine is live.');
-      return json({ ok: true, topic: engine.topic() });
-    } catch (e) {
-      engine.markNtfyFail(e);
-      return json({
-        ok: false,
-        topic: engine.topic(),
-        error: engine.ntfyErr || String(e && e.message ? e.message : e)
-      });
     }
   }
   if ((path === '/run' || path === '/api/run') && (method === 'POST' || method === 'GET')) {

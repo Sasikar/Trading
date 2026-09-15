@@ -96,7 +96,6 @@
       if (live.health) liveBits.push('health ' + live.health);
       if (live.pollMs != null) liveBits.push('last poll ' + Math.round((+live.pollMs || 0) / 60000) + 'm ago');
       if (live.error) liveBits.push(live.error);
-      if (live.ntfyError) liveBits.push(live.ntfyError);
       if (live.telegramError) liveBits.push('telegram ' + live.telegramError);
       if (live.hunterErr) liveBits.push('hunter ' + live.hunterErr);
       if (live.holdersErr) liveBits.push('holders ' + live.holdersErr);
