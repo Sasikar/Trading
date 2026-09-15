@@ -19,7 +19,7 @@
   let liveTimer = null;
   let lastErr = '';
   const LIVE_MS = 20000;
-  const TFS = ['1m', '5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w'];
+  const TFS = ['1m', '5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
   const HIT_PCT = 20;
 
   const $ = (id) => document.getElementById(id);

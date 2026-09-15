@@ -151,12 +151,39 @@ function storeFromSql(sql) {
       );
       sql.exec('DELETE FROM open_bar WHERE ca = ? AND tf = ?', ca.toLowerCase(), tf);
     },
+    insertBar(ca, tf, bar) {
+      const r = one(
+        'SELECT t FROM ohlcv WHERE ca = ? AND tf = ? AND t = ?',
+        ca.toLowerCase(),
+        tf,
+        bar.t
+      );
+      if (r) return false;
+      sql.exec(
+        `INSERT OR REPLACE INTO ohlcv (ca,tf,t,o,h,l,c,vol,buys,sells,n)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        ca.toLowerCase(),
+        tf,
+        bar.t,
+        bar.o,
+        bar.h,
+        bar.l,
+        bar.c,
+        bar.vol || 0,
+        bar.buys || 0,
+        bar.sells || 0,
+        bar.n || 1
+      );
+      return true;
+    },
     flushOpens(now) {
       now = now || Date.now();
       if (now - lastOpenFlush < 5 * 60e3) return;
       lastOpenFlush = now;
       for (const [k, bar] of openMem) {
         const i = k.indexOf('|');
+        const tf = k.slice(i + 1);
+        if (tf === '1d' || tf === '1w' || tf === '1M') continue;
         sql.exec(
           `INSERT OR REPLACE INTO open_bar (ca,tf,t,o,h,l,c,vol,buys,sells,n)
            VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
@@ -187,6 +214,10 @@ function storeFromSql(sql) {
       sql.exec(
         "DELETE FROM ohlcv WHERE tf IN ('5m','10m','15m','30m') AND t < ?",
         now - 30 * 86400e3
+      );
+      sql.exec(
+        "DELETE FROM ohlcv WHERE tf IN ('1d','1w','1M') AND t < ?",
+        now - 730 * 86400e3
       );
     },
     getAlert(key) {

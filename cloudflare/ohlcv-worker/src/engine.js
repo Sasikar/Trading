@@ -16,13 +16,18 @@ export const TF_SEC = {
   '30m': 1800,
   '1h': 3600,
   '2h': 7200,
-  '4h': 14400
+  '4h': 14400,
+  '1d': 86400,
+  '1w': 604800,
+  '1M': 2592000
 };
 export const TAPE_TFS = Object.keys(TF_SEC);
-export const DEX_TFS = ['1d', '1w'];
-export const ALL_TFS = [...TAPE_TFS, ...DEX_TFS];
-export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w'];
+export const LONG_TFS = ['1d', '1w', '1M'];
+export const DEX_TFS = [];
+export const ALL_TFS = [...TAPE_TFS];
+export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
 export const ALIGN_MIN = 2;
+export const KEEP_LONG_MS = 730 * 86400e3;
 
 /** Closed bars required before NEW BREAKOUT is allowed. */
 export const MIN_BARS = {
@@ -33,7 +38,10 @@ export const MIN_BARS = {
   '30m': 10,
   '1h': 8,
   '2h': 6,
-  '4h': 6
+  '4h': 6,
+  '1d': 20,
+  '1w': 8,
+  '1M': 4
 };
 
 export function chainIdOf(chain) {
@@ -52,6 +60,71 @@ export function sleep(ms) {
 
 export function bucketMs(t, sec) {
   return Math.floor(t / (sec * 1000)) * sec * 1000;
+}
+
+export function utcDay(t) {
+  const d = new Date(t);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+export function utcWeekMon(t) {
+  const day0 = utcDay(t);
+  const dow = new Date(day0).getUTCDay();
+  return day0 - ((dow + 6) % 7) * 86400e3;
+}
+
+export function utcMonth(t) {
+  const d = new Date(t);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+}
+
+export function bucketForTf(tf, t) {
+  if (tf === '1w') return utcWeekMon(t);
+  if (tf === '1M') return utcMonth(t);
+  const sec = TF_SEC[tf];
+  if (!sec) return utcDay(t);
+  return bucketMs(t, sec);
+}
+
+export function geckoNetworkOf(chain) {
+  const c = chainIdOf(chain);
+  if (c === 'ethereum') return 'eth';
+  if (c === 'solana') return 'solana';
+  if (c === 'base') return 'base';
+  if (c === 'bsc') return 'bsc';
+  if (c === 'robinhood') return 'robinhood';
+  return c;
+}
+
+export function resampleBars(bars, tf) {
+  const map = {};
+  for (const b of bars || []) {
+    const t = bucketForTf(tf, b.t);
+    if (!map[t]) {
+      map[t] = {
+        t,
+        o: +b.o,
+        h: +b.h,
+        l: +b.l,
+        c: +b.c,
+        vol: +b.vol || 0,
+        buys: b.buys || 0,
+        sells: b.sells || 0,
+        n: 1
+      };
+    } else {
+      const x = map[t];
+      x.h = Math.max(x.h, +b.h);
+      x.l = Math.min(x.l, +b.l);
+      x.c = +b.c;
+      x.vol += +b.vol || 0;
+      x.n += 1;
+    }
+  }
+  return Object.keys(map)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((k) => map[k]);
 }
 
 export function median(nums) {
@@ -1200,6 +1273,24 @@ export class MemoryStore {
     this.ohlcv.push({ ca: caL, tf, ...bar });
     this.open.delete(caL + '|' + tf);
   }
+  insertBar(ca, tf, bar) {
+    const caL = ca.toLowerCase();
+    if (this.ohlcv.some((b) => b.ca === caL && b.tf === tf && +b.t === +bar.t)) return false;
+    this.ohlcv.push({
+      ca: caL,
+      tf,
+      t: bar.t,
+      o: bar.o,
+      h: bar.h,
+      l: bar.l,
+      c: bar.c,
+      vol: bar.vol || 0,
+      buys: bar.buys || 0,
+      sells: bar.sells || 0,
+      n: bar.n || 1
+    });
+    return true;
+  }
   bars(ca, tf, limit) {
     const caL = ca.toLowerCase();
     return this.ohlcv
@@ -1210,9 +1301,11 @@ export class MemoryStore {
   prune(now) {
     const keep1m = now - 7 * 86400e3;
     const keep5 = now - 30 * 86400e3;
+    const keepLong = now - KEEP_LONG_MS;
     this.ohlcv = this.ohlcv.filter((b) => {
       if (b.tf === '1m') return b.t >= keep1m;
       if (b.tf === '5m' || b.tf === '10m' || b.tf === '15m' || b.tf === '30m') return b.t >= keep5;
+      if (b.tf === '1d' || b.tf === '1w' || b.tf === '1M') return b.t >= keepLong;
       return true;
     });
   }
@@ -1253,6 +1346,7 @@ export class Engine {
     this.telegramErr = '';
     this.dexCallsMin = [];
     this.rateLimitedUntil = 0;
+    this.geckoUntil = 0;
     try {
       const saved = JSON.parse(store.getMeta('dex_calls_min') || '[]');
       if (Array.isArray(saved)) this.dexCallsMin = saved.filter((t) => Number.isFinite(+t)).map(Number);
@@ -1382,8 +1476,7 @@ export class Engine {
     this.store.setTick(ca, tick);
     const closed = [];
     for (const tf of TAPE_TFS) {
-      const sec = TF_SEC[tf];
-      const bucket = bucketMs(tick.t, sec);
+      const bucket = bucketForTf(tf, tick.t);
       let open = this.store.openBar(ca, tf);
       if (open && open.t !== bucket) {
         this.store.closeBar(ca, tf, open);
@@ -1612,7 +1705,7 @@ export class Engine {
         det = Object.assign({}, live, { bars: det.bars, need: det.need, level: det.level || 0 });
       }
     } else {
-      det = detectDexTf(tick, tf);
+      det = detectTapeBreakout(this.store.bars(row.ca, tf, 40), tf, tick);
     }
     const hit = hitFrom(row, tick, det, tf, focus);
     hit.entry = entryQuality({
@@ -1631,6 +1724,87 @@ export class Engine {
     });
     this.persistEntry(hit);
     return hit;
+  }
+
+  async maybeBackfill(now) {
+    now = now || Date.now();
+    if (this.geckoUntil && now < this.geckoUntil) return { skipped: 'gecko-wait' };
+    const rows = this.store.getWatch();
+    let map = {};
+    try {
+      map = JSON.parse(this.store.getMeta('bf_long') || '{}') || {};
+    } catch (e) {
+      map = {};
+    }
+    const row = (rows || []).find((r) => {
+      const st = map[String(r.ca || '').toLowerCase()];
+      if (!st) return true;
+      if (st.status === 'done') return false;
+      if (st.status === 'err' && now - (st.at || 0) < 6 * 3600e3) return false;
+      return true;
+    });
+    if (!row) return { skipped: 'all_done' };
+    const ca = String(row.ca).toLowerCase();
+    const tick = this.store.getTick(ca) || {};
+    const pool = row.poolAddress || tick.pairAddress || '';
+    if (!pool) {
+      map[ca] = { status: 'err', why: 'no pool', at: now };
+      this.store.setMeta('bf_long', JSON.stringify(map));
+      return { ca, error: 'no pool' };
+    }
+    const net = geckoNetworkOf(row.chain || tick.chain);
+    const url =
+      'https://api.geckoterminal.com/api/v2/networks/' +
+      encodeURIComponent(net) +
+      '/pools/' +
+      encodeURIComponent(pool) +
+      '/ohlcv/day?aggregate=1&limit=1000&currency=usd&token=base';
+    let j;
+    try {
+      j = await fetchJSON(url, 1);
+    } catch (e) {
+      const m = String(e && e.message ? e.message : e);
+      if (/429/.test(m)) this.geckoUntil = now + 60000;
+      map[ca] = { status: 'err', why: m.slice(0, 100), at: now };
+      this.store.setMeta('bf_long', JSON.stringify(map));
+      return { ca, error: m };
+    }
+    const list = (((j || {}).data || {}).attributes || {}).ohlcv_list || [];
+    const cutoff = now - KEEP_LONG_MS;
+    const today = utcDay(now);
+    const days = list
+      .map((x) => ({
+        t: +x[0] * 1000,
+        o: +x[1],
+        h: +x[2],
+        l: +x[3],
+        c: +x[4],
+        vol: +x[5] || 0,
+        buys: 0,
+        sells: 0,
+        n: 1
+      }))
+      .filter((b) => b.t >= cutoff && b.t < today && b.c > 0)
+      .sort((a, b) => a.t - b.t);
+    if (!this.store.insertBar) {
+      map[ca] = { status: 'err', why: 'no insertBar', at: now };
+      this.store.setMeta('bf_long', JSON.stringify(map));
+      return { ca, error: 'no insertBar' };
+    }
+    let n1d = 0;
+    for (const b of days) if (this.store.insertBar(ca, '1d', b)) n1d++;
+    let n1w = 0;
+    for (const b of resampleBars(days, '1w')) {
+      if (b.t < utcWeekMon(now) && this.store.insertBar(ca, '1w', b)) n1w++;
+    }
+    let n1M = 0;
+    for (const b of resampleBars(days, '1M')) {
+      if (b.t < utcMonth(now) && this.store.insertBar(ca, '1M', b)) n1M++;
+    }
+    map[ca] = { status: days.length ? 'done' : 'err', n1d, n1w, n1M, at: now, pool, days: days.length };
+    if (!days.length) map[ca].why = 'empty gecko 1d';
+    this.store.setMeta('bf_long', JSON.stringify(map));
+    return { ca, name: row.name, n1d, n1w, n1M, days: days.length };
   }
 
   persistEntry(hit) {
@@ -1921,10 +2095,17 @@ export class Engine {
         section: h.section,
         ret1: h.m5
       }));
+    let bf = {};
+    try {
+      bf = JSON.parse(this.store.getMeta('bf_long') || '{}') || {};
+    } catch (e) {
+      bf = {};
+    }
+    const bfVals = Object.values(bf);
     return {
       health,
       engine: 'cloudflare-ohlcv',
-      source: 'DexScreener tape → our candles',
+      source: 'DexScreener tape → our candles (1D/1W/1M from Gecko backfill + UTC close)',
       topic: this.topic(),
       focus: this.store.getMeta('focus_ca') || '',
       focusName: this.store.getMeta('focus_name') || '',
@@ -1933,6 +2114,8 @@ export class Engine {
       lastAll: lastAll ? new Date(lastAll).toISOString() : null,
       pollMs: now - lastPoll,
       candidates: watch.length,
+      backfillDone: bfVals.filter((x) => x && x.status === 'done').length,
+      backfillErr: bfVals.filter((x) => x && x.status === 'err').length,
       dexCallsLastMin: this.dexCallsLastMin(now),
       dexBudget: 30,
       error: this.lastErr || '',
@@ -2209,6 +2392,9 @@ export class Engine {
         }
         for (const tf of tfsToCheck) {
           const hit = this.evaluateRow(row, tf, focus);
+          const long = tf === '1d' || tf === '1w' || tf === '1M';
+          const justClosed = closed.some((c) => c.tf === tf);
+          if (long && !justClosed) continue;
           if (await this.maybeAlert(hit, tf)) nAlert++;
           if (await this.maybeEntryAlert(hit)) nAlert++;
         }
@@ -2234,6 +2420,11 @@ export class Engine {
       try {
         if (this.store.flushOpens) this.store.flushOpens(now);
       } catch (e) {}
+      try {
+        await this.maybeBackfill(now);
+      } catch (e) {
+        this.store.setMeta('bf_err', String(e && e.message ? e.message : e).slice(0, 120));
+      }
       try {
         await this.refreshHunter(now);
       } catch (e) {

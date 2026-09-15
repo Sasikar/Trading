@@ -2,7 +2,7 @@
 
 **Read this first** before changing Breakout, Telegram, Verdict-on-breakouts, or candles.
 
-Last updated: 2026-09-15 (IST) — `entryQuality()` LIVE (WATCH / WINDOW / EXTENDED / FAILED)
+Last updated: 2026-09-15 (IST) — real 1D/1W/1M tape + Gecko backfill (2y keep)
 
 | Status | What |
 |---|---|
@@ -97,9 +97,10 @@ Writes are skipped when a row is unchanged. Open candles stay in memory and flus
      - Else update high/low/close on the forming bar **in memory**.
 6. Evaluate each target on needed TFs → maybe Telegram.
 7. Hunter refresh (discover ~5 min, score ~90s) — separate from breakout detect.
-8. Prune old 1m/5m…30m bars about hourly.
+8. Prune old 1m/5m…30m hourly; **1d / 1w / 1M kept 730 days**.
+9. **Gecko 1D backfill** — one saved CA per alarm. Writes closed 1d (and resampled 1w / 1M). Never overwrites today.
 
-**1d and 1w have no candles.** They use Dex 6h/24h windows only (`detectDexTf`).
+**1d / 1w / 1M are real candles** (UTC day / Monday week / calendar month). Not Dex 24h %. `detectDexTf` is unused.
 
 ---
 
@@ -115,7 +116,11 @@ Writes are skipped when a row is unchanged. Open candles stay in memory and flus
 | 1h | 3600 | 8 |
 | 2h | 7200 | 6 |
 | 4h | 14400 | 6 (~24h of polling) |
-| 1d / 1w | — | no tape |
+| 1d | UTC midnight | 20 |
+| 1w | Monday 00:00 UTC | 8 |
+| 1M | 1st of month 00:00 UTC | 4 |
+
+Keep **2 years** of 1d/1w/1M (`KEEP_LONG_MS`). Forming 1d/1w/1M stay in memory; **SQL write on close + backfill only** (not every 5 min).
 
 **Closed vs forming**
 
@@ -139,14 +144,14 @@ Prior 20 **closed** bars’ highs, excluding the last bar: `max(prior.h)`. Print
 ```
 evaluateRow(row, tf)
   no tick            → WARMING / NO TICK
-  1m–4h, enough bars → detectTapeBreakout(closed, tf, tick)
+  1m–4h / 1d / 1w / 1M, enough bars → detectTapeBreakout(closed, tf, tick)
   4h/2h/1h WARMING   → detectLegacy4h(tick)   mark live:true
   5m WARMING         → detectLive5m(tick)     mark live:true
-  1d/1w              → detectDexTf(tick, tf)
-  then hitFrom() + describeWhy() + classifySection()
+  1d/1w/1M WARMING   → stay WARMING (no Dex-24h fake)
+  then hitFrom() + entryQuality() + classifySection()
 ```
 
-### 5.1 Tape break (`detectTapeBreakout`) — 1m…4h when warm
+### 5.1 Tape break (`detectTapeBreakout`) — 1m…4h **and** 1d/1w/1M when warm
 
 On the **last closed** bar vs prior range high:
 
@@ -186,12 +191,15 @@ Used only while 4h/2h/1h is WARMING.
 - **BREAKOUT HELD:** 5m ≥ +2% AND 1h > 0
 - **CLOSE TO BREAK:** 5m ≥ +1.5%, volX ≥ 1.15
 
-### 5.4 Dex 1d / 1w (`detectDexTf`)
+### 5.4 Real 1d / 1w / 1M (not Dex 24h)
 
-**1d NEW BREAKOUT:** 6h ≥ +8% AND 24h in [+5%, +40%) AND volX ≥ 1.2 AND not stretched  
-**1d HELD:** 24h ≥ +10% AND 6h > 0  
-**1d STRETCHED:** 24h ≥ +80%  
-**1w** uses 24h ≥ +15% as held; stretched at 24h ≥ +120%.
+Same `detectTapeBreakout` vs last **closed** UTC candle’s range high.
+
+**Backfill (once per CA):** Gecko `/ohlcv/day` (up to 1000 days, cap 730). Resample to 1w and 1M. Skip the in-progress day/week/month. One coin per 60s alarm. Meta `bf_long`.
+
+**Alerts:** 1d/1w/1M Telegram only when that bar **just closed** this tick (no spam from history insert).
+
+Until `MIN_BARS` exist (or backfill lands) the TF is **WARMING** — not a fake 24h HOLD.
 
 ### 5.5 Momentum score (`momentumFromTick`) — 0–100
 
