@@ -243,7 +243,11 @@ export class OhlcvEngine {
 
   async ensureAlarm() {
     const next = await this.ctx.storage.getAlarm();
-    if (!next) await this.ctx.storage.setAlarm(Date.now() + 5000);
+    const now = Date.now();
+    /* A past/stuck alarm still returns a timestamp, so `if (!next)` never re-arms. */
+    if (!next || next <= now + 2000) {
+      await this.ctx.storage.setAlarm(now + 4000);
+    }
   }
 
   async alarm() {
