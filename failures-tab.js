@@ -138,7 +138,8 @@
       'hunter-panel',
       'breakouts-panel',
       'holders-panel',
-      'verdict-panel'
+      'verdict-panel',
+      'inmemory-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
@@ -157,6 +158,9 @@
     } catch (e) {}
     try {
       window.showVerdict(false);
+    } catch (e) {}
+    try {
+      window.showInMemory(false);
     } catch (e) {}
   }
 
