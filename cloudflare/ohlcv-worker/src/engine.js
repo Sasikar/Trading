@@ -29,6 +29,7 @@ export const ALIGN_MIN = 2;
 export const KEEP_LONG_MS = 730 * 86400e3;
 /** One Gecko 1D page per this interval. Dex 60s poll is unchanged. */
 export const GECKO_EVERY_MS = 3600e3;
+export const HOLDERS_EVERY_MS = 15 * 60e3;
 
 /** Closed bars required before NEW BREAKOUT is allowed. */
 export const MIN_BARS = {
@@ -302,6 +303,36 @@ export function hunterBand(liq) {
   if (x >= 1000000 && x < 10000000) return 'mid';
   if (x >= 10000000 && x <= 100000000) return 'large';
   return '';
+}
+
+export function netHoldersFromPct(nowN, pct) {
+  const n = +nowN;
+  const p = +pct;
+  if (!(n > 0) || !Number.isFinite(p)) return null;
+  const r = p / 100;
+  if (r <= -0.999) return null;
+  return Math.round(n - n / (1 + r));
+}
+
+export function holderDeltaFromSnaps(snaps, now, windowMs, nowN) {
+  const n = +nowN;
+  if (!(n > 0) || !snaps || !snaps.length || !(windowMs > 0)) {
+    return { net: null, pct: null, ready: false };
+  }
+  const want = now - windowMs;
+  let best = null;
+  for (let i = 0; i < snaps.length; i++) {
+    const s = snaps[i];
+    if (!s || !(+s.n > 0)) continue;
+    if (+s.t <= want + 12 * 60e3) {
+      if (!best || Math.abs(+s.t - want) < Math.abs(+best.t - want)) best = s;
+    }
+  }
+  if (!best) return { net: null, pct: null, ready: false };
+  if (now - +best.t < windowMs * 0.7) return { net: null, pct: null, ready: false };
+  const net = Math.round(n - +best.n);
+  const pct = +best.n > 0 ? (net / +best.n) * 100 : null;
+  return { net, pct, ready: true, from: +best.t };
 }
 
 export function hunterPass(tick, pair, now) {
@@ -1527,6 +1558,133 @@ export class Engine {
     return hit;
   }
 
+  async maybeHolders(now, force) {
+    now = now || Date.now();
+    const last = +this.store.getMeta('holders_at') || 0;
+    if (!force && last && now - last < HOLDERS_EVERY_MS) return { skipped: 'wait', waitMs: HOLDERS_EVERY_MS - (now - last) };
+    const rows = (this.store.getWatch() || []).filter((r) => chainIdOf(r.chain) === 'solana');
+    let map = {};
+    try {
+      map = JSON.parse(this.store.getMeta('holders') || '{}') || {};
+    } catch (e) {
+      map = {};
+    }
+    for (const row of rows) {
+      const ca = String(row.ca || '').toLowerCase();
+      if (!ca) continue;
+      try {
+        const j = await fetchJSON(
+          'https://lite-api.jup.ag/tokens/v2/search?query=' + encodeURIComponent(row.ca),
+          1
+        );
+        const list = Array.isArray(j) ? j : [];
+        const tok = list.find((x) => String(x.id || '').toLowerCase() === ca) || list[0];
+        if (!tok || !(+tok.holderCount > 0)) {
+          map[ca] = Object.assign({}, map[ca] || {}, {
+            ca,
+            name: row.name,
+            error: 'no holderCount',
+            at: now
+          });
+          continue;
+        }
+        const n = +tok.holderCount;
+        const pct1h = (tok.stats1h || {}).holderChange;
+        const pct6h = (tok.stats6h || {}).holderChange;
+        const pct24h = (tok.stats24h || {}).holderChange;
+        const prev = map[ca] || {};
+        let snaps = Array.isArray(prev.snaps) ? prev.snaps.slice() : [];
+        const lastSnap = snaps[snaps.length - 1];
+        if (!lastSnap || now - +lastSnap.t >= 30 * 60e3) {
+          snaps.push({ t: now, n });
+        }
+        const cut = now - 8 * 86400e3;
+        snaps = snaps.filter((s) => s && +s.t >= cut).slice(-220);
+        const d4 = holderDeltaFromSnaps(snaps, now, 4 * 3600e3, n);
+        const d7 = holderDeltaFromSnaps(snaps, now, 7 * 86400e3, n);
+        map[ca] = {
+          ca,
+          name: tok.symbol || row.name,
+          n,
+          at: now,
+          pct1h,
+          net1h: netHoldersFromPct(n, pct1h),
+          pct6h,
+          net6h: netHoldersFromPct(n, pct6h),
+          pct24h,
+          net24h: netHoldersFromPct(n, pct24h),
+          pct4h: d4.pct,
+          net4h: d4.net,
+          ready4h: !!d4.ready,
+          pct1w: d7.pct,
+          net1w: d7.net,
+          ready1w: !!d7.ready,
+          topHoldPct: tok.audit && tok.audit.topHoldersPercentage,
+          mcap: tok.mcap,
+          solscan: 'https://solscan.io/token/' + row.ca + '#holders',
+          snaps,
+          error: ''
+        };
+      } catch (e) {
+        map[ca] = Object.assign({}, map[ca] || {}, {
+          ca,
+          name: row.name,
+          error: String(e && e.message ? e.message : e).slice(0, 80),
+          at: now
+        });
+      }
+    }
+    this.store.setMeta('holders', JSON.stringify(map));
+    this.store.setMeta('holders_at', String(now));
+    return { ok: true, n: rows.length };
+  }
+
+  holdersSnapshot() {
+    let map = {};
+    try {
+      map = JSON.parse(this.store.getMeta('holders') || '{}') || {};
+    } catch (e) {
+      map = {};
+    }
+    const watch = this.store.getWatch() || [];
+    const cards = watch
+      .filter((r) => chainIdOf(r.chain) === 'solana')
+      .map((r) => {
+        const ca = String(r.ca || '').toLowerCase();
+        const h = map[ca] || {};
+        return {
+          ca: r.ca,
+          name: h.name || r.name,
+          n: h.n || 0,
+          at: h.at || 0,
+          pct1h: h.pct1h,
+          net1h: h.net1h,
+          pct6h: h.pct6h,
+          net6h: h.net6h,
+          pct24h: h.pct24h,
+          net24h: h.net24h,
+          pct4h: h.pct4h,
+          net4h: h.net4h,
+          ready4h: !!h.ready4h,
+          pct1w: h.pct1w,
+          net1w: h.net1w,
+          ready1w: !!h.ready1w,
+          topHoldPct: h.topHoldPct,
+          mcap: h.mcap,
+          solscan: h.solscan || 'https://solscan.io/token/' + r.ca + '#holders',
+          error: h.error || ''
+        };
+      })
+      .sort((a, b) => (+b.net1h || -1e12) - (+a.net1h || -1e12));
+    const ethN = watch.filter((r) => chainIdOf(r.chain) !== 'solana').length;
+    return {
+      cards,
+      scannedAt: +this.store.getMeta('holders_at') || 0,
+      ethSkipped: ethN,
+      source: 'Jupiter holderCount (1h/6h/24h). 4h and 1w from our snapshots. Solscan list is the link, not the feed — Solscan growth API is paid.'
+    };
+  }
+
   async maybeBackfill(now) {
     now = now || Date.now();
     const lastAt = +this.store.getMeta('bf_gecko_at') || 0;
@@ -2364,6 +2522,11 @@ export class Engine {
       } catch (e) {
         this.store.setMeta('hunter_err', String(e && e.message ? e.message : e));
       }
+      try {
+        await this.maybeHolders(now);
+      } catch (e) {
+        this.store.setMeta('holders_err', String(e && e.message ? e.message : e).slice(0, 120));
+      }
       if (now % 3600000 < 30000) this.store.prune(now);
       return { scanned, errors, n429, nAlert, doAll, targets: targets.length };
     } catch (e) {
@@ -2445,6 +2608,16 @@ export async function handleApi(engine, request) {
   if (path === '/verdict' || path === '/api/verdict') {
     const ca = url.searchParams.get('ca') || '';
     return json(engine.verdictFor(ca));
+  }
+  if (path === '/holders' || path === '/api/holders') {
+    if (method === 'POST') {
+      try {
+        await engine.maybeHolders(Date.now(), true);
+      } catch (e) {
+        return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
+      }
+    }
+    return json(engine.holdersSnapshot());
   }
   if (path === '/hunter' || path === '/api/hunter') {
     if (method === 'POST') {

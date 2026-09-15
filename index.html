@@ -247,8 +247,22 @@
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
-#coin-panel .card > *,#breakouts-panel .card > *,#hunter-panel .card > *{margin-left:0;margin-right:0}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card > *,#breakouts-panel .card > *,#hunter-panel .card > *,#holders-panel .card > *{margin-left:0;margin-right:0}
+.hd-card{padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a}
+.hd-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.hd-name{font-weight:900;font-size:15px;color:#e8eef6;display:flex;align-items:center;gap:8px}
+.hd-name img{width:16px;height:16px;border-radius:50%;background:#121a24}
+.hd-count{font-weight:900;font-size:18px;color:#e8eef6}
+.hd-count span{font-size:11px;color:#8491a1;font-weight:700;margin-left:4px}
+.hd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+@media(max-width:640px){.hd-grid{grid-template-columns:1fr 1fr}}
+.hd-cell{background:#080d13;border:1px solid #ffffff0a;border-radius:10px;padding:8px}
+.hd-cell .lab{font-size:10px;font-weight:800;color:#8491a1;letter-spacing:.06em}
+.hd-cell .val{font-size:15px;font-weight:900;margin-top:4px}
+.hd-cell .sub{font-size:10px;color:#8491a1;margin-top:2px;min-height:14px}
+.hd-foot{margin-top:8px;font-size:11px;color:#8491a1;line-height:1.45}
+.hd-foot a{color:#6eb6ff;text-decoration:none;font-weight:700}
 .vd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 14px;flex-wrap:wrap}
 .vd-name{font-size:18px;font-weight:900}
 .vd-name span{font-size:11px;color:#8491a1;font-weight:700}
@@ -383,6 +397,7 @@
   <button type="button" class="tab" data-tf="coin">CA</button>
   <button type="button" class="tab" data-tf="breakouts">Breakout Memes</button>
   <button type="button" class="tab" data-tf="hunter">Hunter</button>
+  <button type="button" class="tab" data-tf="holders">Holders</button>
   <button type="button" class="tab" data-tf="verdict">Verdict</button>
   <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
@@ -707,6 +722,24 @@
   </div>
 </section>
 </div>
+<div id="holders-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Holders</h2><p>SOL memes · 1h / 4h / 1d / 1w holder change · ETH skipped</p></div>
+    <span class="source" id="hd-source">JUPITER</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      <button type="button" onclick="try{window.refreshHoldersTab&&window.refreshHoldersTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
+      <span id="hd-status" style="font-size:12px;color:#8491a1">Open this tab to load</span>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">1H and 1D (and 6H while 4H fills) come from Jupiter’s holder feed. 4H and 1W use our own snapshots every ~30 min. Solscan is the holders list link — their growth API is paid, so we don’t fake it.</div>
+    <div id="hd-list" style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#8491a1">Open Holders to load SOL coins.</div>
+    </div>
+  </div>
+</section>
+</div>
 <div id="verdict-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
@@ -814,9 +847,10 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260914-vd2"></script>
+<script src="overview-app.js?v=20260915-hd1"></script>
 <script src="breakout-tab.js?v=20260915-eq2"></script>
 <script src="hunter-tab.js?v=20260914-h4"></script>
+<script src="holders-tab.js?v=20260915-h1"></script>
 <script src="verdict-tab.js?v=20260915-v4"></script>
 <script src="site-nav.js?v=20260914-ui1"></script>
 </body></html>
