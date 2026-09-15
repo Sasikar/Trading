@@ -2405,14 +2405,6 @@ export class Engine {
     if (c === 'robinhood') return 'robinhood';
     return '';
   }
-    const c = chainIdOf(chain);
-    if (c === 'solana') return 'solana';
-    if (c === 'ethereum') return 'ethereum';
-    if (c === 'base') return 'base';
-    if (c === 'bsc') return 'binance-smart-chain';
-    if (c === 'robinhood') return 'robinhood';
-    return '';
-  }
 
   sentimentLists() {
     const slim = (r) => ({
@@ -2463,10 +2455,6 @@ export class Engine {
       if (n && n.length >= 3 && t.includes(n)) return true;
       return false;
     });
-  }
-
-  async geckoByContract(platform, ca) {
-    return null;
   }
 
   buildSentimentReport(row, listings, now) {
