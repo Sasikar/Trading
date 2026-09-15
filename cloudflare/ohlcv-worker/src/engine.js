@@ -30,6 +30,8 @@ export const KEEP_LONG_MS = 730 * 86400e3;
 /** One Gecko 1D page per this interval. Dex 60s poll is unchanged. */
 export const GECKO_EVERY_MS = 3600e3;
 export const HOLDERS_EVERY_MS = 15 * 60e3;
+/** Hunter Dex discover + score. Not the 60s saved-CA tape. */
+export const HUNTER_EVERY_MS = 20 * 60e3;
 
 /** Closed bars required before NEW BREAKOUT is allowed. */
 export const MIN_BARS = {
@@ -2389,8 +2391,8 @@ export class Engine {
     if (!force && this.dexCallsLastMin(now) >= 22) return { skipped: true, budget: true };
     const lastDisc = +this.store.getMeta('hunter_discover') || 0;
     const lastScore = +this.store.getMeta('hunter_at') || 0;
-    const doDiscover = force || now - lastDisc >= 5 * 60e3;
-    const doScore = doDiscover || now - lastScore >= 90e3;
+    const doDiscover = force || now - lastDisc >= HUNTER_EVERY_MS;
+    const doScore = force || now - lastScore >= HUNTER_EVERY_MS;
     if (!doScore) return { skipped: true };
     let seeds = [];
     let calls = 0;

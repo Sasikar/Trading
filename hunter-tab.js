@@ -288,6 +288,7 @@
           watched.length +
           ' hunter-watch · last scan ' +
           fmtAgo(+j.scannedAt) +
+          ' · next auto ~20 min' +
           (j.error ? ' · ' + j.error : '') +
           ' · no phone pings from this tab';
       if (list)
