@@ -71,11 +71,11 @@
     );
   }
   const MIX_ORDER = [
-    { id: 'whale', icon: '🐋', band: '≥$1M', color: '#3ee6a0' },
-    { id: 'shark', icon: '🦈', band: '≥$100k', color: '#5b9cff' },
-    { id: 'dolphin', icon: '🐬', band: '≥$10k', color: '#a78bfa' },
-    { id: 'fish', icon: '🐟', band: '≥$1k', color: '#f0b429' },
-    { id: 'crab', icon: '🦀', band: '≥$100', color: '#ff7a8a' },
+    { id: 'whale', icon: '🐋', band: '$1M+', color: '#3ee6a0' },
+    { id: 'shark', icon: '🦈', band: '$100k–$1M', color: '#5b9cff' },
+    { id: 'dolphin', icon: '🐬', band: '$10k–$100k', color: '#a78bfa' },
+    { id: 'fish', icon: '🐟', band: '$1k–$10k', color: '#f0b429' },
+    { id: 'crab', icon: '🦀', band: '$100–$1k', color: '#ff7a8a' },
     { id: 'shrimp', icon: '🦐', band: '<$100', color: '#8491a1' }
   ];
   function mixColor(id) {
@@ -94,7 +94,7 @@
       rows.push({
         id: o.id,
         icon: t.icon || o.icon,
-        band: t.band || o.band,
+        band: o.band,
         color: o.color,
         n: +t.n,
         pct: +t.pct
@@ -140,7 +140,7 @@
       mixRows.push({
         id: o.id,
         icon: t.icon || o.icon,
-        band: t.band || o.band,
+        band: o.band,
         color: o.color,
         n: +t.n,
         pct: +t.pct || 0

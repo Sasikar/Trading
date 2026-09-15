@@ -384,11 +384,11 @@ export const HOLDER_TIERS = [
 
 export function usdBand(minUsd) {
   const x = +minUsd || 0;
-  if (x >= 1e6) return '≥$1M';
-  if (x >= 1e5) return '≥$100k';
-  if (x >= 1e4) return '≥$10k';
-  if (x >= 1e3) return '≥$1k';
-  if (x >= 100) return '≥$100';
+  if (x >= 1e6) return '$1M+';
+  if (x >= 1e5) return '$100k–$1M';
+  if (x >= 1e4) return '$10k–$100k';
+  if (x >= 1e3) return '$1k–$10k';
+  if (x >= 100) return '$100–$1k';
   return '<$100';
 }
 
