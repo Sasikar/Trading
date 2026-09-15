@@ -100,7 +100,7 @@ Writes are skipped when a row is unchanged. Open candles stay in memory and flus
 8. Prune old 1m/5m…30m hourly; **1d / 1w / 1M kept 730 days**.
 9. **Gecko 1D backfill** — one saved CA per alarm. Writes closed 1d (and resampled 1w / 1M). Never overwrites today.
 
-**1d / 1w / 1M are real candles** (UTC day / Monday week / calendar month). Not Dex 24h %. `detectDexTf` is unused.
+**1d / 1w / 1M are real candles** (UTC day / Monday week / calendar month). Not Dex 24h %. Fake Dex-% detectors (`detectDexTf`, `detectLegacy4h`, `detectLive5m`) are **removed**. WARMING stays WARMING.
 
 ---
 
@@ -143,11 +143,9 @@ Prior 20 **closed** bars’ highs, excluding the last bar: `max(prior.h)`. Print
 
 ```
 evaluateRow(row, tf)
-  no tick            → WARMING / NO TICK
-  1m–4h / 1d / 1w / 1M, enough bars → detectTapeBreakout(closed, tf, tick)
-  4h/2h/1h WARMING   → detectLegacy4h(tick)   mark live:true
-  5m WARMING         → detectLive5m(tick)     mark live:true
-  1d/1w/1M WARMING   → stay WARMING (no Dex-24h fake)
+  no tick                         → WARMING / NO TICK
+  1m–4h / 1d / 1w / 1M            → detectTapeBreakout(closed, tf, tick)
+  not enough closed bars          → WARMING (no Dex-% fake)
   then hitFrom() + entryQuality() + classifySection()
 ```
 
@@ -175,21 +173,7 @@ heldBars = count of trailing closed bars with close >= rangeHigh × 0.998
 or tape `runup ≥ 18%` or this bar `ret ≥ 22%`  
 → if held/broke, `state = STRETCHED` (score −12).
 
-If `n < MIN_BARS` → `WARMING` (not a break).
-
-### 5.2 Legacy live 4h/2h/1h (`detectLegacy4h`) — tape still filling
-
-Used only while 4h/2h/1h is WARMING.
-
-- **NEW BREAKOUT (live):** Dex 5m ≥ +3% AND 1h ≥ +2% AND volX ≥ 1.5 AND not stretched
-- **BREAKOUT HELD:** 1h > 0 AND 6h ≥ +8%
-- **CLOSE TO BREAK:** 5m ≥ +1.2%, 1h ≥ 0, volX ≥ 1.15, not stretched
-
-### 5.3 Live 5m (`detectLive5m`) — 5m tape still filling
-
-- **NEW BREAKOUT (live):** 5m ≥ +4% AND volX ≥ 1.5 AND not stretched
-- **BREAKOUT HELD:** 5m ≥ +2% AND 1h > 0
-- **CLOSE TO BREAK:** 5m ≥ +1.5%, volX ≥ 1.15
+If `n < MIN_BARS` → `WARMING` (not a break). **No Dex 5m/1h/6h/24h substitute.**
 
 ### 5.4 Real 1d / 1w / 1M (not Dex 24h)
 
@@ -466,7 +450,7 @@ Do **not** add a fourth board. Keep EARLY / LIVE / MATURED / ALIGNED.
 - **DO 100k writes:** don’t persist every open 1m bar. Skip unchanged meta/ticks. Alarm **60s**.
 - **Dex 429:** worker pauses ~20s; don’t retry-storm.
 - **ntfy daily cap:** Telegram only for phone.
-- **4h WARMING 24h:** cards may use `live` Dex 4h until 6 closed 4H exist. That is still the **event**, not WINDOW.
+- **4h WARMING:** needs 6 closed 4H bars. Cards stay empty on that TF until then. No Dex-% fake LIVE.
 - **Verdict/Hunter/Breakout all die on 1101.** Market + BTC fib on Pages do not.
 
 ---
@@ -475,7 +459,7 @@ Do **not** add a fourth board. Keep EARLY / LIVE / MATURED / ALIGNED.
 
 If you touch any of:
 
-- `detectTapeBreakout` / `detectLegacy4h` / `detectLive5m` / `detectDexTf`
+- `detectTapeBreakout`
 - `classifySection` / `syncMatured` / `ALIGN_*`
 - `shouldAlert` / `maybeAlert` / Telegram text
 - `entryQuality` (once it exists)

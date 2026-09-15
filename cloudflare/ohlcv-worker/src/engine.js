@@ -23,7 +23,6 @@ export const TF_SEC = {
 };
 export const TAPE_TFS = Object.keys(TF_SEC);
 export const LONG_TFS = ['1d', '1w', '1M'];
-export const DEX_TFS = [];
 export const ALL_TFS = [...TAPE_TFS];
 export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
 export const ALIGN_MIN = 2;
@@ -507,155 +506,6 @@ export function detectTapeBreakout(bars, tf, tick) {
   };
 }
 
-export function detectDexTf(tick, tf) {
-  const mom = momentumFromTick(tick);
-  const m5 = tick.m5 || 0,
-    h1 = tick.h1 || 0,
-    h6 = tick.h6 || 0,
-    h24 = tick.h24 || 0;
-  let event = '—',
-    state = 'WATCH',
-    fresh = false,
-    held = false,
-    age = 99;
-  if (tf === '1d') {
-    if (h6 >= 8 && h24 >= 5 && h24 < 40 && mom.volX >= 1.2 && !mom.stretched) {
-      event = 'NEW BREAKOUT';
-      fresh = true;
-      held = true;
-      age = 0;
-      state = 'EARLY';
-    } else if (h24 >= 10 && h6 > 0) {
-      event = 'BREAKOUT HELD';
-      held = true;
-      age = 1;
-      state = h24 >= 20 ? 'STRONG CONFIRMED' : 'EARLY';
-    }
-    if (h24 >= 80) state = 'STRETCHED';
-  } else {
-    if (h24 >= 15 && h6 > 0) {
-      event = 'BREAKOUT HELD';
-      held = true;
-      age = 2;
-      state = 'EARLY';
-    }
-    if (h24 >= 120) state = 'STRETCHED';
-  }
-  let near = false;
-  if (event === '—' && !mom.stretched) {
-    if (tf === '1d' && h6 >= 4 && h24 >= 2 && h24 < 8 && mom.volX >= 1.1) {
-      event = 'CLOSE TO BREAK';
-      near = true;
-    } else if (tf === '1w' && h24 >= 8 && h24 < 15 && h6 > 0 && mom.volX >= 1.1) {
-      event = 'CLOSE TO BREAK';
-      near = true;
-    }
-  }
-  return {
-    state,
-    event,
-    fresh,
-    held,
-    age,
-    score: mom.score,
-    bars: 0,
-    need: 0,
-    near,
-    interesting: state !== 'WATCH' || fresh || held || near || mom.score >= 55
-  };
-}
-
-/** Immediate 4h/1h/2h label from Dex windows while our tape is still warming. */
-export function detectLegacy4h(tick) {
-  const mom = momentumFromTick(tick);
-  const m5 = tick.m5 || 0,
-    h1 = tick.h1 || 0,
-    h6 = tick.h6 || 0;
-  let event = '—',
-    state = 'WATCH',
-    fresh = false,
-    held = false,
-    age = 99;
-  if (m5 >= 3 && h1 >= 2 && mom.volX >= 1.5 && !mom.stretched) {
-    event = 'NEW BREAKOUT';
-    fresh = true;
-    held = true;
-    age = 0;
-    state = 'EARLY';
-  } else if (h1 > 0 && h6 >= 8) {
-    event = 'BREAKOUT HELD';
-    held = true;
-    age = h6 >= 25 ? 3 : 1;
-    state = h1 >= 6 && mom.volX >= 1.3 && mom.buyR >= 0.52 ? 'STRONG CONFIRMED' : 'EARLY';
-  }
-  let near = false;
-  if (event === '—' && m5 >= 1.2 && h1 >= 0 && mom.volX >= 1.15 && !mom.stretched) {
-    event = 'CLOSE TO BREAK';
-    near = true;
-  }
-  if (mom.stretched && (h1 > 5 || h6 > 40)) state = 'STRETCHED';
-  let score = mom.score;
-  if (state === 'STRETCHED') score = Math.max(0, score - 12);
-  return {
-    state,
-    event,
-    fresh,
-    held,
-    age,
-    score: Math.max(0, Math.min(100, Math.round(score))),
-    bars: 0,
-    need: 0,
-    interesting: state !== 'WATCH' || fresh || held || near || score >= 55,
-    near,
-    live: true
-  };
-}
-
-/** Immediate 5m label from Dex m5 while our 5m tape is still filling. */
-export function detectLive5m(tick) {
-  const mom = momentumFromTick(tick);
-  const m5 = tick.m5 || 0,
-    h1 = tick.h1 || 0;
-  let event = '—',
-    state = 'WATCH',
-    fresh = false,
-    held = false,
-    age = 99;
-  if (m5 >= 4 && mom.volX >= 1.5 && !mom.stretched) {
-    event = 'NEW BREAKOUT';
-    fresh = true;
-    held = true;
-    age = 0;
-    state = 'EARLY';
-  } else if (m5 >= 2 && h1 > 0) {
-    event = 'BREAKOUT HELD';
-    held = true;
-    age = 1;
-    state = mom.volX >= 1.3 && mom.buyR >= 0.52 ? 'STRONG CONFIRMED' : 'EARLY';
-  }
-  let near = false;
-  if (event === '—' && m5 >= 1.8 && m5 < 4 && mom.volX >= 1.15 && !mom.stretched) {
-    event = 'CLOSE TO BREAK';
-    near = true;
-  }
-  if (mom.stretched && m5 >= 8) state = 'STRETCHED';
-  let score = mom.score;
-  if (state === 'STRETCHED') score = Math.max(0, score - 12);
-  return {
-    state,
-    event,
-    fresh,
-    held,
-    age,
-    score: Math.max(0, Math.min(100, Math.round(score))),
-    bars: 0,
-    need: 0,
-    interesting: state !== 'WATCH' || fresh || held || near || score >= 55,
-    near,
-    live: true
-  };
-}
-
 export function sizePctOf(state) {
   if (state === 'STRONG CONFIRMED') return 80;
   if (state === 'EARLY') return 35;
@@ -708,22 +558,7 @@ export function describeWhy(tf, det, tick) {
     };
   }
 
-  if (det.live) {
-    reasons.push('Tape for ' + tfu + ' is still filling, so this label uses Dex’s last 5m / 1h / 6h windows');
-    reasons.push('Dex 5m ' + pctStr(m5) + ' · 1h ' + pctStr(h1) + ' · 6h ' + pctStr(h6) + ' · vol ' + mom.volX + 'x');
-    if (tf === '5m') {
-      if (m5 >= 4 && mom.volX >= 1.5) reasons.push('Rule hit: Dex 5m ≥ +4% and volume ≥ 1.5x usual 5m');
-      else if (m5 >= 2 && h1 > 0) reasons.push('Rule hit: Dex 5m still ≥ +2% and 1h is green — treated as held');
-      else if (det.near) reasons.push('Rule: Dex 5m is lifting but still below +4% / 1.5x — close, not broken');
-    } else if (m5 >= 3 && h1 >= 2 && mom.volX >= 1.5) {
-      reasons.push('Rule hit: Dex 5m ≥ +3%, 1h ≥ +2%, volume ≥ 1.5x');
-    } else if (h1 > 0 && h6 >= 8) {
-      reasons.push('Rule hit: 1h still green and 6h ≥ +8% — move is holding, not brand new');
-    } else if (det.near) {
-      reasons.push('Rule: Dex 5m/1h lifting but not a full live break yet — close to break');
-    }
-  } else if (TF_SEC[tf]) {
-    reasons.push('This is our ' + tfu + ' candle vs the recent high — not “Dex 5m is pumping”');
+  reasons.push('This is our ' + tfu + ' candle vs the recent high — not a Dex 5m/24h %');
     if (det.ret != null) reasons.push('This ' + tfu + ' bar ' + pctStr(det.ret) + ' from open to close');
     if (det.runup != null) reasons.push('Vs recent ' + tfu + ' high: ' + pctStr(det.runup));
     if (lvl) reasons.push('Breakout level ' + lvl + (spot ? ' · spot ' + spot : '') + (distTxt ? ' · ' + distTxt : ''));
@@ -732,10 +567,6 @@ export function describeWhy(tf, det, tick) {
     if ((m5 || 0) < 1 && det.event === 'NEW BREAKOUT') {
       reasons.push('Dex last 5m is weak (' + pctStr(m5) + ') — this fired on a range break, not a 5m pump. Treat as noisy');
     }
-  } else {
-    reasons.push('Daily/weekly read from Dex 6h/24h windows');
-    reasons.push('Dex 6h ' + pctStr(h6) + ' · 24h ' + pctStr(h24) + ' · vol ' + mom.volX + 'x');
-  }
 
   if (mom.stretched) reasons.push('Caution: already stretched (6h ' + pctStr(h6) + ' · 24h ' + pctStr(h24) + ') — often late');
   else reasons.push('Not stretched yet (6h ' + pctStr(h6) + ' · 24h ' + pctStr(h24) + ')');
@@ -749,12 +580,6 @@ export function describeWhy(tf, det, tick) {
       lvlTag +
       '. Volume building — EARLY watch, not a live break.' +
       (lvl ? ' Breaks if ' + tfu + ' closes above ' + lvl + '.' : '');
-  } else if (det.event === 'NEW BREAKOUT' && det.live) {
-    why =
-      'EARLY live read: Dex shows a fresh pop with volume on this timeframe. Not confirmed — first push only.' +
-      (lvl
-        ? ' Provisional ' + tfu + ' high ' + lvlTag + '. Exit if ' + tfu + ' closes back under ' + lvl + '.'
-        : ' No ' + tfu + ' candle high stored yet — tape still filling.');
   } else if (det.event === 'NEW BREAKOUT') {
     why =
       'LIVE: the latest ' +
@@ -776,11 +601,7 @@ export function describeWhy(tf, det, tick) {
         ' candle closes back under (' +
         lvl +
         ').'
-      : 'Still holding on Dex 1h/6h. No ' +
-        tfu +
-        ' candle high stored yet (tape filling) — use DexScreener ' +
-        tfu +
-        ' high as your exit until our tape prints a level.';
+      : 'No printed ' + tfu + ' level yet — not a hold.';
   } else if (det.state === 'STRETCHED') {
     why =
       'Already extended on higher Dex windows. High chance this is late, not an early break.' +
@@ -1049,12 +870,12 @@ export function verdictCall(hz, byTf, tick, hist) {
     };
   }
   if (live.length || held.length) {
-    const n = live.length + held.length;
     const rows = live.concat(held);
-    const lines = rows.map((h) => {
-      const tfu = String(h.tf).toUpperCase();
-      const kind = h.section === 'live' ? 'LIVE' : 'HELD';
-      if (h.levelTxt) {
+    const lines = rows
+      .map((h) => {
+        const tfu = String(h.tf).toUpperCase();
+        const kind = h.section === 'live' ? 'LIVE' : 'HELD';
+        if (!h.levelTxt) return null;
         const dist =
           h.distPct != null
             ? ' · spot ' + fmtPx(h.spot) + ' (' + pctStr(h.distPct) + ' vs level)'
@@ -1074,27 +895,18 @@ export function verdictCall(hz, byTf, tick, hist) {
           h.levelTxt +
           '.'
         );
-      }
-      const dex = tick
-        ? 'Dex 24h ' + pctStr(tick.h24) + ' · 6h ' + pctStr(tick.h6) + ' · spot ' + fmtPx(tick.price)
-        : 'Dex 24h/6h only';
-      return (
-        tfu +
-        ' ' +
-        kind +
-        ' — NO printed candle level (' +
-        dex +
-        '). Not a real 1D/1W range break. No $ invalidation on this card.'
-      );
-    });
-    return {
-      call: 'HOLD',
-      why:
-        (n >= 2 ? n + ' TFs agree. ' : '') +
-        (stretched ? 'Stretched/late. ' : '') +
-        lines.join(' '),
-      reasons: tags
-    };
+      })
+      .filter(Boolean);
+    if (lines.length) {
+      return {
+        call: 'HOLD',
+        why:
+          (lines.length >= 2 ? lines.length + ' TFs agree. ' : '') +
+          (stretched ? 'Stretched/late. ' : '') +
+          lines.join(' '),
+        reasons: tags
+      };
+    }
   }
   if (early.length) {
     return {
@@ -1695,20 +1507,7 @@ export class Engine {
         interesting: false
       }, tf, focus);
     }
-    let det;
-    if (TF_SEC[tf]) {
-      const closed = this.store.bars(row.ca, tf, 40);
-      det = detectTapeBreakout(closed, tf, tick);
-      if (det.state === 'WARMING' && (tf === '4h' || tf === '2h' || tf === '1h')) {
-        const live = detectLegacy4h(tick);
-        det = Object.assign({}, live, { bars: det.bars, need: det.need, level: det.level || 0 });
-      } else if (det.state === 'WARMING' && tf === '5m') {
-        const live = detectLive5m(tick);
-        det = Object.assign({}, live, { bars: det.bars, need: det.need, level: det.level || 0 });
-      }
-    } else {
-      det = detectTapeBreakout(this.store.bars(row.ca, tf, 40), tf, tick);
-    }
+    const det = detectTapeBreakout(this.store.bars(row.ca, tf, 40), tf, tick);
     const hit = hitFrom(row, tick, det, tf, focus);
     hit.entry = entryQuality({
       tf,
