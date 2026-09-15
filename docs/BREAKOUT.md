@@ -2,12 +2,12 @@
 
 **Read this first** before changing Breakout, Telegram, Verdict-on-breakouts, or candles.
 
-Last updated: 2026-09-14 (IST) — live card prints canonical breakout level + spot + +20% target
+Last updated: 2026-09-15 (IST) — `entryQuality()` LIVE (WATCH / WINDOW / EXTENDED / FAILED)
 
 | Status | What |
 |---|---|
-| **LIVE in code** | Everything in sections 1–11 |
-| **FROZEN, not coded yet** | Section 12 — entry-quality layer (WINDOW / EXTENDED / FAILED). Implement only after the Cloudflare worker is unblocked (after 00:00 UTC) **and** 1m/5m tape is filling |
+| **LIVE in code** | Everything in sections 1–12 |
+| **FROZEN, not coded yet** | Daily PA, 1D tape, Feed, Backtest tab |
 
 **Rule:** GitHub Pages is **display-only**. Dex polling, candles, scoring, sections, Telegram all live in the Cloudflare worker.
 
@@ -322,7 +322,7 @@ Each hit includes: `name, chain, ca, tf, section, state, event, score, why, reas
 
 ---
 
-## 12. TOMORROW — entry-quality layer (**frozen, not in code**)
+## 12. Entry-quality layer (**LIVE**)
 
 Implement **after** worker is healthy and 1m/5m have real closed bars.
 

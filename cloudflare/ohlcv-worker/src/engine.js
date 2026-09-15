@@ -731,6 +731,170 @@ export function classifySection(det) {
   return '';
 }
 
+/** Entry vs printed breakout level. Tune in one place. */
+export const ENTRY_EXT_PCT = 10;
+export const ENTRY_THIN_1M = 8;
+
+export function twoFiveMinClosesFailed(bars5m, level) {
+  if (!(+level > 0) || !bars5m || bars5m.length < 2) return false;
+  const a = bars5m[bars5m.length - 2];
+  const b = bars5m[bars5m.length - 1];
+  return +a.c < +level && +b.c < +level;
+}
+
+/**
+ * Is this already-detected breakout enterable NOW?
+ * Does not detect breakouts. Paint: WATCH | WINDOW | EXTENDED | FAILED (or '').
+ */
+export function entryQuality(args) {
+  const tf = String((args && args.tf) || '').toLowerCase();
+  const level = +((args && args.level) || 0);
+  const tick = (args && args.tick) || {};
+  const bars1m = (args && args.bars1m) || [];
+  const bars5m = (args && args.bars5m) || [];
+  const bars15m = (args && args.bars15m) || [];
+  const open5m = (args && args.open5m) || null;
+  const section = (args && args.section) || '';
+  const event = (args && args.event) || '';
+  const volX = +(args && args.volX);
+  const buyR = +(args && args.buyR);
+  const spot = +tick.price || 0;
+  const tape = {
+    pollSec: 60,
+    bars1m: bars1m.length,
+    bars5m: bars5m.length,
+    bars15m: bars15m.length,
+    thin: bars1m.length < ENTRY_THIN_1M
+  };
+  const broke =
+    section === 'live' ||
+    section === 'matured' ||
+    event === 'NEW BREAKOUT' ||
+    event === 'BREAKOUT HELD';
+  if (!broke) return { state: '', paint: '', why: '', tape, internal: '' };
+
+  if ((tf === '1d' || tf === '1w') && !(level > 0)) {
+    return {
+      state: 'n/a',
+      paint: '',
+      why: '1D/1W has no printed candle level — ENTRY not computed.',
+      tape,
+      internal: ''
+    };
+  }
+
+  if (!(level > 0) || !(spot > 0)) {
+    return {
+      state: 'watch',
+      paint: 'WATCH',
+      why: 'WATCH: break exists but no printed level/spot yet. Not a sell.',
+      tape,
+      internal: ''
+    };
+  }
+
+  if (twoFiveMinClosesFailed(bars5m, level)) {
+    return {
+      state: 'failed',
+      paint: 'FAILED',
+      why:
+        'FAILED: two consecutive 5m closes under ' +
+        fmtPx(level) +
+        '. A 1m wick is not this.',
+      tape,
+      internal: ''
+    };
+  }
+
+  if (spot >= level * (1 + ENTRY_EXT_PCT / 100)) {
+    const dist = ((spot - level) / level) * 100;
+    return {
+      state: 'extended',
+      paint: 'EXTENDED',
+      why:
+        'EXTENDED: spot ' +
+        fmtPx(spot) +
+        ' is +' +
+        dist.toFixed(1) +
+        '% vs level ' +
+        fmtPx(level) +
+        ' (≥' +
+        ENTRY_EXT_PCT +
+        '%). Break still valid — do not chase.',
+      tape,
+      internal: ''
+    };
+  }
+
+  if (tape.thin) {
+    return {
+      state: 'watch',
+      paint: 'WATCH',
+      why:
+        'WATCH: 1m tape thin (' +
+        tape.bars1m +
+        ' < ' +
+        ENTRY_THIN_1M +
+        ' bars at 60s poll). Not enough evidence for WINDOW.',
+      tape,
+      internal: ''
+    };
+  }
+
+  const last6 = bars1m.slice(-6);
+  const last3 = bars1m.slice(-3);
+  const closesAbove = last6.filter((b) => +b.c >= level * 0.995).length;
+  const green = last6.filter((b) => +b.c >= +b.o).length;
+  const last = last6[last6.length - 1];
+  const hold = !!(last && +last.c >= level * 0.995);
+  const retesting = !!(open5m && +open5m.l < level && +open5m.c >= level);
+  const formingOk = !open5m || +open5m.c >= level * 0.995 || retesting;
+  const m5 = +tick.m5 || 0;
+  const volAccept = volX >= 0.7 || buyR >= 1 || m5 >= 0.2;
+  const continuation =
+    last3.length >= 3 &&
+    last3.every((b) => +b.c >= level * 0.995) &&
+    last3.filter((b) => +b.c >= +b.o).length >= 2;
+  const notSingle = green >= 2 || closesAbove >= 3;
+  const accepting = hold && last6.length <= 3 && green <= 1;
+
+  if (hold && formingOk && volAccept && notSingle && (continuation || closesAbove >= 3 || retesting)) {
+    return {
+      state: 'window',
+      paint: 'WINDOW',
+      why:
+        'WINDOW: holding ' +
+        fmtPx(level) +
+        ' · 1m closes above ' +
+        closesAbove +
+        '/' +
+        last6.length +
+        ' · vol ' +
+        (Number.isFinite(volX) ? volX : '—') +
+        'x. Consider entry. Not a guarantee.',
+      tape,
+      internal: retesting ? 'retesting' : accepting ? 'accepting' : ''
+    };
+  }
+
+  return {
+    state: 'watch',
+    paint: 'WATCH',
+    why:
+      'WATCH: near ' +
+      fmtPx(level) +
+      ' but not enough 1m/5m proof (closes above ' +
+      closesAbove +
+      '/' +
+      last6.length +
+      ', green ' +
+      green +
+      '). Not a sell.',
+    tape,
+    internal: accepting ? 'accepting' : retesting ? 'retesting' : ''
+  };
+}
+
 export function maturedKey(h) {
   return (
     String(h.chain || 'solana').toLowerCase() +
@@ -1351,6 +1515,76 @@ export class Engine {
     return true;
   }
 
+  async maybeEntryAlert(hit) {
+    const e = hit && hit.entry;
+    if (!e || (e.paint !== 'WINDOW' && e.paint !== 'EXTENDED' && e.paint !== 'FAILED')) return false;
+    const tf = hit.tf;
+    const key = String(hit.ca || '').toLowerCase() + '|' + String(tf || '').toLowerCase() + '|entry|' + e.state;
+    if (this.store.getAlert(key)) return false;
+    const now = Date.now();
+    const icon = e.paint === 'WINDOW' ? '🟢' : e.paint === 'EXTENDED' ? '🟡' : '🔴';
+    const tfu = String(tf).toUpperCase();
+    const title = icon + ' ENTRY ' + e.paint + ' · ' + hit.name + ' (' + tfu + ')';
+    const msg = [
+      hit.name + ' · BREAKOUT: ' + tfu + ' ' + (hit.section || hit.state || ''),
+      'ENTRY: ' + e.paint,
+      '',
+      e.why || '',
+      e.internal ? 'Note: ' + e.internal : '',
+      '',
+      hit.levelTxt
+        ? 'Level (' + tfu + '): ' + hit.levelTxt + (hit.spot ? ' · spot ' + fmtPx(hit.spot) : '')
+        : 'Level: not stored',
+      e.tape && e.tape.thin ? '1m tape thin (' + e.tape.bars1m + ' bars @ 60s)' : '',
+      'CA: ' + hit.ca,
+      'https://sasikar.github.io/Trading/index.html?tab=breakouts'
+    ]
+      .filter(Boolean)
+      .join('\n');
+    let via = '';
+    const token = this.telegramToken();
+    if (token) {
+      try {
+        let chat = this.telegramChatId();
+        if (!chat) chat = await this.resolveTelegramChat();
+        if (!chat) throw new Error('Open t.me/' + this.telegramWantedUsername() + ' and tap Start, then send hi');
+        await sendTelegram(token, chat, title + '\n' + msg);
+        this.telegramErr = '';
+        this.store.setMeta('telegram_err', '');
+        via = 'telegram';
+      } catch (err) {
+        this.markTelegramFail(err);
+        const m = String(err && err.message ? err.message : err);
+        if (/tap Start|not stored|no telegram token/i.test(m)) return false;
+      }
+    }
+    if (!via && !this.ntfyPaused()) {
+      try {
+        await sendNtfy(this.topic(), title, msg);
+        this.ntfyErr = '';
+        this.store.setMeta('ntfy_err', '');
+        via = 'ntfy';
+      } catch (err) {
+        this.markNtfyFail(err);
+      }
+    }
+    if (!via) return false;
+    this.store.setAlert(key, now);
+    this.store.setMeta(
+      'last_entry_alert',
+      JSON.stringify({
+        name: hit.name,
+        ca: hit.ca,
+        tf,
+        entry: e.paint,
+        why: e.why || '',
+        via,
+        at: new Date(now).toISOString()
+      })
+    );
+    return true;
+  }
+
   evaluateRow(row, tf, focus) {
     const tick = this.store.getTick(row.ca);
     if (!tick) {
@@ -1380,7 +1614,49 @@ export class Engine {
     } else {
       det = detectDexTf(tick, tf);
     }
-    return hitFrom(row, tick, det, tf, focus);
+    const hit = hitFrom(row, tick, det, tf, focus);
+    hit.entry = entryQuality({
+      tf,
+      level: hit.level,
+      event: hit.event,
+      section: hit.section,
+      tick,
+      bars1m: this.store.bars(row.ca, '1m', 12),
+      bars5m: this.store.bars(row.ca, '5m', 8),
+      bars15m: this.store.bars(row.ca, '15m', 6),
+      open1m: this.store.openBar(row.ca, '1m'),
+      open5m: this.store.openBar(row.ca, '5m'),
+      volX: hit.volX,
+      buyR: hit.buyR
+    });
+    this.persistEntry(hit);
+    return hit;
+  }
+
+  persistEntry(hit) {
+    const e = hit && hit.entry;
+    if (!e || !e.state || e.state === 'n/a') return;
+    const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
+    let map = {};
+    try {
+      map = JSON.parse(this.store.getMeta('entry_state') || '{}') || {};
+    } catch (err) {
+      map = {};
+    }
+    const prev = map[k];
+    const lvl = +hit.level || 0;
+    const newEpisode =
+      !!prev &&
+      ((prev.level > 0 && lvl > 0 && Math.abs(lvl - prev.level) / prev.level > 0.01) ||
+        (hit.fresh && hit.event === 'NEW BREAKOUT' && prev.state === 'failed'));
+    if (newEpisode) {
+      for (const s of ['window', 'extended', 'failed']) {
+        this.store.setAlert(k + '|entry|' + s, 0);
+      }
+    }
+    if (prev && prev.state === e.state && !newEpisode) return;
+    map[k] = { state: e.state, at: Date.now(), level: lvl };
+    this.store.setMeta('entry_state', JSON.stringify(map));
   }
 
   snapshot(tf) {
@@ -1934,6 +2210,7 @@ export class Engine {
         for (const tf of tfsToCheck) {
           const hit = this.evaluateRow(row, tf, focus);
           if (await this.maybeAlert(hit, tf)) nAlert++;
+          if (await this.maybeEntryAlert(hit)) nAlert++;
         }
       }
       if (scanned > 0) {

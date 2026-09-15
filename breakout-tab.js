@@ -196,6 +196,32 @@
                 tfu +
                 ' high as exit until we print a level.</div>'
               : '') +
+          (h.entry && h.entry.paint
+            ? '<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:#121a24;border:1px solid #2a3a4c">' +
+              '<div style="font-size:10px;letter-spacing:.08em;font-weight:800;color:#8491a1">ENTRY · NOT A BUY BUTTON</div>' +
+              '<div style="margin-top:4px;font-size:16px;font-weight:900;color:' +
+              (h.entry.paint === 'WINDOW'
+                ? '#62e3a0'
+                : h.entry.paint === 'EXTENDED'
+                  ? '#e6c878'
+                  : h.entry.paint === 'FAILED'
+                    ? '#ff6f7c'
+                    : '#8491a1') +
+              '">ENTRY: ' +
+              h.entry.paint +
+              '</div>' +
+              (h.entry.why
+                ? '<div style="margin-top:4px;font-size:12px;color:#c5d0dc;line-height:1.45">' + h.entry.why + '</div>'
+                : '') +
+              (h.entry.tape && h.entry.tape.thin
+                ? '<div style="margin-top:4px;font-size:11px;color:#8491a1">1m tape thin (' +
+                  h.entry.tape.bars1m +
+                  ' bars @ ' +
+                  (h.entry.tape.pollSec || 60) +
+                  's)</div>'
+                : '') +
+              '</div>'
+            : '') +
           (h.why
             ? '<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:#121a24;border:1px solid #243041">' +
               '<div style="font-size:10px;letter-spacing:.06em;font-weight:800;color:#8491a1">WHY THIS LABEL</div>' +
