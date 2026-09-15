@@ -134,7 +134,8 @@
         ? ' <span title="You verified the chain scanners" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
         : '') +
       (h.boosted ? ' <span style="font-size:10px;color:#f0a060;font-weight:800">PAID BOOST</span>' : '') +
-      (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">SAVED</span>' : '') +
+      (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">HUNTER WATCH</span>' : '') +
+      (h.onBreakout ? ' <span style="font-size:10px;color:#8491a1;font-weight:800">SAVED CA</span>' : '') +
       '</div>' +
       '<div style="display:flex;gap:6px;align-items:center">' +
       tools.map(function (t) {
@@ -160,7 +161,7 @@
       '<button type="button" class="hu-save" data-hu-ca="' +
       esc(h.ca) +
       '" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:700;font-size:11px;cursor:pointer">' +
-      (h.saved ? 'On watchlist' : 'Save to Breakout') +
+      (h.saved ? 'Unwatch' : 'Hunter watch') +
       '</button>' +
       (links.dex
         ? '<a href="' +
@@ -174,6 +175,16 @@
       '" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;font-size:11px;text-decoration:none">Full scanner</a>' +
       '</div></div>'
     );
+  }
+
+  function renderWatch(list) {
+    const rows = list || [];
+    if (!rows.length) {
+      return (
+        '<div style="padding:10px 12px;border-radius:10px;border:1px dashed #243041;color:#8491a1;font-size:12px">Nothing on Hunter watch. This list is not your saved CAs and does not run in Breakout.</div>'
+      );
+    }
+    return rows.map(renderCard).join('');
   }
 
   function renderHits(hits) {
@@ -267,14 +278,23 @@
     try {
       const j = await api('/hunter');
       const hits = j.hits || [];
+      const watched = j.watch || [];
       if (stEl)
         stEl.textContent =
           hits.length +
-          ' names · last scan ' +
+          ' names · ' +
+          watched.length +
+          ' hunter-watch · last scan ' +
           fmtAgo(+j.scannedAt) +
           (j.error ? ' · ' + j.error : '') +
           ' · no phone pings from this tab';
-      if (list) list.innerHTML = renderHits(hits);
+      if (list)
+        list.innerHTML =
+          '<div style="font-size:13px;font-weight:900;color:#e8eef6">Hunter watch</div>' +
+          '<div style="font-size:11px;color:#8491a1;margin-top:-4px">Separate from CA recents. No breakout engine, no 1m tape, no alerts.</div>' +
+          renderWatch(watched) +
+          '<div style="height:8px"></div>' +
+          renderHits(hits);
       bind();
     } catch (e) {
       if (stEl) stEl.textContent = String(e.message || e);

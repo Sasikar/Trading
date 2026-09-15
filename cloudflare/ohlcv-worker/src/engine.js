@@ -2262,21 +2262,7 @@ export class Engine {
 
   async refreshWatch() {
     const rows = await fetchWatchlist(this.watchUrl());
-    let extra = [];
-    try {
-      extra = JSON.parse(this.store.getMeta('watch_extra') || '[]');
-    } catch (e) {}
-    const seen = new Set(rows.map((r) => r.ca.toLowerCase()));
-    for (const e of extra) {
-      if (!e || !e.ca || seen.has(String(e.ca).toLowerCase())) continue;
-      rows.push({
-        chain: e.chain || 'solana',
-        ca: e.ca,
-        name: e.name || '',
-        poolAddress: e.poolAddress || ''
-      });
-      seen.add(String(e.ca).toLowerCase());
-    }
+    this.migrateHunterWatch();
     this.store.setWatch(rows);
     return rows;
   }
@@ -2287,6 +2273,40 @@ export class Engine {
     } catch (e) {
       return [];
     }
+  }
+  hunterWatch() {
+    try {
+      return JSON.parse(this.store.getMeta('hunter_watch') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+  migrateHunterWatch() {
+    let extra = [];
+    try {
+      extra = JSON.parse(this.store.getMeta('watch_extra') || '[]');
+    } catch (e) {
+      extra = [];
+    }
+    if (!extra.length) return this.hunterWatch();
+    const hw = this.hunterWatch();
+    const seen = new Set(hw.map((x) => String(x.ca || '').toLowerCase()));
+    for (const e of extra) {
+      const k = String(e && e.ca ? e.ca : '').toLowerCase();
+      if (!k || seen.has(k)) continue;
+      hw.push({
+        ca: e.ca,
+        chain: e.chain || 'solana',
+        name: e.name || '',
+        pairAddress: e.poolAddress || e.pairAddress || '',
+        at: Date.now(),
+        src: 'migrated'
+      });
+      seen.add(k);
+    }
+    this.store.setMeta('hunter_watch', JSON.stringify(hw));
+    this.store.setMeta('watch_extra', '[]');
+    return hw;
   }
   hunterVerifiedMap() {
     try {
@@ -2307,32 +2327,38 @@ export class Engine {
     return { ca: k, verified: m[k] };
   }
   saveHunterCa(ca) {
+    const k = String(ca || '').toLowerCase();
+    if (!k) throw new Error('no ca');
     const hits = this.hunterHits();
-    const h = hits.find((x) => String(x.ca).toLowerCase() === String(ca || '').toLowerCase());
+    let hw = this.migrateHunterWatch();
+    const idx = hw.findIndex((x) => String(x.ca).toLowerCase() === k);
+    if (idx >= 0) {
+      hw.splice(idx, 1);
+      this.store.setMeta('hunter_watch', JSON.stringify(hw));
+      return { ok: true, ca: k, saved: false, n: hw.length };
+    }
+    const h = hits.find((x) => String(x.ca).toLowerCase() === k);
     if (!h) throw new Error('not on hunter list');
-    let extra = [];
-    try {
-      extra = JSON.parse(this.store.getMeta('watch_extra') || '[]');
-    } catch (e) {}
-    if (!extra.some((e) => String(e.ca).toLowerCase() === h.ca.toLowerCase())) {
-      extra.push({ ca: h.ca, chain: h.chain || 'solana', name: h.name, poolAddress: h.pairAddress || '' });
-      this.store.setMeta('watch_extra', JSON.stringify(extra));
-    }
-    const rows = this.store.getWatch();
-    if (!rows.some((r) => r.ca.toLowerCase() === h.ca.toLowerCase())) {
-      rows.push({
-        ca: h.ca,
-        chain: h.chain || 'solana',
-        name: h.name || h.ca.slice(0, 8),
-        poolAddress: h.pairAddress || ''
-      });
-      this.store.setWatch(rows);
-    }
-    return { ok: true, ca: h.ca, name: h.name };
+    hw.push({
+      ca: h.ca,
+      chain: h.chain || 'solana',
+      name: h.name || h.ca.slice(0, 8),
+      pairAddress: h.pairAddress || '',
+      dexUrl: h.dexUrl || '',
+      liq: h.liq,
+      mcap: h.mcap,
+      m5: h.m5,
+      h1: h.h1,
+      band: h.band,
+      at: Date.now()
+    });
+    this.store.setMeta('hunter_watch', JSON.stringify(hw));
+    return { ok: true, ca: h.ca, name: h.name, saved: true, n: hw.length };
   }
   decorateHunter(hits) {
     const vmap = this.hunterVerifiedMap();
-    const watch = new Set(this.store.getWatch().map((w) => w.ca.toLowerCase()));
+    const watching = new Set(this.migrateHunterWatch().map((w) => String(w.ca).toLowerCase()));
+    const breakout = new Set((this.store.getWatch() || []).map((w) => String(w.ca).toLowerCase()));
     return (hits || []).map((h) => {
       const v = vmap[String(h.ca).toLowerCase()] || {};
       const links = hunterLinks(h.ca, h.chain);
@@ -2347,7 +2373,8 @@ export class Engine {
           tokensniffer: !!v.tokensniffer,
           dex: !!v.dex
         },
-        saved: watch.has(String(h.ca).toLowerCase()),
+        saved: watching.has(String(h.ca).toLowerCase()),
+        onBreakout: breakout.has(String(h.ca).toLowerCase()),
         links
       });
     });
@@ -2662,6 +2689,7 @@ export async function handleApi(engine, request) {
           ok: true,
           ...out,
           hits: engine.decorateHunter(engine.hunterHits()),
+          watch: engine.decorateHunter(engine.hunterWatch()),
           scannedAt: engine.store.getMeta('hunter_at') || null,
           error: engine.store.getMeta('hunter_err') || ''
         });
@@ -2671,6 +2699,7 @@ export async function handleApi(engine, request) {
     }
     return json({
       hits: engine.decorateHunter(engine.hunterHits()),
+      watch: engine.decorateHunter(engine.hunterWatch()),
       scannedAt: engine.store.getMeta('hunter_at') || null,
       discoveredAt: engine.store.getMeta('hunter_discover') || null,
       error: engine.store.getMeta('hunter_err') || '',
