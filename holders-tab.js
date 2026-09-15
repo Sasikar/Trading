@@ -150,6 +150,24 @@
   function showHolders(on) {
     const p = $('holders-panel');
     if (on) {
+      try {
+        window.showBreakoutMemes(false);
+      } catch (e) {}
+      try {
+        window.showHunter(false);
+      } catch (e) {}
+      try {
+        window.showVerdict(false);
+      } catch (e) {}
+      ['tf-panels', 'trend-panel', 'struct-panel', 'macro-panel', 'signal-panel', 'memegate-panel', 'coin-panel', 'antifomo-panel', 'hunter-panel', 'breakouts-panel', 'verdict-panel'].forEach(
+        function (id) {
+          const el = $(id);
+          if (!el) return;
+          el.style.display = 'none';
+          el.classList.remove('on');
+          if (id === 'tf-panels') el.classList.add('hidden');
+        }
+      );
       if (p) {
         p.style.display = 'block';
         p.classList.add('on');
@@ -157,6 +175,8 @@
       load(false);
       if (timer) clearInterval(timer);
       timer = setInterval(function () {
+        const onp = $('holders-panel');
+        if (!onp || onp.style.display === 'none') return;
         load(false);
       }, 60000);
     } else {
