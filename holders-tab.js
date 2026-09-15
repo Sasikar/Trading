@@ -70,164 +70,13 @@
       '</div></div>'
     );
   }
-  const MIX_ORDER = [
-    { id: 'whale', icon: '🐋', band: '$1M+', color: '#3ee6a0' },
-    { id: 'shark', icon: '🦈', band: '$100k–$1M', color: '#5b9cff' },
-    { id: 'dolphin', icon: '🐬', band: '$10k–$100k', color: '#a78bfa' },
-    { id: 'fish', icon: '🐟', band: '$1k–$10k', color: '#f0b429' },
-    { id: 'crab', icon: '🦀', band: '$100–$1k', color: '#ff7a8a' },
-    { id: 'shrimp', icon: '🦐', band: '<$100', color: '#8491a1' }
-  ];
-  function mixColor(id) {
-    for (let i = 0; i < MIX_ORDER.length; i++) if (MIX_ORDER[i].id === id) return MIX_ORDER[i].color;
-    return '#8491a1';
-  }
-  function distChartRows(tiers, restPct) {
-    const by = {};
-    (tiers || []).forEach(function (t) {
-      if (t && t.id) by[t.id] = t;
-    });
-    const rows = [];
-    MIX_ORDER.forEach(function (o) {
-      const t = by[o.id];
-      if (!t || !(+t.n > 0) || !(+t.pct > 0)) return;
-      rows.push({
-        id: o.id,
-        icon: t.icon || o.icon,
-        band: o.band,
-        color: o.color,
-        n: +t.n,
-        pct: +t.pct
-      });
-    });
-    if (restPct != null && +restPct > 0.4) {
-      rows.push({
-        id: 'rest',
-        icon: '',
-        band: 'rest',
-        color: '#3a4654',
-        n: null,
-        pct: +restPct
-      });
-    }
-    return rows;
-  }
-  function donutStyle(slices) {
-    let acc = 0;
-    const stops = [];
-    slices.forEach(function (s) {
-      const p = Math.max(0, +s.pct || 0);
-      if (p <= 0) return;
-      const from = acc;
-      acc = Math.min(100, acc + p);
-      stops.push(s.color + ' ' + from.toFixed(2) + '% ' + acc.toFixed(2) + '%');
-    });
-    if (acc < 99.5) stops.push('#1b2430 ' + acc.toFixed(2) + '% 100%');
-    if (!stops.length) stops.push('#1b2430 0 100%');
-    return 'conic-gradient(' + stops.join(',') + ')';
-  }
-  function mixRow(h) {
-    const m = h.mix;
-    if (!m || (!(m.tiers && m.tiers.length) && m.top10Pct == null)) return '';
-    const by = {};
-    (m.tiers || []).forEach(function (t) {
-      if (t && t.id) by[t.id] = t;
-    });
-    const mixRows = [];
-    MIX_ORDER.forEach(function (o) {
-      const t = by[o.id];
-      if (!t || !(+t.n > 0)) return;
-      mixRows.push({
-        id: o.id,
-        icon: t.icon || o.icon,
-        band: o.band,
-        color: o.color,
-        n: +t.n,
-        pct: +t.pct || 0
-      });
-    });
-    const rest = m.restPct != null && +m.restPct > 0.4 ? +m.restPct : 0;
-    const slices = mixRows.map(function (r) {
-      return { color: r.color, pct: r.pct };
-    });
-    if (rest) slices.push({ color: '#2a3544', pct: rest });
-    const top = m.top10Pct != null && Number.isFinite(+m.top10Pct) ? +m.top10Pct : h.topHoldPct;
-    const mixHtml = mixRows
-      .map(function (r) {
-        return (
-          '<div class="hd-mix-row">' +
-          '<span class="ico">' +
-          esc(r.icon) +
-          '</span><span class="lab">' +
-          esc(r.band) +
-          '</span><span class="pct">' +
-          r.pct.toFixed(1) +
-          '%</span><span class="n">' +
-          esc(String(r.n)) +
-          '</span></div>'
-        );
-      })
-      .join('');
-    const restHtml = rest
-      ? '<div class="hd-mix-row hd-mix-rest"><span class="lab">rest</span><span class="pct">' +
-        rest.toFixed(1) +
-        '%</span></div>'
-      : '';
-    const depth = distChartRows(m.tiers, rest);
-    const bars = depth
-      .map(function (d) {
-        const w = Math.max(0, Math.min(100, +d.pct || 0));
-        const nStr = d.n == null ? '' : String(d.n);
-        return (
-          '<div class="hd-bar">' +
-          '<div class="hd-bar-meta">' +
-          '<span class="ico">' +
-          esc(d.icon || '') +
-          '</span><span class="lab">' +
-          esc(d.band) +
-          '</span><span class="n">' +
-          esc(nStr) +
-          '</span><span class="pct">' +
-          (+d.pct || 0).toFixed(1) +
-          '%</span></div>' +
-          '<div class="hd-bar-track"><div class="hd-bar-fill" style="width:' +
-          w.toFixed(1) +
-          '%;background:' +
-          d.color +
-          '"></div></div></div>'
-        );
-      })
-      .join('');
-    return (
-      '<div class="hd-split">' +
-      '<div class="hd-pane">' +
-      '<div class="hd-pane-lab">Mix · largest 20</div>' +
-      '<div class="hd-donut-wrap">' +
-      '<div class="hd-donut" style="background:' +
-      donutStyle(slices) +
-      '">' +
-      '<div class="hd-donut-hole">' +
-      (top != null && Number.isFinite(+top)
-        ? '<b>' + Number(top).toFixed(0) + '%</b><span>Top10</span>'
-        : '') +
-      '</div></div></div>' +
-      '<div class="hd-mix-list">' +
-      mixHtml +
-      restHtml +
-      '</div></div>' +
-      '<div class="hd-pane">' +
-      '<div class="hd-pane-lab">Distribution · largest 20</div>' +
-      '<div class="hd-bars">' +
-      bars +
-      '</div></div></div>'
-    );
-  }
   function renderCard(h) {
     const caShort = h.ca && h.ca.length > 12 ? h.ca.slice(0, 6) + '…' + h.ca.slice(-4) : h.ca || '';
     const four = h.ready4h
       ? cell('4H', h.net4h, h.pct4h, true)
       : cell('4H / 6H', h.net6h, h.pct6h, h.net6h != null, '6h Jupiter · 4h tape filling');
     const analytics = h.solscanAnalytics || (h.ca ? 'https://solscan.io/token/' + h.ca + '#analytics' : '');
+    const holders = h.solscan || (h.ca ? 'https://solscan.io/token/' + h.ca + '#holders' : '');
     return (
       '<div class="hd-card">' +
       '<div class="hd-top">' +
@@ -249,20 +98,22 @@
         ? cell('1M', h.net1M, h.pct1M, true)
         : cell('1M', null, null, false, 'need ~30d of our snaps')) +
       '</div>' +
-      mixRow(h) +
+      '<div class="hd-solscan">' +
+      (analytics
+        ? '<a class="hd-solscan-btn" href="' +
+          esc(analytics) +
+          '" target="_blank" rel="noopener">Solscan analytics</a>'
+        : '') +
+      (holders
+        ? '<a class="hd-solscan-link" href="' +
+          esc(holders) +
+          '" target="_blank" rel="noopener">Holders list</a>'
+        : '') +
+      '</div>' +
       '<div class="hd-foot">' +
       esc(caShort) +
+      (h.topHoldPct != null ? ' · top wallets ' + Number(h.topHoldPct).toFixed(1) + '%' : '') +
       (h.error ? ' · ' + esc(h.error) : '') +
-      (h.solscan
-        ? ' · <a href="' +
-          esc(h.solscan) +
-          '" target="_blank" rel="noopener">Solscan holders</a>'
-        : '') +
-      (analytics
-        ? ' · <a href="' +
-          esc(analytics) +
-          '" target="_blank" rel="noopener">analytics</a>'
-        : '') +
       '</div></div>'
     );
   }
