@@ -75,8 +75,12 @@
     const four = h.ready4h
       ? cell('4H', h.net4h, h.pct4h, true)
       : cell('4H / 6H', h.net6h, h.pct6h, h.net6h != null, '6h Jupiter · 4h tape filling');
-    const analytics = h.solscanAnalytics || (h.ca ? 'https://solscan.io/token/' + h.ca + '#analytics' : '');
-    const holders = h.solscan || (h.ca ? 'https://solscan.io/token/' + h.ca + '#holders' : '');
+    const ca = h.ca || '';
+    const dex =
+      h.solscanDex ||
+      (ca ? 'https://solscan.io/token/' + ca + '?tab=analytics#analytics' : '');
+    const holders =
+      h.solscan || (ca ? 'https://solscan.io/token/' + ca + '?tab=holders#holders' : '');
     return (
       '<div class="hd-card">' +
       '<div class="hd-top">' +
@@ -98,16 +102,16 @@
         ? cell('1M', h.net1M, h.pct1M, true)
         : cell('1M', null, null, false, 'need ~30d of our snaps')) +
       '</div>' +
-      '<div class="hd-solscan">' +
-      (analytics
-        ? '<a class="hd-solscan-btn" href="' +
-          esc(analytics) +
-          '" target="_blank" rel="noopener">Solscan analytics</a>'
+      '<div class="hd-split">' +
+      (dex
+        ? '<a class="hd-pane hd-pane-dex" href="' +
+          esc(dex) +
+          '" target="_blank" rel="noopener"><span class="hd-pane-kicker">Solscan</span><span class="hd-pane-title">Dex trading</span><span class="hd-pane-sub">Analytics · buy/sell volume</span></a>'
         : '') +
       (holders
-        ? '<a class="hd-solscan-link" href="' +
+        ? '<a class="hd-pane hd-pane-hold" href="' +
           esc(holders) +
-          '" target="_blank" rel="noopener">Holders list</a>'
+          '" target="_blank" rel="noopener"><span class="hd-pane-kicker">Solscan</span><span class="hd-pane-title">Holders</span><span class="hd-pane-sub">Wallet list · % supply</span></a>'
         : '') +
       '</div>' +
       '<div class="hd-foot">' +
