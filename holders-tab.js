@@ -91,7 +91,10 @@
       cell('1D', h.net24h, h.pct24h, true) +
       (h.ready1w
         ? cell('1W', h.net1w, h.pct1w, true)
-        : cell('1W', null, null, false, 'need ~7d snapshots')) +
+        : cell('1W', null, null, false, 'need ~7d of our snaps')) +
+      (h.ready1M
+        ? cell('1M', h.net1M, h.pct1M, true)
+        : cell('1M', null, null, false, 'need ~30d of our snaps')) +
       '</div>' +
       '<div class="hd-foot">' +
       (h.topHoldPct != null ? 'Top wallets ' + Number(h.topHoldPct).toFixed(1) + '% · ' : '') +

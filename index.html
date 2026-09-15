@@ -255,7 +255,7 @@
 .hd-name img{width:16px;height:16px;border-radius:50%;background:#121a24}
 .hd-count{font-weight:900;font-size:18px;color:#e8eef6}
 .hd-count span{font-size:11px;color:#8491a1;font-weight:700;margin-left:4px}
-.hd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.hd-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
 @media(max-width:640px){.hd-grid{grid-template-columns:1fr 1fr}}
 .hd-cell{background:#080d13;border:1px solid #ffffff0a;border-radius:10px;padding:8px}
 .hd-cell .lab{font-size:10px;font-weight:800;color:#8491a1;letter-spacing:.06em}
@@ -725,7 +725,7 @@
 <div id="holders-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Holders</h2><p>SOL memes · 1h / 4h / 1d / 1w holder change · ETH skipped</p></div>
+    <div><h2>Holders</h2><p>SOL memes · 1h / 4h / 1d / 1w / 1M · ETH skipped</p></div>
     <span class="source" id="hd-source">JUPITER</span>
   </div>
   <div class="card">
@@ -733,7 +733,7 @@
       <button type="button" onclick="try{window.refreshHoldersTab&&window.refreshHoldersTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
       <span id="hd-status" style="font-size:12px;color:#8491a1">Open this tab to load</span>
     </div>
-    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">1H and 1D (and 6H while 4H fills) come from Jupiter’s holder feed. 4H and 1W use our own snapshots every ~30 min. Solscan is the holders list link — their growth API is paid, so we don’t fake it.</div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">1H and 1D come from Jupiter. 4H / 1W / 1M we build ourselves by saving holder counts (30 min at first, then daily). Those longer windows stay “warming” until we have enough days. Solscan is the holders-list link — their growth API is paid.</div>
     <div id="hd-list" style="display:flex;flex-direction:column;gap:8px">
       <div style="font-size:12px;color:#8491a1">Open Holders to load SOL coins.</div>
     </div>
@@ -850,7 +850,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="overview-app.js?v=20260915-hd1"></script>
 <script src="breakout-tab.js?v=20260915-eq3"></script>
 <script src="hunter-tab.js?v=20260915-h5"></script>
-<script src="holders-tab.js?v=20260915-h2"></script>
+<script src="holders-tab.js?v=20260915-h3"></script>
 <script src="verdict-tab.js?v=20260915-v5"></script>
 <script src="site-nav.js?v=20260914-ui1"></script>
 </body></html>

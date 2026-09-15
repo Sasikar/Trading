@@ -335,6 +335,35 @@ export function holderDeltaFromSnaps(snaps, now, windowMs, nowN) {
   return { net, pct, ready: true, from: +best.t };
 }
 
+/** Keep 30m samples for 48h, 6h samples to 10d, daily to 35d. */
+export function compactHolderSnaps(snaps, now) {
+  const cut = now - 35 * 86400e3;
+  const rows = (snaps || []).filter((s) => s && +s.t >= cut && +s.n > 0).sort((a, b) => +a.t - +b.t);
+  const out = [];
+  const seenDay = new Set();
+  const seen6h = new Set();
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const s = rows[i];
+    const age = now - +s.t;
+    if (age <= 48 * 3600e3) {
+      out.push(s);
+      continue;
+    }
+    if (age <= 10 * 86400e3) {
+      const k = Math.floor(+s.t / (6 * 3600e3));
+      if (seen6h.has(k)) continue;
+      seen6h.add(k);
+      out.push(s);
+      continue;
+    }
+    const day = Math.floor(+s.t / 86400e3);
+    if (seenDay.has(day)) continue;
+    seenDay.add(day);
+    out.push(s);
+  }
+  return out.sort((a, b) => +a.t - +b.t);
+}
+
 export function hunterPass(tick, pair, now) {
   const band = hunterBand(tick.liq);
   if (!band) return false;
@@ -1598,10 +1627,10 @@ export class Engine {
         if (!lastSnap || now - +lastSnap.t >= 30 * 60e3) {
           snaps.push({ t: now, n });
         }
-        const cut = now - 8 * 86400e3;
-        snaps = snaps.filter((s) => s && +s.t >= cut).slice(-220);
+        snaps = compactHolderSnaps(snaps, now);
         const d4 = holderDeltaFromSnaps(snaps, now, 4 * 3600e3, n);
         const d7 = holderDeltaFromSnaps(snaps, now, 7 * 86400e3, n);
+        const d30 = holderDeltaFromSnaps(snaps, now, 30 * 86400e3, n);
         map[ca] = {
           ca,
           name: tok.symbol || row.name,
@@ -1619,6 +1648,9 @@ export class Engine {
           pct1w: d7.pct,
           net1w: d7.net,
           ready1w: !!d7.ready,
+          pct1M: d30.pct,
+          net1M: d30.net,
+          ready1M: !!d30.ready,
           topHoldPct: tok.audit && tok.audit.topHoldersPercentage,
           mcap: tok.mcap,
           solscan: 'https://solscan.io/token/' + row.ca + '#holders',
@@ -1669,6 +1701,9 @@ export class Engine {
           pct1w: h.pct1w,
           net1w: h.net1w,
           ready1w: !!h.ready1w,
+          pct1M: h.pct1M,
+          net1M: h.net1M,
+          ready1M: !!h.ready1M,
           topHoldPct: h.topHoldPct,
           mcap: h.mcap,
           solscan: h.solscan || 'https://solscan.io/token/' + r.ca + '#holders',
@@ -1681,7 +1716,7 @@ export class Engine {
       cards,
       scannedAt: +this.store.getMeta('holders_at') || 0,
       ethSkipped: ethN,
-      source: 'Jupiter holderCount (1h/6h/24h). 4h and 1w from our snapshots. Solscan list is the link, not the feed — Solscan growth API is paid.'
+      source: 'Jupiter 1h/6h/24h. 4h / 1w / 1M from our holder snapshots (35d). Solscan is the list link, not the growth feed.'
     };
   }
 
