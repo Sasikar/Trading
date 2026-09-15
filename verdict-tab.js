@@ -140,11 +140,6 @@
       '<div class="vd-pills">' +
       pills +
       '</div>' +
-      (h.reasons && h.reasons.length
-        ? '<div class="vd-why" style="margin-top:8px;color:#8491a1">' +
-          h.reasons.map(esc).join('<br>') +
-          '</div>'
-        : '') +
       '</div>'
     );
   }

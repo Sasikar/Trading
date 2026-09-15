@@ -811,16 +811,49 @@ export function verdictCall(hz, byTf, tick, hist) {
   }
   if (live.length || held.length) {
     const n = live.length + held.length;
-    const bits = live
-      .map((h) => String(h.tf).toUpperCase() + ' live')
-      .concat(held.map((h) => String(h.tf).toUpperCase() + ' held'));
+    const rows = live.concat(held);
+    const lines = rows.map((h) => {
+      const tfu = String(h.tf).toUpperCase();
+      const kind = h.section === 'live' ? 'LIVE' : 'HELD';
+      if (h.levelTxt) {
+        const dist =
+          h.distPct != null
+            ? ' · spot ' + fmtPx(h.spot) + ' (' + pctStr(h.distPct) + ' vs level)'
+            : h.spot
+              ? ' · spot ' + fmtPx(h.spot)
+              : '';
+        return (
+          tfu +
+          ' ' +
+          kind +
+          ' above ' +
+          h.levelTxt +
+          dist +
+          '. Exit: ' +
+          tfu +
+          ' close under ' +
+          h.levelTxt +
+          '.'
+        );
+      }
+      const dex = tick
+        ? 'Dex 24h ' + pctStr(tick.h24) + ' · 6h ' + pctStr(tick.h6) + ' · spot ' + fmtPx(tick.price)
+        : 'Dex 24h/6h only';
+      return (
+        tfu +
+        ' ' +
+        kind +
+        ' — NO printed candle level (' +
+        dex +
+        '). Not a real 1D/1W range break. No $ invalidation on this card.'
+      );
+    });
     return {
       call: 'HOLD',
       why:
         (n >= 2 ? n + ' TFs agree. ' : '') +
-        bits.join(' · ') +
-        (stretched ? ' — stretched, late, still above the level.' : '.') +
-        ' Exit if that TF closes back under the printed level.',
+        (stretched ? 'Stretched/late. ' : '') +
+        lines.join(' '),
       reasons: tags
     };
   }
@@ -836,7 +869,13 @@ export function verdictCall(hz, byTf, tick, hist) {
   }
   return {
     call: 'EXIT',
-    why: 'No live/held break on ' + hz.label.toLowerCase() + ' (' + hz.sub + ').',
+    why:
+      'No live/held break on ' +
+      hz.label.toLowerCase() +
+      ' (' +
+      hz.sub +
+      ').' +
+      (tick && tick.price ? ' Spot ' + fmtPx(tick.price) + '.' : ''),
     reasons: tags
   };
 }
