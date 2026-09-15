@@ -1051,8 +1051,6 @@ export function hitFrom(row, tick, det, tf, focus) {
   };
 }
 
-}
-
 export async function sendTelegram(token, chatId, text) {
   const r = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
     method: 'POST',
