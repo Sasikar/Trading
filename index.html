@@ -274,6 +274,37 @@
 .hd-chip-rest{opacity:.85}
 .hd-depth{margin-top:8px}
 .hd-depth-lab{font-size:10px;font-weight:800;letter-spacing:.08em;color:#8491a1;margin:0 0 6px}
+.hd-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;align-items:stretch}
+.hd-pane{background:#080d13;border:1px solid #1c2633;border-radius:12px;padding:10px}
+.hd-pane-lab{font-size:10px;font-weight:900;letter-spacing:.08em;color:#8491a1;margin:0 0 8px}
+.hd-donut-wrap{display:flex;justify-content:center;margin-bottom:8px}
+.hd-donut{width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.hd-donut-hole{width:56px;height:56px;border-radius:50%;background:#080d13;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.hd-donut-hole b{font-size:14px;font-weight:900;color:#e8eef6;line-height:1}
+.hd-donut-hole span{font-size:8px;font-weight:800;letter-spacing:.06em;color:#8491a1}
+.hd-mix-list{display:flex;flex-direction:column;gap:4px}
+.hd-mix-row{display:grid;grid-template-columns:18px 1fr auto auto;gap:4px;align-items:center;font-size:11px;font-weight:800}
+.hd-mix-row .ico{font-size:14px;line-height:1}
+.hd-mix-row .lab{color:#c5d0dc}
+.hd-mix-row .pct{color:#e8eef6}
+.hd-mix-row .n{color:#8491a1;font-size:10px}
+.hd-mix-rest{opacity:.75}
+.hd-bars{display:flex;flex-direction:column;gap:8px}
+.hd-bar-meta{display:grid;grid-template-columns:18px 1fr auto auto;gap:4px;align-items:center;font-size:11px;font-weight:800;margin-bottom:4px}
+.hd-bar-meta .ico{font-size:14px;line-height:1}
+.hd-bar-meta .lab{color:#c5d0dc}
+.hd-bar-meta .n{color:#8491a1;font-size:10px}
+.hd-bar-meta .pct{color:#e8eef6}
+.hd-bar-track{height:7px;background:#121a24;border-radius:99px;overflow:hidden}
+.hd-bar-fill{height:100%;border-radius:99px;min-width:0}
+@media(max-width:420px){
+  .hd-split{gap:8px}
+  .hd-pane{padding:8px}
+  .hd-donut{width:76px;height:76px}
+  .hd-donut-hole{width:46px;height:46px}
+  .hd-donut-hole b{font-size:12px}
+  .hd-mix-row,.hd-bar-meta{font-size:10px;grid-template-columns:16px 1fr auto auto}
+}
 .hd-ref-sticky{
   position:sticky;top:52px;z-index:46;
   margin:0 0 10px;padding:8px 10px;
@@ -983,7 +1014,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="overview-app.js?v=20260915-k1"></script>
 <script src="breakout-tab.js?v=20260915-eq4"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
-<script src="holders-tab.js?v=20260915-h7"></script>
+<script src="holders-tab.js?v=20260915-h8"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260915-im5"></script>
 <script src="keep-tab.js?v=20260915-k2"></script>
