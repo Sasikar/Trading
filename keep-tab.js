@@ -1,4 +1,4 @@
-/* Keep — one tab for your Google Keep link. No Google APIs. Opens Keep. */
+/* G-Trade Notes — one Keep link. No Google APIs. Opens Keep. */
 (function () {
   const DEFAULT_URL = 'https://keep.google.com/';
   const STORE = 'trading.keepUrl';
@@ -122,12 +122,6 @@
     openKeep();
   };
   window.saveKeepLink = saveLink;
-  window.openKeepNotes = function () {
-    openKeep('https://keep.google.com/');
-  };
-  window.openKeepReminders = function () {
-    openKeep('https://keep.google.com/#reminders');
-  };
 
   const tabs = document.getElementById('tf-tabs');
   if (tabs) {
