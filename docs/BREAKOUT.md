@@ -195,7 +195,7 @@ Used only while 4h/2h/1h is WARMING.
 
 Same `detectTapeBreakout` vs last **closed** UTC candle’s range high.
 
-**Backfill (once per CA):** Gecko `/ohlcv/day` (up to 1000 days, cap 730). Resample to 1w and 1M. Skip the in-progress day/week/month. One coin per 60s alarm. Meta `bf_long`.
+**Backfill:** Gecko `/ohlcv/day?limit=180` — **one coin, one page, once per hour** (`GECKO_EVERY_MS`). Dex poll stays 60s. Full 180-day page → `partial`, next hour older `before_timestamp` until 730d or empty. Resample to 1w/1M. Meta `bf_long` / `bf_gecko_at`. 429 → skip until next hour.
 
 **Alerts:** 1d/1w/1M Telegram only when that bar **just closed** this tick (no spam from history insert).
 

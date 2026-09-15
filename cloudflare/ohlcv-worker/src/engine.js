@@ -28,6 +28,8 @@ export const ALL_TFS = [...TAPE_TFS];
 export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
 export const ALIGN_MIN = 2;
 export const KEEP_LONG_MS = 730 * 86400e3;
+/** One Gecko 1D page per this interval. Dex 60s poll is unchanged. */
+export const GECKO_EVERY_MS = 3600e3;
 
 /** Closed bars required before NEW BREAKOUT is allowed. */
 export const MIN_BARS = {
@@ -1728,6 +1730,10 @@ export class Engine {
 
   async maybeBackfill(now) {
     now = now || Date.now();
+    const lastAt = +this.store.getMeta('bf_gecko_at') || 0;
+    if (lastAt && now - lastAt < GECKO_EVERY_MS) {
+      return { skipped: 'hourly', waitMs: GECKO_EVERY_MS - (now - lastAt) };
+    }
     if (this.geckoUntil && now < this.geckoUntil) return { skipped: 'gecko-wait' };
     const rows = this.store.getWatch();
     let map = {};
@@ -1736,40 +1742,60 @@ export class Engine {
     } catch (e) {
       map = {};
     }
-    const row = (rows || []).find((r) => {
-      const st = map[String(r.ca || '').toLowerCase()];
+    const caOf = (r) => String(r.ca || '').toLowerCase();
+    const needFirst = (r) => {
+      const st = map[caOf(r)];
       if (!st) return true;
-      if (st.status === 'done') return false;
-      if (st.status === 'err' && now - (st.at || 0) < 6 * 3600e3) {
+      if (st.status === 'err') {
         if (/429/.test(st.why || '')) return true;
-        return false;
+        return now - (st.at || 0) >= 6 * 3600e3;
       }
-      return true;
-    });
+      return false;
+    };
+    const needOlder = (r) => {
+      const st = map[caOf(r)];
+      if (!st) return false;
+      if (st.pagedEnd) return false;
+      if (st.status === 'partial') return true;
+      const n = st.days || st.n1d || 0;
+      return st.status === 'done' && n >= 170;
+    };
+    const row = (rows || []).find(needFirst) || (rows || []).find(needOlder);
     if (!row) return { skipped: 'all_done' };
-    const ca = String(row.ca).toLowerCase();
+
+    const ca = caOf(row);
     const tick = this.store.getTick(ca) || {};
     const pool = row.poolAddress || tick.pairAddress || '';
     if (!pool) {
+      this.store.setMeta('bf_gecko_at', String(now));
       map[ca] = { status: 'err', why: 'no pool', at: now };
       this.store.setMeta('bf_long', JSON.stringify(map));
       return { ca, error: 'no pool' };
     }
     const net = geckoNetworkOf(row.chain || tick.chain);
-    const url =
+    const hist = this.store.bars(ca, '1d', 800);
+    const oldest = hist.length ? +hist[0].t : 0;
+    const paging = needOlder(row) && oldest > 0;
+    let url =
       'https://api.geckoterminal.com/api/v2/networks/' +
       encodeURIComponent(net) +
       '/pools/' +
       encodeURIComponent(pool) +
       '/ohlcv/day?aggregate=1&limit=180&currency=usd&token=base';
+    if (paging) url += '&before_timestamp=' + Math.floor(oldest / 1000);
+
+    this.store.setMeta('bf_gecko_at', String(now));
     let j;
     try {
       j = await fetchJSON(url, 1);
     } catch (e) {
       const m = String(e && e.message ? e.message : e);
       if (/429/.test(m)) {
-        this.geckoUntil = now + 5 * 60e3;
-        this.store.setMeta('bf_last', JSON.stringify({ ca, at: now, error: '429', waitMs: 300000 }));
+        this.geckoUntil = now + GECKO_EVERY_MS;
+        this.store.setMeta(
+          'bf_last',
+          JSON.stringify({ ca, name: row.name, at: now, error: '429', waitMs: GECKO_EVERY_MS })
+        );
         return { ca, skipped: '429' };
       }
       map[ca] = { status: 'err', why: m.slice(0, 100), at: now };
@@ -1777,8 +1803,11 @@ export class Engine {
       return { ca, error: m };
     }
     if (j && j.status && (j.status.error_code === 429 || /rate limit/i.test(String(j.status.error_message || '')))) {
-      this.geckoUntil = now + 5 * 60e3;
-      this.store.setMeta('bf_last', JSON.stringify({ ca, at: now, error: '429-json', waitMs: 300000 }));
+      this.geckoUntil = now + GECKO_EVERY_MS;
+      this.store.setMeta(
+        'bf_last',
+        JSON.stringify({ ca, name: row.name, at: now, error: '429-json', waitMs: GECKO_EVERY_MS })
+      );
       return { ca, skipped: '429' };
     }
     const list = (((j || {}).data || {}).attributes || {}).ohlcv_list || [];
@@ -1813,14 +1842,38 @@ export class Engine {
     for (const b of resampleBars(days, '1M')) {
       if (b.t < utcMonth(now) && this.store.insertBar(ca, '1M', b)) n1M++;
     }
-    map[ca] = { status: days.length ? 'done' : 'err', n1d, n1w, n1M, at: now, pool, days: days.length };
-    if (!days.length) map[ca].why = 'empty gecko 1d';
+    const prev = map[ca] || {};
+    const pages = (prev.pages || 0) + 1;
+    const fullPage = days.length >= 170;
+    const noMore = paging && n1d === 0;
+    map[ca] = {
+      status: noMore ? 'done' : fullPage ? 'partial' : 'done',
+      n1d: (prev.n1d || 0) + n1d,
+      n1w: (prev.n1w || 0) + n1w,
+      n1M: (prev.n1M || 0) + n1M,
+      days: days.length,
+      pages,
+      pagedEnd: !!noMore,
+      at: now,
+      pool
+    };
+    if (!days.length && !paging) map[ca].why = 'empty gecko 1d';
     this.store.setMeta('bf_long', JSON.stringify(map));
     this.store.setMeta(
       'bf_last',
-      JSON.stringify({ ca, name: row.name, n1d, n1w, n1M, days: days.length, at: now })
+      JSON.stringify({
+        ca,
+        name: row.name,
+        n1d,
+        n1w,
+        n1M,
+        days: days.length,
+        pages,
+        paging: !!paging,
+        at: now
+      })
     );
-    return { ca, name: row.name, n1d, n1w, n1M, days: days.length };
+    return { ca, name: row.name, n1d, n1w, n1M, days: days.length, pages, paging: !!paging };
   }
 
   importGeckoDays(ca, list, now, name) {
@@ -1861,7 +1914,15 @@ export class Engine {
     } catch (e) {
       map = {};
     }
-    map[ca] = { status: days.length ? 'done' : 'err', n1d, n1w, n1M, at: now, days: days.length, via: 'import' };
+    map[ca] = {
+      status: days.length >= 170 ? 'partial' : days.length ? 'done' : 'err',
+      n1d,
+      n1w,
+      n1M,
+      at: now,
+      days: days.length,
+      via: 'import'
+    };
     if (!days.length) map[ca].why = 'empty 1d';
     this.store.setMeta('bf_long', JSON.stringify(map));
     this.store.setMeta('bf_last', JSON.stringify({ ca, name, n1d, n1w, n1M, days: days.length, at: now, via: 'import' }));
@@ -2175,8 +2236,14 @@ export class Engine {
       lastAll: lastAll ? new Date(lastAll).toISOString() : null,
       pollMs: now - lastPoll,
       candidates: watch.length,
-      backfillDone: bfVals.filter((x) => x && x.status === 'done').length,
+      backfillDone: bfVals.filter((x) => x && (x.status === 'done' || x.status === 'partial')).length,
+      backfillPartial: bfVals.filter((x) => x && x.status === 'partial').length,
       backfillErr: bfVals.filter((x) => x && x.status === 'err').length,
+      geckoEveryMs: GECKO_EVERY_MS,
+      backfillNextAt: (() => {
+        const t = +this.store.getMeta('bf_gecko_at') || 0;
+        return t ? new Date(t + GECKO_EVERY_MS).toISOString() : null;
+      })(),
       backfillLast: (() => {
         try {
           return JSON.parse(this.store.getMeta('bf_last') || 'null');
