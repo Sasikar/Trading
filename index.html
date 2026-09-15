@@ -247,7 +247,7 @@
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#sentiment-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 #coin-panel .card > *,#breakouts-panel .card > *,#hunter-panel .card > *,#holders-panel .card > *{margin-left:0;margin-right:0}
 .hd-card{padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a}
 .hd-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
@@ -271,6 +271,18 @@
 .fl-row .t{font-size:11px;color:#8491a1;margin-top:3px}
 .fl-live{padding:10px 12px;border-radius:10px;border:1px solid #3a3426;background:#17130d;font-size:12px;color:#c9b8a0;line-height:1.45}
 #im-text{margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dce5ee;background:#080d13;border:1px solid #1c2633;border-radius:12px;padding:12px;max-height:70vh;overflow:auto}
+#st-saved,#st-hunter{flex:1;min-width:140px;height:38px;border-radius:10px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:800;padding:0 10px}
+.st-head{margin-bottom:8px}.st-name{font-size:18px;font-weight:900}.st-name a{font-size:11px;color:#6eb6ff;margin-left:8px;text-decoration:none}
+.st-meta{font-size:12px;color:#8491a1;margin-top:4px}
+.st-vote{padding:12px;border-radius:12px;border:1px solid #243041;background:#0b121a;margin:8px 0}
+.st-vote b{font-size:22px}.st-vote span{display:block;font-size:11px;color:#8491a1;margin-top:4px}
+.st-h{font-size:10px;font-weight:900;letter-spacing:.08em;color:#8491a1;margin:14px 0 6px}
+.st-ul{margin:0;padding-left:18px;color:#dce5ee;font-size:13px;line-height:1.5}
+.st-ul li{margin:0 0 6px}
+.st-row{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid #1a2430;color:#e8eef6;text-decoration:none;font-size:13px}
+.st-row span{color:#8491a1;font-size:12px;text-align:right}
+.st-find{color:#e8eef6;font-size:13px;line-height:1.45}
+.st-note{font-size:11px;color:#8491a1;line-height:1.45;margin-top:8px}
 .vd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 14px;flex-wrap:wrap}
 .vd-name{font-size:18px;font-weight:900}
 .vd-name span{font-size:11px;color:#8491a1;font-weight:700}
@@ -406,6 +418,7 @@
   <button type="button" class="tab" data-tf="breakouts">Breakout Memes</button>
   <button type="button" class="tab" data-tf="hunter">Hunter</button>
   <button type="button" class="tab" data-tf="holders">Holders</button>
+  <button type="button" class="tab" data-tf="sentiment">Sentiment</button>
   <button type="button" class="tab" data-tf="failures">Failures</button>
   <button type="button" class="tab" data-tf="inmemory">InMemory</button>
   <button type="button" class="tab" data-tf="verdict">Verdict</button>
@@ -750,6 +763,23 @@
   </div>
 </section>
 </div>
+<div id="sentiment-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Sentiment</h2><p>Gecko community votes · CEX now · Binance listing desk · not X tweets</p></div>
+    <span class="source" id="st-status">API</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <select id="st-saved"><option value="">Saved CAs — pick one</option></select>
+      <select id="st-hunter"><option value="">Hunter CAs — pick one</option></select>
+      <button type="button" onclick="try{window.refreshSentimentTab&&window.refreshSentimentTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
+    </div>
+    <div style="font-size:11px;color:#8491a1;line-height:1.45">Free stack cannot read X posts. Findings below say exactly what we got (Gecko votes, follower count, CEX tickers, Binance announcement titles). Empty = not listed / no match — not a fake score.</div>
+    <div id="st-board"></div>
+  </div>
+</section>
+</div>
 <div id="failures-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
@@ -890,12 +920,13 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260915-im1"></script>
+<script src="overview-app.js?v=20260915-st1"></script>
 <script src="breakout-tab.js?v=20260915-eq4"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
 <script src="holders-tab.js?v=20260915-h5"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260915-im1"></script>
+<script src="sentiment-tab.js?v=20260915-s1"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
 <script src="site-nav.js?v=20260914-ui1"></script>
 </body></html>

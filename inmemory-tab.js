@@ -72,7 +72,8 @@
       'breakouts-panel',
       'holders-panel',
       'failures-panel',
-      'verdict-panel'
+      'verdict-panel',
+      'sentiment-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
@@ -80,7 +81,7 @@
       el.classList.remove('on');
       if (id === 'tf-panels') el.classList.add('hidden');
     });
-    ['showBreakoutMemes', 'showHunter', 'showHolders', 'showFailures', 'showVerdict'].forEach(function (fn) {
+    ['showBreakoutMemes', 'showHunter', 'showHolders', 'showFailures', 'showVerdict', 'showSentiment'].forEach(function (fn) {
       try {
         window[fn](false);
       } catch (e) {}

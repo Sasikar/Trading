@@ -168,7 +168,10 @@
       try {
         window.showInMemory(false);
       } catch (e) {}
-      ['tf-panels', 'trend-panel', 'struct-panel', 'macro-panel', 'signal-panel', 'memegate-panel', 'coin-panel', 'antifomo-panel', 'hunter-panel', 'breakouts-panel', 'verdict-panel', 'failures-panel', 'inmemory-panel'].forEach(
+      try {
+        window.showSentiment(false);
+      } catch (e) {}
+      ['tf-panels', 'trend-panel', 'struct-panel', 'macro-panel', 'signal-panel', 'memegate-panel', 'coin-panel', 'antifomo-panel', 'hunter-panel', 'breakouts-panel', 'verdict-panel', 'failures-panel', 'inmemory-panel', 'sentiment-panel'].forEach(
         function (id) {
           const el = $(id);
           if (!el) return;

@@ -30,6 +30,28 @@ export const GECKO_EVERY_MS = 3600e3;
 export const HOLDERS_EVERY_MS = 15 * 60e3;
 /** Hunter Dex discover + score. Not the 60s saved-CA tape. */
 export const HUNTER_EVERY_MS = 20 * 60e3;
+/** On-demand sentiment (CoinGecko + Binance listings). Not the 60s tape. */
+export const SENTIMENT_EVERY_MS = 20 * 60e3;
+export const CEX_MARKET_IDS = {
+  binance: 'Binance',
+  'binance-us': 'Binance US',
+  gdax: 'Coinbase',
+  coinbase: 'Coinbase',
+  coinbase_exchange: 'Coinbase',
+  kraken: 'Kraken',
+  okex: 'OKX',
+  okx: 'OKX',
+  bybit_spot: 'Bybit',
+  bybit: 'Bybit',
+  kucoin: 'KuCoin',
+  gate: 'Gate.io',
+  mexc: 'MEXC',
+  bitget: 'Bitget',
+  huobi: 'HTX',
+  crypto_com: 'Crypto.com',
+  upbit: 'Upbit',
+  bithumb: 'Bithumb'
+};
 
 /** Closed bars required before NEW BREAKOUT is allowed. */
 export const MIN_BARS = {
@@ -2373,6 +2395,231 @@ export class Engine {
       });
     });
   }
+
+  geckoPlatformOf(chain) {
+    const c = chainIdOf(chain);
+    if (c === 'solana') return 'solana';
+    if (c === 'ethereum') return 'ethereum';
+    if (c === 'base') return 'base';
+    if (c === 'bsc') return 'binance-smart-chain';
+    if (c === 'robinhood') return 'robinhood';
+    return '';
+  }
+
+  sentimentLists() {
+    const slim = (r) => ({
+      ca: r.ca,
+      name: r.name || r.base || (r.ca || '').slice(0, 6),
+      chain: r.chain || 'solana'
+    });
+    const saved = (this.store.getWatch() || []).map(slim);
+    const seen = new Set(saved.map((x) => String(x.ca).toLowerCase()));
+    const hunter = [];
+    for (const r of [...this.hunterWatch(), ...this.hunterHits()]) {
+      const k = String(r.ca || '').toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      hunter.push(slim(r));
+    }
+    return { saved, hunter };
+  }
+
+  async fetchBinanceListings(now) {
+    now = now || Date.now();
+    try {
+      const cached = JSON.parse(this.store.getMeta('sent_binance') || 'null');
+      if (cached && cached.at && now - cached.at < 3600e3 && Array.isArray(cached.articles)) return cached.articles;
+    } catch (e) {}
+    const url =
+      'https://www.binance.com/bapi/composite/v1/public/cms/article/list/query?type=1&catalogId=48&pageNo=1&pageSize=20';
+    const j = await fetchJSON(url, 1);
+    const arts = ((((j || {}).data || {}).catalogs || [])[0] || {}).articles || [];
+    const articles = arts.map((a) => ({
+      title: a.title || '',
+      code: a.code || '',
+      id: a.id,
+      t: a.releaseDate || a.publishDate || 0,
+      url: a.code ? 'https://www.binance.com/en/support/announcement/' + a.code : 'https://www.binance.com/en/support/announcement'
+    }));
+    this.store.setMeta('sent_binance', JSON.stringify({ at: now, articles }));
+    return articles;
+  }
+
+  matchListingArticles(articles, name, symbol) {
+    const n = String(name || '').trim().toLowerCase();
+    const s = String(symbol || '').trim().toLowerCase();
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return (articles || []).filter((a) => {
+      const t = String(a.title || '').toLowerCase();
+      if (s && s.length >= 2 && new RegExp('\\b' + esc(s) + '\\b', 'i').test(t)) return true;
+      if (n && n.length >= 3 && t.includes(n)) return true;
+      return false;
+    });
+  }
+
+  async geckoByContract(platform, ca) {
+    const url =
+      'https://api.coingecko.com/api/v3/coins/' +
+      encodeURIComponent(platform) +
+      '/contract/' +
+      encodeURIComponent(ca) +
+      '?localization=false&tickers=true&market_data=false&community_data=true&developer_data=false&sparkline=false';
+    const r = await fetch(url, {
+      headers: { Accept: 'application/json', 'User-Agent': 'TradingOhlcv/1.0' },
+      cache: 'no-store'
+    });
+    if (r.status === 404) return null;
+    if (r.status === 429) {
+      this.logFail('gecko429', 'CoinGecko sentiment 429');
+      throw new Error('HTTP 429 api.coingecko.com');
+    }
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' api.coingecko.com');
+    return await r.json();
+  }
+
+  buildSentimentReport(row, gecko, listings, now) {
+    const name = row.name || '';
+    const symbol = String((gecko && gecko.symbol) || name || '').replace(/^\$/, '');
+    const votesUp = gecko ? gecko.sentiment_votes_up_percentage : null;
+    const votesDown = gecko ? gecko.sentiment_votes_down_percentage : null;
+    const comm = (gecko && gecko.community_data) || {};
+    const tw = comm.twitter_followers || 0;
+    const reddit = comm.reddit_subscribers || 0;
+    const twHandle = ((gecko && gecko.links) || {}).twitter_screen_name || '';
+    const cats = (gecko && gecko.categories) || [];
+    const cex = [];
+    const seenCex = new Set();
+    for (const t of (gecko && gecko.tickers) || []) {
+      const ident = String((t.market && t.market.identifier) || '').toLowerCase();
+      const label = CEX_MARKET_IDS[ident];
+      if (!label || seenCex.has(label)) continue;
+      seenCex.add(label);
+      cex.push({
+        name: label,
+        pair: (t.base || '') + '/' + (t.target || ''),
+        ident
+      });
+    }
+    const upcoming = this.matchListingArticles(listings, name, symbol);
+    const findings = [];
+    findings.push('X post tone is not available on the free stack. Official X API is paid. This tab does not scrape tweets.');
+    if (!gecko) {
+      findings.push(
+        (name || 'This token') + ' is not on CoinGecko by contract. Typical for new DEX-only memes — no community votes, no CEX ticker map.'
+      );
+    } else if (votesUp != null || votesDown != null) {
+      findings.push(
+        'CoinGecko community votes: ' +
+          (votesUp != null ? Math.round(votesUp) + '% up' : '—') +
+          ' / ' +
+          (votesDown != null ? Math.round(votesDown) + '% down' : '—') +
+          '. These are Gecko users, not X posts.'
+      );
+    } else {
+      findings.push('On CoinGecko, but no community up/down votes yet.');
+    }
+    if (twHandle || tw) {
+      findings.push(
+        'Linked X account' +
+          (twHandle ? ' @' + twHandle : '') +
+          (tw ? ' · ' + tw.toLocaleString() + ' followers' : '') +
+          '. Follower count is not tweet sentiment.'
+      );
+    }
+    if (reddit) findings.push('Reddit subscribers: ' + reddit.toLocaleString() + '.');
+    if (cex.length) findings.push('Already listed on: ' + cex.map((x) => x.name).join(', ') + '.');
+    else findings.push('No official CEX spot market on CoinGecko for this contract.');
+    if (upcoming.length) {
+      findings.push(
+        'Binance new-listing desk matched ' +
+          upcoming.length +
+          ' announcement(s). Read the title — “Will List / Will Add” is upcoming; “Added” may already be live.'
+      );
+    } else {
+      findings.push('No match in the latest 20 Binance New Cryptocurrency Listing posts for this name/ticker.');
+    }
+    const tick = this.store.getTick(String(row.ca || '').toLowerCase()) || {};
+    if (tick.m5 != null || tick.h1 != null) {
+      findings.push(
+        'Our Dex tape (not social): 5m ' +
+          (tick.m5 >= 0 ? '+' : '') +
+          (tick.m5 != null ? Number(tick.m5).toFixed(1) : '—') +
+          '% · 1h ' +
+          (tick.h1 >= 0 ? '+' : '') +
+          (tick.h1 != null ? Number(tick.h1).toFixed(1) : '—') +
+          '%.'
+      );
+    }
+    return {
+      ca: row.ca,
+      name,
+      chain: row.chain || 'solana',
+      symbol,
+      geckoId: gecko ? gecko.id : '',
+      geckoUrl: gecko ? 'https://www.coingecko.com/en/coins/' + gecko.id : '',
+      votesUp,
+      votesDown,
+      twitterFollowers: tw || 0,
+      twitter: twHandle || '',
+      reddit: reddit || 0,
+      categories: cats.filter(Boolean).slice(0, 8),
+      cex,
+      upcoming,
+      findings,
+      listed: !!cex.length,
+      geckoFound: !!gecko,
+      at: now,
+      source: 'CoinGecko community + tickers. Binance CMS catalog 48. Not X posts.'
+    };
+  }
+
+  async sentimentFor(ca, force) {
+    const now = Date.now();
+    const k = String(ca || '').toLowerCase();
+    if (!k) throw new Error('no ca');
+    const lists = this.sentimentLists();
+    const row = lists.saved.find((x) => x.ca.toLowerCase() === k) || lists.hunter.find((x) => x.ca.toLowerCase() === k);
+    if (!row) throw new Error('CA is not on saved or hunter lists');
+    let cache = {};
+    try {
+      cache = JSON.parse(this.store.getMeta('sent_cache') || '{}') || {};
+    } catch (e) {
+      cache = {};
+    }
+    const hit = cache[k];
+    if (!force && hit && now - (hit.at || 0) < SENTIMENT_EVERY_MS) {
+      return Object.assign({ cached: true }, hit);
+    }
+    let gecko = null;
+    const plat = this.geckoPlatformOf(row.chain);
+    const platforms = plat === 'robinhood' ? ['robinhood', 'ethereum'] : plat ? [plat] : ['solana'];
+    let lastErr = '';
+    for (const p of platforms) {
+      try {
+        gecko = await this.geckoByContract(p, row.ca);
+        if (gecko) break;
+      } catch (e) {
+        lastErr = String(e && e.message ? e.message : e);
+        if (/429/.test(lastErr)) throw e;
+      }
+    }
+    let listings = [];
+    try {
+      listings = await this.fetchBinanceListings(now);
+    } catch (e) {
+      lastErr = (lastErr ? lastErr + ' · ' : '') + 'Binance listings ' + String(e && e.message ? e.message : e);
+    }
+    const report = this.buildSentimentReport(row, gecko, listings, now);
+    if (lastErr && !gecko) report.fetchError = lastErr;
+    cache[k] = report;
+    const cut = now - 6 * 3600e3;
+    for (const id of Object.keys(cache)) {
+      if (!cache[id] || cache[id].at < cut) delete cache[id];
+    }
+    this.store.setMeta('sent_cache', JSON.stringify(cache));
+    return Object.assign({ cached: false }, report);
+  }
+
   async refreshHunter(now, force) {
     now = now || Date.now();
     if (!force && now < this.rateLimitedUntil) {
@@ -2696,6 +2943,26 @@ export async function handleApi(engine, request) {
   if (path === '/verdict' || path === '/api/verdict') {
     const ca = url.searchParams.get('ca') || '';
     return json(engine.verdictFor(ca));
+  }
+  if (path === '/sentiment' || path === '/api/sentiment') {
+    const ca = url.searchParams.get('ca') || '';
+    const lists = engine.sentimentLists();
+    if (!ca) return json({ saved: lists.saved, hunter: lists.hunter, report: null });
+    try {
+      const report = await engine.sentimentFor(ca, method === 'POST' || url.searchParams.get('force') === '1');
+      engine.flushFails(Date.now());
+      return json({ saved: lists.saved, hunter: lists.hunter, report });
+    } catch (e) {
+      engine.flushFails(Date.now());
+      return json(
+        {
+          saved: lists.saved,
+          hunter: lists.hunter,
+          error: String(e && e.message ? e.message : e)
+        },
+        /429/.test(String(e && e.message ? e.message : e)) ? 429 : 400
+      );
+    }
   }
   if (path === '/failures' || path === '/api/failures') {
     return json(engine.failuresSnapshot());

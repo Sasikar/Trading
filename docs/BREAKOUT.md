@@ -98,6 +98,7 @@ Writes are skipped when a row is unchanged. Open candles stay in memory and flus
 6. Evaluate each target on needed TFs → maybe Telegram.
 7. Hunter refresh (**every 20 min**, discover + score together) — separate from the 60s saved-CA tape. **Scan now** forces it.
 8. Failures log: real 429 / skip / telegram / stale only (`fail_log`, last 24h, Failures tab shows last hour). Empty hour = none logged.
+8b. Sentiment tab (on-demand): CoinGecko community votes + CEX tickers + Binance New Listing announcements. **Not X posts.** Cached 20 min.
 8. Prune old 1m/5m…30m hourly; **1d / 1w / 1M kept 730 days**.
 9. **Gecko 1D backfill** — one saved CA per alarm. Writes closed 1d (and resampled 1w / 1M). Never overwrites today.
 
