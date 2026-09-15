@@ -5,7 +5,12 @@
 import { Engine, MemoryStore, handleApi, CORS, json } from './engine.js';
 
 function storeFromSql(sql) {
-  sql.exec(`
+  try {
+    const has = [
+      ...sql.exec("SELECT 1 AS n FROM sqlite_master WHERE type='table' AND name='meta' LIMIT 1")
+    ];
+    if (!has.length) {
+      sql.exec(`
     CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
     CREATE TABLE IF NOT EXISTS ticks (
       ca TEXT PRIMARY KEY, t INTEGER, price REAL, vol5m REAL, vol1h REAL, vol24h REAL,
@@ -27,6 +32,10 @@ function storeFromSql(sql) {
       ca TEXT PRIMARY KEY, chain TEXT, name TEXT, poolAddress TEXT
     );
   `);
+    }
+  } catch (e) {
+    /* Durable Object write quota: keep serving reads. */
+  }
 
   const one = (q, ...b) => {
     const it = sql.exec(q, ...b);
@@ -52,7 +61,9 @@ function storeFromSql(sql) {
       const s = String(v ?? '');
       if (metaMem.get(k) === s) return;
       metaMem.set(k, s);
-      sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', k, s);
+      try {
+        sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', k, s);
+      } catch (e) {}
     },
     getTick(ca) {
       const k = ca.toLowerCase();
