@@ -2788,13 +2788,16 @@ export class Engine {
       const doAll = mode === 'all' || mode === 'auto' || (!want1m && now - lastAll >= AUTO_EVERY_MS);
       let targets = doAll ? rows : rows.filter((r) => r.ca.toLowerCase() === focus);
       if (mode === '1m') {
-        targets = focus
-          ? rows.filter((r) => r.ca.toLowerCase() === focus)
-          : rows.slice(0, 1);
+        if (!focus) {
+          this.busy = false;
+          return { scanned: 0, error: 'Pick a 1m focus coin first' };
+        }
+        targets = rows.filter((r) => r.ca.toLowerCase() === focus);
       }
       if (!targets.length) {
         this.store.setMeta('last_poll', String(now));
-        return { scanned: 0 };
+        this.busy = false;
+        return { scanned: 0, error: mode === '1m' ? 'Focus coin is not on the saved list' : '' };
       }
       const tfs = want1m ? TAPE_TFS : AUTO_TFS;
       const byCa = await fetchDexPairsForCas(targets.map((r) => r.ca));
@@ -3077,8 +3080,10 @@ export async function handleApi(engine, request) {
     }
   }
   if ((path === '/run' || path === '/api/run') && (method === 'POST' || method === 'GET')) {
-    const out = await engine.tick('all');
-    return json({ ok: true, ...out, status: engine.status() });
+    const tf = (url.searchParams.get('tf') || '').toLowerCase();
+    const mode = tf === '1m' ? '1m' : 'auto';
+    const out = await engine.tick(mode);
+    return json({ ok: true, mode, ...out, status: engine.status() });
   }
   if ((path === '/backfill' || path === '/api/backfill') && method === 'POST') {
     let body = {};

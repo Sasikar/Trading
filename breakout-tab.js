@@ -645,10 +645,38 @@
 
   async function forceRun() {
     const stEl = $('bo-status');
-    if (stEl) stEl.textContent = 'Asking worker to poll now…';
+    if (stEl) stEl.textContent = 'Asking worker to poll 5m+ now…';
     try {
       await api('/run', { method: 'POST' });
     } catch (e) {}
+    await scanBreakoutMemes(false);
+  }
+
+  async function fetch1mNow() {
+    const stEl = $('bo-status');
+    const sel = $('bo-focus-sel');
+    const ca = (sel && sel.value) || '';
+    if (!ca) {
+      alert('Pick a 1m focus coin first');
+      return;
+    }
+    if (stEl) stEl.textContent = 'Fetching 1m on demand…';
+    try {
+      const j = await api('/run?tf=1m', { method: 'POST' });
+      if (j && j.error) {
+        alert(j.error);
+        if (stEl) stEl.textContent = j.error;
+        return;
+      }
+      const n = j && j.scanned != null ? j.scanned : 0;
+      if (stEl) stEl.textContent = '1m fetched · ' + n + ' coin';
+    } catch (e) {
+      if (stEl) stEl.textContent = String(e.message || e);
+      alert(e.message || e);
+      return;
+    }
+    breakoutTF = '1m';
+    paintTfButtons();
     await scanBreakoutMemes(false);
   }
 
@@ -742,8 +770,10 @@
   window.setBreakoutTF = function (tf) {
     breakoutTF = String(tf || '4h').toLowerCase();
     paintTfButtons();
+    if (breakoutTF === '1m') return fetch1mNow();
     scanBreakoutMemes(false);
   };
+  window.fetchBreakout1mNow = fetch1mNow;
   window.toggleBreakoutLive = function () {
     liveOn = !liveOn;
     setLiveBtn();

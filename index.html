@@ -772,7 +772,9 @@
       </select>
       <button type="button" onclick="try{window.setBreakoutFocus&&window.setBreakoutFocus()}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:800;cursor:pointer">Set focus</button>
       <button type="button" id="bo-1m-alerts" onclick="try{window.toggleBreakout1mAlerts&&window.toggleBreakout1mAlerts()}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;cursor:pointer">1m alerts off</button>
+      <button type="button" id="bo-1m-now" onclick="try{window.fetchBreakout1mNow&&window.fetchBreakout1mNow()}catch(e){alert(e)}" style="padding:7px 12px;border-radius:8px;border:1px solid #2a6b4e;background:#123526;color:#62e3a0;font-weight:800;cursor:pointer">1m now</button>
     </div>
+    <div style="font-size:11px;color:#8491a1;margin:-4px 0 12px;line-height:1.4">1m is on-demand only (saves write quota). Pick a coin → <b style="color:#62e3a0">1m now</b>. Auto tape is 5m and up.</div>
     <div id="m1m-status" style="margin:0 0 14px;padding:12px 14px;border-radius:14px;border:1px solid #2a3a4c;background:linear-gradient(180deg,#121a24,#0c121a)">
       <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
         <div style="font-size:11px;letter-spacing:.08em;font-weight:900;color:#8491a1">RUN STATUS · CLOUDFLARE ENGINE</div>
@@ -1005,7 +1007,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </div>
 </main></div>
 <script src="overview-app.js?v=20260915-k1"></script>
-<script src="breakout-tab.js?v=20260915-eq4"></script>
+<script src="breakout-tab.js?v=20260915-eq5"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
 <script src="holders-tab.js?v=20260915-h11"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
