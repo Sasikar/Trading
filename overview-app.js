@@ -2592,29 +2592,35 @@ async function dexToken(ca){
   return pr.json();
 }
 async function coinResolvePool(chain, ca){
-  const want=chain==='solana'?'solana':'ethereum';
+  const c=String(chain||'').toLowerCase();
+  const want=c==='sol'||c==='solana'?'solana':(c==='robinhood'||c==='hood'||c==='rh'?'robinhood':'ethereum');
   // 1) DexScreener (CORS-friendly)
   try{
     const j=await dexToken(ca);
-    let pairs=(j.pairs||[]).filter(p=>p && (p.chainId===want || (want==='ethereum'&&p.chainId==='ethereum')));
+    let pairs=(j.pairs||[]).filter(p=>p && p.pairAddress);
+    const same=pairs.filter(p=>String(p.chainId||'').toLowerCase()===want || (want==='ethereum'&&p.chainId==='ethereum'));
+    if(same.length) pairs=same;
     pairs.sort((a,b)=>parseFloat((b.liquidity&&b.liquidity.usd)||0)-parseFloat((a.liquidity&&a.liquidity.usd)||0));
     if(pairs.length){
       const p=pairs[0];
+      const cid=String(p.chainId||want).toLowerCase();
       return {
-        network: want==='solana'?'solana':'eth',
+        network: cid==='solana'?'solana':(cid==='ethereum'||cid==='eth'?'eth':cid),
+        chainId: cid,
         address: p.pairAddress,
         name: ((p.baseToken&&p.baseToken.symbol)||'?')+' / '+((p.quoteToken&&p.quoteToken.symbol)||'?'),
         liq: parseFloat((p.liquidity&&p.liquidity.usd)||0),
         base: (p.baseToken&&p.baseToken.symbol)||ca.slice(0,6),
         price: parseFloat(p.priceUsd||0),
-        dexUrl: p.url||'',
+        dexUrl: p.url||('https://dexscreener.com/'+cid+'/'+p.pairAddress),
+        fromDex: true,
         vol24: parseFloat((p.volume&&p.volume.h24)||0),
         chg24: parseFloat((p.priceChange&&p.priceChange.h24)||0)
       };
     }
   }catch(e){console.warn('dex resolve',e);}
   // 2) GeckoTerminal pools
-  const net=want==='solana'?'solana':'eth';
+  const net=want==='solana'?'solana':(want==='robinhood'?'solana':'eth');
   const j=await gtGet('/networks/'+net+'/tokens/'+encodeURIComponent(ca)+'/pools?page=1');
   const data=j.data||[];
   if(!data.length) throw new Error('No pools for this CA on '+net);
@@ -2623,18 +2629,54 @@ async function coinResolvePool(chain, ca){
   const attr=top.attributes||{};
   return {
     network:net,
+    chainId: want,
     address:attr.address||(top.id||'').split('_').pop(),
     name:attr.name||'pool',
     liq:parseFloat(attr.reserve_in_usd||0),
     base:attr.name||ca.slice(0,8),
     price:null,
-    dexUrl:''
+    dexUrl:'',
+    fromDex:false
   };
 }
 function coinDexInterval(tf){
   tf=String(tf||'4h').toLowerCase();
-  const map={ '1m':1,'5m':5,'10m':5,'15m':15,'30m':30,'1h':60,'2h':120,'4h':240,'1d':1440,'1w':10080 };
+  /* Dex embed only accepts these minute values. 1 and 10080 hang on "Loading pair…". */
+  const map={ '1m':5,'5m':5,'10m':5,'15m':15,'30m':30,'1h':60,'2h':120,'4h':240,'1d':1440,'1w':1440 };
   return map[tf]||240;
+}
+function coinDexChain(pool){
+  const n=String((pool&& (pool.chainId||pool.network))||'').toLowerCase();
+  if(n==='sol'||n==='solana') return 'solana';
+  if(n==='eth'||n==='ethereum') return 'ethereum';
+  if(n==='robinhood'||n==='hood'||n==='rh') return 'robinhood';
+  if(n==='base'||n==='bsc'||n==='polygon'||n==='arbitrum'||n==='avalanche') return n;
+  return n||'solana';
+}
+function coinEmbedUrl(pool, tf){
+  const iv=coinDexInterval(tf);
+  let base='';
+  if(pool&&pool.dexUrl&&/dexscreener\.com\//i.test(pool.dexUrl)){
+    base=String(pool.dexUrl).split('?')[0].replace(/\/$/,'');
+  }else if(pool&&pool.address){
+    base='https://dexscreener.com/'+coinDexChain(pool)+'/'+pool.address;
+  }
+  if(!base) return '';
+  return base+'?embed=1&loadChart=1&theme=dark&trades=0&info=0&chartLeftToolbar=0&chartTheme=dark&chartType=usd&interval='+iv;
+}
+function paintCoinEmbed(){
+  const emb=$('coin-embed');
+  if(!emb) return;
+  if(!coinPool||!coinPool.address){ emb.innerHTML=''; return; }
+  const src=coinEmbedUrl(coinPool, coinTF);
+  const open=coinPool.dexUrl||src.split('?')[0];
+  if(!coinPool.fromDex||!src){
+    emb.innerHTML='<div style="padding:14px;border-radius:14px;border:1px solid #243041;background:#0b121a;font-size:12px;color:#8491a1">No Dex pair URL for this CA (Gecko pool only). <a href="https://dexscreener.com/search?q='+encodeURIComponent(coinCA||'')+'" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800">Search DexScreener</a></div>';
+    return;
+  }
+  emb.innerHTML=
+    '<iframe title="dex" src="'+src+'" style="width:100%;height:460px;border:0;border-radius:14px;background:#000" loading="eager" allow="fullscreen" referrerpolicy="origin"></iframe>'+
+    '<div style="margin-top:6px;font-size:11px"><a href="'+open+'" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:700">Open DexScreener</a> · if chart stays on Loading pair, tap this</div>';
 }
 async function coinFetchOHLCV(network, pool, ctf){
   /* GeckoTerminal: day aggregate=7 returns 400. Build 1W from daily.
@@ -4045,12 +4087,7 @@ async function loadCoin(){
     if($('coin-vol') && coinPool.vol24){ $('coin-vol').textContent='$'+fmt(coinPool.vol24,0)+' 24h'; $('coin-vol').style.color='#e6c878'; }
 
     // Always show Dex embed chart (works even when GT OHLCV rate-limited)
-    const emb=$('coin-embed');
-    if(emb && coinPool.address){
-      const ch=coinPool.network==='solana'?'solana':'ethereum';
-      const iv=String(coinDexInterval(coinTF));
-      emb.innerHTML='<iframe title="dex" src="https://dexscreener.com/'+ch+'/'+coinPool.address+'?embed=1&theme=dark&trades=0&info=0&interval='+iv+'" style="width:100%;height:460px;border:0;border-radius:14px;background:#000" loading="eager"></iframe>';
-    }
+    paintCoinEmbed();
     if($('coin-source'))$('coin-source').textContent='LIVE · Dex pair';
     try{ await loadCoinTF(); }
     catch(e){ if($('coin-meta'))$('coin-meta').textContent=(coinPool.name||'')+' · price OK · indicators pending: '+(e&&e.message||e); }
@@ -4105,10 +4142,8 @@ function wireCoinUI(){
       b.classList.add('on');
       coinTF = b.getAttribute('data-ctf')||'4h';
       if($('coin-tf-name')) $('coin-tf-name').textContent = coinTF.toUpperCase();
-      if(coinPool && coinPool.address && $('coin-embed')){
-        const ch = coinPool.network==='solana'?'solana':'ethereum';
-        const iv = String(coinDexInterval(coinTF));
-        $('coin-embed').innerHTML='<iframe title="dex" src="https://dexscreener.com/'+ch+'/'+coinPool.address+'?embed=1&theme=dark&trades=0&info=0&interval='+iv+'" style="width:100%;height:460px;border:0;border-radius:14px;background:#000"></iframe>';
+      if(coinPool && coinPool.address){
+        paintCoinEmbed();
       }
       if(coinPool && coinPool.address){
         loadCoinTF();
