@@ -768,25 +768,16 @@
 <div id="sentiment-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Sentiment</h2><p>X posts on your phone · spam filtered · Binance listing desk</p></div>
+    <div><h2>Sentiment</h2><p>Pick a coin → X live search opens · you read it</p></div>
     <span class="source" id="st-status">API</span>
   </div>
   <div class="card">
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
       <select id="st-saved"><option value="">Saved CAs — pick one</option></select>
       <select id="st-hunter"><option value="">Hunter CAs — pick one</option></select>
-      <button type="button" onclick="try{window.refreshSentimentTab&&window.refreshSentimentTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
+      <button type="button" onclick="try{window.refreshSentimentTab&&window.refreshSentimentTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Reload lists</button>
     </div>
-    <div style="font-size:12px;color:#c5d0dc;line-height:1.5">
-      <b style="color:#e8eef6">When you pick a coin, this is the only path:</b><br>
-      1. This phone sends the CA to the worker.<br>
-      2. Worker matches Binance “New Listing” titles. No CoinGecko. No X from Cloudflare (X blocks it).<br>
-      3. This phone searches X Live for <code>$TICKER OR TICKER solana</code>.<br>
-      4. Vote-farm / claim links → SPAM, not hype. Rest → bull / bear / mixed from the words in the post.<br>
-      5. If X shows a login wall, posts stay empty — tap Open live X. We do not invent a score.
-    </div>
-    <div id="st-log">Pick a coin. Steps print here.</div>
-    <div id="st-board"></div>
+    <div id="st-board"><div class="st-note">Pick a saved or hunter coin. X Live search opens. No scoring.</div></div>
   </div>
 </section>
 </div>
@@ -936,7 +927,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="holders-tab.js?v=20260915-h5"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260915-im1"></script>
-<script src="sentiment-tab.js?v=20260915-s3"></script>
+<script src="sentiment-tab.js?v=20260915-s4"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
 <script src="site-nav.js?v=20260914-ui1"></script>
 </body></html>
