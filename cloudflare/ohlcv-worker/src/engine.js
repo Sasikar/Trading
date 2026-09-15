@@ -1734,7 +1734,7 @@ export class Engine {
       cards,
       scannedAt: +this.store.getMeta('holders_at') || 0,
       ethSkipped: ethN,
-      source: 'Jupiter 1h/6h/24h. 4h / 1w / 1M from our snaps. Whale mix is on Solscan Analytics — we do not compute it.'
+      source: 'Jupiter 1h/6h/24h. 4h / 1w / 1M from our snaps. Whale mix is on Solscan Analytics. We do not compute it.'
     };
   }
 

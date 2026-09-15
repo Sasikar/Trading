@@ -236,9 +236,13 @@ export class OhlcvEngine {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
-    this.sql = ctx.storage.sql;
+  }
+
+  boot() {
+    if (this.engine) return;
+    this.sql = this.ctx.storage.sql;
     this.store = storeFromSql(this.sql);
-    this.engine = new Engine(this.store, env);
+    this.engine = new Engine(this.store, this.env);
   }
 
   async ensureAlarm() {
@@ -252,17 +256,31 @@ export class OhlcvEngine {
 
   async alarm() {
     try {
+      this.boot();
       await this.engine.tick('auto');
     } catch (e) {
-      this.engine.lastErr = String(e && e.message ? e.message : e);
+      try {
+        if (this.engine) this.engine.lastErr = String(e && e.message ? e.message : e);
+      } catch (e2) {}
     }
-    await this.ctx.storage.setAlarm(Date.now() + 60000);
+    try {
+      await this.ctx.storage.setAlarm(Date.now() + 60000);
+    } catch (e3) {}
   }
 
   async fetch(request) {
-    await this.ensureAlarm();
-    const out = await handleApi(this.engine, request);
-    return new Response(out.body, { status: out.status, headers: out.headers });
+    try {
+      this.boot();
+      await this.ensureAlarm();
+      const out = await handleApi(this.engine, request);
+      return new Response(out.body, { status: out.status, headers: out.headers });
+    } catch (e) {
+      const msg = String(e && e.stack ? e.stack : e);
+      return new Response(JSON.stringify({ ok: false, error: msg }), {
+        status: 200,
+        headers: { ...CORS, 'content-type': 'application/json' }
+      });
+    }
   }
 }
 
