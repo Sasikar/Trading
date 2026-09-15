@@ -285,7 +285,7 @@ Three cards on a **saved** coin: short 5m–1h, medium 2h–4h, long 1d–1w.
 | Call | Rule |
 |---|---|
 | **HOLD** | that horizon still has **live or matured/held** |
-| **EXIT** | broke under printed level, **or** history failed/broke and nothing live/held, **or** only EARLY, **or** nothing printing |
+| **EXIT** | **BROKE** only if that TF **had** a live/held/history break and spot is under **that** printed level. A WATCH range-high is not a break — then EXIT = “no live/held,” not BROKE. Early is not a hold. |
 
 **Early is not a hold.** UI: chips from `/verdict` or Pages `ca-recents.json` if the worker is 1101.
 

@@ -770,7 +770,15 @@ export function verdictCall(hz, byTf, tick, hist) {
     const st = rec && rec.status && rec.status !== 'held' ? rec.status : h.section || h.state || 'WATCH';
     return String(h.tf).toUpperCase() + ' ' + String(st).toUpperCase();
   });
-  const under = xs.find((h) => h.level > 0 && h.spot > 0 && h.spot < h.level);
+  const under = xs.find((h) => {
+    if (!(h.level > 0 && h.spot > 0 && h.spot < h.level)) return false;
+    const rec = hist && hist[maturedKey(h)];
+    const hadBreak =
+      h.section === 'live' ||
+      h.section === 'matured' ||
+      (rec && (rec.status === 'held' || rec.status === 'broke' || rec.status === 'failed'));
+    return hadBreak;
+  });
   if (under) {
     return {
       call: 'EXIT',
