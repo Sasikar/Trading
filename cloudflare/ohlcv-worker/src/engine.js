@@ -1234,11 +1234,17 @@ export class Engine {
       const saved = JSON.parse(store.getMeta('dex_calls_min') || '[]');
       if (Array.isArray(saved)) this.dexCallsMin = saved.filter((t) => Number.isFinite(+t)).map(Number);
     } catch (e) {}
-    this.rateLimitedUntil = +store.getMeta('rate_limited_until') || 0;
-    this.lastErr = store.getMeta('last_err') || '';
-    this.telegramErr = store.getMeta('telegram_err') || '';
-    const lastPoll = +store.getMeta('last_poll') || 0;
-    const lastScanned = +store.getMeta('last_scanned') || 0;
+    try {
+      this.rateLimitedUntil = +store.getMeta('rate_limited_until') || 0;
+      this.lastErr = store.getMeta('last_err') || '';
+      this.telegramErr = store.getMeta('telegram_err') || '';
+    } catch (e) {}
+    let lastPoll = 0;
+    let lastScanned = 0;
+    try {
+      lastPoll = +store.getMeta('last_poll') || 0;
+      lastScanned = +store.getMeta('last_scanned') || 0;
+    } catch (e) {}
     if (lastScanned > 0 && Date.now() - lastPoll < 180000) this.rateLimitedUntil = 0;
     if (/ntfy/i.test(this.lastErr) || /NTFY_/.test(this.lastErr)) this.lastErr = '';
   }
@@ -1736,6 +1742,88 @@ export class Engine {
       ethSkipped: ethN,
       source: 'Jupiter 1h/6h/24h. 4h / 1w / 1M from our snaps. Whale mix is on Solscan Analytics. We do not compute it.'
     };
+  }
+
+  async holdersCardFromJup(row) {
+    const ca = String(row.ca || '');
+    const solscan = 'https://solscan.io/token/' + ca + '#holders';
+    const solscanAnalytics = 'https://solscan.io/token/' + ca + '#analytics';
+    try {
+      const j = await fetchJSON(
+        'https://lite-api.jup.ag/tokens/v2/search?query=' + encodeURIComponent(ca),
+        1
+      );
+      const list = Array.isArray(j) ? j : [];
+      const tok =
+        list.find((x) => String(x.id || '').toLowerCase() === ca.toLowerCase()) || list[0];
+      if (!tok || !(+tok.holderCount > 0)) {
+        return { ca, name: row.name, n: 0, error: 'no holderCount', solscan, solscanAnalytics };
+      }
+      const n = +tok.holderCount;
+      const pct1h = (tok.stats1h || {}).holderChange;
+      const pct6h = (tok.stats6h || {}).holderChange;
+      const pct24h = (tok.stats24h || {}).holderChange;
+      return {
+        ca,
+        name: tok.symbol || row.name,
+        n,
+        at: Date.now(),
+        pct1h,
+        net1h: netHoldersFromPct(n, pct1h),
+        pct6h,
+        net6h: netHoldersFromPct(n, pct6h),
+        pct24h,
+        net24h: netHoldersFromPct(n, pct24h),
+        pct4h: null,
+        net4h: null,
+        ready4h: false,
+        pct1w: null,
+        net1w: null,
+        ready1w: false,
+        pct1M: null,
+        net1M: null,
+        ready1M: false,
+        topHoldPct: tok.audit && tok.audit.topHoldersPercentage,
+        mcap: tok.mcap,
+        solscan,
+        solscanAnalytics,
+        error: ''
+      };
+    } catch (e) {
+      return {
+        ca,
+        name: row.name,
+        n: 0,
+        error: String(e && e.message ? e.message : e).slice(0, 80),
+        solscan,
+        solscanAnalytics
+      };
+    }
+  }
+
+  async holdersLive() {
+    if (this._holdersLive && Date.now() - this._holdersLive.at < 45e3) return this._holdersLive.snap;
+    const rec = await fetchJSON(this.watchUrl(), 1);
+    const items = Array.isArray(rec) ? rec : (rec && rec.items) || [];
+    const rows = items.filter((r) => r && r.ca);
+    const sol = rows.filter((r) => chainIdOf(r.chain) === 'solana');
+    const ethN = rows.length - sol.length;
+    const cards = [];
+    for (let i = 0; i < sol.length; i += 4) {
+      const batch = sol.slice(i, i + 4);
+      const part = await Promise.all(batch.map((row) => this.holdersCardFromJup(row)));
+      cards.push.apply(cards, part);
+    }
+    cards.sort((a, b) => (+b.net1h || -1e12) - (+a.net1h || -1e12));
+    const snap = {
+      cards,
+      scannedAt: Date.now(),
+      ethSkipped: ethN,
+      live: true,
+      source: 'Jupiter live. Storage quota paused 4h/1w/1M snaps. Whale mix is on Solscan.'
+    };
+    this._holdersLive = { at: Date.now(), snap };
+    return snap;
   }
 
   async maybeBackfill(now) {
@@ -2889,11 +2977,17 @@ export async function handleApi(engine, request) {
     if (method === 'POST') {
       try {
         await engine.maybeHolders(Date.now(), true);
-      } catch (e) {
-        return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
-      }
+      } catch (e) {}
     }
-    return json(engine.holdersSnapshot());
+    try {
+      const snap = engine.holdersSnapshot();
+      if (snap && Array.isArray(snap.cards) && snap.cards.length) return json(snap);
+    } catch (e) {}
+    try {
+      return json(await engine.holdersLive());
+    } catch (e) {
+      return json({ ok: false, error: String(e && e.message ? e.message : e), cards: [] });
+    }
   }
   if (path === '/hunter' || path === '/api/hunter') {
     if (method === 'POST') {

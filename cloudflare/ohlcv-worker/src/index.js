@@ -38,11 +38,19 @@ function storeFromSql(sql) {
   }
 
   const one = (q, ...b) => {
-    const it = sql.exec(q, ...b);
-    for (const row of it) return row;
+    try {
+      const it = sql.exec(q, ...b);
+      for (const row of it) return row;
+    } catch (e) {}
     return null;
   };
-  const all = (q, ...b) => [...sql.exec(q, ...b)];
+  const all = (q, ...b) => {
+    try {
+      return [...sql.exec(q, ...b)];
+    } catch (e) {
+      return [];
+    }
+  };
   const metaMem = new Map();
   const tickMem = new Map();
   const openMem = new Map();
@@ -251,9 +259,15 @@ export class OhlcvEngine {
 
   boot() {
     if (this.engine) return;
-    this.sql = this.ctx.storage.sql;
-    this.store = storeFromSql(this.sql);
-    this.engine = new Engine(this.store, this.env);
+    try {
+      this.sql = this.ctx.storage.sql;
+      this.store = storeFromSql(this.sql);
+      this.engine = new Engine(this.store, this.env);
+    } catch (e) {
+      this.store = new MemoryStore();
+      this.engine = new Engine(this.store, this.env);
+      this.engine.lastErr = 'sqlite: ' + String(e && e.message ? e.message : e).slice(0, 120);
+    }
   }
 
   async ensureAlarm() {
@@ -280,9 +294,20 @@ export class OhlcvEngine {
   }
 
   async fetch(request) {
+    const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
+    if (path === '/health' || path === '/api/health') {
+      return new Response(
+        JSON.stringify({ ok: true, engine: 'ohlcv', ts: new Date().toISOString() }),
+        { status: 200, headers: { ...CORS, 'content-type': 'application/json' } }
+      );
+    }
     try {
       this.boot();
-      await this.ensureAlarm();
+      if (path !== '/holders' && path !== '/api/holders') {
+        try {
+          await this.ensureAlarm();
+        } catch (e) {}
+      }
       const out = await handleApi(this.engine, request);
       return new Response(out.body, { status: out.status, headers: out.headers });
     } catch (e) {
