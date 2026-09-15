@@ -2405,6 +2405,14 @@ export class Engine {
     if (c === 'robinhood') return 'robinhood';
     return '';
   }
+    const c = chainIdOf(chain);
+    if (c === 'solana') return 'solana';
+    if (c === 'ethereum') return 'ethereum';
+    if (c === 'base') return 'base';
+    if (c === 'bsc') return 'binance-smart-chain';
+    if (c === 'robinhood') return 'robinhood';
+    return '';
+  }
 
   sentimentLists() {
     const slim = (r) => ({
@@ -2458,82 +2466,21 @@ export class Engine {
   }
 
   async geckoByContract(platform, ca) {
-    const url =
-      'https://api.coingecko.com/api/v3/coins/' +
-      encodeURIComponent(platform) +
-      '/contract/' +
-      encodeURIComponent(ca) +
-      '?localization=false&tickers=true&market_data=false&community_data=true&developer_data=false&sparkline=false';
-    const r = await fetch(url, {
-      headers: { Accept: 'application/json', 'User-Agent': 'TradingOhlcv/1.0' },
-      cache: 'no-store'
-    });
-    if (r.status === 404) return null;
-    if (r.status === 429) {
-      this.logFail('gecko429', 'CoinGecko sentiment 429');
-      throw new Error('HTTP 429 api.coingecko.com');
-    }
-    if (!r.ok) throw new Error('HTTP ' + r.status + ' api.coingecko.com');
-    return await r.json();
+    return null;
   }
 
-  buildSentimentReport(row, gecko, listings, now) {
+  buildSentimentReport(row, listings, now) {
     const name = row.name || '';
-    const symbol = String((gecko && gecko.symbol) || name || '').replace(/^\$/, '');
-    const votesUp = gecko ? gecko.sentiment_votes_up_percentage : null;
-    const votesDown = gecko ? gecko.sentiment_votes_down_percentage : null;
-    const comm = (gecko && gecko.community_data) || {};
-    const tw = comm.twitter_followers || 0;
-    const reddit = comm.reddit_subscribers || 0;
-    const twHandle = ((gecko && gecko.links) || {}).twitter_screen_name || '';
-    const cats = (gecko && gecko.categories) || [];
-    const cex = [];
-    const seenCex = new Set();
-    for (const t of (gecko && gecko.tickers) || []) {
-      const ident = String((t.market && t.market.identifier) || '').toLowerCase();
-      const label = CEX_MARKET_IDS[ident];
-      if (!label || seenCex.has(label)) continue;
-      seenCex.add(label);
-      cex.push({
-        name: label,
-        pair: (t.base || '') + '/' + (t.target || ''),
-        ident
-      });
-    }
+    const symbol = String(name || '').replace(/^\$/, '');
+    const q = ('$' + symbol + ' OR ' + symbol + ' solana').trim();
+    const xUrl = 'https://x.com/search?q=' + encodeURIComponent(q) + '&src=typed_query&f=live';
     const upcoming = this.matchListingArticles(listings, name, symbol);
     const findings = [];
-    findings.push('X post tone is not available on the free stack. Official X API is paid. This tab does not scrape tweets.');
-    if (!gecko) {
-      findings.push(
-        (name || 'This token') + ' is not on CoinGecko by contract. Typical for new DEX-only memes — no community votes, no CEX ticker map.'
-      );
-    } else if (votesUp != null || votesDown != null) {
-      findings.push(
-        'CoinGecko community votes: ' +
-          (votesUp != null ? Math.round(votesUp) + '% up' : '—') +
-          ' / ' +
-          (votesDown != null ? Math.round(votesDown) + '% down' : '—') +
-          '. These are Gecko users, not X posts.'
-      );
-    } else {
-      findings.push('On CoinGecko, but no community up/down votes yet.');
-    }
-    if (twHandle || tw) {
-      findings.push(
-        'Linked X account' +
-          (twHandle ? ' @' + twHandle : '') +
-          (tw ? ' · ' + tw.toLocaleString() + ' followers' : '') +
-          '. Follower count is not tweet sentiment.'
-      );
-    }
-    if (reddit) findings.push('Reddit subscribers: ' + reddit.toLocaleString() + '.');
-    if (cex.length) findings.push('Already listed on: ' + cex.map((x) => x.name).join(', ') + '.');
-    else findings.push('No official CEX spot market on CoinGecko for this contract.');
     if (upcoming.length) {
       findings.push(
         'Binance new-listing desk matched ' +
           upcoming.length +
-          ' announcement(s). Read the title — “Will List / Will Add” is upcoming; “Added” may already be live.'
+          ' announcement(s). “Will List / Will Add” is upcoming; “Added” may already be live.'
       );
     } else {
       findings.push('No match in the latest 20 Binance New Cryptocurrency Listing posts for this name/ticker.');
@@ -2541,7 +2488,7 @@ export class Engine {
     const tick = this.store.getTick(String(row.ca || '').toLowerCase()) || {};
     if (tick.m5 != null || tick.h1 != null) {
       findings.push(
-        'Our Dex tape (not social): 5m ' +
+        'Dex tape (not social): 5m ' +
           (tick.m5 >= 0 ? '+' : '') +
           (tick.m5 != null ? Number(tick.m5).toFixed(1) : '—') +
           '% · 1h ' +
@@ -2555,21 +2502,12 @@ export class Engine {
       name,
       chain: row.chain || 'solana',
       symbol,
-      geckoId: gecko ? gecko.id : '',
-      geckoUrl: gecko ? 'https://www.coingecko.com/en/coins/' + gecko.id : '',
-      votesUp,
-      votesDown,
-      twitterFollowers: tw || 0,
-      twitter: twHandle || '',
-      reddit: reddit || 0,
-      categories: cats.filter(Boolean).slice(0, 8),
-      cex,
+      xQuery: q,
+      xUrl,
       upcoming,
       findings,
-      listed: !!cex.length,
-      geckoFound: !!gecko,
       at: now,
-      source: 'CoinGecko community + tickers. Binance CMS catalog 48. Not X posts.'
+      source: 'X posts from your phone. Binance listing desk. No CoinGecko.'
     };
   }
 
@@ -2578,7 +2516,8 @@ export class Engine {
     const k = String(ca || '').toLowerCase();
     if (!k) throw new Error('no ca');
     const lists = this.sentimentLists();
-    const row = lists.saved.find((x) => x.ca.toLowerCase() === k) || lists.hunter.find((x) => x.ca.toLowerCase() === k);
+    const row =
+      lists.saved.find((x) => x.ca.toLowerCase() === k) || lists.hunter.find((x) => x.ca.toLowerCase() === k);
     if (!row) throw new Error('CA is not on saved or hunter lists');
     let cache = {};
     try {
@@ -2587,30 +2526,18 @@ export class Engine {
       cache = {};
     }
     const hit = cache[k];
-    if (!force && hit && now - (hit.at || 0) < SENTIMENT_EVERY_MS) {
+    if (!force && hit && now - (hit.at || 0) < SENTIMENT_EVERY_MS && hit.xUrl) {
       return Object.assign({ cached: true }, hit);
     }
-    let gecko = null;
-    const plat = this.geckoPlatformOf(row.chain);
-    const platforms = plat === 'robinhood' ? ['robinhood', 'ethereum'] : plat ? [plat] : ['solana'];
-    let lastErr = '';
-    for (const p of platforms) {
-      try {
-        gecko = await this.geckoByContract(p, row.ca);
-        if (gecko) break;
-      } catch (e) {
-        lastErr = String(e && e.message ? e.message : e);
-        if (/429/.test(lastErr)) throw e;
-      }
-    }
     let listings = [];
+    let listErr = '';
     try {
       listings = await this.fetchBinanceListings(now);
     } catch (e) {
-      lastErr = (lastErr ? lastErr + ' · ' : '') + 'Binance listings ' + String(e && e.message ? e.message : e);
+      listErr = 'Binance listings ' + String(e && e.message ? e.message : e);
     }
-    const report = this.buildSentimentReport(row, gecko, listings, now);
-    if (lastErr && !gecko) report.fetchError = lastErr;
+    const report = this.buildSentimentReport(row, listings, now);
+    if (listErr) report.fetchError = listErr;
     cache[k] = report;
     const cut = now - 6 * 3600e3;
     for (const id of Object.keys(cache)) {
