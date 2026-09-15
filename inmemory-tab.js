@@ -22,12 +22,13 @@
     '- Free DO SQL writes: 100k/day, reset 00:00 UTC. Skip unchanged writes. Open 1m bars stay in memory.',
     '',
     'TABS',
-    '- MemeGate / CA / Breakout Memes / Hunter / Holders / Failures / InMemory / Verdict / Anti-FOMO / TF charts',
+    '- MemeGate / CA / Breakout Memes / Hunter / Holders / Failures / InMemory / Keep / Verdict / Anti-FOMO / TF charts',
     '- Breakout: EARLY / LIVE / MATURED only (quiet coins hidden). Print canonical breakout LEVEL, spot, dist%. LIVE ≠ buy.',
     '- Hunter: Dex discover every 20 min (Scan now = force). Hunter watch is a PIN LIST only — hunter_watch meta. NEVER merge into getWatch / ca-recents / breakout tape / Telegram.',
     '- Holders: SOL only. Jupiter 1h/6h/24h. 4h/1w/1M from our snapshots (warming until enough days). No fake Solscan growth API.',
     '- Failures: last hour of REAL errors only (Dex/Gecko 429, retries, hunter skip, nopool, telegram, stale alarm). Empty hour = none. Do not invent OK rows.',
     '- InMemory: this handoff prompt + Copy. Keep it updated when architecture changes.',
+    '- Keep: one tab. Stores your keep.google.com link on the phone and opens Keep (app or site). No Google API, no notes inside the PWA.',
     '- Verdict: tape-only HOLD/EXIT. No Dex-24h fake 1D/1W.',
     '',
     'HARD RULES',
@@ -73,7 +74,8 @@
       'holders-panel',
       'failures-panel',
       'verdict-panel',
-      'sentiment-panel'
+      'sentiment-panel',
+      'keep-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
@@ -81,7 +83,7 @@
       el.classList.remove('on');
       if (id === 'tf-panels') el.classList.add('hidden');
     });
-    ['showBreakoutMemes', 'showHunter', 'showHolders', 'showFailures', 'showVerdict', 'showSentiment'].forEach(function (fn) {
+    ['showBreakoutMemes', 'showHunter', 'showHolders', 'showFailures', 'showVerdict', 'showSentiment', 'showKeep'].forEach(function (fn) {
       try {
         window[fn](false);
       } catch (e) {}

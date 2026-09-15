@@ -247,7 +247,7 @@
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#sentiment-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 #coin-panel .card > *,#breakouts-panel .card > *,#hunter-panel .card > *,#holders-panel .card > *{margin-left:0;margin-right:0}
 .hd-card{padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a}
 .hd-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
@@ -426,6 +426,7 @@
   <button type="button" class="tab" data-tf="sentiment">Sentiment</button>
   <button type="button" class="tab" data-tf="failures">Failures</button>
   <button type="button" class="tab" data-tf="inmemory">InMemory</button>
+  <button type="button" class="tab" data-tf="keep">Keep</button>
   <button type="button" class="tab" data-tf="verdict">Verdict</button>
   <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
@@ -817,6 +818,30 @@
   </div>
 </section>
 </div>
+
+<div id="keep-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Keep</h2><p>Your Google Keep link · opens the Keep app or site</p></div>
+    <span class="source">LINK</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <button type="button" onclick="try{window.openKeepLink&&window.openKeepLink()}catch(e){alert(e)}" style="padding:10px 16px;border-radius:10px;border:0;background:#62e3a0;color:#06120b;font-weight:800;cursor:pointer">Open Keep</button>
+      <button type="button" onclick="try{window.openKeepNotes&&window.openKeepNotes()}catch(e){}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Notes</button>
+      <button type="button" onclick="try{window.openKeepReminders&&window.openKeepReminders()}catch(e){}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Reminders</button>
+    </div>
+    <div style="font-size:11px;color:#8491a1;line-height:1.45">Google blocks embedding Keep inside this PWA. This tab stores <b style="color:#c5d0dc">your</b> keep.google.com link on this phone and opens it. We never read your notes.</div>
+    <label style="display:flex;flex-direction:column;gap:6px;font-size:10px;font-weight:800;letter-spacing:.08em;color:#8491a1">KEEP LINK
+      <input id="keep-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://keep.google.com/" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #263341;background:#080d13;color:#e8eef6;font:700 13px Inter,system-ui,sans-serif">
+    </label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <button type="button" id="keep-save" onclick="try{window.saveKeepLink&&window.saveKeepLink()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Save link</button>
+      <span style="font-size:12px;color:#8491a1">Paste a specific note URL if you have one</span>
+    </div>
+  </div>
+</section>
+</div>
 <div id="verdict-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
@@ -924,12 +949,13 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260915-st1"></script>
+<script src="overview-app.js?v=20260915-k1"></script>
 <script src="breakout-tab.js?v=20260915-eq4"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
 <script src="holders-tab.js?v=20260915-h5"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
-<script src="inmemory-tab.js?v=20260915-im1"></script>
+<script src="inmemory-tab.js?v=20260915-im2"></script>
+<script src="keep-tab.js?v=20260915-k1"></script>
 <script src="sentiment-tab.js?v=20260915-s5"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
 <script src="site-nav.js?v=20260914-ui1"></script>

@@ -151,7 +151,8 @@
       'holders-panel',
       'failures-panel',
       'inmemory-panel',
-      'verdict-panel'
+      'verdict-panel',
+      'keep-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
@@ -159,7 +160,7 @@
       el.classList.remove('on');
       if (id === 'tf-panels') el.classList.add('hidden');
     });
-    ['showBreakoutMemes', 'showHunter', 'showHolders', 'showFailures', 'showInMemory', 'showVerdict'].forEach(
+    ['showBreakoutMemes', 'showHunter', 'showHolders', 'showFailures', 'showInMemory', 'showVerdict', 'showKeep'].forEach(
       function (fn) {
         try {
           window[fn](false);

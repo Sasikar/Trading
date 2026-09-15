@@ -140,7 +140,8 @@
       'holders-panel',
       'verdict-panel',
       'inmemory-panel',
-      'sentiment-panel'
+      'sentiment-panel',
+      'keep-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
@@ -165,6 +166,9 @@
     } catch (e) {}
     try {
       window.showSentiment(false);
+    } catch (e) {}
+    try {
+      window.showKeep(false);
     } catch (e) {}
   }
 
