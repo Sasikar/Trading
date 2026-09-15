@@ -2,7 +2,7 @@
  * API-only Worker. Does NOT host GitHub Pages. No login gate.
  * GitHub Pages (sasikar.github.io/Trading) GETs this for breakout cards.
  */
-import { Engine, MemoryStore, handleApi, CORS, json } from './engine.js';
+import { Engine, MemoryStore, handleApi, CORS, json, AUTO_EVERY_MS } from './engine.js';
 
 function storeFromSql(sql) {
   try {
@@ -202,7 +202,7 @@ function storeFromSql(sql) {
       for (const [k, bar] of openMem) {
         const i = k.indexOf('|');
         const tf = k.slice(i + 1);
-        if (tf === '1d' || tf === '1w' || tf === '1M') continue;
+        if (tf === '1m' || tf === '1d' || tf === '1w' || tf === '1M') continue;
         sql.exec(
           `INSERT OR REPLACE INTO open_bar (ca,tf,t,o,h,l,c,vol,buys,sells,n)
            VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
@@ -275,7 +275,7 @@ export class OhlcvEngine {
     const now = Date.now();
     /* A past/stuck alarm still returns a timestamp, so `if (!next)` never re-arms. */
     if (!next || next <= now + 2000) {
-      await this.ctx.storage.setAlarm(now + 4000);
+      await this.ctx.storage.setAlarm(now + (AUTO_EVERY_MS || 300000));
     }
   }
 
@@ -289,7 +289,7 @@ export class OhlcvEngine {
       } catch (e2) {}
     }
     try {
-      await this.ctx.storage.setAlarm(Date.now() + 60000);
+      await this.ctx.storage.setAlarm(Date.now() + (AUTO_EVERY_MS || 300000));
     } catch (e3) {}
   }
 
@@ -333,7 +333,7 @@ export default {
     return env.ENGINE.get(id).fetch(stubReq);
   },
   async scheduled(event, env, ctx) {
-    // Kick the Durable Object alarm. Alarm polls saved CAs ~60s.
+    // Kick the Durable Object alarm. Auto tape is 5m; 1m is on-demand.
     const id = env.ENGINE.idFromName('main');
     ctx.waitUntil(env.ENGINE.get(id).fetch(new Request('https://ohlcv.local/status')));
   }

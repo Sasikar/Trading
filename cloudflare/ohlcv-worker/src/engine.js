@@ -20,12 +20,15 @@ export const TF_SEC = {
   '1M': 2592000
 };
 export const TAPE_TFS = Object.keys(TF_SEC);
+export const AUTO_TFS = TAPE_TFS.filter((tf) => tf !== '1m');
 export const LONG_TFS = ['1d', '1w', '1M'];
 export const ALL_TFS = [...TAPE_TFS];
+/** Auto tape writes 5m+. 1m is on-demand only (open 1m / /run / /candles?tf=1m). */
+export const AUTO_EVERY_MS = 5 * 60e3;
 export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
 export const ALIGN_MIN = 2;
 export const KEEP_LONG_MS = 730 * 86400e3;
-/** One Gecko 1D page per this interval. Dex 60s poll is unchanged. */
+/** One Gecko 1D page per this interval. Auto Dex poll is 5m (1m on-demand). */
 export const GECKO_EVERY_MS = 3600e3;
 export const HOLDERS_EVERY_MS = 15 * 60e3;
 /** Hunter Dex discover + score. Not the 60s saved-CA tape. */
@@ -1391,12 +1394,13 @@ export class Engine {
     };
   }
 
-  applyTick(ca, tick) {
+  applyTick(ca, tick, tfs) {
     const prev = this.store.getTick(ca);
     const volPiece = prev && tick.vol24h >= 0 ? Math.max(0, tick.vol24h - (prev.vol24h || 0)) : 0;
     this.store.setTick(ca, tick);
     const closed = [];
-    for (const tf of TAPE_TFS) {
+    const list = tfs && tfs.length ? tfs : AUTO_TFS;
+    for (const tf of list) {
       const bucket = bucketForTf(tf, tick.t);
       let open = this.store.openBar(ca, tf);
       if (open && open.t !== bucket) {
@@ -2744,7 +2748,7 @@ export class Engine {
     const now = Date.now();
     if (this.busy) return { skipped: true };
     const lastPoll0 = +this.store.getMeta('last_poll') || 0;
-    if (lastPoll0 && now - lastPoll0 > 180000) {
+    if (lastPoll0 && now - lastPoll0 > 12 * 60e3) {
       this.logFail('stale', 'worker silent ' + Math.round((now - lastPoll0) / 60000) + 'm', {
         gapMs: now - lastPoll0
       });
@@ -2780,12 +2784,19 @@ export class Engine {
       }
       const focus = (this.store.getMeta('focus_ca') || '').toLowerCase();
       const lastAll = +this.store.getMeta('last_all') || 0;
-      const doAll = mode === 'all' || now - lastAll >= 55000;
-      const targets = doAll ? rows : rows.filter((r) => r.ca.toLowerCase() === focus);
+      const want1m = mode === '1m' || mode === 'all';
+      const doAll = mode === 'all' || mode === 'auto' || (!want1m && now - lastAll >= AUTO_EVERY_MS);
+      let targets = doAll ? rows : rows.filter((r) => r.ca.toLowerCase() === focus);
+      if (mode === '1m') {
+        targets = focus
+          ? rows.filter((r) => r.ca.toLowerCase() === focus)
+          : rows.slice(0, 1);
+      }
       if (!targets.length) {
         this.store.setMeta('last_poll', String(now));
         return { scanned: 0 };
       }
+      const tfs = want1m ? TAPE_TFS : AUTO_TFS;
       const byCa = await fetchDexPairsForCas(targets.map((r) => r.ca));
       const nCalls = byCa.calls || 1;
       for (let i = 0; i < nCalls; i++) this.dexCallsMin.push(now);
@@ -2804,11 +2815,11 @@ export class Engine {
         }
         scanned++;
         const tick = pairToTick(pair, row, now);
-        const closed = this.applyTick(row.ca, tick);
+        const closed = this.applyTick(row.ca, tick, tfs);
         const tfsToCheck = new Set(closed.map((c) => c.tf));
-        if (doAll) {
-          for (const tf of ALL_TFS) tfsToCheck.add(tf);
-        } else {
+        if (doAll && !want1m) {
+          for (const tf of AUTO_TFS) tfsToCheck.add(tf);
+        } else if (want1m) {
           tfsToCheck.add('1m');
         }
         for (const tf of tfsToCheck) {
@@ -3036,6 +3047,11 @@ export async function handleApi(engine, request) {
   if ((path === '/focus' || path === '/api/focus') && method === 'POST') {
     const body = await request.json().catch(() => ({}));
     const out = engine.setFocus(body.ca || '', body.alerts1m);
+    if (body.ca) {
+      try {
+        await engine.tick('1m');
+      } catch (e) {}
+    }
     return json(out);
   }
   if ((path === '/ping-telegram' || path === '/api/ping-telegram') && method === 'POST') {
@@ -3084,6 +3100,12 @@ export async function handleApi(engine, request) {
     const ca = url.searchParams.get('ca') || '';
     const tf = (url.searchParams.get('tf') || '15m').toLowerCase();
     const n = Math.min(800, Math.max(5, +(url.searchParams.get('n') || 50)));
+    if (tf === '1m' && ca) {
+      try {
+        engine.setFocus(ca);
+        await engine.tick('1m');
+      } catch (e) {}
+    }
     return json({ ca, tf, bars: engine.store.bars(ca, tf, n) });
   }
   return json({ error: 'not found', path }, 404);
