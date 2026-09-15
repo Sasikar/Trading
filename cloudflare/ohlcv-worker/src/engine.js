@@ -155,6 +155,13 @@ export async function fetchJSON(url, tries = 2) {
       });
       if (r.status === 429) {
         last = new Error('HTTP 429 ' + host);
+        if (FAIL_SINK) {
+          FAIL_SINK(
+            'http429',
+            host + ' try ' + (i + 1) + '/' + tries + (i + 1 < tries ? ' · retry wait' : ' · give up'),
+            { host, n: i + 1 }
+          );
+        }
         // Do not retry-storm 429s — that is how 18 coins turns into a ban.
         if (i + 1 < tries) await sleep(1600);
         continue;
@@ -167,6 +174,11 @@ export async function fetchJSON(url, tries = 2) {
     }
   }
   throw last || new Error('fetch failed ' + host);
+}
+
+let FAIL_SINK = null;
+export function setFailSink(fn) {
+  FAIL_SINK = typeof fn === 'function' ? fn : null;
 }
 
 export function pickBestPair(pairs, chain, ca) {
@@ -1225,6 +1237,8 @@ export class Engine {
     this.dexCallsMin = [];
     this.rateLimitedUntil = 0;
     this.geckoUntil = 0;
+    this._failBuf = [];
+    setFailSink((k, m, x) => this.logFail(k, m, x));
     try {
       const saved = JSON.parse(store.getMeta('dex_calls_min') || '[]');
       if (Array.isArray(saved)) this.dexCallsMin = saved.filter((t) => Number.isFinite(+t)).map(Number);
@@ -1273,6 +1287,7 @@ export class Engine {
       this.ntfyErr = msg;
     }
     this.store.setMeta('ntfy_err', this.ntfyErr);
+    this.logFail('ntfy', this.ntfyErr);
   }
 
   telegramWantedUsername() {
@@ -1287,6 +1302,7 @@ export class Engine {
   markTelegramFail(err) {
     this.telegramErr = String(err && err.message ? err.message : err);
     this.store.setMeta('telegram_err', this.telegramErr);
+    this.logFail('telegram', this.telegramErr);
   }
   async resolveTelegramChat() {
     const saved = this.telegramChatId();
@@ -1346,6 +1362,72 @@ export class Engine {
     const cut = now - 60000;
     this.dexCallsMin = this.dexCallsMin.filter((t) => t >= cut);
     return this.dexCallsMin.length;
+  }
+
+  logFail(kind, msg, extra) {
+    const row = {
+      t: Date.now(),
+      k: String(kind || 'err').slice(0, 24),
+      m: String(msg || '').slice(0, 180)
+    };
+    if (extra && extra.host) row.host = String(extra.host).slice(0, 48);
+    if (extra && extra.n != null) row.n = extra.n;
+    if (extra && extra.gapMs) row.gapMs = extra.gapMs;
+    this._failBuf = this._failBuf || [];
+    this._failBuf.push(row);
+  }
+  failLog() {
+    try {
+      const a = JSON.parse(this.store.getMeta('fail_log') || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  flushFails(now) {
+    now = now || Date.now();
+    const buf = this._failBuf || [];
+    this._failBuf = [];
+    if (!buf.length) return 0;
+    const cut = now - 24 * 3600e3;
+    const log = this.failLog()
+      .concat(buf)
+      .filter((x) => x && +x.t >= cut)
+      .slice(-240);
+    this.store.setMeta('fail_log', JSON.stringify(log));
+    return buf.length;
+  }
+  failuresSnapshot(now) {
+    now = now || Date.now();
+    const hourCut = now - 3600e3;
+    const all = this.failLog();
+    const hour = all.filter((x) => +x.t >= hourCut);
+    const older = all.filter((x) => +x.t < hourCut);
+    const countsHour = {};
+    for (const x of hour) countsHour[x.k] = (countsHour[x.k] || 0) + 1;
+    const st = this.status();
+    return {
+      now,
+      live: {
+        health: st.health,
+        lastPoll: st.lastPoll,
+        pollMs: st.pollMs,
+        error: st.error || '',
+        ntfyError: st.ntfyError || '',
+        telegramError: st.telegramError || '',
+        dexCallsLastMin: st.dexCallsLastMin,
+        rateLimitedUntil: this.rateLimitedUntil || 0,
+        hunterErr: this.store.getMeta('hunter_err') || '',
+        holdersErr: this.store.getMeta('holders_err') || '',
+        backfillLast: st.backfillLast || null
+      },
+      hour,
+      older,
+      countsHour,
+      nHour: hour.length,
+      nOlder: older.length,
+      note: 'Only real failures. Empty last hour means none were logged.'
+    };
   }
 
   applyTick(ca, tick) {
@@ -1766,6 +1848,7 @@ export class Engine {
       this.store.setMeta('bf_gecko_at', String(now));
       map[ca] = { status: 'err', why: 'no pool', at: now };
       this.store.setMeta('bf_long', JSON.stringify(map));
+      this.logFail('gecko_nopool', (row.name || ca) + ' no pool');
       return { ca, error: 'no pool' };
     }
     const net = geckoNetworkOf(row.chain || tick.chain);
@@ -1792,10 +1875,12 @@ export class Engine {
           'bf_last',
           JSON.stringify({ ca, name: row.name, at: now, error: '429', waitMs: GECKO_EVERY_MS })
         );
+        this.logFail('gecko429', (row.name || ca) + ' Gecko 429');
         return { ca, skipped: '429' };
       }
       map[ca] = { status: 'err', why: m.slice(0, 100), at: now };
       this.store.setMeta('bf_long', JSON.stringify(map));
+      this.logFail('gecko_err', (row.name || ca) + ' ' + m.slice(0, 100));
       return { ca, error: m };
     }
     if (j && j.status && (j.status.error_code === 429 || /rate limit/i.test(String(j.status.error_message || '')))) {
@@ -1804,6 +1889,7 @@ export class Engine {
         'bf_last',
         JSON.stringify({ ca, name: row.name, at: now, error: '429-json', waitMs: GECKO_EVERY_MS })
       );
+      this.logFail('gecko429', (row.name || ca) + ' Gecko 429-json');
       return { ca, skipped: '429' };
     }
     const list = (((j || {}).data || {}).attributes || {}).ohlcv_list || [];
@@ -2387,8 +2473,16 @@ export class Engine {
   }
   async refreshHunter(now, force) {
     now = now || Date.now();
-    if (!force && now < this.rateLimitedUntil) return { skipped: true, rateLimited: true };
-    if (!force && this.dexCallsLastMin(now) >= 22) return { skipped: true, budget: true };
+    if (!force && now < this.rateLimitedUntil) {
+      this.logFail('hunter_skip', 'rateLimited');
+      this.flushFails(now);
+      return { skipped: true, rateLimited: true };
+    }
+    if (!force && this.dexCallsLastMin(now) >= 22) {
+      this.logFail('hunter_skip', 'dex budget ' + this.dexCallsLastMin(now));
+      this.flushFails(now);
+      return { skipped: true, budget: true };
+    }
     const lastDisc = +this.store.getMeta('hunter_discover') || 0;
     const lastScore = +this.store.getMeta('hunter_at') || 0;
     const doDiscover = force || now - lastDisc >= HUNTER_EVERY_MS;
@@ -2487,13 +2581,25 @@ export class Engine {
     this.store.setMeta('hunter_err', '');
     this.dexCallsLastMin(now);
     this.store.setMeta('dex_calls_min', JSON.stringify(this.dexCallsMin));
+    this.flushFails(now);
     return { hits: top.length, calls, discover: doDiscover, seeded: uniq.length, matched: hits.length, miss };
   }
 
   async tick(mode) {
     const now = Date.now();
     if (this.busy) return { skipped: true };
+    const lastPoll0 = +this.store.getMeta('last_poll') || 0;
+    if (lastPoll0 && now - lastPoll0 > 180000) {
+      this.logFail('stale', 'worker silent ' + Math.round((now - lastPoll0) / 60000) + 'm', {
+        gapMs: now - lastPoll0
+      });
+    }
     if (now < this.rateLimitedUntil) {
+      this.logFail(
+        'paused',
+        'tick skipped Dex pause ' + Math.round((this.rateLimitedUntil - now) / 1000) + 's'
+      );
+      this.flushFails(now);
       return { skipped: true, rateLimited: true };
     }
     this.busy = true;
@@ -2568,6 +2674,8 @@ export class Engine {
       } else {
         this.lastErr = errors ? errors + ' without pool' : this.lastErr;
       }
+      if (n429) this.logFail('dex429', 'DexScreener 429 on ' + n429 + '/' + targets.length, { n: n429 });
+      if (errors) this.logFail('nopool', errors + ' without pool', { n: errors });
       this.store.setMeta('last_poll', String(now));
       if (doAll) this.store.setMeta('last_all', String(now));
       this.store.setMeta('last_n_alert', String(nAlert));
@@ -2583,17 +2691,23 @@ export class Engine {
       try {
         await this.maybeBackfill(now);
       } catch (e) {
-        this.store.setMeta('bf_err', String(e && e.message ? e.message : e).slice(0, 120));
+        const m = String(e && e.message ? e.message : e).slice(0, 120);
+        this.store.setMeta('bf_err', m);
+        this.logFail('gecko_err', m);
       }
       try {
         await this.refreshHunter(now);
       } catch (e) {
-        this.store.setMeta('hunter_err', String(e && e.message ? e.message : e));
+        const m = String(e && e.message ? e.message : e);
+        this.store.setMeta('hunter_err', m);
+        this.logFail('hunter_err', m.slice(0, 180));
       }
       try {
         await this.maybeHolders(now);
       } catch (e) {
-        this.store.setMeta('holders_err', String(e && e.message ? e.message : e).slice(0, 120));
+        const m = String(e && e.message ? e.message : e).slice(0, 120);
+        this.store.setMeta('holders_err', m);
+        this.logFail('holders_err', m);
       }
       if (now % 3600000 < 30000) this.store.prune(now);
       return { scanned, errors, n429, nAlert, doAll, targets: targets.length };
@@ -2603,8 +2717,12 @@ export class Engine {
       if (dex429) this.rateLimitedUntil = now + 20000;
       this.store.setMeta('rate_limited_until', String(this.rateLimitedUntil || 0));
       this.store.setMeta('last_err', this.lastErr || '');
+      this.logFail(dex429 ? 'dex429' : 'tick_err', this.lastErr);
       return { error: this.lastErr };
     } finally {
+      try {
+        this.flushFails(now);
+      } catch (e) {}
       this.busy = false;
     }
   }
@@ -2677,6 +2795,9 @@ export async function handleApi(engine, request) {
     const ca = url.searchParams.get('ca') || '';
     return json(engine.verdictFor(ca));
   }
+  if (path === '/failures' || path === '/api/failures') {
+    return json(engine.failuresSnapshot());
+  }
   if (path === '/holders' || path === '/api/holders') {
     if (method === 'POST') {
       try {
@@ -2691,6 +2812,7 @@ export async function handleApi(engine, request) {
     if (method === 'POST') {
       try {
         const out = await engine.refreshHunter(Date.now(), true);
+        engine.flushFails(Date.now());
         return json({
           ok: true,
           ...out,

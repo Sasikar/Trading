@@ -224,7 +224,7 @@
     try {
       window.showHunter(false);
     } catch (e) {}
-    ['tf-panels', 'trend-panel', 'struct-panel', 'macro-panel', 'signal-panel', 'memegate-panel', 'coin-panel', 'antifomo-panel', 'hunter-panel', 'breakouts-panel', 'holders-panel'].forEach(
+    ['tf-panels', 'trend-panel', 'struct-panel', 'macro-panel', 'signal-panel', 'memegate-panel', 'coin-panel', 'antifomo-panel', 'hunter-panel', 'breakouts-panel', 'holders-panel', 'failures-panel'].forEach(
       function (id) {
         const el = $(id);
         if (!el) return;

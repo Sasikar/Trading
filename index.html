@@ -247,7 +247,7 @@
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 #coin-panel .card > *,#breakouts-panel .card > *,#hunter-panel .card > *,#holders-panel .card > *{margin-left:0;margin-right:0}
 .hd-card{padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a}
 .hd-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
@@ -263,6 +263,13 @@
 .hd-cell .sub{font-size:10px;color:#8491a1;margin-top:2px;min-height:14px}
 .hd-foot{margin-top:8px;font-size:11px;color:#8491a1;line-height:1.45}
 .hd-foot a{color:#6eb6ff;text-decoration:none;font-weight:700}
+.fl-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #243041;background:#0b121a;font-size:11px;font-weight:800;color:#c5d0dc}
+.fl-chip b{color:#ff6f7c}
+.fl-row{padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#0b121a}
+.fl-row .k{font-size:10px;font-weight:900;letter-spacing:.08em;color:#ff8a96}
+.fl-row .m{font-size:13px;font-weight:700;color:#e8eef6;margin-top:4px}
+.fl-row .t{font-size:11px;color:#8491a1;margin-top:3px}
+.fl-live{padding:10px 12px;border-radius:10px;border:1px solid #3a3426;background:#17130d;font-size:12px;color:#c9b8a0;line-height:1.45}
 .vd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 14px;flex-wrap:wrap}
 .vd-name{font-size:18px;font-weight:900}
 .vd-name span{font-size:11px;color:#8491a1;font-weight:700}
@@ -398,6 +405,7 @@
   <button type="button" class="tab" data-tf="breakouts">Breakout Memes</button>
   <button type="button" class="tab" data-tf="hunter">Hunter</button>
   <button type="button" class="tab" data-tf="holders">Holders</button>
+  <button type="button" class="tab" data-tf="failures">Failures</button>
   <button type="button" class="tab" data-tf="verdict">Verdict</button>
   <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
@@ -740,6 +748,24 @@
   </div>
 </section>
 </div>
+<div id="failures-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Failures</h2><p>Last hour · real 429s, skips, retries · not invented</p></div>
+    <span class="source" id="fl-source">WORKER LOG</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      <button type="button" onclick="try{window.refreshFailuresTab&&window.refreshFailuresTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
+      <span id="fl-status" style="font-size:12px;color:#8491a1">Open this tab to load</span>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">Worker writes a row only when something actually fails (Dex/Gecko 429, retry, hunter skip, no pool, ntfy, telegram, stale gap). Empty last hour means none — not a fake “all good”.</div>
+    <div id="fl-list" style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#8491a1">Open Failures to load the last hour.</div>
+    </div>
+  </div>
+</section>
+</div>
 <div id="verdict-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
@@ -847,10 +873,11 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260915-dex1"></script>
+<script src="overview-app.js?v=20260915-fl1"></script>
 <script src="breakout-tab.js?v=20260915-eq3"></script>
 <script src="hunter-tab.js?v=20260915-h8"></script>
-<script src="holders-tab.js?v=20260915-h3"></script>
+<script src="holders-tab.js?v=20260915-h4"></script>
+<script src="failures-tab.js?v=20260915-f1"></script>
 <script src="verdict-tab.js?v=20260915-v5"></script>
 <script src="site-nav.js?v=20260914-ui1"></script>
 </body></html>
