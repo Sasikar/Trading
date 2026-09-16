@@ -38,6 +38,13 @@
     if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 1e5 ? 0 : 1) + 'k';
     return '$' + Math.round(n);
   }
+  function volM(n) {
+    n = +n || 0;
+    if (!(n > 0)) return '';
+    const m = n / 1e6;
+    const s = m >= 100 ? m.toFixed(0) : m >= 10 ? m.toFixed(1) : m.toFixed(2);
+    return '$' + s.replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + 'M';
+  }
   const TOOLS_SOL = [
     { id: 'bubblemaps', title: 'Bubblemaps', domain: 'bubblemaps.io' },
     { id: 'trench', title: 'Trench Radar', domain: 'trench.bot' },
@@ -135,7 +142,7 @@
       (both
         ? ' <span title="You verified the chain scanners" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
         : '') +
-      ((h.highVol || (h.vol24h && h.liq && h.vol24h >= 0.12 * h.liq)) ? ' <span title="High volume vs liquidity" style="font-size:10px;color:#061018;background:#6eb6ff;font-weight:900;padding:2px 6px;border-radius:999px;letter-spacing:.04em">VOL</span>' : '') +
+      ((h.highVol || (h.vol24h && h.liq && h.vol24h >= 0.12 * h.liq)) ? ' <span title="24h volume" style="font-size:10px;color:#061018;background:#6eb6ff;font-weight:900;padding:2px 7px;border-radius:999px;letter-spacing:.03em">V ' + esc(volM(h.vol24h) || '—') + '</span>' : '') +
       (h.boosted ? ' <span style="font-size:10px;color:#f0a060;font-weight:800">PAID BOOST</span>' : '') +
       (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">HUNTER WATCH</span>' : '') +
       (h.onBreakout ? ' <span style="font-size:10px;color:#8491a1;font-weight:800">SAVED CA</span>' : '') +
@@ -212,7 +219,7 @@
         band.range +
         ' · ' +
         rows.length +
-        ' · blue VOL = high 24h volume</div></div>' +
+        ' · V $xM = 24h volume</div></div>' +
         body +
         '</div>'
       );
