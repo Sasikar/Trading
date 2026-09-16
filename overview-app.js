@@ -614,45 +614,117 @@ function dailySwingSR(klDaily){
   }
   return {s,r};
 }
-function renderBtcHeatmap(book, klDaily){
-  const host=$('hm-chart'), verdict=$('hm-verdict'), st=$('hm-status'), src=$('hm-source');
-  if(!host) return {peak:null, side:null};
-  if(!book){
-    if(st){st.className='struct-status unav';st.textContent='⚪ Unavailable';}
-    if(verdict){verdict.className='hm-verdict';verdict.textContent='No live book.';}
-    host.innerHTML='<div style="padding:12px;color:#8491a1;font-size:12px">Order book failed. <a href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">Open Coinglass heatmap</a></div>';
-    return {peak:null, side:null};
-  }
-  const bids=book.bids, asks=book.asks;
-  const bestBid=+bids[0][0], bestAsk=+asks[0][0], mid=(bestBid+bestAsk)/2;
-  const sr=dailySwingSR(klDaily);
-  const lo=mid*0.98, hi=mid*1.02;
+let hmTf='1h';
+let hmState={book:null,klD:null,klH:null};
+function paintHmTf(){
+  document.querySelectorAll('.hm-tf-btn').forEach(function(b){
+    b.classList.toggle('on', b.getAttribute('data-hmtf')===hmTf);
+  });
+}
+function volumeProfile(kl, midHint){
+  const rows=(kl||[]).filter(k=>k && +k[2]>0 && +k[3]>0 && +k[4]>0);
+  if(rows.length<4) return null;
+  const closed=rows.slice(0,-1);
+  const use=closed.length>=8?closed:rows;
+  let lo=Infinity, hi=-Infinity, mid=+use[use.length-1][4];
+  if(midHint>0) mid=midHint;
+  for(const k of use){ lo=Math.min(lo,+k[3]); hi=Math.max(hi,+k[2]); }
+  if(!(hi>lo)) return null;
+  const pad=(hi-lo)*0.04;
+  lo-=pad; hi+=pad;
   const n=36, step=(hi-lo)/n;
-  const buckets=Array.from({length:n},(_,i)=>({p:lo+(i+0.5)*step, bid:0, ask:0}));
-  const put=function(price, usd, side){
-    if(price<lo||price>=hi) return;
-    const i=Math.min(n-1, Math.max(0, Math.floor((price-lo)/step)));
-    buckets[i][side]+=usd;
-  };
-  for(const [p,sz] of bids) put(+p, +p*+sz, 'bid');
-  for(const [p,sz] of asks) put(+p, +p*+sz, 'ask');
-  let maxUsd=1, peakBid={usd:0,p:null}, peakAsk={usd:0,p:null};
+  const buckets=Array.from({length:n},(_,i)=>({p:lo+(i+0.5)*step, bid:0, ask:0, vol:0}));
+  for(const k of use){
+    const L=+k[3], H=+k[2], C=+k[4], V=+k[5]||0;
+    const usd=V*C;
+    if(!(usd>0) || !(H>=L)) continue;
+    const span=H-L || step;
+    const i0=Math.min(n-1, Math.max(0, Math.floor((L-lo)/step)));
+    const i1=Math.min(n-1, Math.max(0, Math.floor((H-lo)/step)));
+    const parts=i1-i0+1;
+    const slice=usd/parts;
+    for(let i=i0;i<=i1;i++){
+      buckets[i].vol+=slice;
+      if(buckets[i].p>=mid) buckets[i].ask+=slice;
+      else buckets[i].bid+=slice;
+    }
+  }
+  return {buckets, lo, hi, n, step, mid};
+}
+function renderBtcHeatmap(book, klDaily, klHour){
+  const host=$('hm-chart'), verdict=$('hm-verdict'), st=$('hm-status'), src=$('hm-source');
+  paintHmTf();
+  if(!host) return {peak:null, side:null};
+  const sr=dailySwingSR(klDaily);
+  const mode=hmTf;
+  let buckets=null, lo=0, hi=0, n=36, step=1, mid=0, unit='book', source='';
+  if(mode==='live'){
+    if(!book||!book.bids||!book.asks||!book.bids.length){
+      if(st){st.className='struct-status unav';st.textContent='⚪ Unavailable';}
+      if(verdict){verdict.className='hm-verdict';verdict.textContent='No live book.';}
+      host.innerHTML='<div style="padding:12px;color:#8491a1;font-size:12px">Order book failed.</div>';
+      return {peak:null, side:null};
+    }
+    const bids=book.bids, asks=book.asks;
+    const bestBid=+bids[0][0], bestAsk=+asks[0][0];
+    mid=(bestBid+bestAsk)/2;
+    const px=bids.map(x=>+x[0]).concat(asks.map(x=>+x[0]));
+    lo=Math.min.apply(null,px); hi=Math.max.apply(null,px);
+    if(!(hi>lo)) { lo=mid*0.995; hi=mid*1.005; }
+    n=36; step=(hi-lo)/n;
+    buckets=Array.from({length:n},(_,i)=>({p:lo+(i+0.5)*step, bid:0, ask:0}));
+    const put=function(price, usd, side){
+      if(price<lo||price>hi) return;
+      const i=Math.min(n-1, Math.max(0, Math.floor((price-lo)/step)));
+      buckets[i][side]+=usd;
+    };
+    for(const [p,sz] of bids) put(+p, +p*+sz, 'bid');
+    for(const [p,sz] of asks) put(+p, +p*+sz, 'ask');
+    source=book.source||'OKX book';
+    unit='book';
+  } else {
+    const kl=mode==='1d'?klDaily:klHour;
+    const mark=book&&book.bids&&book.asks?((+book.bids[0][0]+ +book.asks[0][0])/2):null;
+    const vp=volumeProfile(kl, mark);
+    if(!vp){
+      if(st){st.className='struct-status unav';st.textContent='⚪ Unavailable';}
+      if(verdict){verdict.className='hm-verdict';verdict.textContent='Need more '+mode+' candles.';}
+      host.innerHTML='<div style="padding:12px;color:#8491a1;font-size:12px">Volume profile needs '+mode+' candles.</div>';
+      return {peak:null, side:null};
+    }
+    buckets=vp.buckets; lo=vp.lo; hi=vp.hi; n=vp.n; step=vp.step; mid=vp.mid;
+    source=mode==='1d'?'Last ~20 daily candles · traded volume':'Last ~24 hourly candles · traded volume';
+    unit='vol';
+  }
+  let maxUsd=1, peakBid={usd:0,p:null}, peakAsk={usd:0,p:null}, peakVol={usd:0,p:null,side:null};
   for(const b of buckets){
-    if(b.bid>maxUsd) maxUsd=b.bid; if(b.ask>maxUsd) maxUsd=b.ask;
+    const usd=(b.bid||0)+(b.ask||0)||(b.vol||0);
+    if(b.bid>maxUsd) maxUsd=b.bid; if(b.ask>maxUsd) maxUsd=b.ask; if(usd>maxUsd) maxUsd=usd;
     if(b.bid>peakBid.usd) peakBid={usd:b.bid,p:b.p};
     if(b.ask>peakAsk.usd) peakAsk={usd:b.ask,p:b.p};
+    if(usd>peakVol.usd) peakVol={usd:usd,p:b.p,side:b.p>=mid?'ask':'bid'};
   }
-  const supportHeavy=peakBid.usd>=peakAsk.usd;
-  const peak=supportHeavy?peakBid:peakAsk;
-  const side=supportHeavy?'SUPPORT':'RESISTANCE';
+  let peak, side, supportHeavy;
+  if(unit==='vol'){
+    peak=peakVol; supportHeavy=peak.side==='bid'; side=supportHeavy?'SUPPORT':'RESISTANCE';
+  } else {
+    supportHeavy=peakBid.usd>=peakAsk.usd;
+    peak=supportHeavy?peakBid:peakAsk;
+    side=supportHeavy?'SUPPORT':'RESISTANCE';
+  }
+  const atMark=peak.p && Math.abs(peak.p-mid)/mid<0.0025;
   let onLine='';
-  if(sr.s && Math.abs(peak.p-sr.s)/mid<0.006) onLine=' · sits on daily SUPPORT '+money(sr.s);
-  else if(sr.r && Math.abs(peak.p-sr.r)/mid<0.006) onLine=' · sits on daily RESISTANCE '+money(sr.r);
+  if(sr.s && Math.abs(peak.p-sr.s)/mid<0.008){
+    onLine=side==='SUPPORT'?'':' · daily SUPPORT is here '+money(sr.s);
+  } else if(sr.r && Math.abs(peak.p-sr.r)/mid<0.008){
+    onLine=side==='RESISTANCE'?'':' · daily RESISTANCE is here '+money(sr.r);
+  }
   if(st){st.className='struct-status '+(supportHeavy?'prot':'vuln');st.textContent=(supportHeavy?'🟢':'🔴')+' '+side;}
-  if(src) src.textContent=book.source||'LIVE BOOK';
+  if(src) src.textContent=(mode==='live'?'LIVE · seconds · ':'')+source;
   if(verdict){
     verdict.className='hm-verdict '+(supportHeavy?'sup':'res');
-    verdict.textContent='Heat concentrated at '+side+' '+money(peak.p)+' · '+moneyShort(peak.usd)+' in that band'+onLine+'.';
+    const where=atMark?('at mark '+money(peak.p)): (side+' '+money(peak.p));
+    verdict.textContent='Heat concentrated '+where+' · '+moneyShort(peak.usd)+(unit==='vol'?' traded':' in that band')+onLine+'.';
   }
   const isSR=function(p){
     const tags=[];
@@ -661,7 +733,7 @@ function renderBtcHeatmap(book, klDaily){
     if(Math.abs(p-mid)<step*0.7) tags.push('M');
     return tags;
   };
-  let html='<div class="hm-axis"><span>Ask / resistance</span><span>Bid / support</span></div>';
+  let html='<div class="hm-axis"><span>'+(unit==='vol'?'Volume below mark':'Bid / support')+'</span><span>'+(unit==='vol'?'Volume above mark':'Ask / resistance')+'</span></div>';
   for(let i=n-1;i>=0;i--){
     const b=buckets[i];
     const tags=isSR(b.p);
@@ -669,8 +741,8 @@ function renderBtcHeatmap(book, klDaily){
     if(tags.indexOf('M')>=0) cls.push('mid');
     if(tags.indexOf('S')>=0) cls.push('sr-s');
     if(tags.indexOf('R')>=0) cls.push('sr-r');
-    const bw=Math.max(2, Math.round(b.bid/maxUsd*100));
-    const aw=Math.max(2, Math.round(b.ask/maxUsd*100));
+    const bw=Math.max(2, Math.round((b.bid||0)/maxUsd*100));
+    const aw=Math.max(2, Math.round((b.ask||0)/maxUsd*100));
     const tag=tags.length?' <b>'+tags.join('')+'</b>':'';
     html+='<div class="'+cls.join(' ')+'">'+
       '<div class="hm-left"><div class="hm-bar bid" style="width:'+(b.bid?bw:0)+'%"></div></div>'+
@@ -679,13 +751,19 @@ function renderBtcHeatmap(book, klDaily){
       '</div>';
   }
   const extra=[];
-  if(sr.s) extra.push('Daily SUPPORT '+money(sr.s)+(sr.s<lo?' (below window)':''));
-  if(sr.r) extra.push('Daily RESISTANCE '+money(sr.r)+(sr.r>hi?' (above window)':''));
-  extra.push('Mark '+money(mid)+' · ±2% book window · '+book.source);
+  extra.push(mode==='live'?'LIVE order book (seconds)':(mode==='1h'?'1H volume profile (updates hourly)':'1D volume profile (updates daily)'));
+  if(sr.s) extra.push('Daily S '+money(sr.s)+(sr.s<lo?' (below window)':''));
+  if(sr.r) extra.push('Daily R '+money(sr.r)+(sr.r>hi?' (above window)':''));
+  extra.push('Mark '+money(mid));
   html+='<div class="hm-cap">'+extra.join(' · ')+'</div>';
   host.innerHTML=html;
   return {peak:peak.p, side, usd:peak.usd, sr};
 }
+window.setHmTf=function(tf){
+  hmTf=String(tf||'1h');
+  paintHmTf();
+  renderBtcHeatmap(hmState.book, hmState.klD, hmState.klH);
+};
 async function loadMarketStructure(direction,klDaily){
   const statusEl=$('ms-status'), subEl=$('ms-sub');
   const set=(id,v,h)=>{if($(id))$(id).textContent=v;if(h&&$(id+'-h'))$(id+'-h').textContent=h;};
@@ -706,7 +784,12 @@ async function loadMarketStructure(direction,klDaily){
     } else set('ms-atr','Data Unavailable');
   }catch(e){ set('ms-atr','Data Unavailable'); }
   const book=await fetchBtcBook();
-  const hm=renderBtcHeatmap(book, klDaily);
+  let klH=hmState.klH;
+  if(!klH || !klH.length){
+    try{ klH=await fetchKlines('1h', 36); }catch(e){ klH=[]; }
+  }
+  hmState={book:book, klD:klDaily, klH:klH};
+  const hm=renderBtcHeatmap(book, klDaily, klH);
   if(!book||!book.bids||!book.asks||!book.bids.length){
     if(statusEl){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';}
     if(subEl) subEl.textContent='Orderbook unavailable.';

@@ -101,6 +101,10 @@
 .hm-px b{color:#e6c878;margin-left:3px}
 .hm-cap{font-size:11px;color:#8491a1;padding:8px 4px 4px;line-height:1.4}
 .hm-card a{color:#6eb6ff;font-weight:700;text-decoration:none}
+.hm-tf{display:flex;gap:6px;margin:10px 0 0;flex-wrap:wrap}
+.hm-tf-btn{padding:6px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font:800 11px Inter,system-ui,sans-serif;cursor:pointer}
+.hm-tf-btn.on{background:#1a9b6c;color:#fff;border-color:#1a9b6c}
+
 
 @media(max-width:560px){#fib-tv{height:220px}#macd-tv{height:180px}.tech-strip,.trend-badges,.detail-grid,.struct-grid{grid-template-columns:1fr}}
 
@@ -684,12 +688,17 @@
   <div class="hm-card" id="btc-hm-card">
     <div class="struct-head">
       <div class="title">BTC LIQUIDITY HEATMAP</div>
+      <div class="hm-tf" id="hm-tf">
+        <button type="button" class="hm-tf-btn" data-hmtf="live" onclick="try{window.setHmTf('live')}catch(e){}">LIVE</button>
+        <button type="button" class="hm-tf-btn on" data-hmtf="1h" onclick="try{window.setHmTf('1h')}catch(e){}">1H</button>
+        <button type="button" class="hm-tf-btn" data-hmtf="1d" onclick="try{window.setHmTf('1d')}catch(e){}">1D</button>
+      </div>
       <div class="struct-status unav" id="hm-status">…</div>
-      <div class="struct-sub" id="hm-source">Live CEX order book · not Coinglass liq map</div>
+      <div class="struct-sub" id="hm-source">1H volume at price · daily S/R overlay</div>
     </div>
     <div class="hm-verdict" id="hm-verdict">Loading book…</div>
     <div class="hm-chart" id="hm-chart"></div>
-    <div class="struct-note">Green = bids (support). Red = asks (resistance). <b>S</b>/<b>R</b> = daily swing. <b>M</b> = mark. This is live order-book density from OKX/Gate — Coinglass liquidation heatmap is a paid API. <a href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">Open Coinglass heatmap →</a></div>
+    <div class="struct-note"><b>LIVE</b> = order book (seconds, flickers). <b>1H</b> = last ~24 hourly candles (default). <b>1D</b> = daily volume. Green below mark / red above. <b>S</b>/<b>R</b> = daily swing. Coinglass liq map is paid. <a href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">Open Coinglass →</a></div>
   </div>
 </section>
 </div>
@@ -1041,7 +1050,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260916-hm2"></script>
+<script src="overview-app.js?v=20260916-hm3"></script>
 <script src="breakout-tab.js?v=20260915-eq5"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
