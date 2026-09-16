@@ -32,6 +32,7 @@
     '- G-Trade Notes (tab label G-Trade + small Notes): one keep.google.com link on the phone. Opens Keep. No Google API, no notes inside the PWA.',
     '- Tab bar: tap Arrange, drag tabs, tap Done. Saved on this phone.',
     '- Hunter: same 4 bands by market cap (Large = $10M+, no cap). High-volume stays while Dex 24h still beats the band floor. No time pin. V $xM = 24h volume.',
+    '- Hunter Growing wallets: Jupiter holderCount >= 2000 and 1h/6h holder change still up. Sub-tab inside Hunter.',
     '- Breakout TF alerts: All on / Picked / All off. Persisted on worker. Picked = only those CAs ping Telegram.',
     '- Verdict: tape-only HOLD/EXIT. No Dex-24h fake 1D/1W.',
     '',

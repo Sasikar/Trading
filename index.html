@@ -891,6 +891,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <div class="card">
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
       <button type="button" onclick="try{window.refreshHunterTab&&window.refreshHunterTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Scan now</button>
+      <button type="button" class="hu-view" data-hu-view="bands" onclick="try{window.setHunterView&&window.setHunterView('bands')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Bands</button>
+      <button type="button" class="hu-view" data-hu-view="grow" onclick="try{window.setHunterView&&window.setHunterView('grow')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">Growing wallets</button>
       <span id="hu-status" style="font-size:12px;color:#8491a1">Hunter every 20 min · saved CAs still 60s</span>
     </div>
     <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">SOL, ETH and Robinhood sit in the same four market-cap bands. <b style="color:#c5d0dc">Hunter watch</b> is a pin list only — it is not CA recents and those coins do not enter Breakout. Chain icon is next to the ticker. Scanner icons follow the chain. Green ring = you already opened that scan.</div>
@@ -1098,7 +1100,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </main></div>
 <script src="overview-app.js?v=20260916-af2"></script>
 <script src="breakout-tab.js?v=20260916-al1"></script>
-<script src="hunter-tab.js?v=20260916-h17"></script>
+<script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260916-im10"></script>

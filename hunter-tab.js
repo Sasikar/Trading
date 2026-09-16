@@ -13,6 +13,9 @@
   const $ = (id) => document.getElementById(id);
   let timer = null;
   let busy = false;
+  let huView = 'bands';
+  try { huView = localStorage.getItem('hu_view') || 'bands'; } catch (e) {}
+  if (huView !== 'grow') huView = 'bands';
 
   function fmtAgo(ms) {
     const n = Number(ms);
@@ -37,6 +40,12 @@
     if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + 'M';
     if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 1e5 ? 0 : 1) + 'k';
     return '$' + Math.round(n);
+  }
+  function wallets(n) {
+    n = +n || 0;
+    if (n >= 10000) return Math.round(n / 1000) + 'k';
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return String(Math.round(n));
   }
   function volM(n) {
     n = +n || 0;
@@ -143,6 +152,13 @@
         ? ' <span title="You verified the chain scanners" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
         : '') +
       ((h.highVol || (h.vol24h && h.liq && h.vol24h >= 0.12 * h.liq)) ? ' <span title="24h volume" style="font-size:11px;color:#f8fbff;background:#10263a;font-weight:900;padding:3px 8px;border-radius:999px;letter-spacing:.03em;border:1px solid #3d7ab8">V ' + esc(volM(h.vol24h) || '—') + '</span>' : '') +
+      (h.holders
+        ? ' <span title="Jupiter holder count" style="font-size:11px;color:#d7f5e6;background:#10281c;font-weight:900;padding:3px 8px;border-radius:999px;border:1px solid #2a6b4e">' +
+          esc(wallets(h.holders)) +
+          ' wallets' +
+          (h.holdNet1h > 0 ? ' +' + Math.round(h.holdNet1h) + '/1h' : h.holdPct1h > 0 ? ' +' + Number(h.holdPct1h).toFixed(1) + '%/1h' : '') +
+          '</span>'
+        : '') +
       (h.boosted ? ' <span style="font-size:10px;color:#f0a060;font-weight:800">PAID BOOST</span>' : '') +
       (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">HUNTER WATCH</span>' : '') +
       (h.onBreakout ? ' <span style="font-size:10px;color:#8491a1;font-weight:800">SAVED CA</span>' : '') +
@@ -201,6 +217,28 @@
     return rows.map(renderCard).join('');
   }
 
+  function renderGrow(list) {
+    const rows = list || [];
+    const body = rows.length
+      ? rows.map(renderCard).join('')
+      : '<div style="padding:10px 12px;border-radius:10px;border:1px dashed #243041;color:#8491a1;font-size:12px">None with 2,000+ wallets still rising on Jupiter this scan.</div>';
+    return (
+      '<div class="hu-band" data-band="grow" data-label="Growing wallets" data-range="2,000+ holders and increasing">' +
+      '<div class="hu-band-h"><b>Growing wallets</b><span>2,000+ · Jupiter 1h/6h still up · ' +
+      rows.length +
+      '</span></div>' +
+      body +
+      '</div>'
+    );
+  }
+  function paintViewBtns() {
+    document.querySelectorAll('.hu-view').forEach(function (b) {
+      const on = b.getAttribute('data-hu-view') === huView;
+      b.style.background = on ? '#1a9b6c' : '#121a24';
+      b.style.color = on ? '#fff' : '#c5d0dc';
+      b.style.borderColor = on ? '#1a9b6c' : '#243041';
+    });
+  }
   function renderHits(hits) {
     const by = { micro: [], small: [], mid: [], large: [] };
     (hits || []).forEach(function (h) {
@@ -297,23 +335,29 @@
       const j = await api('/hunter');
       const hits = j.hits || [];
       const watched = j.watch || [];
+      const grow = j.grow || [];
       if (stEl)
         stEl.textContent =
-          hits.length +
-          ' names · ' +
+          (huView === 'grow' ? grow.length + ' growing · ' : hits.length + ' names · ') +
           watched.length +
           ' hunter-watch · last scan ' +
           fmtAgo(+j.scannedAt) +
           ' · next auto ~20 min' +
           (j.error ? ' · ' + j.error : '') +
           ' · no phone pings from this tab';
-      if (list)
-        list.innerHTML =
-          '<div class="hu-band" data-band="watch" data-label="Hunter watch" data-range="pins only">' +
-          '<div class="hu-band-h"><b>Hunter watch</b><span>pins only · not CA recents</span></div>' +
-          renderWatch(watched) +
-          '</div>' +
-          renderHits(hits);
+      if (list) {
+        if (huView === 'grow') {
+          list.innerHTML = renderGrow(grow);
+        } else {
+          list.innerHTML =
+            '<div class="hu-band" data-band="watch" data-label="Hunter watch" data-range="pins only">' +
+            '<div class="hu-band-h"><b>Hunter watch</b><span>pins only · not CA recents</span></div>' +
+            renderWatch(watched) +
+            '</div>' +
+            renderHits(hits);
+        }
+      }
+      paintViewBtns();
       bind();
       paintBandChip();
     } catch (e) {
@@ -427,6 +471,12 @@
     }
   }
 
+  window.setHunterView = function (v) {
+    huView = v === 'grow' ? 'grow' : 'bands';
+    try { localStorage.setItem('hu_view', huView); } catch (e) {}
+    paintViewBtns();
+    load(true);
+  };
   window.showHunter = showHunter;
   window.refreshHunterTab = function () {
     return api('/hunter', { method: 'POST' }).then(function () {

@@ -2508,6 +2508,13 @@ export class Engine {
       return [];
     }
   }
+  hunterGrow() {
+    try {
+      return JSON.parse(this.store.getMeta('hunter_grow') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
   hunterWatch() {
     try {
       return JSON.parse(this.store.getMeta('hunter_watch') || '[]');
@@ -2571,7 +2578,9 @@ export class Engine {
       this.store.setMeta('hunter_watch', JSON.stringify(hw));
       return { ok: true, ca: k, saved: false, n: hw.length };
     }
-    const h = hits.find((x) => String(x.ca).toLowerCase() === k);
+    const h =
+      hits.find((x) => String(x.ca).toLowerCase() === k) ||
+      this.hunterGrow().find((x) => String(x.ca).toLowerCase() === k);
     if (!h) throw new Error('not on hunter list');
     hw.push({
       ca: h.ca,
@@ -2755,6 +2764,54 @@ export class Engine {
     return Object.assign({ cached: false }, report);
   }
 
+  async attachHunterGrow(hits, now) {
+    const sol = (hits || [])
+      .filter((h) => chainIdOf(h.chain) === 'solana' && h.ca)
+      .sort((a, b) => (b.vol24h || 0) - (a.vol24h || 0) || (b.m5 || 0) - (a.m5 || 0))
+      .slice(0, 24);
+    const out = [];
+    for (let i = 0; i < sol.length; i += 4) {
+      const batch = sol.slice(i, i + 4);
+      const part = await Promise.all(
+        batch.map(async (h) => {
+          try {
+            const j = await fetchJSON(
+              'https://lite-api.jup.ag/tokens/v2/search?query=' + encodeURIComponent(h.ca),
+              1
+            );
+            const list = Array.isArray(j) ? j : [];
+            const tok =
+              list.find((x) => String(x.id || '').toLowerCase() === String(h.ca).toLowerCase()) || list[0];
+            const n = +(tok && tok.holderCount) || 0;
+            if (n < 2000) return null;
+            const pct1h = tok && tok.stats1h ? tok.stats1h.holderChange : null;
+            const pct6h = tok && tok.stats6h ? tok.stats6h.holderChange : null;
+            const net1h = netHoldersFromPct(n, pct1h);
+            const net6h = netHoldersFromPct(n, pct6h);
+            const up1 = (net1h != null && net1h > 0) || (pct1h != null && +pct1h > 0);
+            const up6 = (net6h != null && net6h > 0) || (pct6h != null && +pct6h > 0);
+            if (!up1 && !up6) return null;
+            if (net1h != null && net1h < 0) return null;
+            return Object.assign({}, h, {
+              holders: n,
+              holdPct1h: pct1h != null ? +pct1h : null,
+              holdNet1h: net1h,
+              holdPct6h: pct6h != null ? +pct6h : null,
+              holdNet6h: net6h
+            });
+          } catch (e) {
+            return null;
+          }
+        })
+      );
+      out.push.apply(out, part.filter(Boolean));
+    }
+    out.sort(
+      (a, b) =>
+        (b.holdNet1h || 0) - (a.holdNet1h || 0) || (b.holdPct1h || 0) - (a.holdPct1h || 0) || (b.holders || 0) - (a.holders || 0)
+    );
+    return out.slice(0, 12);
+  }
   async refreshHunter(now, force) {
     now = now || Date.now();
     if (!force && now < this.rateLimitedUntil) {
@@ -2877,13 +2934,15 @@ export class Engine {
         .slice(0, perMom[k]);
       top.push.apply(top, volRows.concat(momRows));
     }
+    const grow = await this.attachHunterGrow(hits, now);
     this.store.setMeta('hunter_hits', JSON.stringify(top));
+    this.store.setMeta('hunter_grow', JSON.stringify(grow));
     this.store.setMeta('hunter_at', String(now));
     this.store.setMeta('hunter_err', '');
     this.dexCallsLastMin(now);
     this.store.setMeta('dex_calls_min', JSON.stringify(this.dexCallsMin));
     this.flushFails(now);
-    return { hits: top.length, calls, discover: doDiscover, seeded: uniq.length, matched: hits.length, miss };
+    return { hits: top.length, grow: grow.length, calls, discover: doDiscover, seeded: uniq.length, matched: hits.length, miss };
   }
 
   async tick(mode) {
@@ -3155,6 +3214,7 @@ export async function handleApi(engine, request) {
           ...out,
           hits: engine.decorateHunter(engine.hunterHits()),
           watch: engine.decorateHunter(engine.hunterWatch()),
+          grow: engine.decorateHunter(engine.hunterGrow()),
           scannedAt: engine.store.getMeta('hunter_at') || null,
           error: engine.store.getMeta('hunter_err') || ''
         });
@@ -3165,6 +3225,7 @@ export async function handleApi(engine, request) {
     return json({
       hits: engine.decorateHunter(engine.hunterHits()),
       watch: engine.decorateHunter(engine.hunterWatch()),
+      grow: engine.decorateHunter(engine.hunterGrow()),
       scannedAt: engine.store.getMeta('hunter_at') || null,
       discoveredAt: engine.store.getMeta('hunter_discover') || null,
       error: engine.store.getMeta('hunter_err') || '',
