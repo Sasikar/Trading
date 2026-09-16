@@ -5,6 +5,7 @@
 const $=id=>document.getElementById(id);
 const fmt=(n,d)=>n==null||!isFinite(n)?'—':Number(n).toLocaleString('en-US',{maximumFractionDigits:d!=null?d:(n>=1000?0:2)});
 const money=n=>n==null?'—':'$'+fmt(n,n>=1000?0:2);
+const moneyShort=n=>{n=+n;if(!Number.isFinite(n))return '—';const a=Math.abs(n);if(a>=1e9)return '$'+(n/1e9).toFixed(a>=10e9?1:2)+'B';if(a>=1e6)return '$'+(n/1e6).toFixed(a>=100e6?0:a>=10e6?1:2)+'M';if(a>=1e3)return '$'+(n/1e3).toFixed(a>=100e3?0:1)+'K';return '$'+Math.round(n);};
 const TF={'1h':{interval:'1h',label:'1H',limit:120,swing:60,volAvg:20,fibBars:48,macdBars:48,rightOff:10,barSp:4},'4h':{interval:'4h',label:'4H',limit:100,swing:50,volAvg:20,fibBars:40,macdBars:40,rightOff:8,barSp:5},'1d':{interval:'1d',label:'1D',limit:120,swing:60,volAvg:20,fibBars:40,macdBars:50,rightOff:10,barSp:6},'1w':{interval:'1w',label:'1W',limit:80,swing:26,volAvg:20,fibBars:26,macdBars:40,rightOff:8,barSp:12},'1M':{interval:'1M',label:'1M',limit:48,swing:18,volAvg:12,fibBars:18,macdBars:24,rightOff:6,barSp:14}};
 let currentTF='memegate',coinTF='4h',coinPool=null,coinChain='eth',coinCA='',coinFibChart,coinFibSeries,coinFibLines=[],coinMacdChart,coinMacdLine,coinSigLine,coinHist,fibChart,fibSeries,fibVol,fibLines=[],macdChart,macdLineS,sigLineS,histS,structW1Chart,structW1Series,structW1Lines=[],sigChart,sigCandle,sigEma50,sigEma200;
 async function jget(url){
@@ -651,7 +652,7 @@ function renderBtcHeatmap(book, klDaily){
   if(src) src.textContent=book.source||'LIVE BOOK';
   if(verdict){
     verdict.className='hm-verdict '+(supportHeavy?'sup':'res');
-    verdict.textContent='Heat concentrated at '+side+' '+money(peak.p)+' · $'+Math.round(peak.usd).toLocaleString()+' in that band'+onLine+'.';
+    verdict.textContent='Heat concentrated at '+side+' '+money(peak.p)+' · '+moneyShort(peak.usd)+' in that band'+onLine+'.';
   }
   const isSR=function(p){
     const tags=[];
@@ -737,7 +738,7 @@ async function loadMarketStructure(direction,klDaily){
   const conc=total2>0?((bid05+ask05)/total2)*100:null;
   if(conc==null) set('ms-conc','Data Unavailable');
   else set('ms-conc', conc.toFixed(1)+'%', 'not support guarantee');
-  if(hm && hm.peak) set('ms-liq', money(hm.peak)+' '+hm.side, '$'+Math.round(hm.usd||0).toLocaleString()+' band');
+  if(hm && hm.peak) set('ms-liq', money(hm.peak)+' '+hm.side, moneyShort(hm.usd||0)+' band');
   else set('ms-liq','Data Unavailable','no cluster');
   const warnings=[];
   if(wide) warnings.push('wide spread');
