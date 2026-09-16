@@ -440,6 +440,8 @@ export function hunterVolPass(tick, pair, now) {
   else return false;
   if (v24 < floor24 && v1 < floor1) return false;
   if (v24 < liq * 0.12 && v1 < liq * 0.03) return false;
+  const mcap = +tick.mcap || 0;
+  if (mcap >= 80e6 && v24 < mcap * 0.04 && v24 < liq * 8) return false;
   return true;
 }
 
@@ -2775,14 +2777,25 @@ export class Engine {
       return { hits: 0, calls };
     }
     const watch = new Set(this.store.getWatch().map((w) => w.ca.toLowerCase()));
-    const uniq = [];
-    const seen = new Set();
+    let heatPrev = [];
+    try {
+      heatPrev = JSON.parse(this.store.getMeta('hunter_heat') || '[]') || [];
+    } catch (e) {
+      heatPrev = [];
+    }
+    for (const h of heatPrev) {
+      if (h && h.ca && now - (+h.t || 0) < 3 * 3600e3)
+        seeds.push({ ca: h.ca, chain: h.chain || 'solana', boosted: false, src: 'heat' });
+    }
+    const volOf = (s) => +((s && s.pair && s.pair.volume && s.pair.volume.h24) || 0);
+    const uniqMap = new Map();
     for (const s of seeds) {
       const k = String(s.ca || '').toLowerCase();
-      if (!k || seen.has(k) || watch.has(k)) continue;
-      seen.add(k);
-      uniq.push(s);
+      if (!k) continue;
+      const prev = uniqMap.get(k);
+      if (!prev || volOf(s) > volOf(prev) || (!prev.pair && s.pair)) uniqMap.set(k, s);
     }
+    const uniq = Array.from(uniqMap.values());
     const needFetch = uniq.filter((s) => !s.pair);
     const byCa = await fetchDexPairsForCas(
       needFetch.map((s) => s.ca),
@@ -2860,6 +2873,22 @@ export class Engine {
         .slice(0, perMom[k]);
       top.push.apply(top, volRows.concat(momRows));
     }
+    const have = new Set(top.map((h) => String(h.ca).toLowerCase()));
+    const heatHits = hits
+      .filter((h) => (+h.vol24h || 0) >= 5e6)
+      .sort((a, b) => (+b.vol24h || 0) - (+a.vol24h || 0));
+    for (const h of heatHits) {
+      const k = String(h.ca).toLowerCase();
+      if (have.has(k)) continue;
+      top.push(h);
+      have.add(k);
+    }
+    this.store.setMeta(
+      'hunter_heat',
+      JSON.stringify(
+        heatHits.slice(0, 24).map((h) => ({ ca: h.ca, chain: h.chain, t: now }))
+      )
+    );
     this.store.setMeta('hunter_hits', JSON.stringify(top));
     this.store.setMeta('hunter_at', String(now));
     this.store.setMeta('hunter_err', '');
