@@ -210,16 +210,20 @@
         ? rows.map(renderCard).join('')
         : '<div style="padding:10px 12px;border-radius:10px;border:1px dashed #243041;color:#8491a1;font-size:12px">None moving in this band right now.</div>';
       return (
-        '<div style="display:flex;flex-direction:column;gap:8px">' +
-        '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">' +
-        '<div style="font-size:13px;font-weight:900;color:#e8eef6">' +
-        band.label +
-        '</div>' +
-        '<div style="font-size:11px;color:#8491a1">' +
-        band.range +
+        '<div class="hu-band" data-band="' +
+        band.id +
+        '" data-label="' +
+        esc(band.label) +
+        '" data-range="' +
+        esc(band.range) +
+        '">' +
+        '<div class="hu-band-h"><b>' +
+        esc(band.label) +
+        '</b><span>' +
+        esc(band.range) +
         ' · ' +
         rows.length +
-        ' · V $xM = 24h volume</div></div>' +
+        ' · V $xM = 24h volume</span></div>' +
         body +
         '</div>'
       );
@@ -302,12 +306,13 @@
           ' · no phone pings from this tab';
       if (list)
         list.innerHTML =
-          '<div style="font-size:13px;font-weight:900;color:#e8eef6">Hunter watch</div>' +
-          '<div style="font-size:11px;color:#8491a1;margin-top:-4px">Separate from CA recents. No breakout engine, no 1m tape, no alerts.</div>' +
+          '<div class="hu-band" data-band="watch" data-label="Hunter watch" data-range="pins only">' +
+          '<div class="hu-band-h"><b>Hunter watch</b><span>pins only · not CA recents</span></div>' +
           renderWatch(watched) +
-          '<div style="height:8px"></div>' +
+          '</div>' +
           renderHits(hits);
       bind();
+      paintBandChip();
     } catch (e) {
       if (stEl) stEl.textContent = String(e.message || e);
       if (list)
@@ -317,6 +322,35 @@
     busy = false;
   }
 
+  function paintBandChip() {
+    const chip = $('hu-band-now');
+    if (!chip) return;
+    const p = $('hunter-panel');
+    const on = p && p.style.display !== 'none' && p.classList.contains('on');
+    if (!on && !(p && p.style.display === 'block')) {
+      chip.hidden = true;
+      return;
+    }
+    const nodes = document.querySelectorAll('#hu-list .hu-band');
+    if (!nodes.length) {
+      chip.hidden = true;
+      return;
+    }
+    const line = 70;
+    let pick = null;
+    for (let i = 0; i < nodes.length; i++) {
+      const r = nodes[i].getBoundingClientRect();
+      if (r.top <= line && r.bottom > line) pick = nodes[i];
+    }
+    if (!pick) {
+      if (nodes[0].getBoundingClientRect().top > line) pick = nodes[0];
+      else pick = nodes[nodes.length - 1];
+    }
+    chip.innerHTML = '<b>' + esc(pick.getAttribute('data-label') || '') + '</b><span>' + esc(pick.getAttribute('data-range') || '') + '</span>';
+    chip.hidden = false;
+  }
+  window.addEventListener('scroll', paintBandChip, { passive: true });
+  window.addEventListener('resize', paintBandChip);
   function showHunter(on) {
     const p = $('hunter-panel');
     const panels = $('tf-panels'),
@@ -369,7 +403,7 @@
         p.style.display = 'block';
         p.classList.add('on');
       }
-      load(false);
+      load(false).then(function () { try { paintBandChip(); } catch (e) {} });
       if (timer) clearInterval(timer);
       timer = setInterval(function () {
         const onp = $('hunter-panel');
@@ -377,6 +411,8 @@
         load(true);
       }, 20000);
     } else {
+      const chip = $('hu-band-now');
+      if (chip) chip.hidden = true;
       if (p) {
         p.style.display = 'none';
         p.classList.remove('on');

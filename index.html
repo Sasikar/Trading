@@ -288,7 +288,18 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,
+.hu-band-now{position:fixed;top:52px;left:0;right:0;z-index:80;display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:rgba(8,13,19,.96);border-bottom:1px solid #2a3644;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px #0006}
+.hu-band-now[hidden]{display:none!important}
+.hu-band-now b{font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
+.hu-band-now span{font-size:11px;font-weight:700;color:#8491a1}
+.hu-band{display:flex;flex-direction:column;gap:8px;padding-top:4px}
+.hu-band-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:2px 0}
+.hu-band-h b{font-size:13px;font-weight:900;color:#e8eef6}
+.hu-band-h span{font-size:11px;color:#8491a1}
+#hunter-panel .card{overflow:visible}
+
+#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 #coin-panel .card > *,#breakouts-panel .card > *,#hunter-panel .card > *,#holders-panel .card > *{margin-left:0;margin-right:0}
 .hd-card{padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a}
 .hd-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
@@ -861,6 +872,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <div><h2>Hunter</h2><p>Scan + Hunter watch · not saved CAs · not Breakout</p></div>
     <span class="source" id="hu-source">API</span>
   </div>
+  <div id="hu-band-now" class="hu-band-now" hidden></div>
   <div class="card">
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
       <button type="button" onclick="try{window.refreshHunterTab&&window.refreshHunterTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Scan now</button>
@@ -1071,7 +1083,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </main></div>
 <script src="overview-app.js?v=20260916-hm9"></script>
 <script src="breakout-tab.js?v=20260915-eq5"></script>
-<script src="hunter-tab.js?v=20260916-h13"></script>
+<script src="hunter-tab.js?v=20260916-h14"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260916-im10"></script>
