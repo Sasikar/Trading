@@ -142,7 +142,7 @@
       (both
         ? ' <span title="You verified the chain scanners" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
         : '') +
-      ((h.highVol || (h.vol24h && h.liq && h.vol24h >= 0.12 * h.liq)) ? ' <span title="24h volume" style="font-size:10px;color:#061018;background:#6eb6ff;font-weight:900;padding:2px 7px;border-radius:999px;letter-spacing:.03em">V ' + esc(volM(h.vol24h) || '—') + '</span>' : '') +
+      ((h.highVol || (h.vol24h && h.liq && h.vol24h >= 0.12 * h.liq)) ? ' <span title="24h volume" style="font-size:11px;color:#f8fbff;background:#10263a;font-weight:900;padding:3px 8px;border-radius:999px;letter-spacing:.03em;border:1px solid #3d7ab8">V ' + esc(volM(h.vol24h) || '—') + '</span>' : '') +
       (h.boosted ? ' <span style="font-size:10px;color:#f0a060;font-weight:800">PAID BOOST</span>' : '') +
       (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">HUNTER WATCH</span>' : '') +
       (h.onBreakout ? ' <span style="font-size:10px;color:#8491a1;font-weight:800">SAVED CA</span>' : '') +
