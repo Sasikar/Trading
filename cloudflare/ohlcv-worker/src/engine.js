@@ -2789,9 +2789,9 @@ export class Engine {
             const net1h = netHoldersFromPct(n, pct1h);
             const net6h = netHoldersFromPct(n, pct6h);
             const up1 = (net1h != null && net1h > 0) || (pct1h != null && +pct1h > 0);
-            const up6 = (net6h != null && net6h > 0) || (pct6h != null && +pct6h > 0);
-            if (!up1 && !up6) return null;
-            if (net1h != null && net1h < 0) return null;
+            if (!up1) return null;
+            const rapid = (net1h != null && net1h >= 40) || (pct1h != null && +pct1h >= 1);
+            if (!rapid) return null;
             return Object.assign({}, h, {
               holders: n,
               holdPct1h: pct1h != null ? +pct1h : null,
