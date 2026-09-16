@@ -228,6 +228,24 @@ export function pickBestPair(pairs, chain, ca) {
   );
   return list[0] || null;
 }
+export function pickHunterPair(pairs, chain, ca) {
+  const want = chainIdOf(chain);
+  const caL = String(ca || '').toLowerCase();
+  let list = (pairs || []).filter((p) => p && p.chainId === want);
+  if (caL) {
+    const exact = list.filter(
+      (p) =>
+        String((p.baseToken && p.baseToken.address) || '').toLowerCase() === caL ||
+        String((p.quoteToken && p.quoteToken.address) || '').toLowerCase() === caL
+    );
+    if (exact.length) list = exact;
+  }
+  if (!list.length) list = pairs || [];
+  list = list.slice().sort(function (a, b) {
+    return +(((b.volume && b.volume.h24) || 0) - ((a.volume && a.volume.h24) || 0));
+  });
+  return list[0] || null;
+}
 
 export async function fetchWatchlist(url) {
   const urls = [url, WATCHLIST_DEFAULT, WATCHLIST_FALLBACK].filter((u) => u && /^https?:/i.test(u));
@@ -2801,7 +2819,7 @@ export class Engine {
           miss++;
           continue;
         }
-        pair = pickBestPair(got, s.chain || 'solana', s.ca);
+        pair = pickHunterPair(got, s.chain || 'solana', s.ca) || pickBestPair(got, s.chain || 'solana', s.ca);
       }
       if (!pair) {
         miss++;
@@ -2842,7 +2860,6 @@ export class Engine {
       });
     }
     const perMom = { micro: 3, small: 3, mid: 3, large: 3 };
-    const perVol = { micro: 4, small: 4, mid: 5, large: 5 };
     const buckets = { micro: [], small: [], mid: [], large: [] };
     for (const h of hits) {
       if (buckets[h.band]) buckets[h.band].push(h);
@@ -2852,8 +2869,7 @@ export class Engine {
       const rows = buckets[k];
       const volRows = rows
         .filter((h) => h.highVol)
-        .sort((a, b) => (b.vol24h || 0) - (a.vol24h || 0) || (b.vol1h || 0) - (a.vol1h || 0))
-        .slice(0, perVol[k]);
+        .sort((a, b) => (b.vol24h || 0) - (a.vol24h || 0) || (b.vol1h || 0) - (a.vol1h || 0));
       const seen = new Set(volRows.map((h) => String(h.ca).toLowerCase()));
       const momRows = rows
         .filter((h) => h.mom && !seen.has(String(h.ca).toLowerCase()))
@@ -2861,17 +2877,6 @@ export class Engine {
         .slice(0, perMom[k]);
       top.push.apply(top, volRows.concat(momRows));
     }
-    const have = new Set(top.map((h) => String(h.ca).toLowerCase()));
-    const heatHits = hits
-      .filter((h) => (+h.vol24h || 0) >= 5e6)
-      .sort((a, b) => (+b.vol24h || 0) - (+a.vol24h || 0));
-    for (const h of heatHits) {
-      const k = String(h.ca).toLowerCase();
-      if (have.has(k)) continue;
-      top.push(h);
-      have.add(k);
-    }
-    this.store.setMeta('hunter_heat', '[]');
     this.store.setMeta('hunter_hits', JSON.stringify(top));
     this.store.setMeta('hunter_at', String(now));
     this.store.setMeta('hunter_err', '');
