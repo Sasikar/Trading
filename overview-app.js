@@ -5278,7 +5278,7 @@ function afClassifyQuality(kl, tf){
   const a50=e50[e50.length-1];
   const aboveEma=a50>0?((spot/a50)-1)*100:null;
   let struct={support:null,resistance:null};
-  try{ if(typeof swingStructure==='function') struct=swingStructure(kl,Math.min(50,kl.length),'1D')||struct; }catch(e){}
+  try{ if(typeof swingStructure==='function') struct=swingStructure(kl,Math.min(50,kl.length),tf||'4h')||struct; }catch(e){}
   const sup=struct.support, res=struct.resistance;
   const nearSup=sup!=null && spot<=sup*1.012 && spot>=sup*0.97;
   const nearRes=res!=null && spot>=res*0.988 && spot<=res*1.03;
@@ -5292,23 +5292,26 @@ function afClassifyQuality(kl, tf){
     }
   }catch(e){}
 
+  const px=function(v){ return v!=null&&isFinite(v)?Number(v).toPrecision(6):'—'; };
+  const srLine='S $'+px(sup)+' / R $'+px(res)+' · spot $'+px(spot);
   let tag, label, color, scorePart, detail;
   if(stretched){
     tag='stretched'; label="🔴 Stretched / Extended — Don't chase"; color='#ff6f7c'; scorePart=40;
-    detail='RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · EMA50 '+(aboveEma!=null?((aboveEma>=0?'+':'')+aboveEma.toFixed(1)+'%'):'—')+' · price extended vs baseline';
+    detail='RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · EMA50 '+(aboveEma!=null?((aboveEma>=0?'+':'')+aboveEma.toFixed(1)+'%'):'—')+' · extended';
   } else if(nearRes && !broke){
     tag='resistance'; label='🔴 At major Resistance — High caution'; color='#ff6f7c'; scorePart=32;
-    detail='Near resistance $'+(res!=null?res.toPrecision(6):'—')+' · spot $'+spot.toPrecision(6);
+    detail='At resistance';
   } else if(nearSup){
     tag='support'; label='🟢 At Support / Retest — Potentially valid'; color='#62e3a0'; scorePart=8;
-    detail='Near support $'+(sup!=null?sup.toPrecision(6):'—')+' · spot $'+spot.toPrecision(6);
+    detail='At support / retest';
   } else if(broke){
     tag='breakout'; label='🟢 Clean Breakout + Confirmation — Potentially valid'; color='#62e3a0'; scorePart=12;
-    detail='Fresh held breakout · RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · not extreme extension';
+    detail='Fresh held breakout · RSI '+(rsi!=null?rsi.toFixed(1):'—');
   } else {
     tag='neutral'; label='🟡 Mid-range — no clear edge'; color='#e6c878'; scorePart=20;
-    detail='RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · EMA50 '+(aboveEma!=null?((aboveEma>=0?'+':'')+aboveEma.toFixed(1)+'%'):'—')+' · S $'+(sup!=null?Number(sup).toPrecision(5):'—')+' / R $'+(res!=null?Number(res).toPrecision(5):'—');
+    detail='RSI '+(rsi!=null?rsi.toFixed(1):'—')+' · EMA50 '+(aboveEma!=null?((aboveEma>=0?'+':'')+aboveEma.toFixed(1)+'%'):'—');
   }
+  detail=detail+' · '+srLine;
   return {tag,label,color,scorePart,detail,rsi,aboveEma,sup,res,spot,stretched,nearSup,nearRes,broke};
 }
 
@@ -5327,7 +5330,7 @@ async function afAssess(){
     if(box){
       box.innerHTML='<div style="font-size:16px;font-weight:900;color:'+afQuality.color+'">'+afQuality.label+'</div>'
         +'<div style="margin-top:8px;font-size:12px;color:#c5d0dc;line-height:1.5">'+afQuality.detail+'</div>'
-        +'<div style="margin-top:8px;font-size:11px;color:#8491a1">'+asset.toUpperCase()+' · '+tf.toUpperCase()+' · closed candles · S/R + EMA50 extension</div>';
+        +'<div style="margin-top:8px;font-size:11px;color:#8491a1">'+asset.toUpperCase()+' · '+(tf==='1M'?'1M':/m$/.test(tf)?tf:tf.toUpperCase())+' · closed candles · S/R + EMA50 extension</div>';
     }
     if($('af-source')) $('af-source').textContent='LIVE · '+asset.toUpperCase()+' '+tf.toUpperCase();
     afSaveState();
