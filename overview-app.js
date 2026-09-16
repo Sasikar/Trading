@@ -733,7 +733,8 @@ function renderBtcHeatmap(book, klDaily, klHour){
     if(Math.abs(p-mid)<step*0.7) tags.push('M');
     return tags;
   };
-  let html='<div class="hm-axis"><span>'+(unit==='vol'?'Volume below mark':'Bid / support')+'</span><span>'+(unit==='vol'?'Volume above mark':'Ask / resistance')+'</span></div>';
+  let html='<div class="hm-axis"><span>'+(unit==='vol'?'Volume below mark':'Bid / support')+'</span><span>'+(unit==='vol'?'Volume above mark':'Ask / resistance')+'</span></div>'+
+    '<div class="hm-keys"><b>S</b> daily support &nbsp;·&nbsp; <b>R</b> daily resistance &nbsp;·&nbsp; <b>M</b> mark (now) &nbsp;·&nbsp; <b>SM</b> price sitting on support</div>';
   for(let i=n-1;i>=0;i--){
     const b=buckets[i];
     const tags=isSR(b.p);
