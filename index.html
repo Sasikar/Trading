@@ -20,6 +20,11 @@
 .tabs::-webkit-scrollbar{display:none}
 .tab{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:36px;min-width:auto;border:0;background:transparent;color:#9aa6b5;font:800 12px Inter,system-ui,sans-serif;padding:0 10px;border-radius:10px;cursor:grab;white-space:nowrap;letter-spacing:.02em}
 .tab.dragging{opacity:.6;cursor:grabbing;transform:scale(1.06);background:#1a2734;box-shadow:0 8px 22px #0008;z-index:5;position:relative}
+.tab-arrange{flex:0 0 auto;height:36px;padding:0 12px;border:1px solid #2a6b4e;border-radius:10px;background:#123526;color:#62e3a0;font:800 11px Inter,system-ui,sans-serif;cursor:pointer;letter-spacing:.04em}
+.tab-arrange.on{background:#1a9b6c;color:#fff;border-color:#1a9b6c}
+.tabs.arranging{box-shadow:inset 0 0 0 1px #2a6b4e}
+.tabs.arranging .tab{touch-action:none;outline:1px dashed rgba(98,227,160,.35)}
+
 
 .tab .tab-sub{font-size:8px;font-weight:800;letter-spacing:.04em;opacity:.68;margin-left:3px;line-height:1;align-self:center}
 .tab.active{background:rgba(98,227,160,.28)!important;color:#f4f7fb!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.45)}
@@ -528,6 +533,7 @@
   <button type="button" class="tab" data-tf="macro">Macro</button>
   <button type="button" class="tab" data-tf="1w">1W</button>
   <button type="button" class="tab" data-tf="1M">1M</button>
+  <button type="button" class="tab-arrange" id="tab-arrange">Arrange</button>
 </div>
 <div id="tf-panels" class="hidden" style="display:none">
 <section class="section">
@@ -1055,7 +1061,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260916-hm6"></script>
+<script src="overview-app.js?v=20260916-hm7"></script>
 <script src="breakout-tab.js?v=20260915-eq5"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>

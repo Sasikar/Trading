@@ -30,7 +30,7 @@
     '- Failures: last hour of REAL errors only (Dex/Gecko 429, retries, hunter skip, nopool, telegram, stale alarm). Empty hour = none. Do not invent OK rows.',
     '- InMemory: this handoff prompt + Copy. Keep it updated when architecture changes.',
     '- G-Trade Notes (tab label G-Trade + small Notes): one keep.google.com link on the phone. Opens Keep. No Google API, no notes inside the PWA.',
-    '- Tab bar: press-hold ~0.3s then drag to reorder. Saved on this phone. Frequent tabs first.',
+    '- Tab bar: tap Arrange, drag tabs, tap Done. Saved on this phone.',
     '- Verdict: tape-only HOLD/EXIT. No Dex-24h fake 1D/1W.',
     '',
     'HARD RULES',

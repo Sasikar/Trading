@@ -5523,9 +5523,12 @@ function initTabReorder(){
   if(!bar || bar.dataset.reorder==='1') return;
   bar.dataset.reorder='1';
   const KEY='tf_tab_order_v1';
+  let arranging=false, dragEl=null, moved=false;
+  function orderNow(){
+    return [].slice.call(bar.querySelectorAll('.tab')).map(function(b){return b.getAttribute('data-tf');});
+  }
   function save(){
-    const order=[].slice.call(bar.querySelectorAll('.tab')).map(function(b){return b.getAttribute('data-tf');});
-    try{localStorage.setItem(KEY, JSON.stringify(order));}catch(e){}
+    try{localStorage.setItem(KEY, JSON.stringify(orderNow()));}catch(e){}
   }
   function apply(){
     let order=[];
@@ -5535,30 +5538,47 @@ function initTabReorder(){
     bar.querySelectorAll('.tab').forEach(function(b){ map[b.getAttribute('data-tf')]=b; });
     order.forEach(function(id){ if(map[id]) bar.appendChild(map[id]); });
     Object.keys(map).forEach(function(id){ if(order.indexOf(id)<0) bar.appendChild(map[id]); });
+    const btn=document.getElementById('tab-arrange');
+    if(btn) bar.appendChild(btn);
   }
   apply();
-  let dragEl=null, startX=0, startY=0, dragging=false, moved=false, holdT=null, pid=null;
-  function clearHold(){ if(holdT){clearTimeout(holdT); holdT=null;} }
-  function armDrag(el){
-    dragging=true; moved=true;
-    el.classList.add('dragging');
-    try{ navigator.vibrate && navigator.vibrate(12); }catch(e){}
+  let btn=document.getElementById('tab-arrange');
+  if(!btn){
+    btn=document.createElement('button');
+    btn.type='button';
+    btn.id='tab-arrange';
+    btn.className='tab-arrange';
+    bar.appendChild(btn);
+  }
+  function paintBtn(){
+    btn.textContent=arranging?'Done':'Arrange';
+    btn.classList.toggle('on', arranging);
+    bar.classList.toggle('arranging', arranging);
+  }
+  paintBtn();
+  btn.addEventListener('click', function(e){
+    e.preventDefault(); e.stopPropagation();
+    arranging=!arranging;
+    if(!arranging) save();
+    paintBtn();
+  });
+  function endDrag(){
+    if(dragEl) dragEl.classList.remove('dragging');
+    dragEl=null;
+    if(moved) save();
+    moved=false;
   }
   bar.addEventListener('pointerdown', function(e){
+    if(!arranging) return;
     const tab=e.target.closest('.tab');
     if(!tab) return;
-    dragEl=tab; startX=e.clientX; startY=e.clientY; dragging=false; moved=false; pid=e.pointerId;
-    clearHold();
-    holdT=setTimeout(function(){ if(dragEl===tab) armDrag(tab); }, 280);
+    e.preventDefault();
+    dragEl=tab; moved=false;
+    tab.classList.add('dragging');
+    try{ tab.setPointerCapture(e.pointerId); }catch(err){}
   });
-  window.addEventListener('pointermove', function(e){
-    if(!dragEl) return;
-    const dx=e.clientX-startX, dy=e.clientY-startY;
-    if(!dragging){
-      if(Math.abs(dy)>14 && Math.abs(dy)>Math.abs(dx)){ clearHold(); dragEl=null; return; }
-      if(Math.abs(dx)>16 || Math.abs(dy)>16){ clearHold(); armDrag(dragEl); }
-    }
-    if(!dragging) return;
+  bar.addEventListener('pointermove', function(e){
+    if(!arranging || !dragEl) return;
     e.preventDefault();
     dragEl.style.pointerEvents='none';
     const over=document.elementFromPoint(e.clientX, e.clientY);
@@ -5570,18 +5590,19 @@ function initTabReorder(){
       if(a<0||b<0) return;
       if(a<b) bar.insertBefore(dragEl, other.nextSibling);
       else bar.insertBefore(dragEl, other);
+      if(btn && btn.parentNode===bar) bar.appendChild(btn);
+      moved=true;
     }
+  });
+  bar.addEventListener('pointerup', endDrag);
+  bar.addEventListener('pointercancel', endDrag);
+  bar.addEventListener('touchmove', function(e){
+    if(arranging && dragEl) e.preventDefault();
   }, {passive:false});
-  function endDrag(){
-    clearHold();
-    if(dragEl) dragEl.classList.remove('dragging');
-    if(moved) save();
-    dragEl=null; dragging=false;
-  }
-  window.addEventListener('pointerup', endDrag);
-  window.addEventListener('pointercancel', endDrag);
   bar.addEventListener('click', function(e){
-    if(moved){ e.stopImmediatePropagation(); e.preventDefault(); moved=false; }
+    if(!arranging) return;
+    if(e.target.closest('#tab-arrange')) return;
+    if(e.target.closest('.tab')){ e.stopImmediatePropagation(); e.preventDefault(); }
   }, true);
 }
 try{initTabReorder();}catch(e){}
