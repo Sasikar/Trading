@@ -301,6 +301,7 @@ export function pairToTick(pair, row, now) {
     buys5m: +t5.buys || 0,
     sells5m: +t5.sells || 0,
     liq: +((pair.liquidity && pair.liquidity.usd) || 0),
+    mcap: +(pair.marketCap || pair.fdv || 0) || 0,
     m5: +pc.m5 || 0,
     h1: +pc.h1 || 0,
     h6: +pc.h6 || 0,
@@ -335,8 +336,8 @@ export function hunterLinks(ca, chain) {
   return links;
 }
 
-export function hunterBand(liq) {
-  const x = +liq || 0;
+export function hunterBand(mcap) {
+  const x = +mcap || 0;
   if (x >= 20000 && x < 100000) return 'micro';
   if (x >= 100000 && x < 1000000) return 'small';
   if (x >= 1000000 && x < 10000000) return 'mid';
@@ -405,7 +406,7 @@ export function compactHolderSnaps(snaps, now) {
 }
 
 export function hunterPass(tick, pair, now) {
-  const band = hunterBand(tick.liq);
+  const band = hunterBand(tick.mcap);
   if (!band) return false;
   const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
   if (created && now - created < 5 * 60e3) return false;
@@ -421,9 +422,9 @@ export function hunterPass(tick, pair, now) {
   return false;
 }
 
-/** High 24h/1h volume in the same four liq bands. Not a momentum pass. */
+/** High 24h/1h volume in the same four market-cap bands. Not a momentum pass. */
 export function hunterVolPass(tick, pair, now) {
-  const band = hunterBand(tick.liq);
+  const band = hunterBand(tick.mcap);
   if (!band) return false;
   const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
   if (created && now - created < 5 * 60e3) return false;
@@ -2726,7 +2727,7 @@ export class Engine {
       if (!isMom && !isVol) continue;
       const mom = momentumFromTick(tick);
       const created = pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
-      const band = hunterBand(tick.liq);
+      const band = hunterBand(tick.mcap);
       hits.push({
         name: tick.name,
         ca: s.ca,
