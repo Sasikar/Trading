@@ -5517,4 +5517,73 @@ else if(at==='macro'){showMemeGate(false);showTrend(false);showStruct(false);sho
 else if(at==='signal'){showSignal(false);showTrend(false);showStruct(false);showMacro(false);showMemeGate(true);await loadMemeGate();}
 else{showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}await loadTF(at);}
 }tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='memegate')loadMemeGate();else loadTF(currentTF);},60000);
+
+function initTabReorder(){
+  const bar=document.getElementById('tf-tabs');
+  if(!bar || bar.dataset.reorder==='1') return;
+  bar.dataset.reorder='1';
+  const KEY='tf_tab_order_v1';
+  function save(){
+    const order=[].slice.call(bar.querySelectorAll('.tab')).map(function(b){return b.getAttribute('data-tf');});
+    try{localStorage.setItem(KEY, JSON.stringify(order));}catch(e){}
+  }
+  function apply(){
+    let order=[];
+    try{order=JSON.parse(localStorage.getItem(KEY)||'[]');}catch(e){}
+    if(!Array.isArray(order)||!order.length) return;
+    const map={};
+    bar.querySelectorAll('.tab').forEach(function(b){ map[b.getAttribute('data-tf')]=b; });
+    order.forEach(function(id){ if(map[id]) bar.appendChild(map[id]); });
+    Object.keys(map).forEach(function(id){ if(order.indexOf(id)<0) bar.appendChild(map[id]); });
+  }
+  apply();
+  let dragEl=null, startX=0, startY=0, dragging=false, moved=false, holdT=null, pid=null;
+  function clearHold(){ if(holdT){clearTimeout(holdT); holdT=null;} }
+  function armDrag(el){
+    dragging=true; moved=true;
+    el.classList.add('dragging');
+    try{ navigator.vibrate && navigator.vibrate(12); }catch(e){}
+  }
+  bar.addEventListener('pointerdown', function(e){
+    const tab=e.target.closest('.tab');
+    if(!tab) return;
+    dragEl=tab; startX=e.clientX; startY=e.clientY; dragging=false; moved=false; pid=e.pointerId;
+    clearHold();
+    holdT=setTimeout(function(){ if(dragEl===tab) armDrag(tab); }, 280);
+  });
+  window.addEventListener('pointermove', function(e){
+    if(!dragEl) return;
+    const dx=e.clientX-startX, dy=e.clientY-startY;
+    if(!dragging){
+      if(Math.abs(dy)>14 && Math.abs(dy)>Math.abs(dx)){ clearHold(); dragEl=null; return; }
+      if(Math.abs(dx)>16 || Math.abs(dy)>16){ clearHold(); armDrag(dragEl); }
+    }
+    if(!dragging) return;
+    e.preventDefault();
+    dragEl.style.pointerEvents='none';
+    const over=document.elementFromPoint(e.clientX, e.clientY);
+    dragEl.style.pointerEvents='';
+    const other=over && over.closest && over.closest('#tf-tabs .tab');
+    if(other && other!==dragEl){
+      const tabs=[].slice.call(bar.querySelectorAll('.tab'));
+      const a=tabs.indexOf(dragEl), b=tabs.indexOf(other);
+      if(a<0||b<0) return;
+      if(a<b) bar.insertBefore(dragEl, other.nextSibling);
+      else bar.insertBefore(dragEl, other);
+    }
+  }, {passive:false});
+  function endDrag(){
+    clearHold();
+    if(dragEl) dragEl.classList.remove('dragging');
+    if(moved) save();
+    dragEl=null; dragging=false;
+  }
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
+  bar.addEventListener('click', function(e){
+    if(moved){ e.stopImmediatePropagation(); e.preventDefault(); moved=false; }
+  }, true);
+}
+try{initTabReorder();}catch(e){}
+
 })();
