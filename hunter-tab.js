@@ -122,7 +122,7 @@
     { id: 'micro', label: 'Micro', range: '$20k–$100k mcap' },
     { id: 'small', label: 'Small', range: '$100k–$1M mcap' },
     { id: 'mid', label: 'Mid', range: '$1M–$10M mcap' },
-    { id: 'large', label: 'Large', range: '$10M–$100M mcap' }
+    { id: 'large', label: 'Large', range: '$10M+ mcap' }
   ];
 
   function renderCard(h) {

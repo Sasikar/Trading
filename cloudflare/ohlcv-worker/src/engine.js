@@ -341,7 +341,7 @@ export function hunterBand(mcap) {
   if (x >= 20000 && x < 100000) return 'micro';
   if (x >= 100000 && x < 1000000) return 'small';
   if (x >= 1000000 && x < 10000000) return 'mid';
-  if (x >= 10000000 && x <= 100000000) return 'large';
+  if (x >= 10000000) return 'large';
   return '';
 }
 
