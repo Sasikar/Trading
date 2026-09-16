@@ -13,9 +13,9 @@
   const $ = (id) => document.getElementById(id);
   let timer = null;
   let busy = false;
-  let ewTf = '4h';
+  let ewTf = 'all';
   try {
-    ewTf = localStorage.getItem('ew_tf') || '4h';
+    ewTf = localStorage.getItem('ew_tf') || 'all';
   } catch (e) {}
 
   function esc(s) {
@@ -143,7 +143,7 @@
 
   function renderPaper(rows) {
     if (!rows || !rows.length) {
-      return '<div style="font-size:12px;color:#8491a1">No paper rows yet. They appear when a saved CA prints a breakout.</div>';
+      return '<div style="font-size:12px;color:#8491a1">No breakout episode stored yet. Paper starts when a saved CA actually breaks (any TF). Quiet coins stay on the list above as NO BREAKOUT.</div>';
     }
     return rows
       .map(function (r) {
@@ -179,11 +179,24 @@
     const paper = $('ew-paper');
     try {
       const j = await api('/entry-window?tf=' + encodeURIComponent(ewTf));
-      if (st) st.textContent = 'LIVE · ' + tfLab(ewTf) + ' · ' + (j.cards || []).length + ' setups';
+      const n = (j.cards || []).length;
+      const nSetup = (j.cards || []).filter(function (c) {
+        const st = (c.ew && c.ew.state) || '';
+        return st && st !== 'NO_SETUP' && st !== 'WARMING';
+      }).length;
+      if (st)
+        st.textContent =
+          'LIVE · ' +
+          (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
+          ' · ' +
+          n +
+          ' saved · ' +
+          nSetup +
+          ' with a setup';
       if (list) {
-        list.innerHTML = (j.cards || []).length
+        list.innerHTML = n
           ? j.cards.map(renderCard).join('')
-          : '<div style="padding:12px;color:#8491a1;font-size:12px">No live/matured breakout on saved CAs for this TF. Load coins on CA / Breakout first.</div>';
+          : '<div style="padding:12px;color:#8491a1;font-size:12px">No saved CAs. Add coins on CA tab first.</div>';
       }
       if (paper) paper.innerHTML = renderPaper(j.paper);
     } catch (e) {

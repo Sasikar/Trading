@@ -1017,7 +1017,28 @@ export function entryWindow(args) {
     confirm: false,
     entryPaint: entry.paint || ''
   };
-  if (!broke) return empty;
+  empty.level = level;
+  empty.spot = spot;
+  empty.sup5 = rangeLowFromBars(bars5m, 24);
+  empty.sup1h = rangeLowFromBars(bars1h, 24);
+  empty.sup4h = rangeLowFromBars(bars4h.length ? bars4h : barsTf, 24);
+  empty.sup1d = rangeLowFromBars(bars1d, 30);
+  empty.extPct = level > 0 && spot > 0 ? +(((spot - level) / level) * 100).toFixed(2) : null;
+  if (!broke) {
+    const near = !!(hit.near || hit.event === 'CLOSE TO BREAK');
+    const warming = !!(hit.warming || hit.state === 'WARMING');
+    empty.state = warming ? 'WARMING' : near ? 'NEAR' : 'NO_SETUP';
+    empty.label = warming ? 'WARMING' : near ? 'CLOSE TO BREAK' : 'NO BREAKOUT';
+    empty.color = near ? '#f0a060' : '#8491a1';
+    empty.why = warming
+      ? 'Not enough ' + String(tf).toUpperCase() + ' candles yet (' + (hit.bars || 0) + '/' + (hit.need || 0) + '). Still a saved coin.'
+      : near
+        ? 'Sitting near the ' + String(tf).toUpperCase() + ' high ' + (fmtPx(level) || '') + '. Not a break yet — no Entry Window.'
+        : level > 0
+          ? 'No ' + String(tf).toUpperCase() + ' breakout. Range high ' + fmtPx(level) + ' · spot ' + fmtPx(spot) + '. Saved — waiting for a break.'
+          : 'No ' + String(tf).toUpperCase() + ' breakout on this saved CA yet.';
+    return empty;
+  }
   const zoneLo = level > 0 ? level * 0.998 : 0;
   const zoneHi = level > 0 ? level * (1 + EW_ZONE_HI_PCT / 100) : 0;
   const ideal = level > 0 ? level * (1 + EW_IDEAL_PCT / 100) : 0;
@@ -2335,6 +2356,7 @@ export class Engine {
   touchEwPaper(hit) {
     const ew = hit && hit.ew;
     if (!ew || !ew.state) return;
+    if (ew.state === 'NO_SETUP' || ew.state === 'WARMING' || ew.state === 'NEAR') return;
     const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
     let list = [];
     try {
@@ -2436,30 +2458,63 @@ export class Engine {
     return true;
   }
   snapshotEntryWindow(tf) {
-    const tfn = String(tf || '4h').toLowerCase();
-    const hits = this.store.getWatch().map((r) => this.evaluateRow(r, tfn, this.store.getMeta('focus_ca') || ''));
-    const cards = hits
-      .filter((h) => h.ew && h.ew.state)
-      .map((h) => ({
-        name: h.name,
-        ca: h.ca,
-        chain: h.chain,
-        tf: h.tf,
-        dexUrl: h.dexUrl,
-        section: h.section,
-        event: h.event,
-        state: h.state,
-        ew: h.ew
-      }));
-    const rank = { ACTIVE: 0, APPROACHING: 1, WAIT: 2, NO_CHASE: 3, INVALIDATED: 4, EXPIRED: 5 };
-    cards.sort((a, b) => (rank[a.ew.state] ?? 9) - (rank[b.ew.state] ?? 9) || (b.ew.extPct || 0) - (a.ew.extPct || 0));
+    const tfn = String(tf || 'all').toLowerCase();
+    const watch = this.store.getWatch() || [];
+    const focus = this.store.getMeta('focus_ca') || '';
+    const pickTfs = tfn === 'all' ? ['5m', '15m', '1h', '2h', '4h', '1d'] : [tfn];
+    const rank = {
+      ACTIVE: 0,
+      APPROACHING: 1,
+      WAIT: 2,
+      NO_CHASE: 3,
+      NEAR: 4,
+      INVALIDATED: 5,
+      EXPIRED: 6,
+      WARMING: 7,
+      NO_SETUP: 8
+    };
+    const slim = (h) => ({
+      name: h.name,
+      ca: h.ca,
+      chain: h.chain,
+      tf: h.tf,
+      dexUrl: h.dexUrl,
+      section: h.section,
+      event: h.event,
+      state: h.state,
+      bars: h.bars,
+      need: h.need,
+      ew: h.ew || { state: 'NO_SETUP', label: 'NO BREAKOUT', color: '#8491a1', why: 'No entry window yet.' }
+    });
+    const cards = watch.map((r) => {
+      if (tfn !== 'all') return slim(this.evaluateRow(r, tfn, focus));
+      let best = null;
+      for (const tf0 of pickTfs) {
+        const h = this.evaluateRow(r, tf0, focus);
+        const st = (h.ew && h.ew.state) || 'NO_SETUP';
+        if (!best) {
+          best = h;
+          continue;
+        }
+        const a = rank[st] ?? 9;
+        const b = rank[(best.ew && best.ew.state) || 'NO_SETUP'] ?? 9;
+        if (a < b) best = h;
+      }
+      return slim(best);
+    });
+    cards.sort(
+      (a, b) =>
+        (rank[(a.ew && a.ew.state) || 'NO_SETUP'] ?? 9) - (rank[(b.ew && b.ew.state) || 'NO_SETUP'] ?? 9) ||
+        (b.ew && b.ew.extPct ? b.ew.extPct : 0) - (a.ew && a.ew.extPct ? a.ew.extPct : 0)
+    );
     let paper = [];
     try {
       paper = JSON.parse(this.store.getMeta('ew_paper') || '[]') || [];
     } catch (e) {
       paper = [];
     }
-    return { tf: tfn, cards, paper: paper.slice(-20).reverse(), updated: new Date().toISOString() };
+    if (tfn !== 'all') paper = paper.filter((p) => String(p.tf || '').toLowerCase() === tfn);
+    return { tf: tfn, saved: watch.length, cards, paper: paper.slice(-40).reverse(), updated: new Date().toISOString() };
   }
   persistEntry(hit) {
     const e = hit && hit.entry;
