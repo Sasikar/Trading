@@ -288,7 +288,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 .hu-band-now{position:fixed;top:52px;left:0;right:0;z-index:80;display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:rgba(8,13,19,.96);border-bottom:1px solid #2a3644;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px #0006}
 .hu-band-now[hidden]{display:none!important}
 .hu-band-now b{font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
@@ -542,6 +542,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="keep">G-Trade<span class="tab-sub">Notes</span></button>
   <button type="button" class="tab" data-tf="verdict">Verdict</button>
   <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
+  <button type="button" class="tab" data-tf="entrywindow">Entry Window</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
@@ -1006,6 +1007,30 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="entrywindow-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Entry Window</h2><p>Don't chase · setup TF = WHERE · 5m = WHEN · saved CAs</p></div>
+    <span class="source" id="ew-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:12px">Good setup is not buy-now. If price already ran, wait the printed pullback zone. ACTIVE only when price is in the zone and existing WINDOW confirmation passes.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800;align-self:center">SETUP TF</span>
+      <button type="button" class="ew-tf" data-ew-tf="5m" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('5m')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">5m</button>
+      <button type="button" class="ew-tf" data-ew-tf="15m" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('15m')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">15m</button>
+      <button type="button" class="ew-tf" data-ew-tf="1h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1H</button>
+      <button type="button" class="ew-tf" data-ew-tf="2h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('2h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">2H</button>
+      <button type="button" class="ew-tf" data-ew-tf="4h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('4h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:11px;cursor:pointer">4H</button>
+      <button type="button" class="ew-tf" data-ew-tf="1d" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1d')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1D</button>
+      <button type="button" class="ew-tf" data-ew-tf="1w" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1w')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1W</button>
+    </div>
+    <div id="ew-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div style="margin-top:18px;font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">PAPER · BREAKOUT vs PULLBACK</div>
+    <div id="ew-paper" style="margin-top:8px"></div>
+  </div>
+</section>
+</div>
 <div id="coin-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head"><div><h2>Meme CA · Indicators</h2><p>ETH / SOL · GeckoTerminal OHLCV · same stack as BTC TFs</p></div><span class="source" id="coin-source">—</span></div>
@@ -1107,5 +1132,6 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260916-s7"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
-<script src="site-nav.js?v=20260914-ui1"></script>
+<script src="entry-window-tab.js?v=20260917-ew1"></script>
+<script src="site-nav.js?v=20260917-ew1"></script>
 </body></html>

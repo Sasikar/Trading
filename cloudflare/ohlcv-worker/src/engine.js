@@ -962,6 +962,150 @@ export function entryQuality(args) {
   };
 }
 
+
+export const EW_ZONE_HI_PCT = 5;
+export const EW_IDEAL_PCT = 2;
+export const EW_APPROACH_PCT = 3;
+
+export function rangeLowFromBars(bars, n) {
+  const s = (bars || []).slice(-(n || 20)).map((b) => +b.l).filter((x) => x > 0);
+  if (!s.length) return 0;
+  return Math.min.apply(null, s);
+}
+
+/**
+ * WHERE to enter a setup that already exists. Does not detect breakouts.
+ * Uses printed breakout level + entryQuality (WHEN) + stretch.
+ */
+export function entryWindow(args) {
+  const hit = (args && args.hit) || {};
+  const entry = hit.entry || {};
+  const tf = String(hit.tf || '4h').toLowerCase();
+  const level = +hit.level || 0;
+  const spot = +hit.spot || 0;
+  const broke =
+    hit.section === 'live' ||
+    hit.section === 'matured' ||
+    hit.event === 'NEW BREAKOUT' ||
+    hit.event === 'BREAKOUT HELD';
+  const bars5m = (args && args.bars5m) || [];
+  const bars1h = (args && args.bars1h) || [];
+  const bars4h = (args && args.bars4h) || [];
+  const bars1d = (args && args.bars1d) || [];
+  const barsTf = (args && args.barsTf) || [];
+  const empty = {
+    state: '',
+    label: '',
+    color: '#8491a1',
+    why: '',
+    spot,
+    level,
+    extPct: null,
+    ideal: 0,
+    zoneLo: 0,
+    zoneHi: 0,
+    distZonePct: null,
+    sup5: 0,
+    sup1h: 0,
+    sup4h: 0,
+    sup1d: 0,
+    inval: 0,
+    trigger: 0,
+    execTf: '5m',
+    volPass: false,
+    momPass: false,
+    confirm: false,
+    entryPaint: entry.paint || ''
+  };
+  if (!broke) return empty;
+  const zoneLo = level > 0 ? level * 0.998 : 0;
+  const zoneHi = level > 0 ? level * (1 + EW_ZONE_HI_PCT / 100) : 0;
+  const ideal = level > 0 ? level * (1 + EW_IDEAL_PCT / 100) : 0;
+  const inval = level > 0 ? level * 0.97 : 0;
+  const extPct = level > 0 && spot > 0 ? ((spot - level) / level) * 100 : null;
+  const distZonePct = zoneHi > 0 && spot > zoneHi ? ((spot - zoneHi) / zoneHi) * 100 : spot && zoneHi ? ((spot - zoneHi) / zoneHi) * 100 : null;
+  const inZone = zoneLo > 0 && spot >= zoneLo && spot <= zoneHi;
+  const volPass = (hit.volX || 0) >= 0.7 || (hit.buyR || 0) >= 1 || (hit.m5 || 0) >= 0.2;
+  const momPass = (hit.m5 || 0) >= 0.2 || (hit.volX || 0) >= 1;
+  const confirm = entry.paint === 'WINDOW';
+  const stretched = hit.state === 'STRETCHED' || entry.paint === 'EXTENDED' || (extPct != null && extPct >= ENTRY_EXT_PCT);
+  const sup5 = rangeLowFromBars(bars5m, 24);
+  const sup1h = rangeLowFromBars(bars1h, 24);
+  const sup4h = rangeLowFromBars(bars4h.length ? bars4h : barsTf, 24);
+  const sup1d = rangeLowFromBars(bars1d, 30);
+  let state = 'WAIT';
+  let label = 'WAIT';
+  let color = '#e6c878';
+  let why = 'Price has not reached the pullback zone.';
+  if (entry.paint === 'FAILED') {
+    state = 'INVALIDATED';
+    label = 'INVALIDATED';
+    color = '#ff6f7c';
+    why = 'Structure lost — two 5m closes under ' + (fmtPx(level) || 'level') + '. Stop waiting for a pullback.';
+  } else if (inval > 0 && spot > 0 && spot < inval) {
+    state = 'INVALIDATED';
+    label = 'INVALIDATED';
+    color = '#ff6f7c';
+    why = 'Price under invalidation ' + fmtPx(inval) + '. Higher-TF setup is done.';
+  } else if (stretched || (zoneHi > 0 && spot > zoneHi && (distZonePct == null || distZonePct > EW_APPROACH_PCT))) {
+    state = 'NO_CHASE';
+    label = 'NO CHASE';
+    color = '#ff6f7c';
+    why =
+      'Price is ' +
+      (extPct != null ? extPct.toFixed(1) + '%' : '') +
+      ' above breakout. Setup can stay valid — do not enter here. Wait ' +
+      fmtPx(zoneLo) +
+      '–' +
+      fmtPx(zoneHi) +
+      '.';
+  } else if (zoneHi > 0 && spot > zoneHi && distZonePct != null && distZonePct <= EW_APPROACH_PCT) {
+    state = 'APPROACHING';
+    label = 'APPROACHING';
+    color = '#f0a060';
+    why = 'Price is ' + distZonePct.toFixed(1) + '% above the pullback zone. Watch ' + fmtPx(zoneHi) + '.';
+  } else if (inZone && confirm && volPass) {
+    state = 'ACTIVE';
+    label = 'ENTRY WINDOW ACTIVE';
+    color = '#62e3a0';
+    why = 'Price in pullback zone and execution confirmation passed (existing WINDOW).';
+  } else if (inZone) {
+    state = 'WAIT';
+    label = 'IN ZONE · NO CONFIRM';
+    color = '#e6c878';
+    why = 'Price reached the pullback zone. Volume/momentum/1m hold not confirmed yet — not an entry.';
+  } else if (hit.age >= 8 && zoneHi > 0 && spot > zoneHi) {
+    state = 'EXPIRED';
+    label = 'EXPIRED';
+    color = '#8491a1';
+    why = 'Setup aged out still extended. New break needed.';
+  }
+  return {
+    state,
+    label,
+    color,
+    why,
+    spot,
+    level,
+    extPct: extPct != null ? +extPct.toFixed(2) : null,
+    ideal,
+    zoneLo,
+    zoneHi,
+    distZonePct: distZonePct != null ? +distZonePct.toFixed(2) : null,
+    sup5,
+    sup1h,
+    sup4h,
+    sup1d,
+    inval,
+    trigger: level,
+    execTf: '5m',
+    volPass,
+    momPass,
+    confirm,
+    entryPaint: entry.paint || ''
+  };
+}
+
 export function maturedKey(h) {
   return (
     String(h.chain || 'solana').toLowerCase() +
@@ -1729,6 +1873,16 @@ export class Engine {
       buyR: hit.buyR
     });
     this.persistEntry(hit);
+    hit.ew = entryWindow({
+      hit,
+      bars5m: this.store.bars(row.ca, '5m', 30),
+      bars1h: this.store.bars(row.ca, '1h', 30),
+      bars4h: this.store.bars(row.ca, '4h', 30),
+      bars1d: this.store.bars(row.ca, '1d', 40),
+      barsTf: this.store.bars(row.ca, tf, 30)
+    });
+    this.persistEw(hit);
+    this.touchEwPaper(hit);
     return hit;
   }
 
@@ -2154,6 +2308,159 @@ export class Engine {
     return { ok: true, ca, name, n1d, n1w, n1M, days: days.length };
   }
 
+  persistEw(hit) {
+    const ew = hit && hit.ew;
+    if (!ew || !ew.state) return;
+    const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
+    let map = {};
+    try {
+      map = JSON.parse(this.store.getMeta('ew_state') || '{}') || {};
+    } catch (e) {
+      map = {};
+    }
+    const prev = map[k];
+    if (prev && prev.state === ew.state) return;
+    map[k] = { state: ew.state, at: Date.now(), level: +hit.level || 0 };
+    this.store.setMeta('ew_state', JSON.stringify(map));
+  }
+  ewStateOf(hit) {
+    const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
+    try {
+      const map = JSON.parse(this.store.getMeta('ew_state') || '{}') || {};
+      return map[k] || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  touchEwPaper(hit) {
+    const ew = hit && hit.ew;
+    if (!ew || !ew.state) return;
+    const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
+    let list = [];
+    try {
+      list = JSON.parse(this.store.getMeta('ew_paper') || '[]') || [];
+    } catch (e) {
+      list = [];
+    }
+    let row = list.find((x) => x.k === k && !x.closed);
+    const lvl = +hit.level || 0;
+    if (row && lvl > 0 && row.level > 0 && Math.abs(lvl - row.level) / row.level > 0.01) {
+      row.closed = true;
+      row = null;
+    }
+    if (!row) {
+      row = {
+        k,
+        ca: hit.ca,
+        name: hit.name,
+        tf: hit.tf,
+        at: Date.now(),
+        level: lvl,
+        breakPx: +hit.spot || 0,
+        zoneLo: ew.zoneLo,
+        zoneHi: ew.zoneHi,
+        hi: +hit.spot || 0,
+        lo: +hit.spot || 0,
+        chase: ew.state === 'NO_CHASE',
+        windowAt: 0,
+        windowPx: 0,
+        invalidAt: 0,
+        closed: false
+      };
+      list.push(row);
+    }
+    const px = +hit.spot || 0;
+    if (px > 0) {
+      row.hi = Math.max(row.hi || px, px);
+      row.lo = Math.min(row.lo || px, px);
+    }
+    if (ew.state === 'NO_CHASE') row.chase = true;
+    if (ew.state === 'ACTIVE' && !row.windowAt) {
+      row.windowAt = Date.now();
+      row.windowPx = px;
+    }
+    if (ew.state === 'INVALIDATED' && !row.invalidAt) {
+      row.invalidAt = Date.now();
+      row.closed = true;
+    }
+    if (row.breakPx > 0) {
+      row.mfe = +((((row.hi - row.breakPx) / row.breakPx) * 100).toFixed(2));
+      row.mae = +((((row.lo - row.breakPx) / row.breakPx) * 100).toFixed(2));
+    }
+    this.store.setMeta('ew_paper', JSON.stringify(list.slice(-40)));
+  }
+  async maybeEwAlert(hit) {
+    const ew = hit && hit.ew;
+    if (!ew || !ew.state) return false;
+    if (!this.alertsAllowed(hit.ca)) return false;
+    if (ew.state !== 'NO_CHASE' && ew.state !== 'APPROACHING' && ew.state !== 'ACTIVE' && ew.state !== 'INVALIDATED')
+      return false;
+    const key = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase() + '|ew|' + ew.state;
+    if (this.store.getAlert(key)) return false;
+    const now = Date.now();
+    const icon = ew.state === 'ACTIVE' ? '🟢' : ew.state === 'APPROACHING' ? '🟡' : '🛑';
+    const title = icon + ' ENTRY WINDOW · ' + hit.name + ' · ' + ew.label;
+    const msg = [
+      hit.name + ' · ' + String(hit.tf).toUpperCase(),
+      ew.label,
+      ew.why,
+      '',
+      'Breakout ' + fmtPx(ew.level) + ' · spot ' + fmtPx(ew.spot),
+      ew.zoneLo
+        ? 'Pullback ' + fmtPx(ew.zoneLo) + '–' + fmtPx(ew.zoneHi) + ' · inval ' + fmtPx(ew.inval)
+        : '',
+      'CA: ' + hit.ca,
+      'https://sasikar.github.io/Trading/index.html?tab=entrywindow'
+    ]
+      .filter(Boolean)
+      .join('\n');
+    let via = '';
+    const token = this.telegramToken();
+    if (token) {
+      try {
+        let chat = this.telegramChatId();
+        if (!chat) chat = await this.resolveTelegramChat();
+        if (!chat) throw new Error('Open t.me/' + this.telegramWantedUsername() + ' and tap Start, then send hi');
+        await sendTelegram(token, chat, title + '\n' + msg);
+        this.telegramErr = '';
+        this.store.setMeta('telegram_err', '');
+        via = 'telegram';
+      } catch (err) {
+        this.markTelegramFail(err);
+        const m = String(err && err.message ? err.message : err);
+        if (/tap Start|not stored|no telegram token/i.test(m)) return false;
+      }
+    }
+    if (!via) return false;
+    this.store.setAlert(key, now);
+    return true;
+  }
+  snapshotEntryWindow(tf) {
+    const tfn = String(tf || '4h').toLowerCase();
+    const hits = this.store.getWatch().map((r) => this.evaluateRow(r, tfn, this.store.getMeta('focus_ca') || ''));
+    const cards = hits
+      .filter((h) => h.ew && h.ew.state)
+      .map((h) => ({
+        name: h.name,
+        ca: h.ca,
+        chain: h.chain,
+        tf: h.tf,
+        dexUrl: h.dexUrl,
+        section: h.section,
+        event: h.event,
+        state: h.state,
+        ew: h.ew
+      }));
+    const rank = { ACTIVE: 0, APPROACHING: 1, WAIT: 2, NO_CHASE: 3, INVALIDATED: 4, EXPIRED: 5 };
+    cards.sort((a, b) => (rank[a.ew.state] ?? 9) - (rank[b.ew.state] ?? 9) || (b.ew.extPct || 0) - (a.ew.extPct || 0));
+    let paper = [];
+    try {
+      paper = JSON.parse(this.store.getMeta('ew_paper') || '[]') || [];
+    } catch (e) {
+      paper = [];
+    }
+    return { tf: tfn, cards, paper: paper.slice(-20).reverse(), updated: new Date().toISOString() };
+  }
   persistEntry(hit) {
     const e = hit && hit.entry;
     if (!e || !e.state || e.state === 'n/a') return;
@@ -3033,6 +3340,7 @@ export class Engine {
           if (long && !justClosed) continue;
           if (await this.maybeAlert(hit, tf)) nAlert++;
           if (await this.maybeEntryAlert(hit)) nAlert++;
+          if (await this.maybeEwAlert(hit)) nAlert++;
         }
       }
       if (scanned > 0) {
@@ -3333,6 +3641,10 @@ export async function handleApi(engine, request) {
     } catch (err) {
       return json({ ok: false, error: String(err && err.message ? err.message : err) }, 502);
     }
+  }
+  if (path === '/entry-window' || path === '/api/entry-window') {
+    const tf = (url.searchParams.get('tf') || '4h').toLowerCase();
+    return json(engine.snapshotEntryWindow(tf));
   }
   if (path === '/candles' || path === '/api/candles') {
     const ca = url.searchParams.get('ca') || '';
