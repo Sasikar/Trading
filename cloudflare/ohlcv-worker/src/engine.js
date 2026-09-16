@@ -466,7 +466,7 @@ export async function fetchHunterSeeds() {
     seeds.push({ ca: a, chain: ch, boosted: !!isBoost, src, pair: pair || null });
   };
   const skipSym = new Set(['weth', 'usdg', 'usdc', 'usdt', 'sol', 'eth', 'wbtc']);
-  for (const q of ['pump', 'SOL', 'pepe', 'ETH', 'robinhood']) {
+  for (const q of ['pump', 'SOL', 'pepe', 'ETH', 'robinhood', 'raydium', 'meteora', 'pumpswap', 'uniswap']) {
     try {
       calls++;
       const s = await fetchJSON('https://api.dexscreener.com/latest/dex/search?q=' + encodeURIComponent(q), 1);
