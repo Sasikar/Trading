@@ -2999,12 +2999,14 @@ async function coinFetchOHLCV(network, pool, ctf){
   } else if(ctf==='1w'){
     tries.push({tf:'day',agg:1,limit:220,rs:7*24*3600*1000});
     tries.push({tf:'hour',agg:1,limit:1000,rs:7*24*3600*1000});
+  } else if(ctf==='1M'){
+    tries.push({tf:'day',agg:1,limit:400,rs:30*24*3600*1000});
   } else {
     tries.push({tf:'hour',agg:4,limit:120,rs:null});
   }
   let lastErr=null;
   const shortTf = ['1m','5m','10m','15m','30m','1h','2h'].indexOf(ctf)>=0;
-  const minBars = ctf==='1w' ? 4 : (ctf==='1d' ? 10 : (shortTf ? 20 : 5));
+  const minBars = ctf==='1M' ? 6 : (ctf==='1w' ? 4 : (ctf==='1d' ? 10 : (shortTf ? 20 : 5)));
   for(const t of tries){
     try{
       const path='/networks/'+network+'/pools/'+encodeURIComponent(pool)+'/ohlcv/'+t.tf+'?aggregate='+t.agg+'&limit='+t.limit+'&currency=usd&token=base';
@@ -4876,6 +4878,13 @@ function showAntifomo(on){
   const p=$('antifomo-panel');
   const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel');
   if(on){
+    ['af-asset','af-tf'].forEach(function(id){
+      const el=$(id);
+      if(el && !el.dataset.afWired){
+        el.dataset.afWired='1';
+        el.addEventListener('change', function(){ try{ afSaveState(); }catch(e){} });
+      }
+    });
     if(panels){panels.classList.add('hidden');panels.style.display='none';}
     if(trend){trend.classList.remove('on');trend.style.display='none';}
     if(sp){sp.classList.remove('on');sp.style.display='none';}
@@ -4931,7 +4940,9 @@ function afSaveState(){
       t: Date.now(),
       pre: afPre,
       quality: afQuality,
-      score: sc
+      score: sc,
+      asset: ($('af-asset')&&$('af-asset').value)||'btc',
+      tf: ($('af-tf')&&$('af-tf').value)||'4h'
     }));
   }catch(e){}
 }
@@ -4950,6 +4961,12 @@ function afRestoreState(){
       const y=$('af-pre-yes'), n=$('af-pre-no');
       if(y) y.style.outline=afPre?'2px solid #62e3a0':'none';
       if(n) n.style.outline=!afPre?'2px solid #ff6f7c':'none';
+    }
+    const tfEl=$('af-tf'), asEl=$('af-asset');
+    if(asEl && s.asset) asEl.value=s.asset;
+    if(tfEl && s.tf){
+      const ok=[].some.call(tfEl.options, function(o){ return o.value===s.tf; });
+      if(ok) tfEl.value=s.tf;
     }
     if(s.quality && typeof s.quality==='object'){
       afQuality=s.quality;
@@ -5158,40 +5175,102 @@ window.afGitSaveMonth=afGitSave;
 
 
 
+function afResampleKl(bars, periodMs){
+  const map={};
+  for(const b of bars||[]){
+    const t=Math.floor(+b[0]/periodMs)*periodMs;
+    if(!map[t]) map[t]=[t,+b[1],+b[2],+b[3],+b[4],+b[5]||0];
+    else {
+      const x=map[t];
+      x[2]=Math.max(x[2],+b[2]); x[3]=Math.min(x[3],+b[3]); x[4]=+b[4]; x[5]+=+b[5]||0;
+    }
+  }
+  return Object.keys(map).map(Number).sort(function(a,b){return a-b;}).map(function(k){return map[k];});
+}
+async function afFetchBinance(symbol, tf){
+  const native={'5m':'5m','15m':'15m','30m':'30m','1h':'1h','2h':'2h','4h':'4h','1d':'1d','1w':'1w','1M':'1M'};
+  if(tf==='10m') return afResampleKl(await afFetchBinance(symbol,'5m'), 10*60e3);
+  const iv=native[tf];
+  if(!iv) throw new Error('unsupported '+tf);
+  const j=await jget('https://api.binance.com/api/v3/klines?symbol='+symbol+'&interval='+iv+'&limit=400');
+  const rows=(j||[]).map(function(r){return [+r[0],+r[1],+r[2],+r[3],+r[4],+r[5]];}).filter(function(k){return isFinite(k[4]);});
+  if(!rows.length) throw new Error('binance empty '+tf);
+  return rows;
+}
+async function afFetchKraken(pair, tf){
+  const map={'5m':5,'15m':15,'30m':30,'1h':60,'4h':240,'1d':1440,'1w':10080};
+  if(tf==='10m') return afResampleKl(await afFetchKraken(pair,'5m'), 10*60e3);
+  if(tf==='2h') return afResampleKl(await afFetchKraken(pair,'1h'), 2*3600e3);
+  if(tf==='1M') throw new Error('kraken no 1M');
+  const iv=map[tf];
+  if(!iv) throw new Error('kraken unsupported '+tf);
+  const j=await jget('https://api.kraken.com/0/public/OHLC?pair='+pair+'&interval='+iv);
+  const rows=(j&&j.result&&(j.result[Object.keys(j.result).filter(function(k){return k!=='last';})[0]]))||[];
+  const mapped=(rows||[]).map(function(k){return [k[0]*1000,+k[1],+k[2],+k[3],+k[4],+k[6]];}).filter(function(k){return isFinite(k[4]);});
+  if(!mapped.length) throw new Error('kraken empty');
+  return mapped;
+}
+async function afFetchGate(inst, tf){
+  const map={'5m':'5m','15m':'15m','30m':'30m','1h':'1h','4h':'4h','1d':'1d','1w':'7d','1M':'30d'};
+  if(tf==='10m') return afResampleKl(await afFetchGate(inst,'5m'), 10*60e3);
+  if(tf==='2h') return afResampleKl(await afFetchGate(inst,'1h'), 2*3600e3);
+  const iv=map[tf];
+  if(!iv) throw new Error('gate unsupported '+tf);
+  const url='https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair='+inst+'&interval='+iv+'&limit=200';
+  const r=await fetch(url);
+  const j=await r.json();
+  return (j||[]).map(function(x){return [+x[0]*1000,+x[5],+x[3],+x[4],+x[2],+x[1]];}).filter(function(k){return isFinite(k[4]);}).sort(function(a,b){return a[0]-b[0];});
+}
 async function afGetKl(asset, tf){
   asset=(asset||'btc').toLowerCase();
   tf=(tf||'4h').toLowerCase();
+  if(tf==='1m') tf='5m';
   if(asset==='ca'){
     if(!coinPool) throw new Error('Load a CA on the CA tab first');
-    return await coinFetchOHLCV(coinPool.network, coinPool.address, tf);
-  }
-  // BTC/ETH via existing TF pipeline if available
-  if(typeof fetchKrakenOHLC==='function'){
-    const pair=asset==='eth'?'ETHUSD':'XBTUSD';
-    const map={ '1h':60,'4h':240,'1d':1440 };
     try{
-      const rows=await fetchKrakenOHLC(pair, map[tf]||240);
-      if(rows&&rows.length) return rows;
-    }catch(e){}
+      return await coinFetchOHLCV(coinPool.network, coinPool.address, tf);
+    }catch(e0){
+      const ca=coinCA||(($('coin-ca')||{}).value||'').trim();
+      if(!ca) throw e0;
+      const base=(function(){try{if(window.BREAKOUT_API)return String(window.BREAKOUT_API).replace(/\/+$/,'');}catch(e){}return 'https://trading-ohlcv.sasipudi.workers.dev';})();
+      const r=await fetch(base+'/candles?ca='+encodeURIComponent(ca)+'&tf='+encodeURIComponent(tf)+'&n=400',{cache:'no-store'});
+      const j=await r.json();
+      const bars=j.bars||j.candles||j.ohlcv||[];
+      const rows=bars.map(function(b){
+        const t=+(b.t||b.time||0);
+        const ts=t<1e12?t*1000:t;
+        return [ts,+b.o,+b.h,+b.l,+b.c,+(b.vol||b.v||0)];
+      }).filter(function(k){return isFinite(k[4]);}).sort(function(a,b){return a[0]-b[0];});
+      if(rows.length) return rows;
+      throw e0;
+    }
   }
-  // Fallback: use last loaded TF candles if BTC
-  if(asset==='btc' && typeof lastKl!=='undefined' && lastKl && lastKl.length) return lastKl;
-  // Gate.io / public try
-  try{
-    const interval=tf==='1d'?'1d':(tf==='1h'?'1h':'4h');
-    const inst=asset==='eth'?'ETH_USDT':'BTC_USDT';
-    const url='https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair='+inst+'&interval='+interval+'&limit=200';
-    const r=await fetch(url);
-    const j=await r.json();
-    // gate: [t,vol,close,high,low,open]
-    return (j||[]).map(x=>[+x[0]*1000,+x[5],+x[3],+x[4],+x[2],+x[1]]).filter(k=>isFinite(k[4])).sort((a,b)=>a[0]-b[0]);
-  }catch(e){
-    throw new Error('Could not load candles: '+(e&&e.message||e));
+  const symbol=asset==='eth'?'ETHUSDT':'BTCUSDT';
+  const pair=asset==='eth'?'ETHUSD':'XBTUSD';
+  const inst=asset==='eth'?'ETH_USDT':'BTC_USDT';
+  if(asset==='btc' && tf==='1M' && typeof fetchKlines==='function'){
+    try{ const rows=await fetchKlines('1M',48); if(rows&&rows.length) return rows; }catch(e){}
   }
+  const errs=[];
+  try{ const rows=await afFetchBinance(symbol, tf); if(rows&&rows.length) return rows; }catch(e){ errs.push(e); }
+  try{ const rows=await afFetchKraken(pair, tf); if(rows&&rows.length) return rows; }catch(e){ errs.push(e); }
+  try{ const rows=await afFetchGate(inst, tf); if(rows&&rows.length) return rows; }catch(e){ errs.push(e); }
+  if(asset==='btc' && typeof fetchKlines==='function' && (tf==='1h'||tf==='4h'||tf==='1d'||tf==='1w'||tf==='1M')){
+    try{ const rows=await fetchKlines(tf, 200); if(rows&&rows.length) return rows; }catch(e){ errs.push(e); }
+  }
+  throw new Error('Could not load candles for '+asset.toUpperCase()+' '+tf.toUpperCase()+(errs[0]?': '+(errs[0].message||errs[0]):''));
 }
 
-function afClassifyQuality(kl){
-  if(!kl||kl.length<30) return {tag:'unknown', label:'Insufficient data', color:'#8491a1', scorePart:30, detail:'Need more closed candles'};
+function afNeedBars(tf){
+  tf=String(tf||'').toLowerCase();
+  if(tf==='1M') return 8;
+  if(tf==='1w') return 8;
+  if(tf==='1d') return 20;
+  return 30;
+}
+function afClassifyQuality(kl, tf){
+  const need=afNeedBars(tf);
+  if(!kl||kl.length<need) return {tag:'unknown', label:'Insufficient data', color:'#8491a1', scorePart:30, detail:'Need more closed candles ('+((kl&&kl.length)||0)+'/'+need+' on '+(tf||'').toUpperCase()+')'};
   const closes=kl.map(k=>+k[4]);
   const spot=closes[closes.length-1];
   const rsi=typeof calcRSI==='function'?calcRSI(closes,14):null;
@@ -5243,7 +5322,7 @@ async function afAssess(){
     const kl=await afGetKl(asset, tf);
     // closed only: drop last if live
     const closed=kl.length>2?kl.slice(0,-1):kl;
-    afQuality=afClassifyQuality(closed);
+    afQuality=afClassifyQuality(closed, tf);
     afQuality.asset=asset; afQuality.tf=tf;
     if(box){
       box.innerHTML='<div style="font-size:16px;font-weight:900;color:'+afQuality.color+'">'+afQuality.label+'</div>'
