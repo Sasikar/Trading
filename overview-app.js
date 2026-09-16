@@ -726,18 +726,28 @@ function renderBtcHeatmap(book, klDaily, klHour){
     const where=atMark?('at mark '+money(peak.p)): (side+' '+money(peak.p));
     verdict.textContent='Heat concentrated '+where+' · '+moneyShort(peak.usd)+(unit==='vol'?' traded':' in that band')+onLine+'.';
   }
-  const isSR=function(p){
+  const nearest=function(target){
+    if(!(target>0)) return -1;
+    let best=-1, dist=Infinity;
+    for(let i=0;i<n;i++){
+      const d=Math.abs(buckets[i].p-target);
+      if(d<dist){dist=d;best=i;}
+    }
+    return best;
+  };
+  const iS=nearest(sr.s), iR=nearest(sr.r), iM=nearest(mid);
+  const isSR=function(idx){
     const tags=[];
-    if(sr.s && Math.abs(p-sr.s)<step*1.2) tags.push('S');
-    if(sr.r && Math.abs(p-sr.r)<step*1.2) tags.push('R');
-    if(Math.abs(p-mid)<step*0.7) tags.push('M');
+    if(idx===iS) tags.push('S');
+    if(idx===iR) tags.push('R');
+    if(idx===iM) tags.push('M');
     return tags;
   };
   let html='<div class="hm-axis"><span>'+(unit==='vol'?'Volume below mark':'Bid / support')+'</span><span>'+(unit==='vol'?'Volume above mark':'Ask / resistance')+'</span></div>'+
     '<div class="hm-keys"><b>S</b> daily support &nbsp;·&nbsp; <b>R</b> daily resistance &nbsp;·&nbsp; <b>M</b> mark (now) &nbsp;·&nbsp; <b>SM</b> price sitting on support</div>';
   for(let i=n-1;i>=0;i--){
     const b=buckets[i];
-    const tags=isSR(b.p);
+    const tags=isSR(i);
     const cls=['hm-row'];
     if(tags.indexOf('M')>=0) cls.push('mid');
     if(tags.indexOf('S')>=0) cls.push('sr-s');
