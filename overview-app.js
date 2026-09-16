@@ -5557,6 +5557,7 @@ function initTabReorder(){
     btn.textContent=arranging?'Done':'Arrange';
     btn.classList.toggle('on', arranging);
     bar.classList.toggle('arranging', arranging);
+    document.body.classList.toggle('tab-arranging', arranging);
     killSelect();
   }
   paintBtn();
@@ -5596,6 +5597,9 @@ function initTabReorder(){
     killSelect();
   }
   bar.addEventListener('selectstart', function(e){ e.preventDefault(); }, true);
+  bar.addEventListener('touchstart', function(){ killSelect(); }, {passive:true});
+  bar.addEventListener('pointerdown', function(){ killSelect(); });
+
   bar.addEventListener('contextmenu', function(e){ if(arranging) e.preventDefault(); }, true);
   bar.addEventListener('touchstart', function(e){
     if(!arranging) return;
