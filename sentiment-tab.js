@@ -118,7 +118,17 @@
     lock = true;
     if (other) other.value = '';
     lock = false;
-    paintLink(name);
+    const box = $('st-board');
+    if (box) {
+      box.style.pointerEvents = 'none';
+      box.innerHTML = '<div class="st-note">Selected '+esc(name)+' · tap X Live below if you want search. Not opening it.</div>';
+    }
+    setTimeout(function () {
+      paintLink(name);
+      setTimeout(function () {
+        if (box) box.style.pointerEvents = '';
+      }, 500);
+    }, 450);
   }
   function hideOthers() {
     [
