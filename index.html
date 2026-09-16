@@ -837,6 +837,16 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
       </div>
     </div>
     <div style="font-size:11px;color:#8491a1;margin-bottom:10px;line-height:1.45"><b style="color:#e6c878">EARLY</b> = close to a break, not broken. <b style="color:#62e3a0">LIVE</b> = happened now. <b style="color:#6eb6ff">MATURED</b> = already happened. Quiet coins stay off this page. Phone pings only on LIVE.</div>
+    <div id="bo-alert-bar" style="margin:0 0 12px;padding:10px 12px;border-radius:12px;border:1px solid #243041;background:#0b121a">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">TF ALERTS</span>
+        <button type="button" class="bo-al-mode" data-al-mode="all" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('all')}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">All on</button>
+        <button type="button" class="bo-al-mode" data-al-mode="picked" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('picked')}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">Picked</button>
+        <button type="button" class="bo-al-mode" data-al-mode="off" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('off')}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">All off</button>
+        <span id="bo-al-meta" style="font-size:11px;color:#8491a1;font-weight:700">Telegram · persisted on worker</span>
+      </div>
+      <div id="bo-alert-picks" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    </div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
       <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">FOCUS 1m</span>
       <select id="bo-focus-sel" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:700">
@@ -1080,7 +1090,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </div>
 </main></div>
 <script src="overview-app.js?v=20260916-hm9"></script>
-<script src="breakout-tab.js?v=20260915-eq5"></script>
+<script src="breakout-tab.js?v=20260916-al1"></script>
 <script src="hunter-tab.js?v=20260916-h16"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>

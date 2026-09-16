@@ -1462,7 +1462,54 @@ export class Engine {
     return 30 * 60e3;
   }
 
+  alertMode() {
+    const m = String(this.store.getMeta('alert_mode') || 'all').toLowerCase();
+    if (m === 'off' || m === 'picked') return m;
+    return 'all';
+  }
+  alertCas() {
+    try {
+      const a = JSON.parse(this.store.getMeta('alert_cas') || '[]');
+      return Array.isArray(a) ? a.map((x) => String(x).toLowerCase()).filter(Boolean) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  alertsAllowed(ca) {
+    const mode = this.alertMode();
+    if (mode === 'off') return false;
+    if (mode === 'picked') {
+      const k = String(ca || '').toLowerCase();
+      return !!k && this.alertCas().indexOf(k) >= 0;
+    }
+    return true;
+  }
+  setAlertPrefs(body) {
+    body = body || {};
+    if (body.mode) {
+      const m = String(body.mode).toLowerCase();
+      if (m === 'all' || m === 'off' || m === 'picked') this.store.setMeta('alert_mode', m);
+    }
+    const watch = new Set((this.store.getWatch() || []).map((w) => String(w.ca).toLowerCase()));
+    if (Array.isArray(body.cas)) {
+      const cas = body.cas.map((x) => String(x).toLowerCase()).filter((x) => watch.has(x));
+      this.store.setMeta('alert_cas', JSON.stringify(cas));
+    }
+    if (body.ca) {
+      const k = String(body.ca).toLowerCase();
+      if (!watch.has(k)) throw new Error('CA is not on the saved list');
+      const set = new Set(this.alertCas());
+      if (body.on === false) set.delete(k);
+      else set.add(k);
+      this.store.setMeta('alert_cas', JSON.stringify(Array.from(set)));
+    }
+    return {
+      alertMode: this.alertMode(),
+      alertCas: this.alertCas()
+    };
+  }
   shouldAlert(hit, tf) {
+    if (!this.alertsAllowed(hit && hit.ca)) return false;
     if (hit.state === 'WARMING' || hit.state === 'WATCH' || hit.section === 'early') return false;
     if (tf === '1m') {
       if (!hit.focus) return false;
@@ -1542,6 +1589,7 @@ export class Engine {
 
   async maybeEntryAlert(hit) {
     const e = hit && hit.entry;
+    if (!this.alertsAllowed(hit && hit.ca)) return false;
     if (!e || (e.paint !== 'WINDOW' && e.paint !== 'EXTENDED' && e.paint !== 'FAILED')) return false;
     const tf = hit.tf;
     const key = String(hit.ca || '').toLowerCase() + '|' + String(tf || '').toLowerCase() + '|entry|' + e.state;
@@ -2359,6 +2407,12 @@ export class Engine {
       focus: this.store.getMeta('focus_ca') || '',
       focusName: this.store.getMeta('focus_name') || '',
       focus1mAlerts: this.store.getMeta('focus_1m_alerts') === 'on',
+      alertMode: this.alertMode(),
+      alertCas: this.alertCas(),
+      alertWatch: (watch || []).map((r) => ({
+        ca: r.ca,
+        name: r.name || (r.ca || '').slice(0, 8)
+      })),
       lastPoll: lastPoll ? new Date(lastPoll).toISOString() : null,
       lastAll: lastAll ? new Date(lastAll).toISOString() : null,
       pollMs: now - lastPoll,
@@ -3078,6 +3132,15 @@ export async function handleApi(engine, request) {
     try {
       const out = engine.saveHunterCa(body.ca || '');
       return json(out);
+    } catch (e) {
+      return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
+    }
+  }
+  if ((path === '/alerts' || path === '/api/alerts') && method === 'POST') {
+    const body = await request.json().catch(() => ({}));
+    try {
+      const out = engine.setAlertPrefs(body);
+      return json({ ok: true, ...out, alertWatch: engine.status().alertWatch });
     } catch (e) {
       return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
     }

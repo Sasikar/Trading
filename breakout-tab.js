@@ -18,6 +18,8 @@
   let liveOn = true;
   let liveTimer = null;
   let lastErr = '';
+  let alertMode = 'all';
+  let alertCas = [];
   const LIVE_MS = 20000;
   const TFS = ['1m', '5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
   const HIT_PCT = 20;
@@ -250,6 +252,15 @@
           '<button type="button" data-focus-ca="' +
           h.ca +
           '" class="bo-focus-ca" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:700;font-size:11px;cursor:pointer">Focus 1m</button>' +
+          '<button type="button" data-al-ca="' +
+          h.ca +
+          '" class="bo-al-ca" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:' +
+          (alertCas.indexOf(String(h.ca).toLowerCase()) >= 0 ? '#1a9b6c' : '#121a24') +
+          ';color:' +
+          (alertCas.indexOf(String(h.ca).toLowerCase()) >= 0 ? '#fff' : '#c5d0dc') +
+          ';font-weight:700;font-size:11px;cursor:pointer">' +
+          (alertCas.indexOf(String(h.ca).toLowerCase()) >= 0 ? 'Alert ON' : 'Alert') +
+          '</button>' +
           (h.dexUrl
             ? '<a href="' +
               h.dexUrl +
@@ -347,6 +358,15 @@
           '<button type="button" data-focus-ca="' +
           h.ca +
           '" class="bo-focus-ca" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:700;font-size:11px;cursor:pointer">Focus 1m</button>' +
+          '<button type="button" data-al-ca="' +
+          h.ca +
+          '" class="bo-al-ca" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:' +
+          (alertCas.indexOf(String(h.ca).toLowerCase()) >= 0 ? '#1a9b6c' : '#121a24') +
+          ';color:' +
+          (alertCas.indexOf(String(h.ca).toLowerCase()) >= 0 ? '#fff' : '#c5d0dc') +
+          ';font-weight:700;font-size:11px;cursor:pointer">' +
+          (alertCas.indexOf(String(h.ca).toLowerCase()) >= 0 ? 'Alert ON' : 'Alert') +
+          '</button>' +
           (h.dexUrl
             ? '<a href="' +
               h.dexUrl +
@@ -408,6 +428,11 @@
     document.querySelectorAll('.bo-focus-ca').forEach(function (b) {
       b.onclick = function () {
         setFocus(b.getAttribute('data-focus-ca'));
+      };
+    });
+    document.querySelectorAll('.bo-al-ca').forEach(function (b) {
+      b.onclick = function () {
+        toggleAlertCa(b.getAttribute('data-al-ca'));
       };
     });
   }
@@ -533,12 +558,93 @@
       else hint.textContent = 'Open t.me/' + tgBot + ' → Start → send hi, then tap Test Telegram.';
     }
     paintFocusRow(st);
+    paintAlertBar(st);
   }
 
+
+  function paintAlertBar(st) {
+    if (st && st.alertMode) alertMode = st.alertMode;
+    if (st && Array.isArray(st.alertCas)) alertCas = st.alertCas.map(function (x) { return String(x).toLowerCase(); });
+    document.querySelectorAll('.bo-al-mode').forEach(function (b) {
+      const on = b.getAttribute('data-al-mode') === alertMode;
+      b.style.background = on ? '#1a9b6c' : '#121a24';
+      b.style.color = on ? '#fff' : '#c5d0dc';
+      b.style.borderColor = on ? '#1a9b6c' : '#243041';
+    });
+    const meta = $('bo-al-meta');
+    const n = alertCas.length;
+    if (meta) {
+      meta.textContent =
+        alertMode === 'off'
+          ? 'No Telegram · saved on worker'
+          : alertMode === 'picked'
+            ? n + ' coin' + (n === 1 ? '' : 's') + ' · others silenced · saved on worker'
+            : 'Every saved CA · saved on worker';
+    }
+    const box = $('bo-alert-picks');
+    if (!box) return;
+    const watch = (st && st.alertWatch) || [];
+    if (alertMode !== 'picked') {
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+    box.style.display = 'flex';
+    box.innerHTML = watch.length
+      ? watch
+          .map(function (w) {
+            const on = alertCas.indexOf(String(w.ca).toLowerCase()) >= 0;
+            return (
+              '<button type="button" class="bo-al-ca" data-al-ca="' +
+              w.ca +
+              '" style="padding:6px 10px;border-radius:999px;border:1px solid ' +
+              (on ? '#1a9b6c' : '#243041') +
+              ';background:' +
+              (on ? '#1a9b6c' : '#121a24') +
+              ';color:' +
+              (on ? '#fff' : '#c5d0dc') +
+              ';font-weight:800;font-size:11px;cursor:pointer">' +
+              (w.name || w.ca.slice(0, 6)) +
+              '</button>'
+            );
+          })
+          .join('')
+      : '<span style="font-size:11px;color:#8491a1">No saved CAs to pick</span>';
+    box.querySelectorAll('.bo-al-ca').forEach(function (b) {
+      b.onclick = function () {
+        toggleAlertCa(b.getAttribute('data-al-ca'));
+      };
+    });
+  }
+  async function setAlertMode(mode) {
+    try {
+      const j = await api('/alerts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: mode }) });
+      paintAlertBar(Object.assign({}, j, { alertWatch: j.alertWatch }));
+      await loadStatus();
+      scanBreakoutMemes(true);
+    } catch (e) {
+      alert(e.message || e);
+    }
+  }
+  async function toggleAlertCa(ca) {
+    try {
+      const k = String(ca || '').toLowerCase();
+      const on = alertCas.indexOf(k) < 0;
+      if (alertMode !== 'picked') {
+        await api('/alerts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'picked', ca: ca, on: true }) });
+      } else {
+        await api('/alerts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ca: ca, on: on }) });
+      }
+      await loadStatus();
+      scanBreakoutMemes(true);
+    } catch (e) {
+      alert(e.message || e);
+    }
+  }
   function paintFocusRow(st) {
     const sel = $('bo-focus-sel');
     if (!sel) return;
-    const watch = (st && st.watch) || [];
+    const watch = (st && (st.watch || st.alertWatch)) || [];
     const cur = (st && st.focus) || '';
     const keep = sel.value;
     sel.innerHTML =
@@ -766,6 +872,9 @@
   };
   window.loadMomentum1mStatus = function (force) {
     return loadStatus();
+  };
+  window.setBreakoutAlertMode = function (mode) {
+    return setAlertMode(mode);
   };
   window.setBreakoutTF = function (tf) {
     breakoutTF = String(tf || '4h').toLowerCase();
