@@ -421,6 +421,27 @@ export function hunterPass(tick, pair, now) {
   return false;
 }
 
+/** High 24h/1h volume in the same four liq bands. Not a momentum pass. */
+export function hunterVolPass(tick, pair, now) {
+  const band = hunterBand(tick.liq);
+  if (!band) return false;
+  const created = pair && pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
+  if (created && now - created < 5 * 60e3) return false;
+  const liq = +tick.liq || 0;
+  const v24 = +tick.vol24h || 0;
+  const v1 = +tick.vol1h || 0;
+  if (!(liq > 0)) return false;
+  let floor24 = 0, floor1 = 0;
+  if (band === 'micro') { floor24 = 80000; floor1 = 15000; }
+  else if (band === 'small') { floor24 = 250000; floor1 = 40000; }
+  else if (band === 'mid') { floor24 = 800000; floor1 = 120000; }
+  else if (band === 'large') { floor24 = 2000000; floor1 = 250000; }
+  else return false;
+  if (v24 < floor24 && v1 < floor1) return false;
+  if (v24 < liq * 0.12 && v1 < liq * 0.03) return false;
+  return true;
+}
+
 export async function fetchHunterSeeds() {
   const seeds = [];
   const boosted = new Set();
@@ -2700,7 +2721,9 @@ export class Engine {
       }
       const row = { ca: s.ca, chain: pair.chainId || 'solana', name: (pair.baseToken && pair.baseToken.symbol) || s.ca.slice(0, 6), poolAddress: pair.pairAddress || '' };
       const tick = pairToTick(pair, row, now);
-      if (!hunterPass(tick, pair, now)) continue;
+      const isMom = hunterPass(tick, pair, now);
+      const isVol = hunterVolPass(tick, pair, now);
+      if (!isMom && !isVol) continue;
       const mom = momentumFromTick(tick);
       const created = pair.pairCreatedAt ? +pair.pairCreatedAt : 0;
       const band = hunterBand(tick.liq);
@@ -2715,6 +2738,8 @@ export class Engine {
         h6: tick.h6,
         volX: mom.volX,
         buyR: mom.buyR,
+        vol24h: tick.vol24h,
+        vol1h: tick.vol1h,
         liq: tick.liq,
         mcap: +(pair.marketCap || pair.fdv || 0) || null,
         spot: tick.price,
@@ -2722,18 +2747,27 @@ export class Engine {
         boosted: !!s.boosted,
         src: s.src || '',
         dexUrl: tick.dexUrl,
-        pairAddress: tick.pairAddress
+        pairAddress: tick.pairAddress,
+        mom: !!isMom,
+        highVol: !!isVol
       });
     }
-    const per = { micro: 3, small: 3, mid: 3, large: 3 };
+    const perMom = { micro: 3, small: 3, mid: 3, large: 3 };
+    const perVol = { micro: 3, small: 3, mid: 3, large: 3 };
     const buckets = { micro: [], small: [], mid: [], large: [] };
     for (const h of hits) {
       if (buckets[h.band]) buckets[h.band].push(h);
     }
     const top = [];
     for (const k of ['micro', 'small', 'mid', 'large']) {
-      buckets[k].sort((a, b) => (b.m5 || 0) - (a.m5 || 0) || (b.score || 0) - (a.score || 0));
-      top.push.apply(top, buckets[k].slice(0, per[k]));
+      const rows = buckets[k];
+      const momRows = rows.filter((h) => h.mom).sort((a, b) => (b.m5 || 0) - (a.m5 || 0) || (b.score || 0) - (a.score || 0)).slice(0, perMom[k]);
+      const seen = new Set(momRows.map((h) => String(h.ca).toLowerCase()));
+      const volRows = rows
+        .filter((h) => h.highVol && !seen.has(String(h.ca).toLowerCase()))
+        .sort((a, b) => (b.vol24h || 0) - (a.vol24h || 0) || (b.vol1h || 0) - (a.vol1h || 0))
+        .slice(0, perVol[k]);
+      top.push.apply(top, momRows.concat(volRows));
     }
     this.store.setMeta('hunter_hits', JSON.stringify(top));
     this.store.setMeta('hunter_at', String(now));

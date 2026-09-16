@@ -135,6 +135,7 @@
       (both
         ? ' <span title="You verified the chain scanners" style="font-size:10px;color:#06281a;background:#62e3a0;font-weight:900;padding:2px 7px;border-radius:999px">OK</span>'
         : '') +
+      (h.highVol ? ' <span title="High volume vs liquidity" style="font-size:10px;color:#061018;background:#6eb6ff;font-weight:900;padding:2px 7px;border-radius:999px">V</span>' : '') +
       (h.boosted ? ' <span style="font-size:10px;color:#f0a060;font-weight:800">PAID BOOST</span>' : '') +
       (h.saved ? ' <span style="font-size:10px;color:#62e3a0;font-weight:800">HUNTER WATCH</span>' : '') +
       (h.onBreakout ? ' <span style="font-size:10px;color:#8491a1;font-weight:800">SAVED CA</span>' : '') +
@@ -153,6 +154,7 @@
       (h.h1 != null ? Number(h.h1).toFixed(1) : '—') +
       '% · liq ' +
       money(h.liq) +
+      (h.vol24h ? ' · vol 24h ' + money(h.vol24h) : '') +
       (h.mcap ? ' · mcap ' + money(h.mcap) : '') +
       (h.ageMin != null ? ' · age ' + (h.ageMin < 60 ? h.ageMin + 'm' : Math.round(h.ageMin / 60) + 'h') : '') +
       '</div>' +
@@ -208,9 +210,9 @@
         '</div>' +
         '<div style="font-size:11px;color:#8491a1">' +
         band.range +
-        ' · top ' +
+        ' · ' +
         rows.length +
-        '</div></div>' +
+        ' · V = high volume</div></div>' +
         body +
         '</div>'
       );

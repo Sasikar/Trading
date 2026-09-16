@@ -31,6 +31,7 @@
     '- InMemory: this handoff prompt + Copy. Keep it updated when architecture changes.',
     '- G-Trade Notes (tab label G-Trade + small Notes): one keep.google.com link on the phone. Opens Keep. No Google API, no notes inside the PWA.',
     '- Tab bar: tap Arrange, drag tabs, tap Done. Saved on this phone.',
+    '- Hunter: same 4 liq bands. Momentum names plus high-volume names. V badge = high volume vs liquidity.',
     '- Verdict: tape-only HOLD/EXIT. No Dex-24h fake 1D/1W.',
     '',
     'HARD RULES',
