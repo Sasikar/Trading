@@ -5523,12 +5523,15 @@ function initTabReorder(){
   if(!bar || bar.dataset.reorder==='1') return;
   bar.dataset.reorder='1';
   const KEY='tf_tab_order_v1';
-  let arranging=false, dragEl=null, moved=false;
+  let arranging=false, dragEl=null, moved=false, fromTouch=false;
   function orderNow(){
     return [].slice.call(bar.querySelectorAll('.tab')).map(function(b){return b.getAttribute('data-tf');});
   }
   function save(){
     try{localStorage.setItem(KEY, JSON.stringify(orderNow()));}catch(e){}
+  }
+  function killSelect(){
+    try{ const s=window.getSelection(); if(s&&s.removeAllRanges) s.removeAllRanges(); }catch(e){}
   }
   function apply(){
     let order=[];
@@ -5538,8 +5541,8 @@ function initTabReorder(){
     bar.querySelectorAll('.tab').forEach(function(b){ map[b.getAttribute('data-tf')]=b; });
     order.forEach(function(id){ if(map[id]) bar.appendChild(map[id]); });
     Object.keys(map).forEach(function(id){ if(order.indexOf(id)<0) bar.appendChild(map[id]); });
-    const btn=document.getElementById('tab-arrange');
-    if(btn) bar.appendChild(btn);
+    const b=document.getElementById('tab-arrange');
+    if(b) bar.appendChild(b);
   }
   apply();
   let btn=document.getElementById('tab-arrange');
@@ -5554,6 +5557,7 @@ function initTabReorder(){
     btn.textContent=arranging?'Done':'Arrange';
     btn.classList.toggle('on', arranging);
     bar.classList.toggle('arranging', arranging);
+    killSelect();
   }
   paintBtn();
   btn.addEventListener('click', function(e){
@@ -5562,26 +5566,11 @@ function initTabReorder(){
     if(!arranging) save();
     paintBtn();
   });
-  function endDrag(){
-    if(dragEl) dragEl.classList.remove('dragging');
-    dragEl=null;
-    if(moved) save();
-    moved=false;
-  }
-  bar.addEventListener('pointerdown', function(e){
-    if(!arranging) return;
-    const tab=e.target.closest('.tab');
-    if(!tab) return;
-    e.preventDefault();
-    dragEl=tab; moved=false;
-    tab.classList.add('dragging');
-    try{ tab.setPointerCapture(e.pointerId); }catch(err){}
-  });
-  bar.addEventListener('pointermove', function(e){
-    if(!arranging || !dragEl) return;
-    e.preventDefault();
+  function pinBtn(){ if(btn && btn.parentNode===bar) bar.appendChild(btn); }
+  function moveTo(x,y){
+    if(!dragEl) return;
     dragEl.style.pointerEvents='none';
-    const over=document.elementFromPoint(e.clientX, e.clientY);
+    const over=document.elementFromPoint(x, y);
     dragEl.style.pointerEvents='';
     const other=over && over.closest && over.closest('#tf-tabs .tab');
     if(other && other!==dragEl){
@@ -5590,15 +5579,61 @@ function initTabReorder(){
       if(a<0||b<0) return;
       if(a<b) bar.insertBefore(dragEl, other.nextSibling);
       else bar.insertBefore(dragEl, other);
-      if(btn && btn.parentNode===bar) bar.appendChild(btn);
+      pinBtn();
       moved=true;
     }
-  });
-  bar.addEventListener('pointerup', endDrag);
-  bar.addEventListener('pointercancel', endDrag);
-  bar.addEventListener('touchmove', function(e){
-    if(arranging && dragEl) e.preventDefault();
+  }
+  function startDrag(tab){
+    killSelect();
+    dragEl=tab; moved=false;
+    tab.classList.add('dragging');
+  }
+  function endDrag(){
+    if(dragEl) dragEl.classList.remove('dragging');
+    dragEl=null; fromTouch=false;
+    if(moved) save();
+    moved=false;
+    killSelect();
+  }
+  bar.addEventListener('selectstart', function(e){ e.preventDefault(); }, true);
+  bar.addEventListener('contextmenu', function(e){ if(arranging) e.preventDefault(); }, true);
+  bar.addEventListener('touchstart', function(e){
+    if(!arranging) return;
+    if(e.target.closest('#tab-arrange')) return;
+    const tab=e.target.closest('.tab');
+    if(!tab) return;
+    e.preventDefault();
+    fromTouch=true;
+    startDrag(tab);
   }, {passive:false});
+  bar.addEventListener('touchmove', function(e){
+    if(!arranging || !dragEl) return;
+    e.preventDefault();
+    killSelect();
+    const touch=e.touches[0];
+    if(touch) moveTo(touch.clientX, touch.clientY);
+  }, {passive:false});
+  bar.addEventListener('touchend', function(e){
+    if(!arranging) return;
+    if(dragEl) e.preventDefault();
+    endDrag();
+  }, {passive:false});
+  bar.addEventListener('pointerdown', function(e){
+    if(!arranging || fromTouch) return;
+    if(e.target.closest('#tab-arrange')) return;
+    const tab=e.target.closest('.tab');
+    if(!tab) return;
+    e.preventDefault();
+    startDrag(tab);
+    try{ tab.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  bar.addEventListener('pointermove', function(e){
+    if(!arranging || !dragEl || fromTouch) return;
+    e.preventDefault();
+    moveTo(e.clientX, e.clientY);
+  });
+  bar.addEventListener('pointerup', function(){ if(!fromTouch) endDrag(); });
+  bar.addEventListener('pointercancel', function(){ if(!fromTouch) endDrag(); });
   bar.addEventListener('click', function(e){
     if(!arranging) return;
     if(e.target.closest('#tab-arrange')) return;
