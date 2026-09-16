@@ -159,6 +159,9 @@
       '% · 1h ' +
       (h.h1 >= 0 ? '+' : '') +
       (h.h1 != null ? Number(h.h1).toFixed(1) : '—') +
+      '% · 24h ' +
+      (h.h24 >= 0 ? '+' : '') +
+      (h.h24 != null ? Number(h.h24).toFixed(Math.abs(h.h24) >= 100 ? 0 : 1) : '—') +
       '% · liq ' +
       money(h.liq) +
       (h.vol24h ? ' · vol 24h ' + money(h.vol24h) : '') +

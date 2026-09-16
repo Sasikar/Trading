@@ -467,11 +467,14 @@ export async function fetchHunterSeeds() {
     seeds.push({ ca: a, chain: ch, boosted: !!isBoost, src, pair: pair || null });
   };
   const skipSym = new Set(['weth', 'usdg', 'usdc', 'usdt', 'sol', 'eth', 'wbtc']);
-  for (const q of ['pump', 'SOL', 'pepe', 'ETH', 'robinhood', 'raydium', 'meteora', 'pumpswap', 'uniswap']) {
+  for (const q of ['pumpswap', 'pump.fun', 'SOL', 'pepe', 'ETH', 'robinhood', 'raydium', 'meteora', 'uniswap']) {
     try {
       calls++;
       const s = await fetchJSON('https://api.dexscreener.com/latest/dex/search?q=' + encodeURIComponent(q), 1);
-      for (const p of s.pairs || []) {
+      const pairs = (s.pairs || []).slice().sort(function (a, b) {
+        return +(((b.volume && b.volume.h24) || 0) - ((a.volume && a.volume.h24) || 0));
+      });
+      for (const p of pairs) {
         if (!p) continue;
         const ch = chainIdOf(p.chainId);
         if (ch !== 'solana' && ch !== 'ethereum' && ch !== 'robinhood') continue;
@@ -496,6 +499,29 @@ export async function fetchHunterSeeds() {
       push(p.tokenAddress, p.chainId, 'boost', true, null);
     }
   } catch (e) {}
+  try {
+    calls++;
+    const top = await fetchJSON('https://api.dexscreener.com/token-boosts/top/v1', 1);
+    for (const p of top || []) {
+      push(p.tokenAddress, p.chainId, 'boost', true, null);
+    }
+  } catch (e) {}
+  for (const net of ['solana', 'eth']) {
+    try {
+      calls++;
+      const g = await fetchJSON(
+        'https://api.geckoterminal.com/api/v2/networks/' + net + '/trending_pools?page=1',
+        1
+      );
+      for (const d of g.data || []) {
+        const rel = d.relationships && d.relationships.base_token && d.relationships.base_token.data;
+        const id = rel && rel.id ? String(rel.id) : '';
+        const ca = id.includes('_') ? id.slice(id.indexOf('_') + 1) : '';
+        if (!ca) continue;
+        push(ca, net === 'eth' ? 'ethereum' : 'solana', 'trend', false, null);
+      }
+    } catch (e) {}
+  }
   for (const s of seeds) if (boosted.has(s.ca.toLowerCase())) s.boosted = true;
   return { seeds, calls };
 }
@@ -2725,18 +2751,24 @@ export class Engine {
     if (!doScore) return { skipped: true };
     let seeds = [];
     let calls = 0;
+    const prevHits = this.hunterHits().map((h) => ({
+      ca: h.ca,
+      chain: h.chain,
+      boosted: h.boosted,
+      src: h.src || 'prev'
+    }));
     if (doDiscover) {
       try {
         const got = await fetchHunterSeeds();
-        seeds = got.seeds || [];
+        seeds = (got.seeds || []).concat(prevHits);
         calls += got.calls || 0;
         this.store.setMeta('hunter_discover', String(now));
       } catch (e) {
         this.store.setMeta('hunter_err', String(e && e.message ? e.message : e));
-        seeds = this.hunterHits().map((h) => ({ ca: h.ca, chain: h.chain, boosted: h.boosted }));
+        seeds = prevHits;
       }
     } else {
-      seeds = this.hunterHits().map((h) => ({ ca: h.ca, chain: h.chain, boosted: h.boosted, src: h.src }));
+      seeds = prevHits;
     }
     if (!seeds.length) {
       this.store.setMeta('hunter_at', String(now));
@@ -2791,6 +2823,7 @@ export class Engine {
         m5: tick.m5,
         h1: tick.h1,
         h6: tick.h6,
+        h24: tick.h24,
         volX: mom.volX,
         buyR: mom.buyR,
         vol24h: tick.vol24h,
@@ -2808,7 +2841,7 @@ export class Engine {
       });
     }
     const perMom = { micro: 3, small: 3, mid: 3, large: 3 };
-    const perVol = { micro: 3, small: 3, mid: 3, large: 3 };
+    const perVol = { micro: 4, small: 4, mid: 5, large: 5 };
     const buckets = { micro: [], small: [], mid: [], large: [] };
     for (const h of hits) {
       if (buckets[h.band]) buckets[h.band].push(h);
@@ -2816,13 +2849,16 @@ export class Engine {
     const top = [];
     for (const k of ['micro', 'small', 'mid', 'large']) {
       const rows = buckets[k];
-      const momRows = rows.filter((h) => h.mom).sort((a, b) => (b.m5 || 0) - (a.m5 || 0) || (b.score || 0) - (a.score || 0)).slice(0, perMom[k]);
-      const seen = new Set(momRows.map((h) => String(h.ca).toLowerCase()));
       const volRows = rows
-        .filter((h) => h.highVol && !seen.has(String(h.ca).toLowerCase()))
+        .filter((h) => h.highVol)
         .sort((a, b) => (b.vol24h || 0) - (a.vol24h || 0) || (b.vol1h || 0) - (a.vol1h || 0))
         .slice(0, perVol[k]);
-      top.push.apply(top, momRows.concat(volRows));
+      const seen = new Set(volRows.map((h) => String(h.ca).toLowerCase()));
+      const momRows = rows
+        .filter((h) => h.mom && !seen.has(String(h.ca).toLowerCase()))
+        .sort((a, b) => (b.m5 || 0) - (a.m5 || 0) || (b.score || 0) - (a.score || 0))
+        .slice(0, perMom[k]);
+      top.push.apply(top, volRows.concat(momRows));
     }
     this.store.setMeta('hunter_hits', JSON.stringify(top));
     this.store.setMeta('hunter_at', String(now));
