@@ -1,4 +1,4 @@
-/* Sentiment tab — pick a coin, open X Live search. You read it. */
+/* Sentiment tab — pick a coin, stay on page. X Live chip is below. */
 (function () {
   function apiBase() {
     try {
@@ -78,21 +78,6 @@
     });
     return (hit && hit.name) || ca.slice(0, 8);
   }
-  function openX(name) {
-    const url = xUrlFor(name);
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    try {
-      window.open(url, '_blank', 'noopener');
-    } catch (e) {}
-    return url;
-  }
   function paintLink(name) {
     const box = $('st-board');
     if (!box) return;
@@ -134,7 +119,6 @@
     if (other) other.value = '';
     lock = false;
     paintLink(name);
-    openX(name);
   }
   function hideOthers() {
     [
