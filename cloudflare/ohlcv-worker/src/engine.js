@@ -3101,6 +3101,27 @@ export async function handleApi(engine, request) {
       return json({ error: String(e && e.message ? e.message : e) }, 500);
     }
   }
+  if (path === '/orderbook' || path === '/api/orderbook') {
+    try {
+      const r = await fetch('https://www.okx.com/api/v5/market/books?instId=BTC-USDT-SWAP&sz=400', {
+        headers: { accept: 'application/json' }
+      });
+      const j = await r.json();
+      const d = (j && j.data && j.data[0]) || {};
+      const bids = (d.bids || []).map((x) => [+x[0], +x[1]]).filter((x) => x[0] > 0 && x[1] > 0);
+      const asks = (d.asks || []).map((x) => [+x[0], +x[1]]).filter((x) => x[0] > 0 && x[1] > 0);
+      if (!bids.length || !asks.length) return json({ ok: false, error: 'empty book' }, 502);
+      return json({
+        ok: true,
+        source: 'OKX BTC-USDT-SWAP',
+        ts: +(d.ts || Date.now()),
+        bids,
+        asks
+      });
+    } catch (err) {
+      return json({ ok: false, error: String(err && err.message ? err.message : err) }, 502);
+    }
+  }
   if (path === '/candles' || path === '/api/candles') {
     const ca = url.searchParams.get('ca') || '';
     const tf = (url.searchParams.get('tf') || '15m').toLowerCase();

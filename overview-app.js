@@ -263,12 +263,7 @@ async function fetchPrice(){
   }catch(e){}
   return null;
 }
-async function loadMarketStructure(direction,klDaily){const statusEl=$('ms-status'),subEl=$('ms-sub');const set=(id,v,h)=>{if($(id))$(id).textContent=v;if(h&&$(id+'-h'))$(id+'-h').textContent=h;};try{const rows=Array.isArray(klDaily)&&klDaily.length>16?klDaily.slice(0,-1):[];if(rows.length>=15){const trs=[];for(let i=1;i<rows.length;i++){const h=+rows[i][2],l=+rows[i][3],pc=+rows[i-1][4];trs.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));}const atr=trs.slice(-14).reduce((a,b)=>a+b,0)/14;const mark=+rows[rows.length-1][4];const bull=direction==='BULLISH';const inv=bull?mark-1.5*atr:mark+1.5*atr;const pct=Math.abs(inv-mark)/mark*100;set('ms-atr',money(inv)+' · '+pct.toFixed(1)+'%',(bull?'below':'above')+' mark');}else set('ms-atr','Data Unavailable');}catch(e){set('ms-atr','Data Unavailable');}set('ms-liq','Data Unavailable','no estimated levels');let book=null,fetchedAt=null;
-/* Orderbook unavailable on GitHub Pages (no Worker proxy) */
-if(!book||!book.bids||!book.asks||!book.bids.length){if(statusEl){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';}if(subEl)subEl.textContent='Orderbook unavailable on static Pages.';set('ms-spread','Data Unavailable');set('ms-bid','Data Unavailable');set('ms-conc','Data Unavailable');set('ms-fresh','Data Unavailable');return;}
-const ageMs=Date.now()-(fetchedAt||(book.ts?+book.ts:Date.now()));
-if(ageMs>300000){if(statusEl){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';}if(subEl)subEl.textContent='Book stale >5m.';set('ms-fresh',(ageMs/1000).toFixed(1)+'s','stale');set('ms-spread','Data Unavailable');set('ms-bid','Data Unavailable');set('ms-conc','Data Unavailable');return;}set('ms-fresh',(ageMs/1000).toFixed(2)+'s',ageMs>5000?'ok':'fresh');const bestBid=+book.bids[0][0],bestAsk=+book.asks[0][0],mid=(bestBid+bestAsk)/2,spreadBps=((bestAsk-bestBid)/mid)*10000;const key='ms_spread_samples_v1';let samples=[];try{samples=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}samples.push({t:Date.now(),bps:spreadBps});while(samples.length>40)samples.shift();try{localStorage.setItem(key,JSON.stringify(samples));}catch(e){}const nums=samples.map(x=>x.bps).filter(x=>isFinite(x)).sort((a,b)=>a-b);const med=nums.length>=5?nums[Math.floor(nums.length/2)]:null;const wide=med!=null?spreadBps>3*med:spreadBps>5;set('ms-spread',spreadBps.toFixed(2)+' bps',(wide?'Wide':'Normal')+(med!=null?' vs med '+med.toFixed(2):''));let bid2=0,ask2=0,bid05=0,ask05=0;for(const [p,sz] of book.bids){const price=+p,n=price*+sz,pct=(mid-price)/mid*100;if(pct<=2)bid2+=n;if(pct<=0.5)bid05+=n;}for(const [p,sz] of book.asks){const price=+p,n=price*+sz,pct=(price-mid)/mid*100;if(pct<=2)ask2+=n;if(pct<=0.5)ask05+=n;}const total2=bid2+ask2,bull=direction==='BULLISH',side=total2>0?((bull?bid2:ask2)/total2)*100:null;if(side==null)set('ms-bid','Data Unavailable');else set('ms-bid',side.toFixed(1)+'%',(bull?'Bid':'Ask')+(side<40?' · thin':''));const conc=total2>0?((bid05+ask05)/total2)*100:null;if(conc==null)set('ms-conc','Data Unavailable');else set('ms-conc',conc.toFixed(1)+'%','not support guarantee');const warnings=[];if(wide)warnings.push('wide spread');if(side!=null&&side<40)warnings.push(bull?'thin bid':'thin ask');let status='Protected',cls='prot',icon='🟢';if(warnings.length>=2||(side!=null&&side<40&&wide)){status='Vulnerable';cls='vuln';icon='🔴';}else if(warnings.length===1){status='Caution';cls='caut';icon='🟡';}statusEl.className='struct-status '+cls;statusEl.textContent=icon+' '+status;subEl.textContent=(warnings.length?'Warnings: '+warnings.join(', ')+'. ':'No book warnings. ')+'Observable only.';}
-
+async function loadMarketStructure_OLD_DISABLED(direction,klDaily){return;}
 function smaArr(arr,period){const out=[];for(let i=0;i<arr.length;i++){if(i<period-1){out.push(null);continue;}let s=0;for(let j=i-period+1;j<=i;j++)s+=arr[j];out.push(s/period);}return out;}
 function stdArr(arr,period){const out=[];for(let i=0;i<arr.length;i++){if(i<period-1){out.push(null);continue;}const slice=arr.slice(i-period+1,i+1);const m=slice.reduce((a,b)=>a+b,0)/period;const v=slice.reduce((a,b)=>a+(b-m)*(b-m),0)/period;out.push(Math.sqrt(v));}return out;}
 function calcStretchScore(klDaily){
@@ -574,7 +569,186 @@ function emaArr(closes,n){const o=[],k=2/(n+1);let prev=null;for(let i=0;i<close
 function trendFromCloses(closes){if(closes.length<200)return{dir:'NEUTRAL',detail:'need 200'};const e50=emaArr(closes,50),e200=emaArr(closes,200);const c=closes[closes.length-1],a=e50[e50.length-1],b=e200[e200.length-1];if(a==null||b==null)return{dir:'NEUTRAL',detail:'EMA'};let dir='NEUTRAL';if(c>a&&c>b)dir='BULLISH';else if(c<a&&c<b)dir='BEARISH';const f=x=>Math.round(x).toLocaleString('en-US');return{dir,detail:'C '+f(c)+' · 50 '+f(a)+' · 200 '+f(b)};}
 function colorDir(dir){return dir==='BULLISH'?'#62e3a0':dir==='BEARISH'?'#ff6f7c':'#e6c878';}
 function macdMomentum(closes,times){const pack=calcMACDSeries(closes,times);const h=pack.lastHist,m=pack.lastMacd,s=pack.lastSig,ph=pack.prevHist;let dir='FADING';if(m!=null&&s!=null&&h!=null){if(m>s&&h>0)dir='BULLISH';else if(m<s&&h<0)dir='BEARISH';}const fresh=ph!=null&&h!=null&&((ph<0&&h>=0)||(ph>=0&&h<0));const f=v=>(v==null?'—':((v>=0?'+':'')+Number(v).toFixed(0)));return{dir,label:dir+(fresh?' (fresh cross)':''),detail:'HIST '+f(h)+' · LINE '+f(m)+' · SIG '+f(s)};}
-async function loadMarketStructure(direction,klDaily){const statusEl=$('ms-status'),subEl=$('ms-sub');const set=(id,v,h)=>{if($(id))$(id).textContent=v;if(h&&$(id+'-h'))$(id+'-h').textContent=h;};try{const rows=Array.isArray(klDaily)&&klDaily.length>16?klDaily.slice(0,-1):[];if(rows.length>=15){const trs=[];for(let i=1;i<rows.length;i++){const h=+rows[i][2],l=+rows[i][3],pc=+rows[i-1][4];trs.push(Math.max(h-l,Math.abs(h-pc),Math.abs(l-pc)));}const atr=trs.slice(-14).reduce((a,b)=>a+b,0)/14;const mark=+rows[rows.length-1][4];const bull=direction==='BULLISH';const inv=bull?mark-1.5*atr:mark+1.5*atr;const pct=Math.abs(inv-mark)/mark*100;set('ms-atr',money(inv)+' · '+pct.toFixed(1)+'%',(bull?'below':'above')+' mark');}else set('ms-atr','Data Unavailable');}catch(e){set('ms-atr','Data Unavailable');}set('ms-liq','Data Unavailable','no estimated levels');let book=null,fetchedAt=null;try{const res=await fetch('/api/orderbook?instId=BTC-USDT&sz=50',{cache:'no-store',credentials:'same-origin'});if(res.ok){book=await res.json();fetchedAt=Date.now();}}catch(e){}if(!book||!book.bids||!book.asks||!book.bids.length){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';subEl.textContent='Orderbook missing.';set('ms-spread','Data Unavailable');set('ms-bid','Data Unavailable');set('ms-conc','Data Unavailable');set('ms-fresh','Data Unavailable');return;}const ageMs=Date.now()-(fetchedAt||(book.ts?+book.ts:Date.now()));if(ageMs>60000){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';subEl.textContent='Book stale >60s.';set('ms-fresh',(ageMs/1000).toFixed(1)+'s','stale');set('ms-spread','Data Unavailable');set('ms-bid','Data Unavailable');set('ms-conc','Data Unavailable');return;}set('ms-fresh',(ageMs/1000).toFixed(2)+'s',ageMs>5000?'ok':'fresh');const bestBid=+book.bids[0][0],bestAsk=+book.asks[0][0],mid=(bestBid+bestAsk)/2,spreadBps=((bestAsk-bestBid)/mid)*10000;const key='ms_spread_samples_v1';let samples=[];try{samples=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}samples.push({t:Date.now(),bps:spreadBps});while(samples.length>40)samples.shift();try{localStorage.setItem(key,JSON.stringify(samples));}catch(e){}const nums=samples.map(x=>x.bps).filter(x=>isFinite(x)).sort((a,b)=>a-b);const med=nums.length>=5?nums[Math.floor(nums.length/2)]:null;const wide=med!=null?spreadBps>3*med:spreadBps>5;set('ms-spread',spreadBps.toFixed(2)+' bps',(wide?'Wide':'Normal')+(med!=null?' vs med '+med.toFixed(2):''));let bid2=0,ask2=0,bid05=0,ask05=0;for(const [p,sz] of book.bids){const price=+p,n=price*+sz,pct=(mid-price)/mid*100;if(pct<=2)bid2+=n;if(pct<=0.5)bid05+=n;}for(const [p,sz] of book.asks){const price=+p,n=price*+sz,pct=(price-mid)/mid*100;if(pct<=2)ask2+=n;if(pct<=0.5)ask05+=n;}const total2=bid2+ask2,bull=direction==='BULLISH',side=total2>0?((bull?bid2:ask2)/total2)*100:null;if(side==null)set('ms-bid','Data Unavailable');else set('ms-bid',side.toFixed(1)+'%',(bull?'Bid':'Ask')+(side<40?' · thin':''));const conc=total2>0?((bid05+ask05)/total2)*100:null;if(conc==null)set('ms-conc','Data Unavailable');else set('ms-conc',conc.toFixed(1)+'%','not support guarantee');const warnings=[];if(wide)warnings.push('wide spread');if(side!=null&&side<40)warnings.push(bull?'thin bid':'thin ask');let status='Protected',cls='prot',icon='🟢';if(warnings.length>=2||(side!=null&&side<40&&wide)){status='Vulnerable';cls='vuln';icon='🔴';}else if(warnings.length===1){status='Caution';cls='caut';icon='🟡';}statusEl.className='struct-status '+cls;statusEl.textContent=icon+' '+status;subEl.textContent=(warnings.length?'Warnings: '+warnings.join(', ')+'. ':'No book warnings. ')+'Observable only.';}
+async function fetchBtcBook(){
+  const base=(function(){try{if(window.BREAKOUT_API)return String(window.BREAKOUT_API).replace(/\/+$/,'');}catch(e){}return 'https://trading-ohlcv.sasipudi.workers.dev';})();
+  const tries=[
+    {u:base+'/orderbook', kind:'worker'},
+    {u:'https://www.okx.com/api/v5/market/books?instId=BTC-USDT-SWAP&sz=400', kind:'okx'},
+    {u:'https://api.gateio.ws/api/v4/spot/order_book?currency_pair=BTC_USDT&limit=50', kind:'gate'},
+    {u:'https://data-api.binance.vision/api/v3/depth?symbol=BTCUSDT&limit=100', kind:'binance'}
+  ];
+  for(const t of tries){
+    try{
+      const r=await fetch(t.u,{cache:'no-store'});
+      if(!r.ok) continue;
+      const j=await r.json();
+      let bids=null, asks=null, ts=Date.now(), source=t.kind;
+      if(j && j.ok && Array.isArray(j.bids) && Array.isArray(j.asks)){
+        bids=j.bids.map(x=>[+x[0],+x[1]]); asks=j.asks.map(x=>[+x[0],+x[1]]);
+        ts=+j.ts||Date.now(); source=j.source||source;
+      }else if(j && j.data && j.data[0]){
+        const d=j.data[0];
+        bids=(d.bids||[]).map(x=>[+x[0],+x[1]]); asks=(d.asks||[]).map(x=>[+x[0],+x[1]]);
+        ts=+d.ts||Date.now(); source='OKX BTC-USDT-SWAP';
+      }else if(j && j.bids && j.asks){
+        bids=(j.bids||[]).map(x=>[+x[0],+x[1]]); asks=(j.asks||[]).map(x=>[+x[0],+x[1]]);
+        source=t.kind==='gate'?'Gate BTC_USDT':'Binance BTCUSDT spot';
+      }
+      bids=(bids||[]).filter(x=>x[0]>0&&x[1]>0);
+      asks=(asks||[]).filter(x=>x[0]>0&&x[1]>0);
+      if(bids.length&&asks.length) return {bids,asks,ts,source,fetchedAt:Date.now()};
+    }catch(e){}
+  }
+  return null;
+}
+function dailySwingSR(klDaily){
+  const rows=Array.isArray(klDaily)?klDaily.slice(0,-1):[];
+  if(rows.length<10) return {s:null,r:null};
+  const hi=rows.map(k=>+k[2]), lo=rows.map(k=>+k[3]);
+  let r=null,s=null;
+  for(let i=rows.length-4;i>=3;i--){
+    if(r==null && hi[i]>=hi[i-1]&&hi[i]>=hi[i-2]&&hi[i]>=hi[i+1]&&hi[i]>=hi[i+2]) r=hi[i];
+    if(s==null && lo[i]<=lo[i-1]&&lo[i]<=lo[i-2]&&lo[i]<=lo[i+1]&&lo[i]<=lo[i+2]) s=lo[i];
+    if(r!=null&&s!=null) break;
+  }
+  return {s,r};
+}
+function renderBtcHeatmap(book, klDaily){
+  const host=$('hm-chart'), verdict=$('hm-verdict'), st=$('hm-status'), src=$('hm-source');
+  if(!host) return {peak:null, side:null};
+  if(!book){
+    if(st){st.className='struct-status unav';st.textContent='⚪ Unavailable';}
+    if(verdict){verdict.className='hm-verdict';verdict.textContent='No live book.';}
+    host.innerHTML='<div style="padding:12px;color:#8491a1;font-size:12px">Order book failed. <a href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">Open Coinglass heatmap</a></div>';
+    return {peak:null, side:null};
+  }
+  const bids=book.bids, asks=book.asks;
+  const bestBid=+bids[0][0], bestAsk=+asks[0][0], mid=(bestBid+bestAsk)/2;
+  const sr=dailySwingSR(klDaily);
+  const lo=mid*0.98, hi=mid*1.02;
+  const n=36, step=(hi-lo)/n;
+  const buckets=Array.from({length:n},(_,i)=>({p:lo+(i+0.5)*step, bid:0, ask:0}));
+  const put=function(price, usd, side){
+    if(price<lo||price>=hi) return;
+    const i=Math.min(n-1, Math.max(0, Math.floor((price-lo)/step)));
+    buckets[i][side]+=usd;
+  };
+  for(const [p,sz] of bids) put(+p, +p*+sz, 'bid');
+  for(const [p,sz] of asks) put(+p, +p*+sz, 'ask');
+  let maxUsd=1, peakBid={usd:0,p:null}, peakAsk={usd:0,p:null};
+  for(const b of buckets){
+    if(b.bid>maxUsd) maxUsd=b.bid; if(b.ask>maxUsd) maxUsd=b.ask;
+    if(b.bid>peakBid.usd) peakBid={usd:b.bid,p:b.p};
+    if(b.ask>peakAsk.usd) peakAsk={usd:b.ask,p:b.p};
+  }
+  const supportHeavy=peakBid.usd>=peakAsk.usd;
+  const peak=supportHeavy?peakBid:peakAsk;
+  const side=supportHeavy?'SUPPORT':'RESISTANCE';
+  let onLine='';
+  if(sr.s && Math.abs(peak.p-sr.s)/mid<0.006) onLine=' · sits on daily SUPPORT '+money(sr.s);
+  else if(sr.r && Math.abs(peak.p-sr.r)/mid<0.006) onLine=' · sits on daily RESISTANCE '+money(sr.r);
+  if(st){st.className='struct-status '+(supportHeavy?'prot':'vuln');st.textContent=(supportHeavy?'🟢':'🔴')+' '+side;}
+  if(src) src.textContent=book.source||'LIVE BOOK';
+  if(verdict){
+    verdict.className='hm-verdict '+(supportHeavy?'sup':'res');
+    verdict.textContent='Heat concentrated at '+side+' '+money(peak.p)+' · $'+Math.round(peak.usd).toLocaleString()+' in that band'+onLine+'.';
+  }
+  const isSR=function(p){
+    const tags=[];
+    if(sr.s && Math.abs(p-sr.s)<step*1.2) tags.push('S');
+    if(sr.r && Math.abs(p-sr.r)<step*1.2) tags.push('R');
+    if(Math.abs(p-mid)<step*0.7) tags.push('M');
+    return tags;
+  };
+  let html='<div class="hm-axis"><span>Ask / resistance</span><span>Bid / support</span></div>';
+  for(let i=n-1;i>=0;i--){
+    const b=buckets[i];
+    const tags=isSR(b.p);
+    const cls=['hm-row'];
+    if(tags.indexOf('M')>=0) cls.push('mid');
+    if(tags.indexOf('S')>=0) cls.push('sr-s');
+    if(tags.indexOf('R')>=0) cls.push('sr-r');
+    const bw=Math.max(2, Math.round(b.bid/maxUsd*100));
+    const aw=Math.max(2, Math.round(b.ask/maxUsd*100));
+    const tag=tags.length?' <b>'+tags.join('')+'</b>':'';
+    html+='<div class="'+cls.join(' ')+'">'+
+      '<div class="hm-left"><div class="hm-bar bid" style="width:'+(b.bid?bw:0)+'%"></div></div>'+
+      '<div class="hm-px">'+Math.round(b.p)+tag+'</div>'+
+      '<div class="hm-right"><div class="hm-bar ask" style="width:'+(b.ask?aw:0)+'%"></div></div>'+
+      '</div>';
+  }
+  const extra=[];
+  if(sr.s) extra.push('Daily SUPPORT '+money(sr.s)+(sr.s<lo?' (below window)':''));
+  if(sr.r) extra.push('Daily RESISTANCE '+money(sr.r)+(sr.r>hi?' (above window)':''));
+  extra.push('Mark '+money(mid)+' · ±2% book window · '+book.source);
+  html+='<div class="hm-cap">'+extra.join(' · ')+'</div>';
+  host.innerHTML=html;
+  return {peak:peak.p, side, usd:peak.usd, sr};
+}
+async function loadMarketStructure(direction,klDaily){
+  const statusEl=$('ms-status'), subEl=$('ms-sub');
+  const set=(id,v,h)=>{if($(id))$(id).textContent=v;if(h&&$(id+'-h'))$(id+'-h').textContent=h;};
+  try{
+    const rows=Array.isArray(klDaily)&&klDaily.length>16?klDaily.slice(0,-1):[];
+    if(rows.length>=15){
+      const trs=[];
+      for(let i=1;i<rows.length;i++){
+        const h=+rows[i][2], l=+rows[i][3], pc=+rows[i-1][4];
+        trs.push(Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc)));
+      }
+      const atr=trs.slice(-14).reduce((a,b)=>a+b,0)/14;
+      const mark=+rows[rows.length-1][4];
+      const bull=direction==='BULLISH';
+      const inv=bull?mark-1.5*atr:mark+1.5*atr;
+      const pct=Math.abs(inv-mark)/mark*100;
+      set('ms-atr', money(inv)+' · '+pct.toFixed(1)+'%', (bull?'below':'above')+' mark');
+    } else set('ms-atr','Data Unavailable');
+  }catch(e){ set('ms-atr','Data Unavailable'); }
+  const book=await fetchBtcBook();
+  const hm=renderBtcHeatmap(book, klDaily);
+  if(!book||!book.bids||!book.asks||!book.bids.length){
+    if(statusEl){statusEl.className='struct-status unav';statusEl.textContent='⚪ Unavailable';}
+    if(subEl) subEl.textContent='Orderbook unavailable.';
+    set('ms-spread','Data Unavailable'); set('ms-bid','Data Unavailable');
+    set('ms-conc','Data Unavailable'); set('ms-fresh','Data Unavailable');
+    set('ms-liq','Data Unavailable','no live book');
+    return;
+  }
+  const fetchedAt=book.fetchedAt||Date.now();
+  const ageMs=Date.now()-fetchedAt;
+  set('ms-fresh', (ageMs/1000).toFixed(2)+'s', book.source||'live');
+  const bestBid=+book.bids[0][0], bestAsk=+book.asks[0][0], mid=(bestBid+bestAsk)/2;
+  const spreadBps=((bestAsk-bestBid)/mid)*10000;
+  const key='ms_spread_samples_v1';
+  let samples=[]; try{samples=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+  samples.push({t:Date.now(),bps:spreadBps}); while(samples.length>40) samples.shift();
+  try{localStorage.setItem(key, JSON.stringify(samples));}catch(e){}
+  const nums=samples.map(x=>x.bps).filter(x=>isFinite(x)).sort((a,b)=>a-b);
+  const med=nums.length>=5?nums[Math.floor(nums.length/2)]:null;
+  const wide=med!=null?spreadBps>3*med:spreadBps>5;
+  set('ms-spread', spreadBps.toFixed(2)+' bps', (wide?'Wide':'Normal')+(med!=null?' vs med '+med.toFixed(2):''));
+  let bid2=0, ask2=0, bid05=0, ask05=0;
+  for(const [p,sz] of book.bids){ const price=+p, n=price*+sz, pct=(mid-price)/mid*100; if(pct<=2) bid2+=n; if(pct<=0.5) bid05+=n; }
+  for(const [p,sz] of book.asks){ const price=+p, n=price*+sz, pct=(price-mid)/mid*100; if(pct<=2) ask2+=n; if(pct<=0.5) ask05+=n; }
+  const total2=bid2+ask2, bull=direction==='BULLISH';
+  const side=total2>0?((bull?bid2:ask2)/total2)*100:null;
+  if(side==null) set('ms-bid','Data Unavailable');
+  else set('ms-bid', side.toFixed(1)+'%', (bull?'Bid':'Ask')+(side<40?' · thin':''));
+  const conc=total2>0?((bid05+ask05)/total2)*100:null;
+  if(conc==null) set('ms-conc','Data Unavailable');
+  else set('ms-conc', conc.toFixed(1)+'%', 'not support guarantee');
+  if(hm && hm.peak) set('ms-liq', money(hm.peak)+' '+hm.side, '$'+Math.round(hm.usd||0).toLocaleString()+' band');
+  else set('ms-liq','Data Unavailable','no cluster');
+  const warnings=[];
+  if(wide) warnings.push('wide spread');
+  if(side!=null && side<40) warnings.push(bull?'thin bid':'thin ask');
+  let status='Protected', cls='prot', icon='🟢';
+  if(warnings.length>=2 || (side!=null && side<40 && wide)){ status='Vulnerable'; cls='vuln'; icon='🔴'; }
+  else if(warnings.length===1){ status='Caution'; cls='caut'; icon='🟡'; }
+  if(statusEl){ statusEl.className='struct-status '+cls; statusEl.textContent=icon+' '+status; }
+  if(subEl) subEl.textContent=(warnings.length?'Warnings: '+warnings.join(', ')+'. ':'No book warnings. ')+'OKX/Gate book · observable only.';
+}
+
 
 function smaArr(arr,period){const out=[];for(let i=0;i<arr.length;i++){if(i<period-1){out.push(null);continue;}let s=0;for(let j=i-period+1;j<=i;j++)s+=arr[j];out.push(s/period);}return out;}
 function stdArr(arr,period){const out=[];for(let i=0;i<arr.length;i++){if(i<period-1){out.push(null);continue;}const slice=arr.slice(i-period+1,i+1);const m=slice.reduce((a,b)=>a+b,0)/period;const v=slice.reduce((a,b)=>a+(b-m)*(b-m),0)/period;out.push(Math.sqrt(v));}return out;}

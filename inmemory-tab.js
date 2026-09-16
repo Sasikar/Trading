@@ -16,6 +16,7 @@
     '',
     'ARCHITECTURE (do not violate)',
     '- GitHub Pages = display only. No Dex polling from the browser.',
+    '- Trend liquidity: live OKX/Gate BTC book heatmap + daily S/R lines. Coinglass liq heatmap is paid — we link out, we do not fake it.',
     '- Cloudflare Durable Object "main" = Dex/Gecko/candles/alerts. Auto tape 5m. 1m on-demand only.',
     '- Watchlist for Breakout = data/ca-recents.json (saved CAs). ~18 coins.',
     '- Deploy: commit to GitHub master → GH Action deploys Pages + worker.',

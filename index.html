@@ -84,6 +84,24 @@
 .struct-metric{background:#080d13;border:1px solid #ffffff0a;border-radius:12px;padding:12px}
 .struct-metric .k{font-size:10px;font-weight:800;color:#8491a1}.struct-metric .v{font-size:15px;font-weight:900;margin-top:6px}.struct-metric .h{font-size:11px;color:#8491a1;margin-top:4px}
 .struct-note{padding:12px 16px;font-size:11px;color:#6b7a8c;line-height:1.45;border-top:1px solid #1c2633}
+.hm-card{margin-top:12px;border:1px solid #2a3544;border-radius:18px;background:#0c1218;overflow:hidden}
+.hm-verdict{padding:10px 16px 0;font-size:14px;font-weight:800;line-height:1.35}
+.hm-verdict.sup{color:#62e3a0}.hm-verdict.res{color:#ff6f7c}
+.hm-chart{padding:10px 12px 6px}
+.hm-axis{display:flex;justify-content:space-between;font-size:10px;font-weight:800;color:#8491a1;margin-bottom:6px;letter-spacing:.04em}
+.hm-row{display:grid;grid-template-columns:1fr 64px 1fr;gap:6px;align-items:center;min-height:7px;margin:1px 0}
+.hm-row.mid{background:rgba(230,200,120,.12);border-radius:4px}
+.hm-row.sr-s{box-shadow:inset 0 0 0 1px rgba(98,227,160,.55)}
+.hm-row.sr-r{box-shadow:inset 0 0 0 1px rgba(255,111,124,.55)}
+.hm-left,.hm-right{height:6px}
+.hm-bar{height:6px;border-radius:2px;min-width:0}
+.hm-bar.bid{background:#62e3a0;margin-left:auto}
+.hm-bar.ask{background:#ff6f7c}
+.hm-px{font-size:9px;font-weight:800;color:#c5d0dc;text-align:center;white-space:nowrap}
+.hm-px b{color:#e6c878;margin-left:3px}
+.hm-cap{font-size:11px;color:#8491a1;padding:8px 4px 4px;line-height:1.4}
+.hm-card a{color:#6eb6ff;font-weight:700;text-decoration:none}
+
 @media(max-width:560px){#fib-tv{height:220px}#macd-tv{height:180px}.tech-strip,.trend-badges,.detail-grid,.struct-grid{grid-template-columns:1fr}}
 
 .stretch-card.side-up{border-color:rgba(230,160,80,.4);background:linear-gradient(165deg,#16120c 0%,#0e0c09 100%)}
@@ -658,10 +676,20 @@
       <div class="struct-metric"><div class="k">SIDE DEPTH</div><div class="v" id="ms-bid">—</div><div class="h" id="ms-bid-h">±2% book</div></div>
       <div class="struct-metric"><div class="k">NEAR-MARKET CONC.</div><div class="v" id="ms-conc">—</div><div class="h">±0.5% / ±2%</div></div>
       <div class="struct-metric"><div class="k">REF ATR 1.5×</div><div class="v" id="ms-atr">—</div><div class="h" id="ms-atr-h">reference</div></div>
-      <div class="struct-metric"><div class="k">LIQ CLUSTERS</div><div class="v" id="ms-liq">—</div><div class="h" id="ms-liq-h">estimated only</div></div>
+      <div class="struct-metric"><div class="k">LIQ CLUSTERS</div><div class="v" id="ms-liq">—</div><div class="h" id="ms-liq-h">book peak</div></div>
       <div class="struct-metric"><div class="k">FRESHNESS</div><div class="v" id="ms-fresh">—</div><div class="h" id="ms-fresh-h">&lt;5s required</div></div>
     </div>
     <div class="struct-note">Does not modify Confirmation or Stretch. Liquidity can disappear rapidly.</div>
+  </div>
+  <div class="hm-card" id="btc-hm-card">
+    <div class="struct-head">
+      <div class="title">BTC LIQUIDITY HEATMAP</div>
+      <div class="struct-status unav" id="hm-status">…</div>
+      <div class="struct-sub" id="hm-source">Live CEX order book · not Coinglass liq map</div>
+    </div>
+    <div class="hm-verdict" id="hm-verdict">Loading book…</div>
+    <div class="hm-chart" id="hm-chart"></div>
+    <div class="struct-note">Green = bids (support). Red = asks (resistance). <b>S</b>/<b>R</b> = daily swing. <b>M</b> = mark. This is live order-book density from OKX/Gate — Coinglass liquidation heatmap is a paid API. <a href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">Open Coinglass heatmap →</a></div>
   </div>
 </section>
 </div>
@@ -1013,12 +1041,12 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260915-k1"></script>
+<script src="overview-app.js?v=20260916-hm1"></script>
 <script src="breakout-tab.js?v=20260915-eq5"></script>
 <script src="hunter-tab.js?v=20260915-h9"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
-<script src="inmemory-tab.js?v=20260915-im9"></script>
+<script src="inmemory-tab.js?v=20260916-im10"></script>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260915-s5"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
