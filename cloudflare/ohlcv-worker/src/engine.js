@@ -445,7 +445,8 @@ export function hunterVolPass(tick, pair, now) {
   return true;
 }
 
-export async function fetchHunterSeeds() {
+export async function fetchHunterSeeds(opts) {
+  const volumeOnly = !!(opts && opts.volumeOnly);
   const seeds = [];
   const boosted = new Set();
   let calls = 0;
@@ -487,42 +488,44 @@ export async function fetchHunterSeeds() {
       }
     } catch (e) {}
   }
-  try {
-    calls++;
-    const prof = await fetchJSON('https://api.dexscreener.com/token-profiles/latest/v1', 1);
-    for (const p of prof || []) {
-      push(p.tokenAddress, p.chainId, 'profile', false, null);
-    }
-  } catch (e) {}
-  try {
-    calls++;
-    const b = await fetchJSON('https://api.dexscreener.com/token-boosts/latest/v1', 1);
-    for (const p of b || []) {
-      push(p.tokenAddress, p.chainId, 'boost', true, null);
-    }
-  } catch (e) {}
-  try {
-    calls++;
-    const top = await fetchJSON('https://api.dexscreener.com/token-boosts/top/v1', 1);
-    for (const p of top || []) {
-      push(p.tokenAddress, p.chainId, 'boost', true, null);
-    }
-  } catch (e) {}
-  for (const net of ['solana', 'eth']) {
+  if (!volumeOnly) {
     try {
       calls++;
-      const g = await fetchJSON(
-        'https://api.geckoterminal.com/api/v2/networks/' + net + '/trending_pools?page=1',
-        1
-      );
-      for (const d of g.data || []) {
-        const rel = d.relationships && d.relationships.base_token && d.relationships.base_token.data;
-        const id = rel && rel.id ? String(rel.id) : '';
-        const ca = id.includes('_') ? id.slice(id.indexOf('_') + 1) : '';
-        if (!ca) continue;
-        push(ca, net === 'eth' ? 'ethereum' : 'solana', 'trend', false, null);
+      const prof = await fetchJSON('https://api.dexscreener.com/token-profiles/latest/v1', 1);
+      for (const p of prof || []) {
+        push(p.tokenAddress, p.chainId, 'profile', false, null);
       }
     } catch (e) {}
+    try {
+      calls++;
+      const b = await fetchJSON('https://api.dexscreener.com/token-boosts/latest/v1', 1);
+      for (const p of b || []) {
+        push(p.tokenAddress, p.chainId, 'boost', true, null);
+      }
+    } catch (e) {}
+    try {
+      calls++;
+      const top = await fetchJSON('https://api.dexscreener.com/token-boosts/top/v1', 1);
+      for (const p of top || []) {
+        push(p.tokenAddress, p.chainId, 'boost', true, null);
+      }
+    } catch (e) {}
+    for (const net of ['solana', 'eth']) {
+      try {
+        calls++;
+        const g = await fetchJSON(
+          'https://api.geckoterminal.com/api/v2/networks/' + net + '/trending_pools?page=1',
+          1
+        );
+        for (const d of g.data || []) {
+          const rel = d.relationships && d.relationships.base_token && d.relationships.base_token.data;
+          const id = rel && rel.id ? String(rel.id) : '';
+          const ca = id.includes('_') ? id.slice(id.indexOf('_') + 1) : '';
+          if (!ca) continue;
+          push(ca, net === 'eth' ? 'ethereum' : 'solana', 'trend', false, null);
+        }
+      } catch (e) {}
+    }
   }
   for (const s of seeds) if (boosted.has(s.ca.toLowerCase())) s.boosted = true;
   return { seeds, calls };
@@ -2759,33 +2762,18 @@ export class Engine {
       boosted: h.boosted,
       src: h.src || 'prev'
     }));
-    if (doDiscover) {
-      try {
-        const got = await fetchHunterSeeds();
-        seeds = (got.seeds || []).concat(prevHits);
-        calls += got.calls || 0;
-        this.store.setMeta('hunter_discover', String(now));
-      } catch (e) {
-        this.store.setMeta('hunter_err', String(e && e.message ? e.message : e));
-        seeds = prevHits;
-      }
-    } else {
+    try {
+      const got = await fetchHunterSeeds(doDiscover ? {} : { volumeOnly: true });
+      seeds = (got.seeds || []).concat(prevHits);
+      calls += got.calls || 0;
+      if (doDiscover) this.store.setMeta('hunter_discover', String(now));
+    } catch (e) {
+      this.store.setMeta('hunter_err', String(e && e.message ? e.message : e));
       seeds = prevHits;
     }
     if (!seeds.length) {
       this.store.setMeta('hunter_at', String(now));
       return { hits: 0, calls };
-    }
-    const watch = new Set(this.store.getWatch().map((w) => w.ca.toLowerCase()));
-    let heatPrev = [];
-    try {
-      heatPrev = JSON.parse(this.store.getMeta('hunter_heat') || '[]') || [];
-    } catch (e) {
-      heatPrev = [];
-    }
-    for (const h of heatPrev) {
-      if (h && h.ca && now - (+h.t || 0) < 3 * 3600e3)
-        seeds.push({ ca: h.ca, chain: h.chain || 'solana', boosted: false, src: 'heat' });
     }
     const volOf = (s) => +((s && s.pair && s.pair.volume && s.pair.volume.h24) || 0);
     const uniqMap = new Map();
@@ -2883,12 +2871,7 @@ export class Engine {
       top.push(h);
       have.add(k);
     }
-    this.store.setMeta(
-      'hunter_heat',
-      JSON.stringify(
-        heatHits.slice(0, 24).map((h) => ({ ca: h.ca, chain: h.chain, t: now }))
-      )
-    );
+    this.store.setMeta('hunter_heat', '[]');
     this.store.setMeta('hunter_hits', JSON.stringify(top));
     this.store.setMeta('hunter_at', String(now));
     this.store.setMeta('hunter_err', '');
