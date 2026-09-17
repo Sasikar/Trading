@@ -25,7 +25,7 @@
     'TABS',
     '- MemeGate / CA / Breakout Memes / Hunter / Holders / Failures / InMemory / G-Trade Notes / Verdict / Anti-FOMO / Entry Window / TF charts',
     '- Entry Window: WHERE = printed breakout + 5% pullback zone. WHEN = existing WINDOW/5m. NO CHASE if extended. Paper tracks break vs pullback.',
-    '- Alerts: enabled coins, every TF except 1m. NEW BREAKOUT pings even if STRETCHED. Forming candle counts. Dex parabolic net: 1h≥20% or 5m≥10% or 6h≥45%.',
+    '- Alerts: enabled coins, every TF except 1m. NEW BREAKOUT pings even if STRETCHED. Forming candle counts. Dex parabolic net: OR, not AND. 1h≥20% or 5m≥10%. 6h is not a gate.',
     '- Breakout: EARLY / LIVE / MATURED only (quiet coins hidden). Print canonical breakout LEVEL, spot, dist%. LIVE ≠ buy.',
     '- Hunter: Dex discover every 20 min (Scan now = force). Hunter watch is a PIN LIST only — hunter_watch meta. NEVER merge into getWatch / ca-recents / breakout tape / Telegram.',
     '- Holders: SOL only. Jupiter 1h/6h/24h. 4h/1w/1M from our snapshots. No mix/depth charts in-app. Each card opens Solscan token #analytics and #holders. Do not invent whale counts.',
