@@ -198,16 +198,22 @@
     const bar = document.querySelector('#entrywindow-panel .ew-sticky');
     const pad = $('ew-sticky-pad');
     if (!bar || !pad) return;
-    const h = Math.max(96, bar.offsetHeight || 0);
+    const h = Math.max(48, bar.offsetHeight || 0);
     pad.style.height = h + 'px';
   }
   function paintLooking() {
     const el = $('ew-looking');
     if (!el) return;
+    const gs = groupsOf(lastCards);
+    const g = gs.filter(function (x) {
+      return x.ca === selCa;
+    })[0];
+    const coin = g ? g.name : '';
     el.innerHTML =
+      (coin ? esc(coin) + ' · ' : '') +
       'Looking at <b style="color:#62e3a0">' +
       (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
-      '</b><span> · tap a coin</span>';
+      '</b><span> · change TF above · card below</span>';
   }
   function paintCoins(cards) {
     const wrap = $('ew-coins');
