@@ -57,6 +57,31 @@
     if (!r.ok) throw new Error((j && (j.error || j.message)) || 'HTTP ' + r.status);
     return j;
   }
+  function recentsUrl() {
+    const h = location.hostname;
+    if (h === 'sasikar.github.io' || /\.github\.io$/.test(h)) return 'data/ca-recents.json';
+    return 'https://sasikar.github.io/Trading/data/ca-recents.json';
+  }
+  async function loadRecentsCards(why) {
+    const r = await fetch(recentsUrl(), { cache: 'no-store' });
+    const j = await r.json().catch(function () {
+      return {};
+    });
+    return (j.items || []).map(function (x) {
+      return {
+        ca: x.ca,
+        name: x.name || x.base,
+        chain: x.chain,
+        tf: ewTf,
+        ew: {
+          state: 'NO_SETUP',
+          label: 'NO TAPE',
+          color: '#ffb020',
+          why: why || 'Worker has no tape right now. Coin is still saved.'
+        }
+      };
+    });
+  }
 
   function hideOthers() {
     ['showBreakoutMemes', 'showHunter', 'showKeep', 'showHolders', 'showSentiment', 'showFailures', 'showInMemory', 'showVerdict', 'showPositionMonitor'].forEach(
@@ -268,21 +293,39 @@
     const list = $('ew-list');
     const paper = $('ew-paper');
     try {
-      const j = await api('/entry-window?tf=' + encodeURIComponent(ewTf));
+      let j = {};
+      try {
+        j = await api('/entry-window?tf=' + encodeURIComponent(ewTf));
+      } catch (e) {
+        j = { error: String(e.message || e), cards: [], saved: 0 };
+      }
+      const quota = /rows read|quota/i.test(String(j.error || ''));
+      if (!(j.cards && j.cards.length)) {
+        const rec = await loadRecentsCards(
+          quota
+            ? 'Cloudflare SQLite read quota is used up. These 19 CAs are still saved. Tape/levels come back after midnight UTC.'
+            : 'Worker returned no cards. Showing saved CAs from GitHub. Levels when the tape is up.'
+        );
+        if (rec.length) {
+          j.cards = rec;
+          j.saved = rec.length;
+        }
+      }
       const n = (j.cards || []).length;
       const nSetup = (j.cards || []).filter(function (c) {
-        const st = (c.ew && c.ew.state) || '';
-        return st && st !== 'NO_SETUP' && st !== 'WARMING';
+        const st0 = (c.ew && c.ew.state) || '';
+        return st0 && st0 !== 'NO_SETUP' && st0 !== 'WARMING';
       }).length;
       if (st)
-        st.textContent =
-          'LIVE · ' +
-          (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
-          ' · ' +
-          n +
-          ' saved · ' +
-          nSetup +
-          ' with a setup';
+        st.textContent = quota
+          ? 'QUOTA · ' + n + ' saved on GitHub · tape down until midnight UTC'
+          : 'LIVE · ' +
+            (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
+            ' · ' +
+            n +
+            ' saved · ' +
+            nSetup +
+            ' with a setup';
       lastCards = j.cards || [];
       paintCoins(lastCards);
       paintLooking();

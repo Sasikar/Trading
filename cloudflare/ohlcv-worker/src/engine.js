@@ -3941,7 +3941,16 @@ export async function handleApi(engine, request) {
   }
   if (path === '/entry-window' || path === '/api/entry-window') {
     const tf = (url.searchParams.get('tf') || '4h').toLowerCase();
-    return json(engine.snapshotEntryWindow(tf));
+    try {
+      if (!(engine.store.getWatch() || []).length) {
+        await engine.refreshWatch();
+      }
+    } catch (e) {
+      engine.lastErr = String(e && e.message ? e.message : e);
+    }
+    const out = engine.snapshotEntryWindow(tf);
+    if (engine.lastErr) out.error = engine.lastErr;
+    return json(out);
   }
   if (path === '/candles' || path === '/api/candles') {
     const ca = url.searchParams.get('ca') || '';

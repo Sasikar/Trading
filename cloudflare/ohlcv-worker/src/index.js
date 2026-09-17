@@ -126,19 +126,34 @@ function storeFromSql(sql) {
       const j = JSON.stringify(rows || []);
       if (j === watchJson) return;
       watchJson = j;
-      sql.exec('DELETE FROM watch');
-      for (const r of rows || []) {
-        sql.exec(
-          'INSERT OR REPLACE INTO watch (ca, chain, name, poolAddress) VALUES (?,?,?,?)',
-          r.ca,
-          r.chain,
-          r.name || '',
-          r.poolAddress || ''
-        );
+      try {
+        sql.exec('DELETE FROM watch');
+        for (const r of rows || []) {
+          sql.exec(
+            'INSERT OR REPLACE INTO watch (ca, chain, name, poolAddress) VALUES (?,?,?,?)',
+            r.ca,
+            r.chain,
+            r.name || '',
+            r.poolAddress || ''
+          );
+        }
+      } catch (e) {
+        /* quota: keep memory watch */
       }
     },
     getWatch() {
-      return all('SELECT ca, chain, name, poolAddress FROM watch');
+      if (watchJson) {
+        try {
+          const cached = JSON.parse(watchJson);
+          if (cached && cached.length) return cached;
+        } catch (e) {}
+      }
+      const rows = all('SELECT ca, chain, name, poolAddress FROM watch');
+      if (rows && rows.length) {
+        watchJson = JSON.stringify(rows);
+        return rows;
+      }
+      return [];
     },
     openBar(ca, tf) {
       const k = ca.toLowerCase() + '|' + tf;
