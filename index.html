@@ -191,6 +191,22 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 .mac-hist-risk{font-size:8px;font-weight:800;margin-top:1px}
 .mac-two-line{font-size:11px;color:#8491a1;margin-top:4px}
 
+
+.ew-sticky{
+  position:sticky;top:52px;z-index:70;
+  margin:0 0 12px;padding:10px 12px;
+  border-radius:12px;border:1px solid #2a3644;
+  background:rgba(8,13,19,.96);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.ew-sticky-tf{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ew-looking{margin-top:8px;font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
+.ew-looking span{font-size:11px;font-weight:700;color:#8491a1;margin-left:6px}
+.ew-coins{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ew-coin{padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ew-coin.on{background:#1a9b6c;color:#fff;border-color:#1a9b6c}
+
 .mac-ref-sticky{
   position:sticky;top:52px;z-index:45;
   margin:0 0 12px;padding:10px 12px;
@@ -1028,16 +1044,20 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
   <div class="card">
     <div style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:12px">Good setup is not buy-now. If price already ran, wait the printed pullback zone. ACTIVE only when price is in the zone and existing WINDOW confirmation passes.</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-      <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800;align-self:center">SETUP TF</span>
-      <button type="button" class="ew-tf" data-ew-tf="all" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('all')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:11px;cursor:pointer">All</button>
-      <button type="button" class="ew-tf" data-ew-tf="5m" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('5m')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">5m</button>
-      <button type="button" class="ew-tf" data-ew-tf="15m" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('15m')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">15m</button>
-      <button type="button" class="ew-tf" data-ew-tf="1h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1H</button>
-      <button type="button" class="ew-tf" data-ew-tf="2h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('2h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">2H</button>
-      <button type="button" class="ew-tf" data-ew-tf="4h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('4h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">4H</button>
-      <button type="button" class="ew-tf" data-ew-tf="1d" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1d')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1D</button>
-      <button type="button" class="ew-tf" data-ew-tf="1w" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1w')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1W</button>
+    <div class="ew-sticky">
+      <div class="ew-sticky-tf">
+        <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">SETUP TF</span>
+        <button type="button" class="ew-tf" data-ew-tf="all" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('all')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:11px;cursor:pointer">All</button>
+        <button type="button" class="ew-tf" data-ew-tf="5m" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('5m')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">5m</button>
+        <button type="button" class="ew-tf" data-ew-tf="15m" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('15m')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">15m</button>
+        <button type="button" class="ew-tf" data-ew-tf="1h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1H</button>
+        <button type="button" class="ew-tf" data-ew-tf="2h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('2h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">2H</button>
+        <button type="button" class="ew-tf" data-ew-tf="4h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('4h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">4H</button>
+        <button type="button" class="ew-tf" data-ew-tf="1d" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1d')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1D</button>
+        <button type="button" class="ew-tf" data-ew-tf="1w" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1w')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1W</button>
+      </div>
+      <div class="ew-looking" id="ew-looking">Looking at ALL TF</div>
+      <div class="ew-coins" id="ew-coins"></div>
     </div>
     <div id="ew-list" style="display:flex;flex-direction:column;gap:10px"></div>
     <div style="margin-top:18px;font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">PAPER · BREAKOUT vs PULLBACK</div>
@@ -1146,7 +1166,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260916-s7"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
-<script src="entry-window-tab.js?v=20260917-ew2"></script>
+<script src="entry-window-tab.js?v=20260917-ew3"></script>
 <script src="position-tab.js?v=20260917-pm1"></script>
 <script src="site-nav.js?v=20260917-pm1"></script>
 </body></html>

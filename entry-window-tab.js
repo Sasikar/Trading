@@ -17,6 +17,11 @@
   try {
     ewTf = localStorage.getItem('ew_tf') || 'all';
   } catch (e) {}
+  let selCa = '';
+  try {
+    selCa = (localStorage.getItem('ew_ca') || '').toLowerCase();
+  } catch (e) {}
+  let lastCards = [];
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -172,6 +177,76 @@
       .join('');
   }
 
+
+  function groupsOf(cards) {
+    const map = [];
+    const ix = {};
+    (cards || []).forEach(function (c) {
+      const k = String(c.ca || '').toLowerCase();
+      if (!k) return;
+      if (ix[k] == null) {
+        ix[k] = map.length;
+        map.push({ ca: k, name: c.name, list: [] });
+      }
+      map[ix[k]].list.push(c);
+      map[ix[k]].name = c.name || map[ix[k]].name;
+    });
+    return map;
+  }
+  function paintLooking() {
+    const el = $('ew-looking');
+    if (!el) return;
+    el.innerHTML =
+      'Looking at <b style="color:#62e3a0">' +
+      (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
+      '</b><span> · tap a coin</span>';
+  }
+  function paintCoins(cards) {
+    const wrap = $('ew-coins');
+    if (!wrap) return;
+    const gs = groupsOf(cards);
+    if (!gs.length) {
+      wrap.innerHTML = '<span style="font-size:12px;color:#8491a1">No saved CAs</span>';
+      return;
+    }
+    const have = gs.some(function (g) { return g.ca === selCa; });
+    if (!have) selCa = gs[0].ca;
+    wrap.innerHTML = gs
+      .map(function (g) {
+        const on = g.ca === selCa;
+        const lab = (g.list[0] && g.list[0].ew && g.list[0].ew.label) || '';
+        return (
+          '<button type="button" class="ew-coin' +
+          (on ? ' on' : '') +
+          '" data-ca="' +
+          esc(g.ca) +
+          '">' +
+          esc(g.name) +
+          '</button>'
+        );
+      })
+      .join('');
+  }
+  function paintDetail(cards) {
+    const list = $('ew-list');
+    if (!list) return;
+    const gs = groupsOf(cards);
+    const g = gs.filter(function (x) { return x.ca === selCa; })[0];
+    if (!g) {
+      list.innerHTML = '<div style="padding:12px;color:#8491a1;font-size:12px">Tap a coin above.</div>';
+      return;
+    }
+    list.innerHTML = g.list.map(renderCard).join('');
+  }
+  function pickCoin(ca) {
+    selCa = String(ca || '').toLowerCase();
+    try {
+      localStorage.setItem('ew_ca', selCa);
+    } catch (e) {}
+    paintCoins(lastCards);
+    paintDetail(lastCards);
+  }
+
   async function load() {
     if (busy) return;
     busy = true;
@@ -194,11 +269,10 @@
           ' saved · ' +
           nSetup +
           ' with a setup';
-      if (list) {
-        list.innerHTML = n
-          ? j.cards.map(renderCard).join('')
-          : '<div style="padding:12px;color:#8491a1;font-size:12px">No saved CAs. Add coins on CA tab first.</div>';
-      }
+      lastCards = j.cards || [];
+      paintCoins(lastCards);
+      paintLooking();
+      paintDetail(lastCards);
       if (paper) paper.innerHTML = renderPaper(j.paper);
     } catch (e) {
       if (st) st.textContent = String(e.message || e);
@@ -213,6 +287,7 @@
       b.style.background = on ? '#1a9b6c' : '#121a24';
       b.style.color = on ? '#fff' : '#c5d0dc';
     });
+    paintLooking();
   }
 
   function showEntryWindow(on) {
@@ -253,6 +328,15 @@
     load();
   };
 
+
+  const coins = document.getElementById('ew-coins');
+  if (coins) {
+    coins.addEventListener('click', function (ev) {
+      const b = ev.target && ev.target.closest && ev.target.closest('[data-ca]');
+      if (!b) return;
+      pickCoin(b.getAttribute('data-ca'));
+    });
+  }
   const tabs = document.getElementById('tf-tabs');
   if (tabs) {
     tabs.addEventListener('click', function (ev) {
