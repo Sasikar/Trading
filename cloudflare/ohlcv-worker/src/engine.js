@@ -792,8 +792,8 @@ export function classifySection(det) {
   const state = det.state || '';
   const age = det.age == null ? 99 : det.age;
   if (det.near || event === 'CLOSE TO BREAK') return 'early';
-  if (state === 'STRETCHED') return 'matured';
   if (event === 'NEW BREAKOUT' && (det.fresh || age <= 1)) return 'live';
+  if (state === 'STRETCHED') return 'matured';
   if (event === 'BREAKOUT HELD' || state === 'STRONG CONFIRMED' || event === 'NEW BREAKOUT') return 'matured';
   return '';
 }
@@ -1731,8 +1731,11 @@ export class Engine {
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
       return hit.section === 'live' || (hit.fresh && hit.event === 'NEW BREAKOUT');
     }
-    // Enabled coins: every TF except 1m. LIVE card → phone. No score/held gate.
-    return hit.section === 'live';
+    // Enabled coins: every TF except 1m. NEW BREAKOUT / LIVE pings even if STRETCHED.
+    return (
+      hit.section === 'live' ||
+      (hit.event === 'NEW BREAKOUT' && (hit.fresh || hit.age <= 1))
+    );
   }
 
   async maybeAlert(hit, tf) {
@@ -3347,7 +3350,7 @@ export class Engine {
       const lastAll = +this.store.getMeta('last_all') || 0;
       const want1m = mode === '1m' || mode === 'all';
       const doAll = mode === 'all' || mode === 'auto' || (!want1m && now - lastAll >= AUTO_EVERY_MS);
-      let targets = doAll ? rows : rows.filter((r) => r.ca.toLowerCase() === focus);
+      let targets = rows;
       if (mode === '1m') {
         if (!focus) {
           this.busy = false;
