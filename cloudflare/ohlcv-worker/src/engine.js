@@ -1671,8 +1671,9 @@ export class Engine {
   }
 
   cooldownMs(tf) {
-    if (tf === '1m') return 20 * 60e3;
-    if (tf === '5m' || tf === '10m') return 20 * 60e3;
+    const t = String(tf || '').toLowerCase();
+    if (t === '1m') return 20 * 60e3;
+    if (t === '5m' || t === '10m' || t === '15m' || t === '30m') return 20 * 60e3;
     return 30 * 60e3;
   }
 
@@ -1730,9 +1731,7 @@ export class Engine {
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
       return hit.fresh && hit.event === 'NEW BREAKOUT';
     }
-    // One phone ping per coin — live 4h only. 5m/1h/2h show on the cards.
-    if (hit.live && tf !== '4h') return false;
-    if (tf === '5m' || tf === '10m') {
+    if (tf === '5m' || tf === '10m' || tf === '15m') {
       return hit.fresh && hit.event === 'NEW BREAKOUT' && hit.score >= 55;
     }
     return hit.fresh && hit.held && hit.age <= 2 && (hit.score >= 55 || hit.event === 'NEW BREAKOUT');
@@ -1741,8 +1740,9 @@ export class Engine {
   async maybeAlert(hit, tf) {
     if (!this.shouldAlert(hit, tf)) return false;
     const now = Date.now();
-    const key = tf === '1m' ? hit.ca.toLowerCase() + '|1m' : hit.ca.toLowerCase() + '|coin';
-    if (now - this.store.getAlert(key) < this.cooldownMs(tf === '1m' ? '1m' : '4h')) return false;
+    const tfn = String(tf || '').toLowerCase();
+    const key = String(hit.ca || '').toLowerCase() + '|tf|' + tfn;
+    if (now - this.store.getAlert(key) < this.cooldownMs(tfn)) return false;
     const tfu = String(tf).toUpperCase() + (hit.live ? ' live' : '');
     const title = '🚀 ' + hit.name + ' · ' + hit.event + ' (' + tfu + ')';
     const msg = [
