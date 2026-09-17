@@ -288,7 +288,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 .hu-band-now{position:fixed;top:52px;left:0;right:0;z-index:80;display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:rgba(8,13,19,.96);border-bottom:1px solid #2a3644;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px #0006}
 .hu-band-now[hidden]{display:none!important}
 .hu-band-now b{font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
@@ -543,6 +543,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="verdict">Verdict</button>
   <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
   <button type="button" class="tab" data-tf="entrywindow">Entry Window</button>
+  <button type="button" class="tab" data-tf="position">Position</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
@@ -1007,6 +1008,18 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="position-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Position Monitor</h2><p>Already in · STRETCHED still watches · not a buy button</p></div>
+    <span class="source" id="pm-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:12px">STRETCHED blocks <b style="color:#e8eef6">entry</b>, never observation. Acceleration, continuation, exhaustion, retest. Telegram says what changed — CA / Entry Window still decide if you enter.</div>
+    <div id="pm-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
 <div id="entrywindow-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
@@ -1134,5 +1147,6 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="sentiment-tab.js?v=20260916-s7"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
 <script src="entry-window-tab.js?v=20260917-ew2"></script>
-<script src="site-nav.js?v=20260917-ew1"></script>
+<script src="position-tab.js?v=20260917-pm1"></script>
+<script src="site-nav.js?v=20260917-pm1"></script>
 </body></html>

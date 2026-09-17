@@ -574,6 +574,94 @@ export function parabolicFromTick(tick) {
   return { on: true, m5, h1, h6, h24, why: 'Parabolic Dex tape · ' + bits.join(' · ') };
 }
 
+
+export function positionObserve(args) {
+  const tick = (args && args.tick) || {};
+  const bars5 = (args && args.bars5) || [];
+  const bars15 = (args && args.bars15) || [];
+  const hit5 = (args && args.hit5) || {};
+  const hit1h = (args && args.hit1h) || {};
+  const mom = momentumFromTick(tick);
+  const m5 = +tick.m5 || 0;
+  const h1 = +tick.h1 || 0;
+  const spot = +tick.price || 0;
+  const volX = +mom.volX || 0;
+  const stretched = !!mom.stretched;
+  const last5 = bars5[bars5.length - 1];
+  const last15 = bars15[bars15.length - 1];
+  const ret15 =
+    last15 && +last15.o > 0 ? ((+last15.c - +last15.o) / +last15.o) * 100 : 0;
+  const high15 = rangeHighFromBars(bars15);
+  const events = [];
+  if (last5 && +last5.h > +last5.l) {
+    const wick = (+last5.h - +last5.c) / (+last5.h - +last5.l);
+    if ((m5 >= 8 || h1 >= 15) && volX >= 1.8 && wick >= 0.5 && +last5.c < +last5.h * 0.992) {
+      events.push({
+        type: 'EXHAUSTION',
+        label: 'EXHAUSTION WATCH',
+        why:
+          'Fast move + volume ' +
+          (Number.isFinite(volX) ? volX.toFixed(1) : '—') +
+          'x + wick rejection on 5m. Not an entry.'
+      });
+    }
+  }
+  if (m5 >= 2) {
+    events.push({
+      type: 'ACCELERATION',
+      label: 'ACCELERATION',
+      why: (m5 >= 0 ? '+' : '') + m5.toFixed(1) + '% / 5m · volume ' + (Number.isFinite(volX) ? volX.toFixed(1) : '—') + 'x. Existing-position monitor only.'
+    });
+  }
+  if (ret15 >= 3) {
+    events.push({
+      type: 'MOMENTUM',
+      label: 'MOMENTUM',
+      why: (ret15 >= 0 ? '+' : '') + ret15.toFixed(1) + '% / 15m candle. Not an entry signal.'
+    });
+  }
+  if (high15 > 0 && spot >= high15 * 0.998 && volX >= 1.3 && m5 > 0) {
+    events.push({
+      type: 'CONTINUATION',
+      label: 'BREAKOUT CONTINUATION',
+      why: 'New local high ' + fmtPx(high15) + ' + volume expansion. Observation only.'
+    });
+  }
+  const level = +hit5.level || +hit1h.level || 0;
+  if (level > 0 && spot > 0) {
+    const dist = ((spot - level) / level) * 100;
+    if (dist >= -2 && dist <= 2.5) {
+      events.push({
+        type: 'RETEST',
+        label: 'HOLD/RETEST WATCH',
+        why: 'Spot ' + fmtPx(spot) + ' vs breakout ' + fmtPx(level) + ' (' + dist.toFixed(1) + '%). Pullback to level.'
+      });
+    }
+  }
+  const rank = { EXHAUSTION: 0, ACCELERATION: 1, CONTINUATION: 2, MOMENTUM: 3, RETEST: 4 };
+  events.sort((a, b) => (rank[a.type] ?? 9) - (rank[b.type] ?? 9));
+  const primary = events[0] || {
+    type: stretched ? 'STRETCHED_WATCH' : 'QUIET',
+    label: stretched ? 'STRETCHED · WATCH' : 'QUIET',
+    why: stretched
+      ? 'Already extended. Entry blocked. Position still watched.'
+      : 'No acceleration on this poll.'
+  };
+  return {
+    stretched,
+    m5,
+    h1,
+    ret15: +ret15.toFixed(2),
+    spot,
+    volX,
+    high15,
+    level,
+    events,
+    primary,
+    note: 'STRETCHED blocks entry, not observation. Not a buy signal.'
+  };
+}
+
 export function momentumFromTick(tick) {
   const m5 = tick.m5 || 0,
     h1 = tick.h1 || 0,
@@ -2526,6 +2614,86 @@ export class Engine {
     this.store.setAlert(key, now);
     return true;
   }
+  observePosition(row) {
+    const tick = this.store.getTick(row.ca) || {};
+    const hit5 = this.evaluateRow(row, '5m', '');
+    const hit1h = this.evaluateRow(row, '1h', '');
+    const pm = positionObserve({
+      tick,
+      bars5: this.tapeBars(row.ca, '5m', 24),
+      bars15: this.tapeBars(row.ca, '15m', 16),
+      hit5,
+      hit1h
+    });
+    return {
+      name: tick.name || row.name,
+      ca: row.ca,
+      chain: tick.chain || row.chain,
+      dexUrl: tick.dexUrl || '',
+      stretched: pm.stretched,
+      m5: pm.m5,
+      h1: pm.h1,
+      ret15: pm.ret15,
+      spot: pm.spot,
+      volX: pm.volX,
+      events: pm.events,
+      primary: pm.primary,
+      note: pm.note,
+      entryPaint: (hit5.entry && hit5.entry.paint) || '',
+      section5: hit5.section || '',
+      event5: hit5.event || ''
+    };
+  }
+  snapshotPosition() {
+    const cards = (this.store.getWatch() || []).map((r) => this.observePosition(r));
+    const rank = { EXHAUSTION: 0, ACCELERATION: 1, CONTINUATION: 2, MOMENTUM: 3, RETEST: 4, STRETCHED_WATCH: 5, QUIET: 6 };
+    cards.sort(
+      (a, b) =>
+        (rank[(a.primary && a.primary.type) || 'QUIET'] ?? 9) -
+          (rank[(b.primary && b.primary.type) || 'QUIET'] ?? 9) || (b.m5 || 0) - (a.m5 || 0)
+    );
+    return { cards, saved: cards.length, updated: new Date().toISOString(), note: 'Position monitor. STRETCHED never blinds this. Not entry alerts.' };
+  }
+  async maybePositionAlert(row, tick) {
+    if (!this.alertsAllowed(row && row.ca)) return false;
+    const card = this.observePosition(row);
+    const p = card.primary || {};
+    if (!p.type || p.type === 'QUIET' || p.type === 'STRETCHED_WATCH') return false;
+    const key = String(row.ca || '').toLowerCase() + '|pos|' + p.type;
+    const now = Date.now();
+    if (now - this.store.getAlert(key) < 20 * 60e3) return false;
+    const name = card.name || row.name;
+    const title = '👀 ' + name + ' · ' + p.label;
+    const msg = [
+      name + ' · POSITION MONITOR',
+      p.label,
+      p.why || '',
+      'Dex 5m ' + pctStr(card.m5) + ' · 1h ' + pctStr(card.h1) + ' · vol ' + (card.volX != null ? Number(card.volX).toFixed(1) : '—') + 'x',
+      card.stretched ? 'STRETCHED — existing-position monitor only.' : 'Existing-position monitor.',
+      'Not an entry signal. CA / Entry Window decide entry.',
+      'CA: ' + row.ca,
+      'https://sasikar.github.io/Trading/index.html?tab=position'
+    ].join('\n');
+    const token = this.telegramToken();
+    if (!token) return false;
+    try {
+      let chat = this.telegramChatId();
+      if (!chat) chat = await this.resolveTelegramChat();
+      if (!chat) return false;
+      await sendTelegram(token, chat, title + '\n' + msg);
+      this.telegramErr = '';
+      this.store.setMeta('telegram_err', '');
+    } catch (e) {
+      this.markTelegramFail(e);
+      return false;
+    }
+    this.store.setAlert(key, now);
+    this.store.setMeta(
+      'last_pos_alert',
+      JSON.stringify({ name, ca: row.ca, type: p.type, why: p.why, via: 'telegram', at: new Date(now).toISOString() })
+    );
+    return true;
+  }
   snapshotEntryWindow(tf) {
     const tfn = String(tf || 'all').toLowerCase();
     const watch = this.store.getWatch() || [];
@@ -3467,6 +3635,7 @@ export class Engine {
           if (await this.maybeEwAlert(hit)) nAlert++;
         }
         if (await this.maybeParabolicAlert(row, tick)) nAlert++;
+        if (await this.maybePositionAlert(row, tick)) nAlert++;
       }
       if (scanned > 0) {
         this.rateLimitedUntil = 0;
@@ -3766,6 +3935,9 @@ export async function handleApi(engine, request) {
     } catch (err) {
       return json({ ok: false, error: String(err && err.message ? err.message : err) }, 502);
     }
+  }
+  if (path === '/position' || path === '/api/position') {
+    return json(engine.snapshotPosition());
   }
   if (path === '/entry-window' || path === '/api/entry-window') {
     const tf = (url.searchParams.get('tf') || '4h').toLowerCase();
