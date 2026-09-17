@@ -193,13 +193,15 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 
 
 .ew-sticky{
-  position:sticky;top:52px;z-index:70;
-  margin:0 0 12px;padding:10px 12px;
-  border-radius:12px;border:1px solid #2a3644;
-  background:rgba(8,13,19,.96);
+  display:none;
+  position:fixed;top:52px;left:0;right:0;z-index:90;
+  margin:0;padding:8px 14px 10px;
+  border:none;border-bottom:1px solid #2a3644;border-radius:0;
+  background:rgba(8,13,19,.98);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  box-shadow:0 8px 24px rgba(0,0,0,.45);
 }
+#entrywindow-panel.on .ew-sticky{display:block}
 .ew-sticky-tf{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .ew-looking{margin-top:8px;font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
 .ew-looking span{font-size:11px;font-weight:700;color:#8491a1;margin-left:6px}
@@ -1037,14 +1039,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 </section>
 </div>
 <div id="entrywindow-panel" class="trend-panel" style="display:none">
-<section class="section">
-  <div class="head">
-    <div><h2>Entry Window</h2><p>Don't chase · setup TF = WHERE · 5m = WHEN · saved CAs</p></div>
-    <span class="source" id="ew-status">API</span>
-  </div>
-  <div class="card">
-    <div style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:12px">Good setup is not buy-now. If price already ran, wait the printed pullback zone. ACTIVE only when price is in the zone and existing WINDOW confirmation passes.</div>
-    <div class="ew-sticky">
+<div class="ew-sticky">
       <div class="ew-sticky-tf">
         <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">SETUP TF</span>
         <button type="button" class="ew-tf" data-ew-tf="all" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('all')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:11px;cursor:pointer">All</button>
@@ -1059,6 +1054,14 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
       <div class="ew-looking" id="ew-looking">Looking at ALL TF</div>
       <div class="ew-coins" id="ew-coins"></div>
     </div>
+<section class="section">
+  <div class="head">
+    <div><h2>Entry Window</h2><p>Don't chase · setup TF = WHERE · 5m = WHEN · saved CAs</p></div>
+    <span class="source" id="ew-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:12px">Good setup is not buy-now. If price already ran, wait the printed pullback zone. ACTIVE only when price is in the zone and existing WINDOW confirmation passes.</div>
+    <div id="ew-sticky-pad" style="height:120px"></div>
     <div id="ew-list" style="display:flex;flex-direction:column;gap:10px"></div>
     <div style="margin-top:18px;font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">PAPER · BREAKOUT vs PULLBACK</div>
     <div id="ew-paper" style="margin-top:8px"></div>
@@ -1166,7 +1169,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260916-s7"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
-<script src="entry-window-tab.js?v=20260917-ew3"></script>
+<script src="entry-window-tab.js?v=20260917-ew4"></script>
 <script src="position-tab.js?v=20260917-pm1"></script>
 <script src="site-nav.js?v=20260917-pm1"></script>
 </body></html>

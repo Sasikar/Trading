@@ -193,6 +193,14 @@
     });
     return map;
   }
+
+  function syncEwPad() {
+    const bar = document.querySelector('#entrywindow-panel .ew-sticky');
+    const pad = $('ew-sticky-pad');
+    if (!bar || !pad) return;
+    const h = Math.max(96, bar.offsetHeight || 0);
+    pad.style.height = h + 'px';
+  }
   function paintLooking() {
     const el = $('ew-looking');
     if (!el) return;
@@ -214,7 +222,6 @@
     wrap.innerHTML = gs
       .map(function (g) {
         const on = g.ca === selCa;
-        const lab = (g.list[0] && g.list[0].ew && g.list[0].ew.label) || '';
         return (
           '<button type="button" class="ew-coin' +
           (on ? ' on' : '') +
@@ -226,6 +233,7 @@
         );
       })
       .join('');
+    syncEwPad();
   }
   function paintDetail(cards) {
     const list = $('ew-list');
@@ -300,6 +308,7 @@
       }
       paintTf();
       load();
+      setTimeout(syncEwPad, 50);
       if (timer) clearInterval(timer);
       timer = setInterval(function () {
         const onp = $('entrywindow-panel');
