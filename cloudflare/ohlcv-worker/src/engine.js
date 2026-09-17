@@ -565,11 +565,11 @@ export function parabolicFromTick(tick) {
   const h1 = +(tick && tick.h1) || 0;
   const h6 = +(tick && tick.h6) || 0;
   const h24 = +(tick && tick.h24) || 0;
-  if (!(h1 >= 40 || m5 >= 18 || h6 >= 70)) return { on: false, m5, h1, h6, h24 };
+  if (!(h1 >= 20 || m5 >= 10 || h6 >= 45)) return { on: false, m5, h1, h6, h24 };
   const bits = [];
-  if (m5 >= 18) bits.push('5m ' + pctStr(m5));
-  if (h1 >= 40) bits.push('1h ' + pctStr(h1));
-  if (h6 >= 70) bits.push('6h ' + pctStr(h6));
+  if (m5 >= 10) bits.push('5m ' + pctStr(m5));
+  if (h1 >= 20) bits.push('1h ' + pctStr(h1));
+  if (h6 >= 45) bits.push('6h ' + pctStr(h6));
   if (h24 >= 80) bits.push('24h ' + pctStr(h24));
   return { on: true, m5, h1, h6, h24, why: 'Parabolic Dex tape · ' + bits.join(' · ') };
 }
