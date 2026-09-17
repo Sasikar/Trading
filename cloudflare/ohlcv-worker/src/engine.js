@@ -560,6 +560,20 @@ function buyROf(tick) {
   return n ? tick.buys5m / n : 0.5;
 }
 
+export function parabolicFromTick(tick) {
+  const m5 = +(tick && tick.m5) || 0;
+  const h1 = +(tick && tick.h1) || 0;
+  const h6 = +(tick && tick.h6) || 0;
+  const h24 = +(tick && tick.h24) || 0;
+  if (!(h1 >= 40 || m5 >= 18 || h6 >= 70)) return { on: false, m5, h1, h6, h24 };
+  const bits = [];
+  if (m5 >= 18) bits.push('5m ' + pctStr(m5));
+  if (h1 >= 40) bits.push('1h ' + pctStr(h1));
+  if (h6 >= 70) bits.push('6h ' + pctStr(h6));
+  if (h24 >= 80) bits.push('24h ' + pctStr(h24));
+  return { on: true, m5, h1, h6, h24, why: 'Parabolic Dex tape · ' + bits.join(' · ') };
+}
+
 export function momentumFromTick(tick) {
   const m5 = tick.m5 || 0,
     h1 = tick.h1 || 0,
@@ -1738,6 +1752,60 @@ export class Engine {
     );
   }
 
+  tapeBars(ca, tf, n) {
+    const closed = this.store.bars(ca, tf, n) || [];
+    const open = this.store.openBar(ca, tf);
+    if (!open || !(+open.c > 0)) return closed;
+    const last = closed[closed.length - 1];
+    if (last && +last.t === +open.t) return closed;
+    return closed.concat([open]);
+  }
+  async maybeParabolicAlert(row, tick) {
+    if (!this.alertsAllowed(row && row.ca)) return false;
+    const p = parabolicFromTick(tick || {});
+    if (!p.on) return false;
+    const key = String(row.ca || '').toLowerCase() + '|parab';
+    const now = Date.now();
+    if (now - this.store.getAlert(key) < 30 * 60e3) return false;
+    const name = (tick && tick.name) || row.name || 'coin';
+    const chain = (tick && tick.chain) || row.chain || '';
+    const title = '🚀 ' + name + ' · PARABOLIC';
+    const msg = [
+      name + ' (' + (chainIdOf(chain) === 'solana' ? 'SOL' : chainIdOf(chain) === 'ethereum' ? 'ETH' : String(chain).toUpperCase()) + ')',
+      p.why,
+      'Dex 5m ' + pctStr(p.m5) + ' · 1h ' + pctStr(p.h1) + ' · 6h ' + pctStr(p.h6) + ' · 24h ' + pctStr(p.h24),
+      'Do not wait for a higher-TF close. This is the smash.',
+      'CA: ' + row.ca,
+      'https://sasikar.github.io/Trading/index.html?tab=breakouts'
+    ].join('\n');
+    const token = this.telegramToken();
+    if (!token) return false;
+    try {
+      let chat = this.telegramChatId();
+      if (!chat) chat = await this.resolveTelegramChat();
+      if (!chat) return false;
+      await sendTelegram(token, chat, title + '\n' + msg);
+      this.telegramErr = '';
+      this.store.setMeta('telegram_err', '');
+    } catch (e) {
+      this.markTelegramFail(e);
+      return false;
+    }
+    this.store.setAlert(key, now);
+    this.store.setMeta(
+      'last_alert',
+      JSON.stringify({
+        name,
+        ca: row.ca,
+        tf: 'dex',
+        event: 'PARABOLIC',
+        why: p.why,
+        via: 'telegram',
+        at: new Date(now).toISOString()
+      })
+    );
+    return true;
+  }
   async maybeAlert(hit, tf) {
     if (!this.shouldAlert(hit, tf)) return false;
     const now = Date.now();
@@ -1878,7 +1946,7 @@ export class Engine {
         interesting: false
       }, tf, focus);
     }
-    const det = detectTapeBreakout(this.store.bars(row.ca, tf, 40), tf, tick);
+    const det = detectTapeBreakout(this.tapeBars(row.ca, tf, 40), tf, tick);
     const hit = hitFrom(row, tick, det, tf, focus);
     hit.entry = entryQuality({
       tf,
@@ -3398,6 +3466,7 @@ export class Engine {
           if (await this.maybeEntryAlert(hit)) nAlert++;
           if (await this.maybeEwAlert(hit)) nAlert++;
         }
+        if (await this.maybeParabolicAlert(row, tick)) nAlert++;
       }
       if (scanned > 0) {
         this.rateLimitedUntil = 0;
