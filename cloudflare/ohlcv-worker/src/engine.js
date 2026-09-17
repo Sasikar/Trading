@@ -1725,16 +1725,14 @@ export class Engine {
   }
   shouldAlert(hit, tf) {
     if (!this.alertsAllowed(hit && hit.ca)) return false;
-    if (hit.state === 'WARMING' || hit.state === 'WATCH' || hit.section === 'early') return false;
-    if (tf === '1m') {
+    const tfn = String(tf || '').toLowerCase();
+    if (tfn === '1m') {
       if (!hit.focus) return false;
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
-      return hit.fresh && hit.event === 'NEW BREAKOUT';
+      return hit.section === 'live' || (hit.fresh && hit.event === 'NEW BREAKOUT');
     }
-    if (tf === '5m' || tf === '10m' || tf === '15m') {
-      return hit.fresh && hit.event === 'NEW BREAKOUT' && hit.score >= 55;
-    }
-    return hit.fresh && hit.held && hit.age <= 2 && (hit.score >= 55 || hit.event === 'NEW BREAKOUT');
+    // Enabled coins: every TF except 1m. LIVE card → phone. No score/held gate.
+    return hit.section === 'live';
   }
 
   async maybeAlert(hit, tf) {
@@ -1743,7 +1741,7 @@ export class Engine {
     const tfn = String(tf || '').toLowerCase();
     const key = String(hit.ca || '').toLowerCase() + '|tf|' + tfn;
     if (now - this.store.getAlert(key) < this.cooldownMs(tfn)) return false;
-    const tfu = String(tf).toUpperCase() + (hit.live ? ' live' : '');
+    const tfu = String(tf).toUpperCase() + (hit.section === 'live' ? ' LIVE' : '');
     const title = '🚀 ' + hit.name + ' · ' + hit.event + ' (' + tfu + ')';
     const msg = [
       hit.name + ' (' + (hit.chain === 'solana' ? 'SOL' : 'ETH') + ')',
@@ -3383,10 +3381,10 @@ export class Engine {
         const tick = pairToTick(pair, row, now);
         const closed = this.applyTick(row.ca, tick, tfs);
         const tfsToCheck = new Set(closed.map((c) => c.tf));
-        if (doAll && !want1m) {
-          for (const tf of AUTO_TFS) tfsToCheck.add(tf);
-        } else if (want1m) {
+        if (want1m) {
           tfsToCheck.add('1m');
+        } else {
+          for (const tf of AUTO_TFS) tfsToCheck.add(tf);
         }
         for (const tf of tfsToCheck) {
           const hit = this.evaluateRow(row, tf, focus);
