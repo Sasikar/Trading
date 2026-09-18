@@ -210,6 +210,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 .ew-st{padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .ew-st.on{background:#1a9b6c;color:#fff;border-color:#1a9b6c}
 .ew-st b{font-size:10px;margin-left:4px;opacity:.9}
+.ew-coin-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px}
+.ew-coin-sel{flex:1;min-width:160px;max-width:280px;padding:8px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:800;font-size:13px}
 
 .mac-ref-sticky{
   position:sticky;top:52px;z-index:45;
@@ -1054,7 +1056,12 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
         <button type="button" class="ew-tf" data-ew-tf="1d" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1d')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1D</button>
         <button type="button" class="ew-tf" data-ew-tf="1w" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1w')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1W</button>
       </div>
-      <div class="ew-looking" id="ew-looking">Looking at ALL TF</div>
+      <div class="ew-coin-row">
+        <div class="ew-looking" id="ew-looking" style="margin:0">Looking at ALL TF</div>
+        <select id="ew-coin-sel" class="ew-coin-sel">
+          <option value="">All coins · by state</option>
+        </select>
+      </div>
       <div class="ew-states" id="ew-states"></div>
     </div>
 <section class="section">
@@ -1170,7 +1177,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260916-s7"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
-<script src="entry-window-tab.js?v=20260918-ew9"></script>
+<script src="entry-window-tab.js?v=20260918-ew10"></script>
 <script src="position-tab.js?v=20260917-pm1"></script>
 <script src="site-nav.js?v=20260918-t3"></script>
 </body></html>

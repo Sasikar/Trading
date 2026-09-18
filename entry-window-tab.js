@@ -21,6 +21,10 @@
   try {
     selState = localStorage.getItem('ew_state') || '';
   } catch (e) {}
+  let selCa = '';
+  try {
+    selCa = (localStorage.getItem('ew_ca') || '').toLowerCase();
+  } catch (e) {}
   let lastCards = [];
   const EW_BANDS = [
     { id: 'ACTIVE', lab: 'ACTIVE' },
@@ -245,15 +249,54 @@
     }
     return 'NO_SETUP';
   }
+  function uniqCoins(cards) {
+    const seen = {};
+    const out = [];
+    (cards || []).forEach(function (c) {
+      const k = String(c.ca || '').toLowerCase();
+      if (!k || seen[k]) return;
+      seen[k] = 1;
+      out.push({ ca: k, name: c.name || k.slice(0, 8) });
+    });
+    out.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+    return out;
+  }
+  function paintCoinSel(cards) {
+    const sel = $('ew-coin-sel');
+    if (!sel) return;
+    const coins = uniqCoins(cards);
+    const keep = selCa;
+    sel.innerHTML =
+      '<option value="">All coins · by state</option>' +
+      coins
+        .map(function (c) {
+          return (
+            '<option value="' +
+            esc(c.ca) +
+            '"' +
+            (c.ca === keep ? ' selected' : '') +
+            '>' +
+            esc(c.name) +
+            '</option>'
+          );
+        })
+        .join('');
+    if (keep && coins.some(function (c) { return c.ca === keep; })) sel.value = keep;
+    else if (keep && !coins.some(function (c) { return c.ca === keep; })) {
+      selCa = '';
+      sel.value = '';
+    }
+  }
   function paintLooking() {
     const el = $('ew-looking');
     if (!el) return;
     const band = EW_BANDS.filter(function (b) { return b.id === selState; })[0];
+    const coin = uniqCoins(lastCards).filter(function (c) { return c.ca === selCa; })[0];
     el.innerHTML =
       'Looking at <b style="color:#62e3a0">' +
       (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
       '</b><span> · ' +
-      (band ? band.lab : 'state') +
+      (coin ? coin.name : band ? band.lab : 'state') +
       '</span>';
   }
   function paintStateTabs(cards) {
@@ -284,19 +327,40 @@
   function paintDetail(cards) {
     const list = $('ew-list');
     if (!list) return;
-    const rows = (cards || []).filter(function (c) { return bandId(c) === selState; });
+    const rows = (cards || []).filter(function (c) {
+      if (selCa) return String(c.ca || '').toLowerCase() === selCa;
+      return bandId(c) === selState;
+    });
     if (!rows.length) {
-      list.innerHTML = '<div style="padding:12px;color:#8491a1;font-size:12px">No coins in this state on ' + (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) + '.</div>';
+      list.innerHTML =
+        '<div style="padding:12px;color:#8491a1;font-size:12px">' +
+        (selCa ? 'No card for this coin on ' : 'No coins in this state on ') +
+        (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
+        '.</div>';
       return;
     }
     list.innerHTML = rows.map(renderCard).join('');
   }
   function pickState(id) {
+    selCa = '';
+    try {
+      localStorage.setItem('ew_ca', '');
+    } catch (e) {}
     selState = String(id || '');
     try {
       localStorage.setItem('ew_state', selState);
     } catch (e) {}
+    paintCoinSel(lastCards);
     paintStateTabs(lastCards);
+    paintLooking();
+    paintDetail(lastCards);
+  }
+  function pickCoin(ca) {
+    selCa = String(ca || '').toLowerCase();
+    try {
+      localStorage.setItem('ew_ca', selCa);
+    } catch (e) {}
+    paintCoinSel(lastCards);
     paintLooking();
     paintDetail(lastCards);
   }
@@ -342,6 +406,7 @@
             nSetup +
             ' with a setup';
       lastCards = j.cards || [];
+      paintCoinSel(lastCards);
       paintStateTabs(lastCards);
       paintLooking();
       paintDetail(lastCards);
@@ -408,6 +473,12 @@
       const b = ev.target && ev.target.closest && ev.target.closest('[data-ew-st]');
       if (!b) return;
       pickState(b.getAttribute('data-ew-st'));
+    });
+  }
+  const coinSel = document.getElementById('ew-coin-sel');
+  if (coinSel) {
+    coinSel.addEventListener('change', function () {
+      pickCoin(coinSel.value);
     });
   }
   const tabs = document.getElementById('tf-tabs');
