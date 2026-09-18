@@ -3274,6 +3274,30 @@ export class Engine {
       note: 'Parabolic + WOW DIP log. Kept 7 days. Not a buy board.'
     };
   }
+  snapshotPitfalls() {
+    const watch = this.store.getWatch() || [];
+    const cards = watch.map((r) => {
+      const tick = this.store.getTick(r.ca) || {};
+      const chain = chainIdOf(tick.chain || r.chain) || 'solana';
+      const ca = r.ca;
+      return {
+        name: tick.name || r.name || String(ca).slice(0, 8),
+        ca,
+        chain,
+        spot: +tick.price || 0,
+        mcap: +tick.mcap || 0,
+        dexUrl: 'https://dexscreener.com/' + chain + '/' + ca,
+        pairUrl: tick.dexUrl || dexHref(ca, chain, '')
+      };
+    });
+    cards.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return {
+      cards,
+      saved: cards.length,
+      updated: new Date().toISOString(),
+      note: 'Tap a coin → DexScreener token page (Website / Twitter).'
+    };
+  }
   async maybeCrashAlert(row, card) {
     if (this.alertMode() === 'off') return false;
     if (!this.alertsAllowed(row && row.ca)) return false;
@@ -4736,6 +4760,12 @@ export async function handleApi(engine, request) {
       if (!(engine.store.getWatch() || []).length) await engine.refreshWatch();
     } catch (e) {}
     return json(engine.snapshotOmg());
+  }
+  if (path === '/pitfalls' || path === '/api/pitfalls') {
+    try {
+      if (!(engine.store.getWatch() || []).length) await engine.refreshWatch();
+    } catch (e) {}
+    return json(engine.snapshotPitfalls());
   }
   if (path === '/entry-window' || path === '/api/entry-window') {
     const tf = (url.searchParams.get('tf') || '4h').toLowerCase();

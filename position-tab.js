@@ -46,7 +46,7 @@
     return j;
   }
   function hideOthers() {
-    ['showBreakoutMemes', 'showHunter', 'showKeep', 'showHolders', 'showSentiment', 'showFailures', 'showInMemory', 'showVerdict', 'showEntryWindow', 'showWowDip', 'showOmg'].forEach(
+    ['showBreakoutMemes', 'showHunter', 'showKeep', 'showHolders', 'showSentiment', 'showFailures', 'showInMemory', 'showVerdict', 'showEntryWindow', 'showWowDip', 'showOmg', 'showPitfalls'].forEach(
       function (fn) {
         try {
           window[fn](false);
@@ -72,7 +72,8 @@
       'verdict-panel',
       'entrywindow-panel',
       'wowdip-panel',
-      'omg-panel'
+      'omg-panel',
+      'pitfalls-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
