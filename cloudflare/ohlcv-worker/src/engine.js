@@ -1838,7 +1838,8 @@ export class Engine {
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
       return hit.section === 'live' || (hit.fresh && hit.event === 'NEW BREAKOUT');
     }
-    // Enabled coins: every TF except 1m. NEW BREAKOUT / LIVE pings even if STRETCHED.
+    // Closed TF candle only. Do not ping LIVE if 5m already failed the level.
+    if (hit.entry && hit.entry.paint === 'FAILED') return false;
     return (
       hit.section === 'live' ||
       (hit.event === 'NEW BREAKOUT' && (hit.fresh || hit.age <= 1))
@@ -2039,7 +2040,7 @@ export class Engine {
         interesting: false
       }, tf, focus);
     }
-    const det = detectTapeBreakout(this.tapeBars(row.ca, tf, 40), tf, tick);
+    const det = detectTapeBreakout(this.store.bars(row.ca, tf, 40), tf, tick);
     const hit = hitFrom(row, tick, det, tf, focus);
     hit.entry = entryQuality({
       tf,
@@ -2579,6 +2580,7 @@ export class Engine {
     if (!this.alertsAllowed(hit.ca)) return false;
     if (ew.state !== 'NO_CHASE' && ew.state !== 'APPROACHING' && ew.state !== 'ACTIVE' && ew.state !== 'INVALIDATED')
       return false;
+    if (ew.state === 'INVALIDATED' && hit.entry && hit.entry.paint === 'FAILED') return false;
     const key = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase() + '|ew|' + ew.state;
     if (this.store.getAlert(key)) return false;
     const now = Date.now();
