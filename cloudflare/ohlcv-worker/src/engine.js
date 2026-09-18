@@ -3298,6 +3298,56 @@ export class Engine {
       note: 'Tap a coin → DexScreener token page (Website / Twitter).'
     };
   }
+  strategyState() {
+    let s = {};
+    try {
+      s = JSON.parse(this.store.getMeta('strategy_notes') || '{}') || {};
+    } catch (e) {
+      s = {};
+    }
+    const out = {};
+    for (const k of ['fund', 'rotation', 'wallet']) {
+      const b = s[k] || {};
+      out[k] = {
+        text: String(b.text || ''),
+        history: Array.isArray(b.history) ? b.history.slice(0, 80) : []
+      };
+    }
+    return out;
+  }
+  saveStrategy(body) {
+    const tab = String((body && body.tab) || '').toLowerCase();
+    if (tab !== 'fund' && tab !== 'rotation' && tab !== 'wallet') throw new Error('tab must be fund|rotation|wallet');
+    const all = this.strategyState();
+    const cur = all[tab];
+    if (body && body.dropAt) {
+      const at = +body.dropAt;
+      cur.history = cur.history.filter((h) => +h.at !== at);
+      all[tab] = cur;
+      this.store.setMeta('strategy_notes', JSON.stringify(all));
+      return all;
+    }
+    if (body && body.restoreAt) {
+      const hit = cur.history.find((h) => +h.at === +body.restoreAt);
+      if (hit) cur.text = String(hit.text || '');
+      all[tab] = cur;
+      this.store.setMeta('strategy_notes', JSON.stringify(all));
+      return all;
+    }
+    const next = String(body && body.text != null ? body.text : cur.text).slice(0, 20000);
+    if (body && body.snapshot) {
+      const last = cur.history[0] && String(cur.history[0].text || '');
+      if (next.trim() && next !== last) {
+        let at = Date.now();
+        if (cur.history[0] && +cur.history[0].at >= at) at = +cur.history[0].at + 1;
+        cur.history = [{ at, text: next }].concat(cur.history).slice(0, 80);
+      }
+    }
+    cur.text = next;
+    all[tab] = cur;
+    this.store.setMeta('strategy_notes', JSON.stringify(all));
+    return all;
+  }
   async maybeCrashAlert(row, card) {
     if (this.alertMode() === 'off') return false;
     if (!this.alertsAllowed(row && row.ca)) return false;
@@ -4766,6 +4816,17 @@ export async function handleApi(engine, request) {
       if (!(engine.store.getWatch() || []).length) await engine.refreshWatch();
     } catch (e) {}
     return json(engine.snapshotPitfalls());
+  }
+  if (path === '/strategy' || path === '/api/strategy') {
+    if (method === 'POST') {
+      const body = await request.json().catch(() => ({}));
+      try {
+        return json({ ok: true, tabs: engine.saveStrategy(body) });
+      } catch (e) {
+        return json({ ok: false, error: String(e && e.message ? e.message : e) }, 400);
+      }
+    }
+    return json({ ok: true, tabs: engine.strategyState() });
   }
   if (path === '/entry-window' || path === '/api/entry-window') {
     const tf = (url.searchParams.get('tf') || '4h').toLowerCase();

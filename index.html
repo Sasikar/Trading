@@ -310,7 +310,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card,#wowdip-panel .card,#omg-panel .card,#pitfalls-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card,#wowdip-panel .card,#omg-panel .card,#pitfalls-panel .card,#strategy-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 .hu-band-now{position:fixed;top:52px;left:0;right:0;z-index:80;display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:rgba(8,13,19,.96);border-bottom:1px solid #2a3644;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px #0006}
 .hu-band-now[hidden]{display:none!important}
 .hu-band-now b{font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
@@ -569,6 +569,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="wowdip">WOW DIP</button>
   <button type="button" class="tab" data-tf="omg">OMG</button>
   <button type="button" class="tab" data-tf="pitfalls">Pitfalls</button>
+  <button type="button" class="tab" data-tf="strategy">Strategy</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
@@ -1092,6 +1093,28 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="strategy-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Strategy</h2><p>Fund · Rotation · Wallet · saved versions</p></div>
+    <span class="source" id="stgy-status">local</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="stgy-tab" data-stgy="fund" onclick="try{window.setStrategyInner&&window.setStrategyInner('fund')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:12px;cursor:pointer">Fund Strategy</button>
+      <button type="button" class="stgy-tab" data-stgy="rotation" onclick="try{window.setStrategyInner&&window.setStrategyInner('rotation')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Rotation Strategy</button>
+      <button type="button" class="stgy-tab" data-stgy="wallet" onclick="try{window.setStrategyInner&&window.setStrategyInner('wallet')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Wallet Strategy</button>
+    </div>
+    <textarea id="stgy-text" placeholder="Write this strategy here…" style="width:100%;min-height:220px;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font:14px/1.45 Inter,system-ui,sans-serif;resize:vertical"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button type="button" onclick="try{window.saveStrategyVersion&&window.saveStrategyVersion()}catch(e){}" style="padding:8px 14px;border-radius:10px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Save version</button>
+      <span style="font-size:11px;color:#8491a1;align-self:center">Draft auto-saves. Save version keeps history for this sub-tab.</span>
+    </div>
+    <div style="margin-top:16px;font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">HISTORY</div>
+    <div id="stgy-hist" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</section>
+</div>
 <div id="entrywindow-panel" class="trend-panel" style="display:none">
 <div class="ew-sticky">
       <div class="ew-sticky-tf">
@@ -1231,5 +1254,6 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="crash-tab.js?v=20260918-wd2"></script>
 <script src="omg-tab.js?v=20260919-omg1"></script>
 <script src="pitfalls-tab.js?v=20260919-pf1"></script>
-<script src="site-nav.js?v=20260919-pf1"></script>
+<script src="strategy-tab.js?v=20260919-st1"></script>
+<script src="site-nav.js?v=20260919-st1"></script>
 </body></html>

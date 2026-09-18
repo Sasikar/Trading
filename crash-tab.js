@@ -72,7 +72,8 @@
       'showEntryWindow',
       'showPositionMonitor',
       'showOmg',
-      'showPitfalls'
+      'showPitfalls',
+      'showStrategy'
     ].forEach(function (fn) {
       try {
         window[fn](false);
@@ -98,7 +99,8 @@
       'entrywindow-panel',
       'position-panel',
       'omg-panel',
-      'pitfalls-panel'
+      'pitfalls-panel',
+      'strategy-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
