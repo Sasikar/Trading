@@ -26,6 +26,9 @@ export const ALL_TFS = [...TAPE_TFS];
 /** Auto tape writes 5m+. 1m is on-demand only (open 1m / /run / /candles?tf=1m). */
 export const AUTO_EVERY_MS = 5 * 60e3;
 export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
+/** Timeframes Entry Window actually serves (UI chips + /entry-window?tf=). */
+export const EW_SETUP_TFS = ['5m', '15m', '1h', '2h', '4h', '1d', '1w'];
+export const EW_OPEN_MS = 20 * 60e3;
 export const ALIGN_MIN = 2;
 export const KEEP_LONG_MS = 730 * 86400e3;
 /** One Gecko 1D page per this interval. Auto Dex poll is 5m (1m on-demand). */
@@ -751,7 +754,9 @@ export function detectTapeBreakout(bars, tf, tick) {
       bars: n,
       need,
       interesting: false,
-      level
+      level,
+      strict: false,
+      barT: 0
     };
   }
   const last = bars[bars.length - 1];
@@ -815,7 +820,9 @@ export function detectTapeBreakout(bars, tf, tick) {
     near,
     level: rangeHigh,
     ret: +ret.toFixed(2),
-    runup: +runup.toFixed(2)
+    runup: +runup.toFixed(2),
+    strict: !!broke,
+    barT: last ? +last.t || 0 : 0
   };
 }
 
@@ -1119,23 +1126,94 @@ export function rangeLowFromBars(bars, n) {
  * WHERE to enter a setup that already exists. Does not detect breakouts.
  * Uses printed breakout level + entryQuality (WHEN) + stretch.
  */
+
+export function ewEpisodeId(ca, tf, level, barT) {
+  const lv = +level > 0 ? Number(level).toExponential(8) : '0';
+  return (
+    String(ca || '').toLowerCase() +
+    '|' +
+    String(tf || '').toLowerCase() +
+    '|' +
+    lv +
+    '|' +
+    String(barT || 0)
+  );
+}
+
+export function ewBarClosedAgo(det, tf, now) {
+  const tfMs = (TF_SEC[String(tf || '')] || 0) * 1000;
+  const t = +((det && det.barT) || 0);
+  if (!t || !tfMs) return 9e15;
+  return now - (t + tfMs);
+}
+
+export function resolveEwEpisode(args) {
+  const ca = String((args && args.ca) || '').toLowerCase();
+  const tf = String((args && args.tf) || '').toLowerCase();
+  const det = (args && args.det) || {};
+  const prev = args && args.prev;
+  const dead = (args && args.dead) || [];
+  const now = +((args && args.now) || Date.now());
+  const strictNew = !!(det.strict && det.event === 'NEW BREAKOUT');
+  const barT = +det.barT || 0;
+  const level = +det.level || 0;
+  function open() {
+    return {
+      id: ewEpisodeId(ca, tf, level, barT),
+      ca,
+      tf,
+      level,
+      barT,
+      invalidated: false,
+      left: false,
+      dipped: false,
+      state: 'WAIT_RETEST'
+    };
+  }
+  if (prev && !prev.invalidated) return { ep: prev, action: 'continue' };
+  if (prev && prev.invalidated) {
+    const newer = strictNew && barT && barT !== +prev.barT && barT > +prev.barT;
+    if (newer) return { ep: open(), action: 'open' };
+    return { ep: prev, action: 'keep-dead' };
+  }
+  const killed = dead.some(
+    (d) =>
+      String(d.ca || '').toLowerCase() === ca &&
+      String(d.tf || '').toLowerCase() === tf &&
+      (+d.barT === barT || String(d.id) === ewEpisodeId(ca, tf, level, barT))
+  );
+  if (killed) {
+    const d = dead.find((x) => +x.barT === barT && String(x.ca).toLowerCase() === ca && String(x.tf).toLowerCase() === tf) || {
+      id: ewEpisodeId(ca, tf, level, barT),
+      ca,
+      tf,
+      level,
+      barT,
+      invalidated: true,
+      state: 'INVALIDATED'
+    };
+    return { ep: Object.assign({}, d, { invalidated: true, state: 'INVALIDATED' }), action: 'keep-dead' };
+  }
+  if (strictNew && barT && level > 0 && ewBarClosedAgo(det, tf, now) <= EW_OPEN_MS) {
+    return { ep: open(), action: 'open' };
+  }
+  return { ep: null, action: 'none' };
+}
+
 export function entryWindow(args) {
   const hit = (args && args.hit) || {};
   const entry = hit.entry || {};
   const tf = String(hit.tf || '4h').toLowerCase();
   const level = +hit.level || 0;
   const spot = +hit.spot || 0;
-  const broke =
-    hit.section === 'live' ||
-    hit.section === 'matured' ||
-    hit.event === 'NEW BREAKOUT' ||
-    hit.event === 'BREAKOUT HELD';
   const bars5m = (args && args.bars5m) || [];
   const bars1h = (args && args.bars1h) || [];
   const bars4h = (args && args.bars4h) || [];
   const bars1d = (args && args.bars1d) || [];
   const barsTf = (args && args.barsTf) || [];
   const open5m = (args && args.open5m) || null;
+  const ep = (args && args.episode) || null;
+  const live = !!(ep && !ep.invalidated);
   const empty = {
     state: '',
     label: '',
@@ -1169,8 +1247,31 @@ export function entryWindow(args) {
   empty.sup1h = rangeLowFromBars(bars1h, 24);
   empty.sup4h = rangeLowFromBars(bars4h.length ? bars4h : barsTf, 24);
   empty.sup1d = rangeLowFromBars(bars1d, 30);
-  empty.extPct = level > 0 && spot > 0 ? +(((spot - level) / level) * 100).toFixed(2) : null;
-  if (!broke) {
+  if (ep && +ep.level > 0) {
+    empty.level = +ep.level;
+  }
+  empty.extPct = empty.level > 0 && spot > 0 ? +(((spot - empty.level) / empty.level) * 100).toFixed(2) : null;
+  if (ep && ep.invalidated) {
+    const lv = +ep.level || level;
+    const ext = lv > 0 && spot > 0 ? ((spot - lv) / lv) * 100 : null;
+    empty.state = 'INVALIDATED';
+    empty.label = 'INVALIDATED';
+    empty.color = '#ff6f7c';
+    empty.level = lv;
+    empty.trigger = lv;
+    empty.inval = lv > 0 ? lv * 0.97 : 0;
+    empty.extPct = ext != null ? +ext.toFixed(2) : null;
+    empty.why =
+      'Structure lost — setup cancelled. Current ' +
+      fmtPx(spot) +
+      (ext != null ? ' is ' + (ext >= 0 ? '+' : '') + ext.toFixed(1) + '% vs level ' + fmtPx(lv) : '') +
+      '. Being above the old high is not a reclaim. Do not chase. Wait for a NEW ' +
+      String(tf).toUpperCase() +
+      ' breakout.';
+    empty.entryPaint = 'FAILED';
+    return empty;
+  }
+  if (!live) {
     const near = !!(hit.near || hit.event === 'CLOSE TO BREAK');
     const warming = !!(hit.warming || hit.state === 'WARMING');
     empty.state = warming ? 'WARMING' : near ? 'NEAR' : 'NO_SETUP';
@@ -1185,12 +1286,13 @@ export function entryWindow(args) {
           : 'No ' + String(tf).toUpperCase() + ' breakout on this saved CA yet.';
     return empty;
   }
-  const zoneLo = level > 0 ? level * 0.995 : 0;
-  const zoneHi = level > 0 ? level * 1.02 : 0;
-  const ideal = level > 0 ? level : 0;
-  const inval = level > 0 ? level * 0.97 : 0;
-  const leaveAt = level > 0 ? level * 1.015 : 0;
-  const extPct = level > 0 && spot > 0 ? ((spot - level) / level) * 100 : null;
+  const level0 = +((ep && ep.level) || level);
+  const zoneLo = level0 > 0 ? level0 * 0.995 : 0;
+  const zoneHi = level0 > 0 ? level0 * 1.02 : 0;
+  const ideal = level0 > 0 ? level0 : 0;
+  const inval = level0 > 0 ? level0 * 0.97 : 0;
+  const leaveAt = level0 > 0 ? level0 * 1.015 : 0;
+  const extPct = level0 > 0 && spot > 0 ? ((spot - level0) / level0) * 100 : null;
   const distZonePct = zoneHi > 0 && spot > zoneHi ? ((spot - zoneHi) / zoneHi) * 100 : spot && zoneHi ? ((spot - zoneHi) / zoneHi) * 100 : null;
   const prev = (args && args.prev) || {};
   const swing = Math.max(
@@ -1198,18 +1300,19 @@ export function entryWindow(args) {
     ...bars5m.map((b) => +b.h || 0),
     ...bars1h.slice(-12).map((b) => +b.h || 0)
   );
-  const left = (leaveAt > 0 && swing >= leaveAt) || !!prev.left;
+  const left = (leaveAt > 0 && swing >= leaveAt) || !!prev.left || !!(ep && ep.left);
   const recent5 = bars5m.slice(-8);
   const dipped =
-    recent5.some((b) => +b.l > 0 && +b.l < level) ||
-    !!(open5m && +open5m.l > 0 && +open5m.l < level) ||
-    !!prev.dipped;
+    recent5.some((b) => +b.l > 0 && +b.l < level0) ||
+    !!(open5m && +open5m.l > 0 && +open5m.l < level0) ||
+    !!prev.dipped ||
+    !!(ep && ep.dipped);
   const last5 = recent5[recent5.length - 1];
   const reclaimBar = !!(
-    (open5m && +open5m.l < level && +open5m.c >= level) ||
-    (last5 && +last5.l < level && +last5.c >= level)
+    (open5m && +open5m.l < level0 && +open5m.c >= level0) ||
+    (last5 && +last5.l < level0 && +last5.c >= level0)
   );
-  const reclaim = !!(level > 0 && dipped && spot >= level && (reclaimBar || (last5 && +last5.c >= level)));
+  const reclaim = !!(level0 > 0 && dipped && spot >= level0 && (reclaimBar || (last5 && +last5.c >= level0)));
   const inZone = zoneLo > 0 && spot >= zoneLo && spot <= zoneHi;
   const volPass = (hit.volX || 0) >= 0.7 || (hit.buyR || 0) >= 1 || (hit.m5 || 0) >= 0.2;
   const momPass = (hit.m5 || 0) >= 0.2 || (hit.volX || 0) >= 1;
@@ -1222,14 +1325,14 @@ export function entryWindow(args) {
   let state = 'WAIT_RETEST';
   let label = 'WAIT FOR RETEST';
   let color = '#e6c878';
-  let why = 'Break confirmed. Do not buy the break candle. Wait for price to leave, pull back to ' + fmtPx(level) + ', then reclaim.';
+  let why = 'Break confirmed. Do not buy the break candle. Wait for price to leave, pull back to ' + fmtPx(level0) + ', then reclaim.';
   if (entry.paint === 'FAILED') {
     state = 'INVALIDATED';
     label = 'INVALIDATED';
     color = '#ff6f7c';
     why =
       'Structure lost — setup cancelled. Two 5m closes under ' +
-      (fmtPx(level) || 'level') +
+      (fmtPx(level0) || 'level') +
       '. Current ' +
       fmtPx(spot) +
       (extPct != null ? ' is ' + (extPct >= 0 ? '+' : '') + extPct.toFixed(1) + '% vs level' : '') +
@@ -1256,7 +1359,7 @@ export function entryWindow(args) {
       'Price is ' +
       (extPct != null ? extPct.toFixed(1) + '%' : '') +
       ' above breakout. Break can stay valid — do not enter here. Wait retest of ' +
-      fmtPx(level) +
+      fmtPx(level0) +
       '.';
   } else if (!left) {
     state = 'WAIT_RETEST';
@@ -1281,17 +1384,17 @@ export function entryWindow(args) {
     state = 'ACTIVE';
     label = 'ENTRY WINDOW ACTIVE';
     color = '#62e3a0';
-    why = 'Retest + reclaim of ' + fmtPx(level) + ' and 1m/5m WINDOW passed. Only now is this an entry.';
+    why = 'Retest + reclaim of ' + fmtPx(level0) + ' and 1m/5m WINDOW passed. Only now is this an entry.';
   } else if (left && inZone && reclaim) {
     state = 'RECLAIM';
     label = 'RECLAIM';
     color = '#62e3a0';
-    why = 'Dipped under/at ' + fmtPx(level) + ' and closed back above. Wait 1m/5m WINDOW confirm. Not yet.';
+    why = 'Dipped under/at ' + fmtPx(level0) + ' and closed back above. Wait 1m/5m WINDOW confirm. Not yet.';
   } else if (left && inZone) {
     state = 'RETEST';
     label = 'RETEST';
     color = '#e6c878';
-    why = 'Pullback reached ' + fmtPx(zoneLo) + '–' + fmtPx(zoneHi) + '. Need a 5m reclaim close above ' + fmtPx(level) + '.';
+    why = 'Pullback reached ' + fmtPx(zoneLo) + '–' + fmtPx(zoneHi) + '. Need a 5m reclaim close above ' + fmtPx(level0) + '.';
   } else if (hit.age >= 8 && zoneHi > 0 && spot > zoneHi) {
     state = 'EXPIRED';
     label = 'EXPIRED';
@@ -1304,7 +1407,7 @@ export function entryWindow(args) {
     color,
     why,
     spot,
-    level,
+    level: level0,
     extPct: extPct != null ? +extPct.toFixed(2) : null,
     ideal,
     zoneLo,
@@ -1315,7 +1418,7 @@ export function entryWindow(args) {
     sup4h,
     sup1d,
     inval,
-    trigger: level,
+    trigger: level0,
     execTf: '5m',
     volPass,
     momPass,
@@ -2147,11 +2250,28 @@ export class Engine {
     }
     const det = detectTapeBreakout(this.store.bars(row.ca, tf, 40), tf, tick);
     const hit = hitFrom(row, tick, det, tf, focus);
+    const resolved = resolveEwEpisode({
+      ca: row.ca,
+      tf,
+      det,
+      prev: this.ewEpisodeOf(row.ca, tf),
+      dead: this.ewDeadOf(row.ca, tf),
+      now: +tick.t || Date.now()
+    });
+    const ep = resolved.ep;
+    const live = !!(ep && !ep.invalidated);
+    if (ep && +ep.level > 0) {
+      hit.level = +ep.level;
+      hit.levelTxt = fmtPx(ep.level);
+      if (hit.spot > 0) hit.distPct = +(((hit.spot - ep.level) / ep.level) * 100).toFixed(2);
+    }
+    hit.ewEp = ep;
+    hit.ewAction = resolved.action;
     hit.entry = entryQuality({
       tf,
       level: hit.level,
-      event: hit.event,
-      section: hit.section,
+      event: live ? hit.event : '',
+      section: live ? hit.section : '',
       tick,
       bars1m: this.store.bars(row.ca, '1m', 12),
       bars5m: this.store.bars(row.ca, '5m', 8),
@@ -2161,20 +2281,29 @@ export class Engine {
       volX: hit.volX,
       buyR: hit.buyR
     });
-    this.latchFailedEntry(hit);
+    if (ep && ep.invalidated) {
+      hit.entry = Object.assign({}, hit.entry || {}, {
+        state: 'failed',
+        paint: 'FAILED',
+        why:
+          'FAILED (dead episode): wait a NEW ' +
+          String(tf).toUpperCase() +
+          ' close-above. Spot above the old high is not a reclaim.'
+      });
+    }
     this.persistEntry(hit);
     hit.ew = entryWindow({
       hit,
+      episode: ep,
       bars5m: this.store.bars(row.ca, '5m', 30),
       bars1h: this.store.bars(row.ca, '1h', 30),
       bars4h: this.store.bars(row.ca, '4h', 30),
       bars1d: this.store.bars(row.ca, '1d', 40),
       barsTf: this.store.bars(row.ca, tf, 30),
       open5m: this.store.openBar(row.ca, '5m'),
-      prev: this.ewStateOf(hit)
+      prev: ep || {}
     });
-    this.latchInvalidatedEw(hit);
-    this.persistEw(hit);
+    this.commitEwEpisode(row.ca, tf, resolved, hit);
     this.touchEwPaper(hit);
     return hit;
   }
@@ -2602,32 +2731,77 @@ export class Engine {
   }
 
   persistEw(hit) {
-    const ew = hit && hit.ew;
-    if (!ew || !ew.state) return;
-    const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
-    let map = {};
-    try {
-      map = JSON.parse(this.store.getMeta('ew_state') || '{}') || {};
-    } catch (e) {
-      map = {};
-    }
-    const prev = map[k] || {};
-    map[k] = {
-      state: ew.state,
-      at: Date.now(),
-      level: +hit.level || +(prev.level) || 0,
-      left: !!(ew.left || prev.left),
-      dipped: !!(ew.dipped || prev.dipped)
-    };
-    this.store.setMeta('ew_state', JSON.stringify(map));
+    if (!hit) return;
+    this.commitEwEpisode(hit.ca, hit.tf, { ep: hit.ewEp, action: hit.ewAction }, hit);
   }
   ewStateOf(hit) {
-    const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
+    return this.ewEpisodeOf(hit && hit.ca, hit && hit.tf);
+  }
+  ewEpisodeKey(ca, tf) {
+    return String(ca || '').toLowerCase() + '|' + String(tf || '').toLowerCase();
+  }
+  ewEpisodeMap() {
     try {
-      const map = JSON.parse(this.store.getMeta('ew_state') || '{}') || {};
-      return map[k] || null;
+      return JSON.parse(this.store.getMeta('ew_ep') || '{}') || {};
     } catch (e) {
-      return null;
+      return {};
+    }
+  }
+  ewDeadList() {
+    try {
+      const a = JSON.parse(this.store.getMeta('ew_dead') || '[]') || [];
+      return Array.isArray(a) ? a : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  ewEpisodeOf(ca, tf) {
+    const map = this.ewEpisodeMap();
+    return map[this.ewEpisodeKey(ca, tf)] || null;
+  }
+  ewDeadOf(ca, tf) {
+    const caL = String(ca || '').toLowerCase();
+    const tfL = String(tf || '').toLowerCase();
+    return this.ewDeadList().filter(
+      (d) => String(d.ca || '').toLowerCase() === caL && String(d.tf || '').toLowerCase() === tfL
+    );
+  }
+  commitEwEpisode(ca, tf, resolved, hit) {
+    const ew = hit && hit.ew;
+    let ep = resolved && resolved.ep ? Object.assign({}, resolved.ep) : null;
+    if (!ep) return;
+    if (ew) {
+      ep.state = ew.state || ep.state;
+      ep.left = !!(ep.left || ew.left);
+      ep.dipped = !!(ep.dipped || ew.dipped);
+      if (ew.state === 'INVALIDATED') ep.invalidated = true;
+    }
+    ep.at = Date.now();
+    const map = this.ewEpisodeMap();
+    map[this.ewEpisodeKey(ca, tf)] = ep;
+    const epJson = JSON.stringify(map);
+    this.store.setMeta('ew_ep', epJson);
+    try {
+      this.store.setMeta('ew_ep', epJson);
+    } catch (e) {}
+    if (ep.invalidated) {
+      let dead = this.ewDeadList();
+      if (!dead.some((d) => d.id === ep.id)) {
+        dead.push({
+          id: ep.id,
+          ca: ep.ca,
+          tf: ep.tf,
+          level: ep.level,
+          barT: ep.barT,
+          at: ep.at
+        });
+        if (dead.length > 400) dead = dead.slice(-400);
+        const dj = JSON.stringify(dead);
+        this.store.setMeta('ew_dead', dj);
+        try {
+          this.store.setMeta('ew_dead', dj);
+        } catch (e) {}
+      }
     }
   }
   entryStateOf(hit) {
@@ -2928,7 +3102,7 @@ export class Engine {
     const tfn = String(tf || 'all').toLowerCase();
     const watch = this.store.getWatch() || [];
     const focus = this.store.getMeta('focus_ca') || '';
-    const pickTfs = tfn === 'all' ? ['5m', '15m', '1h', '2h', '4h', '1d'] : [tfn];
+    const pickTfs = tfn === 'all' ? EW_SETUP_TFS.slice() : [tfn];
     const rank = {
       ACTIVE: 0,
       APPROACHING: 1,
@@ -3090,7 +3264,7 @@ export class Engine {
     if (!row) return { coins, verdict: null, error: 'not a saved coin' };
     const focus = this.store.getMeta('focus_ca') || '';
     const byTf = {};
-    for (const tf of ['5m', '15m', '1h', '2h', '4h', '1d', '1w']) {
+    for (const tf of EW_SETUP_TFS) {
       byTf[tf] = this.evaluateRow(row, tf, focus);
     }
     let hist = {};

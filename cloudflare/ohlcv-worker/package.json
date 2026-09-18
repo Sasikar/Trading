@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev"
+    "dev": "wrangler dev",
+    "test": "node --test src/ew-episode.test.js"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
