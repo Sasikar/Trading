@@ -332,6 +332,8 @@ export function pairToTick(pair, row, now) {
     vol24h: +vol.h24 || 0,
     buys5m: +t5.buys || 0,
     sells5m: +t5.sells || 0,
+    buys1h: +(tx.h1 && tx.h1.buys) || 0,
+    sells1h: +(tx.h1 && tx.h1.sells) || 0,
     liq: +((pair.liquidity && pair.liquidity.usd) || 0),
     mcap: +(pair.marketCap || pair.fdv || 0) || 0,
     m5: +pc.m5 || 0,
@@ -703,6 +705,97 @@ export function positionObserve(args) {
     events,
     primary,
     note: 'STRETCHED blocks entry, not observation. Not a buy signal.'
+  };
+}
+
+/** Crash / breakdown surveillance. Not an entry. −40% is not a buy. */
+export function crashObserve(args) {
+  const tick = (args && args.tick) || {};
+  const bars1h = (args && args.bars1h) || [];
+  const bars15 = (args && args.bars15) || [];
+  const bars5 = (args && args.bars5) || [];
+  const prevLiq = +((args && args.prevLiq) || 0);
+  const m5 = +tick.m5 || 0;
+  const h1 = +tick.h1 || 0;
+  const h6 = +tick.h6 || 0;
+  const h24 = +tick.h24 || 0;
+  const volX = volXOf(tick);
+  const liq = +tick.liq || 0;
+  const spot = +tick.price || 0;
+  const buys = +tick.buys1h || +tick.buys5m || 0;
+  const sells = +tick.sells1h || +tick.sells5m || 0;
+  const nTx = buys + sells;
+  const sellR = nTx ? sells / nTx : 0.5;
+  const vol1h = +tick.vol1h || 0;
+  const buyVol = nTx ? vol1h * (buys / nTx) : 0;
+  const sellVol = nTx ? vol1h * (sells / nTx) : 0;
+  const sellPressure = nTx >= 8 && sells >= buys * 1.15;
+  const volShock = volX >= 2.2;
+  const liqDropPct = prevLiq > 0 && liq > 0 ? ((liq - prevLiq) / prevLiq) * 100 : 0;
+  const liqShock = liqDropPct <= -15;
+  const last15 = bars15[bars15.length - 1];
+  const ret15 =
+    last15 && +last15.o > 0 ? ((+last15.c - +last15.o) / +last15.o) * 100 : 0;
+  const prior1h = bars1h.length >= 2 ? bars1h.slice(0, -1) : bars1h;
+  const lvl = rangeLowFromBars(prior1h, 20);
+  const last1h = bars1h[bars1h.length - 1];
+  const last1hC = last1h ? +last1h.c || 0 : 0;
+  const structural = !!(lvl > 0 && last1hC > 0 && last1hC < lvl * 0.995);
+  const reclaim = !!(lvl > 0 && spot >= lvl && last1hC >= lvl * 0.998);
+  let severity = '';
+  if (h1 <= -40 || h6 <= -50 || m5 <= -25) severity = 'EXTREME';
+  else if (h1 <= -30 || h6 <= -40 || m5 <= -18) severity = 'SEVERE';
+  else if (h1 <= -20 || h6 <= -30 || m5 <= -12 || ret15 <= -12) severity = 'CRASH';
+  const deadCat = !!(severity && m5 >= 8 && !reclaim);
+  let status = 'QUIET';
+  if (severity === 'EXTREME' || severity === 'SEVERE') status = 'AVOID';
+  else if (severity && (liqShock || structural || sellPressure)) status = 'AVOID';
+  else if (severity && reclaim) status = 'RECOVERY_TEST';
+  else if (severity) status = 'WATCH';
+  if (severity && reclaim && (severity === 'EXTREME' || severity === 'SEVERE' || liqShock)) status = 'AVOID';
+  if (deadCat && status === 'RECOVERY_TEST') status = 'WATCH';
+  const flags = [];
+  if (severity === 'EXTREME') flags.push({ id: 'EXTREME', label: 'Extreme crash', why: 'Emergency surveillance' });
+  else if (severity === 'SEVERE') flags.push({ id: 'SEVERE', label: 'Severe crash', why: 'Major breakdown' });
+  else if (severity === 'CRASH') flags.push({ id: 'CRASH', label: '1H crash', why: 'Abnormal hourly collapse' });
+  if (volShock) flags.push({ id: 'VOL', label: 'Volume shock', why: (Number.isFinite(volX) ? volX.toFixed(1) : '—') + 'x usual 5m' });
+  if (sellPressure) flags.push({ id: 'SELL', label: 'Sell pressure', why: 'Sells ' + Math.round(sellR * 100) + '% of 1h flow' });
+  if (liqShock) flags.push({ id: 'LIQ', label: 'Liquidity shock', why: liqDropPct.toFixed(1) + '% liq vs last poll' });
+  if (structural) flags.push({ id: 'BREAK', label: 'Level breakdown', why: '1H close under ' + fmtPx(lvl) });
+  if (reclaim && severity) flags.push({ id: 'RECLAIM', label: 'Recovery test', why: 'Back over broken level ' + fmtPx(lvl) + ' — not a buy' });
+  if (deadCat) flags.push({ id: 'BOUNCE', label: 'Dead-cat bounce', why: '5m ' + pctStr(m5) + ' while dump still active' });
+  const whyBits = [
+    'CRASH: ' + (severity ? pctStr(h1) + ' 1H' : 'no'),
+    'STRUCTURAL BREAKDOWN: ' + (structural ? 'YES' : 'NO'),
+    'LIQUIDITY SHOCK: ' + (liqShock ? 'YES' : 'NO'),
+    'RECOVERY: ' + (reclaim ? 'YES' : deadCat ? 'NO (dead-cat bounce)' : 'NO'),
+    'STATUS: ' + status
+  ];
+  return {
+    severity: severity || 'NONE',
+    status,
+    m5,
+    h1,
+    h6,
+    h24,
+    ret15: +(+ret15).toFixed(2),
+    spot,
+    volX,
+    liq,
+    liqDropPct: +liqDropPct.toFixed(2),
+    buyVol,
+    sellVol,
+    sellR,
+    sellPressure,
+    volShock,
+    liqShock,
+    structural,
+    reclaim,
+    deadCat,
+    level: lvl,
+    flags,
+    why: whyBits.join('\n'),
+    note: 'Not a buy. A 5m bounce after a dump is volatility, not an entry.'
   };
 }
 
@@ -3070,6 +3163,99 @@ export class Engine {
     );
     return { cards, saved: cards.length, updated: new Date().toISOString(), note: 'Position monitor. STRETCHED never blinds this. Not entry alerts.' };
   }
+  observeCrash(row, opts) {
+    const tick = this.store.getTick(row.ca) || {};
+    let prevMap = {};
+    try {
+      prevMap = JSON.parse(this.store.getMeta('crash_liq') || '{}') || {};
+    } catch (e) {
+      prevMap = {};
+    }
+    const k = String(row.ca || '').toLowerCase();
+    const prevLiq = +(prevMap[k] || 0);
+    const out = crashObserve({
+      tick,
+      bars1h: this.store.bars(row.ca, '1h', 28),
+      bars15: this.store.bars(row.ca, '15m', 16),
+      bars5: this.store.bars(row.ca, '5m', 16),
+      prevLiq
+    });
+    if (opts && opts.commitLiq && +tick.liq > 0) {
+      prevMap[k] = +tick.liq;
+      this.store.setMeta('crash_liq', JSON.stringify(prevMap));
+    }
+    return {
+      name: tick.name || row.name || k.slice(0, 8),
+      ca: row.ca,
+      chain: tick.chain || row.chain,
+      dexUrl: tick.dexUrl || '',
+      mcap: +tick.mcap || 0,
+      ...out
+    };
+  }
+  snapshotCrash() {
+    const cards = (this.store.getWatch() || []).map((r) => this.observeCrash(r));
+    const rank = { AVOID: 0, WATCH: 1, RECOVERY_TEST: 2, QUIET: 3 };
+    cards.sort(
+      (a, b) =>
+        (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || (a.h1 || 0) - (b.h1 || 0)
+    );
+    return {
+      cards,
+      saved: cards.length,
+      hot: cards.filter((c) => c.status && c.status !== 'QUIET').length,
+      updated: new Date().toISOString(),
+      note: 'WOW DIP · crash surveillance. Not a buy. Entry Window suppressed on AVOID.'
+    };
+  }
+  async maybeCrashAlert(row, card) {
+    if (this.alertMode() === 'off') return false;
+    if (!this.alertsAllowed(row && row.ca)) return false;
+    const c = card || {};
+    if (!c.status || c.status === 'QUIET') return false;
+    const key = String(row.ca || '').toLowerCase() + '|crash|' + c.status + '|' + (c.severity || '');
+    const now = Date.now();
+    if (now - this.store.getAlert(key) < 30 * 60e3) return false;
+    const name = c.name || row.name || 'coin';
+    const icon = c.status === 'AVOID' ? '💥' : c.status === 'RECOVERY_TEST' ? '🧱' : '⚠️';
+    const title = icon + ' WOW DIP · ' + name + ' · ' + c.status;
+    const msg = [
+      name + ' (' + (chainIdOf(c.chain || row.chain) === 'solana' ? 'SOL' : 'ETH') + ')',
+      alertPxMcLine({ spot: c.spot, mcap: c.mcap }),
+      c.why || '',
+      '',
+      'Dex 5m ' + pctStr(c.m5) + ' · 1h ' + pctStr(c.h1) + ' · 6h ' + pctStr(c.h6) + ' · 24h ' + pctStr(c.h24),
+      c.volX != null ? 'Vol ' + Number(c.volX).toFixed(1) + 'x usual 5m' : '',
+      c.sellVol || c.buyVol
+        ? 'Buy ~' + fmtUsdCompact(c.buyVol) + ' · sell ~' + fmtUsdCompact(c.sellVol) + ' (1h)'
+        : '',
+      'Liq ' + fmtUsdCompact(c.liq),
+      'Not a buy. 5m bounce after a dump is volatility, not an entry. CA / Entry Window do not chase this.',
+      'CA: ' + row.ca,
+      dexHref(row.ca, c.chain || row.chain, c.dexUrl)
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const token = this.telegramToken();
+    if (!token) return false;
+    try {
+      let chat = this.telegramChatId();
+      if (!chat) chat = await this.resolveTelegramChat();
+      if (!chat) return false;
+      await sendTelegram(token, chat, title + '\n' + msg);
+      this.telegramErr = '';
+      this.store.setMeta('telegram_err', '');
+    } catch (e) {
+      this.markTelegramFail(e);
+      return false;
+    }
+    this.store.setAlert(key, now);
+    this.store.setMeta(
+      'last_crash_alert',
+      JSON.stringify({ name, ca: row.ca, status: c.status, severity: c.severity, via: 'telegram', at: new Date(now).toISOString() })
+    );
+    return true;
+  }
   async maybePositionAlert(row, tick) {
     if (this.alertMode() === 'off') return false;
     const card = this.observePosition(row);
@@ -4110,17 +4296,20 @@ export class Engine {
         } else {
           for (const tf of AUTO_TFS) tfsToCheck.add(tf);
         }
+        const crash = this.observeCrash(row, { commitLiq: true });
+        const avoid = crash.status === 'AVOID';
         for (const tf of tfsToCheck) {
           const hit = this.evaluateRow(row, tf, focus);
           const long = tf === '1d' || tf === '1w' || tf === '1M';
           const justClosed = closed.some((c) => c.tf === tf);
           if (long && !justClosed) continue;
           if (await this.maybeAlert(hit, tf)) nAlert++;
-          if (await this.maybeEntryAlert(hit)) nAlert++;
-          if (await this.maybeEwAlert(hit)) nAlert++;
+          if (!avoid && (await this.maybeEntryAlert(hit))) nAlert++;
+          if (!avoid && (await this.maybeEwAlert(hit))) nAlert++;
         }
         if (await this.maybeParabolicAlert(row, tick)) nAlert++;
         if (await this.maybePositionAlert(row, tick)) nAlert++;
+        if (await this.maybeCrashAlert(row, crash)) nAlert++;
       }
       if (scanned > 0) {
         this.rateLimitedUntil = 0;
@@ -4423,6 +4612,17 @@ export async function handleApi(engine, request) {
   }
   if (path === '/position' || path === '/api/position') {
     return json(engine.snapshotPosition());
+  }
+  if (path === '/crash' || path === '/api/crash' || path === '/wow-dip' || path === '/api/wow-dip') {
+    try {
+      if (!(engine.store.getWatch() || []).length) await engine.refreshWatch();
+    } catch (e) {}
+    try {
+      await engine.refreshSpotIfStale(20000);
+    } catch (e) {}
+    const out = engine.snapshotCrash();
+    if (engine.lastErr) out.error = engine.lastErr;
+    return json(out);
   }
   if (path === '/entry-window' || path === '/api/entry-window') {
     const tf = (url.searchParams.get('tf') || '4h').toLowerCase();

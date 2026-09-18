@@ -566,6 +566,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="verdict">Verdict</button>
   <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
   <button type="button" class="tab" data-tf="position">Position</button>
+  <button type="button" class="tab" data-tf="wowdip">WOW DIP</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
@@ -1043,6 +1044,23 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="wowdip-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>WOW DIP</h2><p>Crash / breakdown surveillance · not a buy button</p></div>
+    <span class="source" id="wd-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45;margin-bottom:10px">Saved CAs only. −20/−30/−40% 1H is classification, not an entry. 5m bounce after a dump can be a dead-cat. Entry Window is suppressed on AVOID.</div>
+    <div id="wd-legend" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <span style="font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;background:#ff6f7c22;color:#ff6f7c;border:1px solid #ff6f7c55">💥 Extreme ≤−40% 1H</span>
+      <span style="font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;background:#f0a06022;color:#f0a060;border:1px solid #f0a06055">🔴 Severe ≤−30% 1H</span>
+      <span style="font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;background:#e6c87822;color:#e6c878;border:1px solid #e6c87855">🟠 Crash ≤−20% 1H</span>
+    </div>
+    <div id="wd-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
 <div id="entrywindow-panel" class="trend-panel" style="display:none">
 <div class="ew-sticky">
       <div class="ew-sticky-tf">
@@ -1179,5 +1197,6 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="verdict-tab.js?v=20260915-v6"></script>
 <script src="entry-window-tab.js?v=20260918-ew14"></script>
 <script src="position-tab.js?v=20260917-pm1"></script>
-<script src="site-nav.js?v=20260918-t3"></script>
+<script src="crash-tab.js?v=20260918-wd1"></script>
+<script src="site-nav.js?v=20260918-wd1"></script>
 </body></html>

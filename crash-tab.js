@@ -1,4 +1,4 @@
-/* Position Monitor — observation only. STRETCHED does not blind this. Not a buy button. */
+/* WOW DIP — crash / breakdown surveillance. Not a buy button. */
 (function () {
   function apiBase() {
     try {
@@ -33,6 +33,20 @@
     if (!Number.isFinite(n)) return '—';
     return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
   }
+  function usd(n) {
+    n = +n;
+    if (!(n > 0)) return '—';
+    if (n >= 1e9) return '$' + (n / 1e9).toFixed(n >= 10e9 ? 1 : 2) + 'B';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 10e6 ? 1 : 2) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 100e3 ? 0 : 1) + 'k';
+    return '$' + n.toFixed(0);
+  }
+  function colorOf(st) {
+    if (st === 'AVOID') return '#ff6f7c';
+    if (st === 'WATCH') return '#f0a060';
+    if (st === 'RECOVERY_TEST') return '#e6c878';
+    return '#8491a1';
+  }
   async function api(path) {
     const r = await fetch(apiBase() + path, { cache: 'no-store' });
     const text = await r.text();
@@ -46,13 +60,22 @@
     return j;
   }
   function hideOthers() {
-    ['showBreakoutMemes', 'showHunter', 'showKeep', 'showHolders', 'showSentiment', 'showFailures', 'showInMemory', 'showVerdict', 'showEntryWindow', 'showWowDip'].forEach(
-      function (fn) {
-        try {
-          window[fn](false);
-        } catch (e) {}
-      }
-    );
+    [
+      'showBreakoutMemes',
+      'showHunter',
+      'showKeep',
+      'showHolders',
+      'showSentiment',
+      'showFailures',
+      'showInMemory',
+      'showVerdict',
+      'showEntryWindow',
+      'showPositionMonitor'
+    ].forEach(function (fn) {
+      try {
+        window[fn](false);
+      } catch (e) {}
+    });
     [
       'tf-panels',
       'trend-panel',
@@ -71,7 +94,7 @@
       'keep-panel',
       'verdict-panel',
       'entrywindow-panel',
-      'wowdip-panel'
+      'position-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
@@ -80,18 +103,21 @@
       if (id === 'tf-panels') el.classList.add('hidden');
     });
   }
-  function colorOf(type) {
-    if (type === 'EXHAUSTION') return '#ff6f7c';
-    if (type === 'ACCELERATION' || type === 'CONTINUATION') return '#f0a060';
-    if (type === 'MOMENTUM') return '#e6c878';
-    if (type === 'RETEST') return '#62e3a0';
-    return '#8491a1';
+  function yn(v) {
+    return v ? 'YES' : 'NO';
   }
   function renderCard(c) {
-    const p = c.primary || {};
-    const ev = (c.events || [])
-      .map(function (e) {
-        return '<div style="font-size:12px;color:#c5d0dc;margin-top:4px">· ' + esc(e.label) + ' — ' + esc(e.why) + '</div>';
+    const st = c.status || 'QUIET';
+    const col = colorOf(st);
+    const flags = (c.flags || [])
+      .map(function (f) {
+        return (
+          '<div style="font-size:12px;color:#c5d0dc;margin-top:4px">· ' +
+          esc(f.label) +
+          ' — ' +
+          esc(f.why) +
+          '</div>'
+        );
       })
       .join('');
     return (
@@ -99,31 +125,49 @@
       '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">' +
       '<div style="font-weight:900;font-size:16px;color:#e8eef6">' +
       esc(c.name) +
-      (c.stretched
-        ? ' <span style="font-size:10px;font-weight:800;color:#f0a060">STRETCHED · watch only</span>'
+      (c.severity && c.severity !== 'NONE'
+        ? ' <span style="font-size:10px;font-weight:800;color:' + col + '">' + esc(c.severity) + '</span>'
         : '') +
       '</div>' +
       '<div style="font-size:13px;font-weight:900;color:' +
-      colorOf(p.type) +
+      col +
       '">' +
-      esc(p.label || 'QUIET') +
+      esc(st.replace('_', ' ')) +
       '</div></div>' +
-      '<div style="margin-top:8px;font-size:12px;color:#c5d0dc;line-height:1.45">' +
-      esc(p.why || '') +
+      '<div style="margin-top:8px;font-size:12px;color:#c5d0dc;line-height:1.5;white-space:pre-line">' +
+      'CRASH: ' +
+      pct(c.h1) +
+      ' 1H\nSTRUCTURAL BREAKDOWN: ' +
+      yn(c.structural) +
+      '\nLIQUIDITY SHOCK: ' +
+      yn(c.liqShock) +
+      '\nRECOVERY: ' +
+      (c.reclaim ? 'YES' : c.deadCat ? 'NO (dead-cat bounce)' : 'NO') +
+      '\nSTATUS: ' +
+      esc(st) +
       '</div>' +
+      flags +
       '<div style="margin-top:8px;font-size:12px;color:#8491a1">5m ' +
       pct(c.m5) +
       ' · 1h ' +
       pct(c.h1) +
-      ' · 15m bar ' +
-      pct(c.ret15) +
+      ' · 6h ' +
+      pct(c.h6) +
+      ' · 24h ' +
+      pct(c.h24) +
       ' · vol ' +
       (c.volX != null ? Number(c.volX).toFixed(1) : '—') +
-      'x · spot ' +
+      'x</div>' +
+      '<div style="margin-top:4px;font-size:12px;color:#8491a1">Buy ~' +
+      usd(c.buyVol) +
+      ' · sell ~' +
+      usd(c.sellVol) +
+      ' · liq ' +
+      usd(c.liq) +
+      ' · spot ' +
       px(c.spot) +
       '</div>' +
-      ev +
-      '<div style="margin-top:8px;font-size:11px;color:#8491a1">Not an entry signal. CA / Entry Window decide entry.</div>' +
+      '<div style="margin-top:8px;font-size:11px;color:#ff6f7c;font-weight:800">Not a buy. Do not let a 5m bounce become an entry.</div>' +
       (c.dexUrl
         ? '<div style="margin-top:8px"><a href="' +
           esc(c.dexUrl) +
@@ -135,18 +179,16 @@
   async function load() {
     if (busy) return;
     busy = true;
-    const st = $('pm-status');
-    const list = $('pm-list');
+    const st = $('wd-status');
+    const list = $('wd-list');
     try {
-      const j = await api('/position');
-      const nHot = (j.cards || []).filter(function (c) {
-        const t = c.primary && c.primary.type;
-        return t && t !== 'QUIET' && t !== 'STRETCHED_WATCH';
-      }).length;
-      if (st) st.textContent = 'LIVE · ' + (j.saved || 0) + ' saved · ' + nHot + ' moving';
+      const j = await api('/crash');
+      const hot = j.hot || 0;
+      if (st) st.textContent = 'LIVE · ' + (j.saved || 0) + ' saved · ' + hot + ' dumping';
+      const cards = j.cards || [];
       if (list)
-        list.innerHTML = (j.cards || []).length
-          ? j.cards.map(renderCard).join('')
+        list.innerHTML = cards.length
+          ? cards.map(renderCard).join('')
           : '<div style="color:#8491a1;font-size:12px">No saved CAs.</div>';
     } catch (e) {
       if (st) st.textContent = String(e.message || e);
@@ -154,8 +196,8 @@
     }
     busy = false;
   }
-  function showPositionMonitor(on) {
-    const p = $('position-panel');
+  function showWowDip(on) {
+    const p = $('wowdip-panel');
     if (on) {
       hideOthers();
       if (p) {
@@ -165,7 +207,7 @@
       load();
       if (timer) clearInterval(timer);
       timer = setInterval(function () {
-        const onp = $('position-panel');
+        const onp = $('wowdip-panel');
         if (!onp || onp.style.display === 'none') return;
         load();
       }, 60000);
@@ -180,7 +222,7 @@
       }
     }
   }
-  window.showPositionMonitor = showPositionMonitor;
+  window.showWowDip = showWowDip;
   const tabs = document.getElementById('tf-tabs');
   if (tabs) {
     tabs.addEventListener('click', function (ev) {
@@ -189,8 +231,8 @@
       setTimeout(function () {
         const act = document.querySelector('#tf-tabs .tab.active');
         const tf = act && act.getAttribute('data-tf');
-        if (tf === 'position') showPositionMonitor(true);
-        else showPositionMonitor(false);
+        if (tf === 'wowdip') showWowDip(true);
+        else showWowDip(false);
       }, 0);
     });
   }
