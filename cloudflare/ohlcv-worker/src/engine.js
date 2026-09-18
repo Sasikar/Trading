@@ -1192,14 +1192,18 @@ export function entryWindow(args) {
   const leaveAt = level > 0 ? level * 1.015 : 0;
   const extPct = level > 0 && spot > 0 ? ((spot - level) / level) * 100 : null;
   const distZonePct = zoneHi > 0 && spot > zoneHi ? ((spot - zoneHi) / zoneHi) * 100 : spot && zoneHi ? ((spot - zoneHi) / zoneHi) * 100 : null;
+  const prev = (args && args.prev) || {};
   const swing = Math.max(
     spot || 0,
     ...bars5m.map((b) => +b.h || 0),
     ...bars1h.slice(-12).map((b) => +b.h || 0)
   );
-  const left = leaveAt > 0 && swing >= leaveAt;
+  const left = (leaveAt > 0 && swing >= leaveAt) || !!prev.left;
   const recent5 = bars5m.slice(-8);
-  const dipped = recent5.some((b) => +b.l > 0 && +b.l < level) || !!(open5m && +open5m.l > 0 && +open5m.l < level);
+  const dipped =
+    recent5.some((b) => +b.l > 0 && +b.l < level) ||
+    !!(open5m && +open5m.l > 0 && +open5m.l < level) ||
+    !!prev.dipped;
   const last5 = recent5[recent5.length - 1];
   const reclaimBar = !!(
     (open5m && +open5m.l < level && +open5m.c >= level) ||
@@ -1223,12 +1227,27 @@ export function entryWindow(args) {
     state = 'INVALIDATED';
     label = 'INVALIDATED';
     color = '#ff6f7c';
-    why = 'Structure lost — two 5m closes under ' + (fmtPx(level) || 'level') + '. Stop waiting for a pullback.';
+    why =
+      'Structure lost — setup cancelled. Two 5m closes under ' +
+      (fmtPx(level) || 'level') +
+      '. Current ' +
+      fmtPx(spot) +
+      (extPct != null ? ' is ' + (extPct >= 0 ? '+' : '') + extPct.toFixed(1) + '% vs level' : '') +
+      '. Being above the old high is not a reclaim. Do not chase. Wait for a NEW ' +
+      String(tf).toUpperCase() +
+      ' breakout.';
   } else if (inval > 0 && spot > 0 && spot < inval) {
     state = 'INVALIDATED';
     label = 'INVALIDATED';
     color = '#ff6f7c';
-    why = 'Price under invalidation ' + fmtPx(inval) + '. Higher-TF setup is done.';
+    why =
+      'Structure lost — setup cancelled. Price under invalidation ' +
+      fmtPx(inval) +
+      '. Current ' +
+      fmtPx(spot) +
+      '. Do not chase. Wait for a NEW ' +
+      String(tf).toUpperCase() +
+      ' breakout.';
   } else if (stretched && !inZone && !reclaim) {
     state = 'NO_CHASE';
     label = 'NO CHASE';
@@ -2142,6 +2161,7 @@ export class Engine {
       volX: hit.volX,
       buyR: hit.buyR
     });
+    this.latchFailedEntry(hit);
     this.persistEntry(hit);
     hit.ew = entryWindow({
       hit,
@@ -2150,8 +2170,10 @@ export class Engine {
       bars4h: this.store.bars(row.ca, '4h', 30),
       bars1d: this.store.bars(row.ca, '1d', 40),
       barsTf: this.store.bars(row.ca, tf, 30),
-      open5m: this.store.openBar(row.ca, '5m')
+      open5m: this.store.openBar(row.ca, '5m'),
+      prev: this.ewStateOf(hit)
     });
+    this.latchInvalidatedEw(hit);
     this.persistEw(hit);
     this.touchEwPaper(hit);
     return hit;
@@ -2589,9 +2611,14 @@ export class Engine {
     } catch (e) {
       map = {};
     }
-    const prev = map[k];
-    if (prev && prev.state === ew.state) return;
-    map[k] = { state: ew.state, at: Date.now(), level: +hit.level || 0 };
+    const prev = map[k] || {};
+    map[k] = {
+      state: ew.state,
+      at: Date.now(),
+      level: +hit.level || +(prev.level) || 0,
+      left: !!(ew.left || prev.left),
+      dipped: !!(ew.dipped || prev.dipped)
+    };
     this.store.setMeta('ew_state', JSON.stringify(map));
   }
   ewStateOf(hit) {
@@ -2602,6 +2629,63 @@ export class Engine {
     } catch (e) {
       return null;
     }
+  }
+  entryStateOf(hit) {
+    const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
+    try {
+      const map = JSON.parse(this.store.getMeta('entry_state') || '{}') || {};
+      return map[k] || null;
+    } catch (e) {
+      return null;
+    }
+  }
+  sameEwEpisode(hit, prev) {
+    if (!prev) return false;
+    const lvl = +hit.level || 0;
+    const pl = +prev.level || 0;
+    if (pl > 0 && lvl > 0 && Math.abs(lvl - pl) / pl > 0.01) return false;
+    if (hit.fresh && hit.event === 'NEW BREAKOUT' && (prev.state === 'INVALIDATED' || prev.state === 'failed'))
+      return false;
+    return true;
+  }
+  latchFailedEntry(hit) {
+    const prev = this.entryStateOf(hit);
+    if (!prev || prev.state !== 'failed') return;
+    if (!this.sameEwEpisode(hit, prev)) return;
+    hit.entry = Object.assign({}, hit.entry || {}, {
+      state: 'failed',
+      paint: 'FAILED',
+      why:
+        'FAILED (latched): this break already printed two 5m closes under ' +
+        fmtPx(hit.level) +
+        '. Spot back above the high is not a new break. Wait a NEW ' +
+        String(hit.tf || '').toUpperCase() +
+        ' close-above.'
+    });
+  }
+  latchInvalidatedEw(hit) {
+    const prev = this.ewStateOf(hit);
+    const ew = hit && hit.ew;
+    if (!ew) return;
+    const dead = (prev && prev.state === 'INVALIDATED') || (hit.entry && hit.entry.paint === 'FAILED');
+    if (!dead) return;
+    if (prev && !this.sameEwEpisode(hit, prev) && hit.event === 'NEW BREAKOUT' && hit.fresh) return;
+    if (prev && !this.sameEwEpisode(hit, prev)) return;
+    const ext =
+      ew.extPct != null ? (ew.extPct >= 0 ? '+' : '') + Number(ew.extPct).toFixed(1) + '%' : '';
+    hit.ew = Object.assign({}, ew, {
+      state: 'INVALIDATED',
+      label: 'INVALIDATED',
+      color: '#ff6f7c',
+      latched: true,
+      why:
+        'Structure lost — setup cancelled. Current ' +
+        fmtPx(ew.spot) +
+        (ext ? ' is ' + ext + ' vs level ' + fmtPx(ew.level) : '') +
+        '. Being above the old high is not a reclaim. Do not chase. Wait for a NEW ' +
+        String(hit.tf || '').toUpperCase() +
+        ' breakout.'
+    });
   }
   touchEwPaper(hit) {
     const ew = hit && hit.ew;

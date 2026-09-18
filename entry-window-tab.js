@@ -60,9 +60,12 @@
     const st = String((e && e.state) || '');
     if (!e || !e.level || st === 'NO_SETUP' || st === 'NEAR' || st === 'WARMING' || !st)
       return '—';
+    if (st === 'INVALIDATED' || st === 'EXPIRED')
+      return 'Setup cancelled · wait NEW breakout';
     if (st === 'ACTIVE') return px(e.trigger) + ' held';
     if (st === 'RECLAIM') return px(e.trigger) + ' reclaimed · wait confirm';
     if (st === 'RETEST') return 'At level · wait 5m reclaim close';
+    if (st === 'NO_CHASE') return 'Do not chase · wait retest of ' + px(e.trigger);
     return 'Do not buy · retest then reclaim ' + px(e.trigger);
   }
   function tfLab(tf) {
@@ -187,7 +190,7 @@
       row('Trigger', triggerTxt(e)) +
       row('Volume', e.volPass ? 'PASS' : 'WAIT') +
       row('Momentum', e.momPass ? 'PASS' : 'WAIT') +
-      row('Confirm', e.confirm ? 'WINDOW' : e.entryPaint || 'WAIT') +
+      row('Confirm', e.state === 'INVALIDATED' ? 'CANCELLED' : e.confirm ? 'WINDOW' : e.entryPaint || 'WAIT') +
       '</div>' +
       (c.dexUrl
         ? '<div style="margin-top:10px"><a href="' +
