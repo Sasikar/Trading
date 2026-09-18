@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-18T16:05:11.587Z",
+  "updated": "2026-09-18T16:07:06.214Z",
   "count": 19,
   "items": [
     {
@@ -7,11 +7,11 @@
       "ca": "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
       "name": "fone",
       "base": "fone",
-      "t": 1789745959232,
+      "t": 1789747522628,
       "poolAddress": "3dcwhqJp6JBTJPq8ga335HWgSQVS7uQmdmeX7iGjMNpj",
       "poolNetwork": "solana",
-      "poolLiq": 550614.96,
-      "poolCachedAt": 1789745959231
+      "poolLiq": 545104.41,
+      "poolCachedAt": 1789747522628
     },
     {
       "chain": "solana",
