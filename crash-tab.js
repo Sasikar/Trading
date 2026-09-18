@@ -185,11 +185,13 @@
       const j = await api('/crash');
       const hot = j.hot || 0;
       if (st) st.textContent = 'LIVE · ' + (j.saved || 0) + ' saved · ' + hot + ' dumping';
-      const cards = j.cards || [];
+      const cards = (j.cards || []).filter(function (c) {
+        return c.status && c.status !== 'QUIET';
+      });
       if (list)
         list.innerHTML = cards.length
           ? cards.map(renderCard).join('')
-          : '<div style="color:#8491a1;font-size:12px">No saved CAs.</div>';
+          : '<div style="color:#8491a1;font-size:12px">No dumps on saved CAs right now.</div>';
     } catch (e) {
       if (st) st.textContent = String(e.message || e);
       if (list) list.innerHTML = '<div style="color:#ff6f7c;font-size:13px">' + esc(e.message || e) + '</div>';

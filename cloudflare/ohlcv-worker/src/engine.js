@@ -3194,18 +3194,16 @@ export class Engine {
     };
   }
   snapshotCrash() {
-    const cards = (this.store.getWatch() || []).map((r) => this.observeCrash(r));
-    const rank = { AVOID: 0, WATCH: 1, RECOVERY_TEST: 2, QUIET: 3 };
-    cards.sort(
-      (a, b) =>
-        (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || (a.h1 || 0) - (b.h1 || 0)
-    );
+    const all = (this.store.getWatch() || []).map((r) => this.observeCrash(r));
+    const rank = { AVOID: 0, WATCH: 1, RECOVERY_TEST: 2 };
+    const cards = all.filter((c) => c.status && c.status !== 'QUIET');
+    cards.sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || (a.h1 || 0) - (b.h1 || 0));
     return {
       cards,
-      saved: cards.length,
-      hot: cards.filter((c) => c.status && c.status !== 'QUIET').length,
+      saved: all.length,
+      hot: cards.length,
       updated: new Date().toISOString(),
-      note: 'WOW DIP · crash surveillance. Not a buy. Entry Window suppressed on AVOID.'
+      note: 'WOW DIP · crash surveillance. Quiet coins hidden. Not a buy. Entry Window suppressed on AVOID.'
     };
   }
   async maybeCrashAlert(row, card) {
