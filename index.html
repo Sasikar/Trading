@@ -868,9 +868,10 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <div id="bo-alert-bar" style="margin:0 0 12px;padding:10px 12px;border-radius:12px;border:1px solid #243041;background:#0b121a">
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
         <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">TF ALERTS</span>
-        <button type="button" class="bo-al-mode" data-al-mode="all" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('all')}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">All on</button>
-        <button type="button" class="bo-al-mode" data-al-mode="picked" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('picked')}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">Picked</button>
-        <button type="button" class="bo-al-mode" data-al-mode="off" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('off')}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">All off</button>
+        <button type="button" class="bo-al-mode" data-al-mode="all" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('all')}catch(e){alert(e)}" style="padding:10px 14px;min-height:42px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:900;font-size:13px;cursor:pointer">TURN ALL ON</button>
+        <button type="button" class="bo-al-mode" data-al-mode="picked" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('picked')}catch(e){alert(e)}" style="padding:10px 14px;min-height:42px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:900;font-size:13px;cursor:pointer">Picked</button>
+        <button type="button" class="bo-al-mode" data-al-mode="off" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('off')}catch(e){alert(e)}" style="padding:10px 14px;min-height:42px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:900;font-size:13px;cursor:pointer">TURN ALL OFF</button>
+        <button type="button" onclick="try{window.selectAllBreakoutAlerts&&window.selectAllBreakoutAlerts()}catch(e){alert(e)}" style="padding:10px 14px;min-height:42px;border-radius:10px;border:1px solid #2a6b4e;background:#123526;color:#62e3a0;font-weight:900;font-size:12px;cursor:pointer">Select all coins</button>
         <span id="bo-al-meta" style="font-size:11px;color:#8491a1;font-weight:700">Telegram · persisted on worker</span>
       </div>
       <div id="bo-alert-picks" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
@@ -1162,7 +1163,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </div>
 </main></div>
 <script src="overview-app.js?v=20260916-af2"></script>
-<script src="breakout-tab.js?v=20260916-al1"></script>
+<script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>

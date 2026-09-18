@@ -616,6 +616,22 @@
       };
     });
   }
+
+  async function selectAllAlerts() {
+    try {
+      const st = await api('/status');
+      const cas = ((st && st.alertWatch) || []).map(function (w) { return w.ca; });
+      const j = await api('/alerts', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mode: 'all', selectAll: true, cas: cas })
+      });
+      paintAlertBar(Object.assign({}, st, j));
+      await loadStatus();
+    } catch (e) {
+      alert(e.message || e);
+    }
+  }
   async function setAlertMode(mode) {
     try {
       const j = await api('/alerts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: mode }) });
@@ -876,6 +892,7 @@
   window.setBreakoutAlertMode = function (mode) {
     return setAlertMode(mode);
   };
+  window.selectAllBreakoutAlerts = selectAllAlerts;
   window.setBreakoutTF = function (tf) {
     breakoutTF = String(tf || '4h').toLowerCase();
     paintTfButtons();

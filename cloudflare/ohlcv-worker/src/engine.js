@@ -1803,11 +1803,16 @@ export class Engine {
   }
   setAlertPrefs(body) {
     body = body || {};
+    const watchList = (this.store.getWatch() || []).map((w) => String(w.ca).toLowerCase()).filter(Boolean);
+    const watch = new Set(watchList);
     if (body.mode) {
       const m = String(body.mode).toLowerCase();
       if (m === 'all' || m === 'off' || m === 'picked') this.store.setMeta('alert_mode', m);
+      if (m === 'all') this.store.setMeta('alert_cas', JSON.stringify(watchList));
+      if (m === 'off') this.store.setMeta('alert_cas', '[]');
     }
-    const watch = new Set((this.store.getWatch() || []).map((w) => String(w.ca).toLowerCase()));
+    if (body.selectAll) this.store.setMeta('alert_cas', JSON.stringify(watchList));
+    if (body.clearAll) this.store.setMeta('alert_cas', '[]');
     if (Array.isArray(body.cas)) {
       const cas = body.cas.map((x) => String(x).toLowerCase()).filter((x) => watch.has(x));
       this.store.setMeta('alert_cas', JSON.stringify(cas));
