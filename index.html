@@ -194,14 +194,14 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 
 .ew-sticky{
   display:none;
-  position:fixed;top:52px;left:0;right:0;z-index:90;
-  margin:0;padding:8px 14px;
-  border:none;border-bottom:1px solid #2a3644;border-radius:0;
+  position:sticky;top:52px;z-index:90;
+  margin:0 0 10px;padding:8px 12px;
+  border:1px solid #2a3644;border-radius:12px;
   background:rgba(8,13,19,.98);
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-  box-shadow:0 8px 24px rgba(0,0,0,.45);
 }
 #entrywindow-panel.on .ew-sticky{display:block}
+#entrywindow-panel .section > .head{display:none}
 .ew-sticky-tf{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .ew-sticky-tf::-webkit-scrollbar{height:0}
 .ew-looking{margin:0 0 10px;font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
@@ -1063,8 +1063,6 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <span class="source" id="ew-status">API</span>
   </div>
   <div class="card">
-    <div style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:12px">Good setup is not buy-now. If price already ran, wait the printed pullback zone. ACTIVE only when price is in the zone and existing WINDOW confirmation passes.</div>
-    <div id="ew-sticky-pad" style="height:96px"></div>
     <div id="ew-list" style="display:flex;flex-direction:column;gap:10px"></div>
     <div style="margin-top:18px;font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">PAPER · BREAKOUT vs PULLBACK</div>
     <div id="ew-paper" style="margin-top:8px"></div>
@@ -1172,7 +1170,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260916-s7"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
-<script src="entry-window-tab.js?v=20260918-ew8"></script>
+<script src="entry-window-tab.js?v=20260918-ew9"></script>
 <script src="position-tab.js?v=20260917-pm1"></script>
 <script src="site-nav.js?v=20260917-pm1"></script>
 </body></html>

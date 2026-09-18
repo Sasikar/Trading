@@ -216,13 +216,7 @@
 
 
 
-  function syncEwPad() {
-    const bar = document.querySelector('#entrywindow-panel .ew-sticky');
-    const pad = $('ew-sticky-pad');
-    if (!bar || !pad) return;
-    const h = Math.max(72, bar.offsetHeight || 0);
-    pad.style.height = h + 'px';
-  }
+  function syncEwPad() {}
   function bandId(c) {
     const s = String((c && c.ew && c.ew.state) || 'NO_SETUP');
     if (s === 'ACTIVE') return 'ACTIVE';
