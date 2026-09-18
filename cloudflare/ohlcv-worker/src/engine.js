@@ -81,6 +81,16 @@ export function chainIdOf(chain) {
   return c || 'solana';
 }
 
+
+export function dexHref(ca, chain, dexUrl) {
+  if (dexUrl && /^https?:\/\//i.test(String(dexUrl))) return String(dexUrl);
+  const k = String(ca || '').trim();
+  if (!k) return '';
+  const id = chainIdOf(chain) || 'solana';
+  return 'https://dexscreener.com/' + id + '/' + k;
+}
+
+
 export function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -1897,7 +1907,7 @@ export class Engine {
       'Dex 5m ' + pctStr(p.m5) + ' · 1h ' + pctStr(p.h1) + ' · 6h ' + pctStr(p.h6) + ' · 24h ' + pctStr(p.h24),
       'Do not wait for a higher-TF close. This is the smash.',
       'CA: ' + row.ca,
-      'https://sasikar.github.io/Trading/index.html?tab=breakouts'
+      dexHref(row.ca, (tick && tick.chain) || row.chain, tick && tick.dexUrl)
     ].join('\n');
     const token = this.telegramToken();
     if (!token) return false;
@@ -1952,7 +1962,7 @@ export class Engine {
         : 'Level: not stored yet (tape filling)',
       hit.levelTxt ? 'Exit: ' + String(tf).toUpperCase() + ' close back under ' + hit.levelTxt : '',
       'CA: ' + hit.ca,
-      'https://sasikar.github.io/Trading/index.html?tab=breakouts'
+      dexHref(hit.ca, hit.chain, hit.dexUrl)
     ].join('\n');
     let via = '';
     const token = this.telegramToken();
@@ -2014,7 +2024,7 @@ export class Engine {
         : 'Level: not stored',
       e.tape && e.tape.thin ? '1m tape thin (' + e.tape.bars1m + ' bars @ 60s)' : '',
       'CA: ' + hit.ca,
-      'https://sasikar.github.io/Trading/index.html?tab=breakouts'
+      dexHref(hit.ca, hit.chain, hit.dexUrl)
     ]
       .filter(Boolean)
       .join('\n');
@@ -2623,7 +2633,7 @@ export class Engine {
         ? 'Pullback ' + fmtPx(ew.zoneLo) + '–' + fmtPx(ew.zoneHi) + ' · inval ' + fmtPx(ew.inval)
         : '',
       'CA: ' + hit.ca,
-      'https://sasikar.github.io/Trading/index.html?tab=entrywindow'
+      dexHref(hit.ca, hit.chain, hit.dexUrl)
     ]
       .filter(Boolean)
       .join('\n');
@@ -2706,7 +2716,7 @@ export class Engine {
       card.stretched ? 'STRETCHED — existing-position monitor only.' : 'Existing-position monitor.',
       'Not an entry signal. CA / Entry Window decide entry.',
       'CA: ' + row.ca,
-      'https://sasikar.github.io/Trading/index.html?tab=position'
+      dexHref(row.ca, card.chain || row.chain, card.dexUrl)
     ].join('\n');
     const token = this.telegramToken();
     if (!token) return false;
