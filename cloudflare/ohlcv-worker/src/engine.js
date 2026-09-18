@@ -1880,10 +1880,17 @@ export class Engine {
     }
     // Closed TF candle only. Do not ping LIVE if 5m already failed the level.
     if (hit.entry && hit.entry.paint === 'FAILED') return false;
-    return (
+    const live =
       hit.section === 'live' ||
-      (hit.event === 'NEW BREAKOUT' && (hit.fresh || hit.age <= 1))
-    );
+      (hit.event === 'NEW BREAKOUT' && (hit.fresh || hit.age <= 1));
+    if (!live) return false;
+    // Short TF range-nicks with dead Dex 5m/vol are not the boom. Do not Telegram.
+    if (tfn === '5m' || tfn === '10m' || tfn === '15m' || tfn === '30m') {
+      const m5 = +(hit.m5 || 0);
+      const volX = +(hit.volX || 0);
+      if (m5 < 1 && volX < 1) return false;
+    }
+    return true;
   }
 
   tapeBars(ca, tf, n) {
