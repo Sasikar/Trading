@@ -13,6 +13,7 @@
   const $ = (id) => document.getElementById(id);
   let timer = null;
   let busy = false;
+  let loadAgain = false;
   let ewTf = 'all';
   try {
     ewTf = localStorage.getItem('ew_tf') || 'all';
@@ -343,7 +344,7 @@
   function paintDetail(cards) {
     const list = $('ew-list');
     if (!list) return;
-    const rows = (cards || []).filter(function (c) {
+    const rows = cardsForTf(cards).filter(function (c) {
       if (selCa) return String(c.ca || '').toLowerCase() === selCa;
       return bandId(c) === selState;
     });
@@ -381,16 +382,28 @@
     paintDetail(lastCards);
   }
 
+  function cardsForTf(cards) {
+    if (ewTf === 'all') return cards || [];
+    const want = String(ewTf).toLowerCase();
+    return (cards || []).filter(function (c) {
+      return String(c.tf || '').toLowerCase() === want;
+    });
+  }
   async function load() {
-    if (busy) return;
+    if (busy) {
+      loadAgain = true;
+      return;
+    }
     busy = true;
+    loadAgain = false;
+    const wantTf = ewTf;
     const st = $('ew-status');
     const list = $('ew-list');
     const paper = $('ew-paper');
     try {
       let j = {};
       try {
-        j = await api('/entry-window?tf=' + encodeURIComponent(ewTf));
+        j = await api('/entry-window?tf=' + encodeURIComponent(wantTf));
       } catch (e) {
         j = { error: String(e.message || e), cards: [], saved: 0 };
       }
@@ -424,7 +437,10 @@
             ' saved · ' +
             nSetup +
             ' with a setup';
-      lastCards = j.cards || [];
+      lastCards = (j.cards || []).filter(function (c) {
+        if (wantTf === 'all') return true;
+        return String(c.tf || '').toLowerCase() === wantTf;
+      });
       paintCoinSel(lastCards);
       paintStateTabs(lastCards);
       paintLooking();
@@ -435,6 +451,7 @@
       if (list) list.innerHTML = '<div style="color:#ff6f7c;font-size:13px">' + esc(e.message || e) + '</div>';
     }
     busy = false;
+    if (loadAgain || wantTf !== ewTf) load();
   }
 
   function paintTf() {
@@ -481,7 +498,11 @@
     try {
       localStorage.setItem('ew_tf', ewTf);
     } catch (e) {}
+    lastCards = cardsForTf(lastCards);
     paintTf();
+    paintStateTabs(lastCards);
+    paintLooking();
+    paintDetail(lastCards);
     load();
   };
 
