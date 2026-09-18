@@ -2879,6 +2879,51 @@ export class Engine {
     );
     return true;
   }
+  async refreshSpotIfStale(maxAgeMs) {
+    const now = Date.now();
+    const last = +this.store.getMeta('spot_refresh') || 0;
+    const age = last ? now - last : 9e9;
+    if (age < (maxAgeMs || 20000)) return { skipped: true, age };
+    if (now < this.rateLimitedUntil) return { skipped: true, paused: true };
+    if (this.dexCallsLastMin(now) >= 26) return { skipped: true, budget: true };
+    const rows = this.store.getWatch() || [];
+    if (!rows.length) return { skipped: true };
+    const byCa = await fetchDexPairsForCas(rows.map((r) => r.ca));
+    for (let i = 0; i < (byCa.calls || 0); i++) this.dexCallsMin.push(now);
+    let n = 0;
+    for (const row of rows) {
+      const got = byCa.get(row.ca);
+      if (!got || got instanceof Error) continue;
+      const pair = pickBestPair(got, row.chain, row.ca);
+      if (!pair || !(+pair.priceUsd > 0)) continue;
+      const fresh = pairToTick(pair, row, now);
+      const prev = this.store.getTick(row.ca) || {};
+      this.store.setTick(
+        row.ca,
+        Object.assign({}, prev, {
+          t: now,
+          price: fresh.price,
+          m5: fresh.m5,
+          h1: fresh.h1,
+          h6: fresh.h6,
+          h24: fresh.h24,
+          vol5m: fresh.vol5m,
+          vol1h: fresh.vol1h,
+          vol24h: fresh.vol24h,
+          liq: fresh.liq,
+          mcap: fresh.mcap,
+          dexUrl: fresh.dexUrl || prev.dexUrl,
+          pairAddress: fresh.pairAddress || prev.pairAddress
+        })
+      );
+      n++;
+    }
+    this.store.setMeta('spot_refresh', String(now));
+    this.dexCallsLastMin(now);
+    this.store.setMeta('dex_calls_min', JSON.stringify(this.dexCallsMin));
+    return { ok: true, n };
+  }
+
   snapshotEntryWindow(tf) {
     const tfn = String(tf || 'all').toLowerCase();
     const watch = this.store.getWatch() || [];
@@ -4133,8 +4178,13 @@ export async function handleApi(engine, request) {
     } catch (e) {
       engine.lastErr = String(e && e.message ? e.message : e);
     }
+    try {
+      await engine.refreshSpotIfStale(20000);
+    } catch (e) {}
     const out = engine.snapshotEntryWindow(tf);
     if (engine.lastErr) out.error = engine.lastErr;
+    const sr = +engine.store.getMeta('spot_refresh') || 0;
+    out.spotAgeMs = sr ? Date.now() - sr : null;
     return json(out);
   }
   if (path === '/candles' || path === '/api/candles') {

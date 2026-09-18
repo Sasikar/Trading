@@ -411,11 +411,14 @@
         const st0 = (c.ew && c.ew.state) || '';
         return st0 && st0 !== 'NO_SETUP' && st0 !== 'WARMING';
       }).length;
+      const ageS = j.spotAgeMs != null ? Math.max(0, Math.round(j.spotAgeMs / 1000)) : null;
       if (st)
         st.textContent = quota
           ? 'QUOTA · ' + n + ' saved on GitHub · tape down until midnight UTC'
           : 'LIVE · ' +
             (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
+            ' · Dex ' +
+            (ageS == null ? '—' : ageS + 's') +
             ' · ' +
             n +
             ' saved · ' +
@@ -459,7 +462,7 @@
         const onp = $('entrywindow-panel');
         if (!onp || onp.style.display === 'none') return;
         load();
-      }, 60000);
+      }, 20000);
     } else {
       if (p) {
         p.style.display = 'none';
