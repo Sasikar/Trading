@@ -627,14 +627,41 @@ export function positionObserve(args) {
       why: 'New local high ' + fmtPx(high15) + ' + volume expansion. Observation only.'
     });
   }
-  const level = +hit5.level || +hit1h.level || 0;
-  if (level > 0 && spot > 0) {
+  function brokeHit(h) {
+    const ev = String((h && h.event) || '');
+    const sec = String((h && h.section) || '');
+    return (
+      ev === 'NEW BREAKOUT' ||
+      ev === 'BREAKOUT HELD' ||
+      sec === 'live' ||
+      sec === 'matured'
+    );
+  }
+  const src = brokeHit(hit1h) ? hit1h : brokeHit(hit5) ? hit5 : null;
+  const level = src ? +src.level || 0 : 0;
+  if (src && level > 0 && spot > 0) {
     const dist = ((spot - level) / level) * 100;
-    if (dist >= -2 && dist <= 2.5) {
+    const swing = Math.max(
+      high15 || 0,
+      ...bars5.map((b) => +b.h || 0),
+      ...bars15.map((b) => +b.h || 0)
+    );
+    const left = swing >= level * 1.02;
+    const back = dist >= -2 && dist <= 1.2;
+    if (left && back) {
       events.push({
         type: 'RETEST',
         label: 'HOLD/RETEST WATCH',
-        why: 'Spot ' + fmtPx(spot) + ' vs breakout ' + fmtPx(level) + ' (' + dist.toFixed(1) + '%). Pullback to level.'
+        why:
+          'Came back to ' +
+          String(src.tf || '').toUpperCase() +
+          ' break ' +
+          fmtPx(level) +
+          ' · spot ' +
+          fmtPx(spot) +
+          ' (' +
+          dist.toFixed(1) +
+          '%). Hold vs fail. Not an entry.'
       });
     }
   }
