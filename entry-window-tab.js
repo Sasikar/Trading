@@ -28,7 +28,9 @@
   let lastCards = [];
   const EW_BANDS = [
     { id: 'ACTIVE', lab: 'ACTIVE' },
-    { id: 'WAIT', lab: 'IN ZONE' },
+    { id: 'RECLAIM', lab: 'RECLAIM' },
+    { id: 'RETEST', lab: 'RETEST' },
+    { id: 'WAIT_RETEST', lab: 'WAIT RETEST' },
     { id: 'APPROACHING', lab: 'APPROACHING' },
     { id: 'NO_CHASE', lab: 'NO CHASE' },
     { id: 'NEAR', lab: 'CLOSE TO BREAK' },
@@ -53,6 +55,15 @@
     if (n >= 0.01) return n.toFixed(6);
     if (n >= 1e-6) return n.toFixed(8);
     return n.toExponential(3);
+  }
+  function triggerTxt(e) {
+    const st = String((e && e.state) || '');
+    if (!e || !e.level || st === 'NO_SETUP' || st === 'NEAR' || st === 'WARMING' || !st)
+      return '—';
+    if (st === 'ACTIVE') return px(e.trigger) + ' held';
+    if (st === 'RECLAIM') return px(e.trigger) + ' reclaimed · wait confirm';
+    if (st === 'RETEST') return 'At level · wait 5m reclaim close';
+    return 'Do not buy · retest then reclaim ' + px(e.trigger);
   }
   function tfLab(tf) {
     if (tf === '1M') return '1M';
@@ -173,7 +184,7 @@
       row('Support 1D', px(e.sup1d)) +
       row('Invalidation', px(e.inval)) +
       row('Exec TF', esc(e.execTf || '5m')) +
-      row('Trigger', px(e.trigger) + ' reclaim') +
+      row('Trigger', triggerTxt(e)) +
       row('Volume', e.volPass ? 'PASS' : 'WAIT') +
       row('Momentum', e.momPass ? 'PASS' : 'WAIT') +
       row('Confirm', e.confirm ? 'WINDOW' : e.entryPaint || 'WAIT') +
@@ -224,7 +235,9 @@
   function bandId(c) {
     const s = String((c && c.ew && c.ew.state) || 'NO_SETUP');
     if (s === 'ACTIVE') return 'ACTIVE';
-    if (s === 'WAIT') return 'WAIT';
+    if (s === 'RECLAIM') return 'RECLAIM';
+    if (s === 'RETEST') return 'RETEST';
+    if (s === 'WAIT_RETEST' || s === 'WAIT') return 'WAIT_RETEST';
     if (s === 'APPROACHING') return 'APPROACHING';
     if (s === 'NO_CHASE') return 'NO_CHASE';
     if (s === 'NEAR') return 'NEAR';

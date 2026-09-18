@@ -1135,6 +1135,7 @@ export function entryWindow(args) {
   const bars4h = (args && args.bars4h) || [];
   const bars1d = (args && args.bars1d) || [];
   const barsTf = (args && args.barsTf) || [];
+  const open5m = (args && args.open5m) || null;
   const empty = {
     state: '',
     label: '',
@@ -1157,6 +1158,9 @@ export function entryWindow(args) {
     volPass: false,
     momPass: false,
     confirm: false,
+    left: false,
+    dipped: false,
+    reclaim: false,
     entryPaint: entry.paint || ''
   };
   empty.level = level;
@@ -1181,12 +1185,27 @@ export function entryWindow(args) {
           : 'No ' + String(tf).toUpperCase() + ' breakout on this saved CA yet.';
     return empty;
   }
-  const zoneLo = level > 0 ? level * 0.998 : 0;
-  const zoneHi = level > 0 ? level * (1 + EW_ZONE_HI_PCT / 100) : 0;
-  const ideal = level > 0 ? level * (1 + EW_IDEAL_PCT / 100) : 0;
+  const zoneLo = level > 0 ? level * 0.995 : 0;
+  const zoneHi = level > 0 ? level * 1.02 : 0;
+  const ideal = level > 0 ? level : 0;
   const inval = level > 0 ? level * 0.97 : 0;
+  const leaveAt = level > 0 ? level * 1.015 : 0;
   const extPct = level > 0 && spot > 0 ? ((spot - level) / level) * 100 : null;
   const distZonePct = zoneHi > 0 && spot > zoneHi ? ((spot - zoneHi) / zoneHi) * 100 : spot && zoneHi ? ((spot - zoneHi) / zoneHi) * 100 : null;
+  const swing = Math.max(
+    spot || 0,
+    ...bars5m.map((b) => +b.h || 0),
+    ...bars1h.slice(-12).map((b) => +b.h || 0)
+  );
+  const left = leaveAt > 0 && swing >= leaveAt;
+  const recent5 = bars5m.slice(-8);
+  const dipped = recent5.some((b) => +b.l > 0 && +b.l < level) || !!(open5m && +open5m.l > 0 && +open5m.l < level);
+  const last5 = recent5[recent5.length - 1];
+  const reclaimBar = !!(
+    (open5m && +open5m.l < level && +open5m.c >= level) ||
+    (last5 && +last5.l < level && +last5.c >= level)
+  );
+  const reclaim = !!(level > 0 && dipped && spot >= level && (reclaimBar || (last5 && +last5.c >= level)));
   const inZone = zoneLo > 0 && spot >= zoneLo && spot <= zoneHi;
   const volPass = (hit.volX || 0) >= 0.7 || (hit.buyR || 0) >= 1 || (hit.m5 || 0) >= 0.2;
   const momPass = (hit.m5 || 0) >= 0.2 || (hit.volX || 0) >= 1;
@@ -1196,10 +1215,10 @@ export function entryWindow(args) {
   const sup1h = rangeLowFromBars(bars1h, 24);
   const sup4h = rangeLowFromBars(bars4h.length ? bars4h : barsTf, 24);
   const sup1d = rangeLowFromBars(bars1d, 30);
-  let state = 'WAIT';
-  let label = 'WAIT';
+  let state = 'WAIT_RETEST';
+  let label = 'WAIT FOR RETEST';
   let color = '#e6c878';
-  let why = 'Price has not reached the pullback zone.';
+  let why = 'Break confirmed. Do not buy the break candle. Wait for price to leave, pull back to ' + fmtPx(level) + ', then reclaim.';
   if (entry.paint === 'FAILED') {
     state = 'INVALIDATED';
     label = 'INVALIDATED';
@@ -1210,33 +1229,50 @@ export function entryWindow(args) {
     label = 'INVALIDATED';
     color = '#ff6f7c';
     why = 'Price under invalidation ' + fmtPx(inval) + '. Higher-TF setup is done.';
-  } else if (stretched || (zoneHi > 0 && spot > zoneHi && (distZonePct == null || distZonePct > EW_APPROACH_PCT))) {
+  } else if (stretched && !inZone && !reclaim) {
     state = 'NO_CHASE';
     label = 'NO CHASE';
     color = '#ff6f7c';
     why =
       'Price is ' +
       (extPct != null ? extPct.toFixed(1) + '%' : '') +
-      ' above breakout. Setup can stay valid — do not enter here. Wait ' +
-      fmtPx(zoneLo) +
-      '–' +
-      fmtPx(zoneHi) +
+      ' above breakout. Break can stay valid — do not enter here. Wait retest of ' +
+      fmtPx(level) +
       '.';
-  } else if (zoneHi > 0 && spot > zoneHi && distZonePct != null && distZonePct <= EW_APPROACH_PCT) {
+  } else if (!left) {
+    state = 'WAIT_RETEST';
+    label = 'WAIT FOR RETEST';
+    color = '#e6c878';
+    why =
+      String(tf).toUpperCase() +
+      ' break is real. Price has not established above ' +
+      fmtPx(leaveAt) +
+      ' then returned. Not an entry.';
+  } else if (left && !inZone && spot > zoneHi && distZonePct != null && distZonePct > EW_APPROACH_PCT) {
+    state = 'NO_CHASE';
+    label = 'NO CHASE';
+    color = '#ff6f7c';
+    why = 'Left the level, still extended. Wait pullback to ' + fmtPx(zoneLo) + '–' + fmtPx(zoneHi) + '.';
+  } else if (left && !inZone && spot > zoneHi) {
     state = 'APPROACHING';
     label = 'APPROACHING';
     color = '#f0a060';
-    why = 'Price is ' + distZonePct.toFixed(1) + '% above the pullback zone. Watch ' + fmtPx(zoneHi) + '.';
-  } else if (inZone && confirm && volPass) {
+    why = 'Coming back toward the retest zone. Watch ' + fmtPx(zoneHi) + '.';
+  } else if (left && inZone && reclaim && confirm && volPass) {
     state = 'ACTIVE';
     label = 'ENTRY WINDOW ACTIVE';
     color = '#62e3a0';
-    why = 'Price in pullback zone and execution confirmation passed (existing WINDOW).';
-  } else if (inZone) {
-    state = 'WAIT';
-    label = 'IN ZONE · NO CONFIRM';
+    why = 'Retest + reclaim of ' + fmtPx(level) + ' and 1m/5m WINDOW passed. Only now is this an entry.';
+  } else if (left && inZone && reclaim) {
+    state = 'RECLAIM';
+    label = 'RECLAIM';
+    color = '#62e3a0';
+    why = 'Dipped under/at ' + fmtPx(level) + ' and closed back above. Wait 1m/5m WINDOW confirm. Not yet.';
+  } else if (left && inZone) {
+    state = 'RETEST';
+    label = 'RETEST';
     color = '#e6c878';
-    why = 'Price reached the pullback zone. Volume/momentum/1m hold not confirmed yet — not an entry.';
+    why = 'Pullback reached ' + fmtPx(zoneLo) + '–' + fmtPx(zoneHi) + '. Need a 5m reclaim close above ' + fmtPx(level) + '.';
   } else if (hit.age >= 8 && zoneHi > 0 && spot > zoneHi) {
     state = 'EXPIRED';
     label = 'EXPIRED';
@@ -1265,6 +1301,9 @@ export function entryWindow(args) {
     volPass,
     momPass,
     confirm,
+    left,
+    dipped,
+    reclaim,
     entryPaint: entry.paint || ''
   };
 }
@@ -2110,7 +2149,8 @@ export class Engine {
       bars1h: this.store.bars(row.ca, '1h', 30),
       bars4h: this.store.bars(row.ca, '4h', 30),
       bars1d: this.store.bars(row.ca, '1d', 40),
-      barsTf: this.store.bars(row.ca, tf, 30)
+      barsTf: this.store.bars(row.ca, tf, 30),
+      open5m: this.store.openBar(row.ca, '5m')
     });
     this.persistEw(hit);
     this.touchEwPaper(hit);
@@ -2625,7 +2665,14 @@ export class Engine {
     const ew = hit && hit.ew;
     if (!ew || !ew.state) return false;
     if (!this.alertsAllowed(hit.ca)) return false;
-    if (ew.state !== 'NO_CHASE' && ew.state !== 'APPROACHING' && ew.state !== 'ACTIVE' && ew.state !== 'INVALIDATED')
+    if (
+      ew.state !== 'NO_CHASE' &&
+      ew.state !== 'APPROACHING' &&
+      ew.state !== 'RETEST' &&
+      ew.state !== 'RECLAIM' &&
+      ew.state !== 'ACTIVE' &&
+      ew.state !== 'INVALIDATED'
+    )
       return false;
     if (ew.state === 'INVALIDATED' && hit.entry && hit.entry.paint === 'FAILED') return false;
     const key = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase() + '|ew|' + ew.state;
