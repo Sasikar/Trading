@@ -17,11 +17,22 @@
   try {
     ewTf = localStorage.getItem('ew_tf') || 'all';
   } catch (e) {}
-  let selCa = '';
+  let selState = '';
   try {
-    selCa = (localStorage.getItem('ew_ca') || '').toLowerCase();
+    selState = localStorage.getItem('ew_state') || '';
   } catch (e) {}
   let lastCards = [];
+  const EW_BANDS = [
+    { id: 'ACTIVE', lab: 'ACTIVE' },
+    { id: 'WAIT', lab: 'IN ZONE' },
+    { id: 'APPROACHING', lab: 'APPROACHING' },
+    { id: 'NO_CHASE', lab: 'NO CHASE' },
+    { id: 'NEAR', lab: 'CLOSE TO BREAK' },
+    { id: 'INVALIDATED', lab: 'INVALIDATED' },
+    { id: 'EXPIRED', lab: 'EXPIRED' },
+    { id: 'WARMING', lab: 'WARMING' },
+    { id: 'NO_SETUP', lab: 'NO BREAKOUT' }
+  ];
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -203,86 +214,88 @@
   }
 
 
-  function groupsOf(cards) {
-    const map = [];
-    const ix = {};
-    (cards || []).forEach(function (c) {
-      const k = String(c.ca || '').toLowerCase();
-      if (!k) return;
-      if (ix[k] == null) {
-        ix[k] = map.length;
-        map.push({ ca: k, name: c.name, list: [] });
-      }
-      map[ix[k]].list.push(c);
-      map[ix[k]].name = c.name || map[ix[k]].name;
-    });
-    return map;
-  }
 
-  function syncEwPad() {
-    const bar = document.querySelector('#entrywindow-panel .ew-sticky');
-    const pad = $('ew-sticky-pad');
-    if (!bar || !pad) return;
-    const h = Math.max(48, bar.offsetHeight || 0);
-    pad.style.height = h + 'px';
+  function bandId(c) {
+    const s = String((c && c.ew && c.ew.state) || 'NO_SETUP');
+    if (s === 'ACTIVE') return 'ACTIVE';
+    if (s === 'WAIT') return 'WAIT';
+    if (s === 'APPROACHING') return 'APPROACHING';
+    if (s === 'NO_CHASE') return 'NO_CHASE';
+    if (s === 'NEAR') return 'NEAR';
+    if (s === 'INVALIDATED') return 'INVALIDATED';
+    if (s === 'EXPIRED') return 'EXPIRED';
+    if (s === 'WARMING') return 'WARMING';
+    return 'NO_SETUP';
+  }
+  function countsOf(cards) {
+    const n = {};
+    EW_BANDS.forEach(function (b) { n[b.id] = 0; });
+    (cards || []).forEach(function (c) {
+      const id = bandId(c);
+      n[id] = (n[id] || 0) + 1;
+    });
+    return n;
+  }
+  function pickDefaultState(cards) {
+    const n = countsOf(cards);
+    for (let i = 0; i < EW_BANDS.length; i++) {
+      if (n[EW_BANDS[i].id] > 0) return EW_BANDS[i].id;
+    }
+    return 'NO_SETUP';
   }
   function paintLooking() {
     const el = $('ew-looking');
     if (!el) return;
-    const gs = groupsOf(lastCards);
-    const g = gs.filter(function (x) {
-      return x.ca === selCa;
-    })[0];
-    const coin = g ? g.name : '';
+    const band = EW_BANDS.filter(function (b) { return b.id === selState; })[0];
     el.innerHTML =
-      (coin ? esc(coin) + ' · ' : '') +
       'Looking at <b style="color:#62e3a0">' +
       (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
-      '</b><span> · change TF above · card below</span>';
+      '</b><span> · ' +
+      (band ? band.lab : 'state') +
+      '</span>';
   }
-  function paintCoins(cards) {
-    const wrap = $('ew-coins');
+  function paintStateTabs(cards) {
+    const wrap = $('ew-states');
     if (!wrap) return;
-    const gs = groupsOf(cards);
-    if (!gs.length) {
-      wrap.innerHTML = '<span style="font-size:12px;color:#8491a1">No saved CAs</span>';
-      return;
-    }
-    const have = gs.some(function (g) { return g.ca === selCa; });
-    if (!have) selCa = gs[0].ca;
-    wrap.innerHTML = gs
-      .map(function (g) {
-        const on = g.ca === selCa;
-        return (
-          '<button type="button" class="ew-coin' +
-          (on ? ' on' : '') +
-          '" data-ca="' +
-          esc(g.ca) +
-          '">' +
-          esc(g.name) +
-          '</button>'
-        );
-      })
-      .join('');
+    const n = countsOf(cards);
+    if (!selState || !(n[selState] > 0)) selState = pickDefaultState(cards);
+    wrap.innerHTML = EW_BANDS.map(function (b) {
+      const on = b.id === selState;
+      const c = n[b.id] || 0;
+      const dim = c ? '' : 'opacity:.45';
+      return (
+        '<button type="button" class="ew-st' +
+        (on ? ' on' : '') +
+        '" data-ew-st="' +
+        b.id +
+        '" style="' +
+        dim +
+        '">' +
+        b.lab +
+        ' <b>' +
+        c +
+        '</b></button>'
+      );
+    }).join('');
     syncEwPad();
   }
   function paintDetail(cards) {
     const list = $('ew-list');
     if (!list) return;
-    const gs = groupsOf(cards);
-    const g = gs.filter(function (x) { return x.ca === selCa; })[0];
-    if (!g) {
-      list.innerHTML = '<div style="padding:12px;color:#8491a1;font-size:12px">Tap a coin above.</div>';
+    const rows = (cards || []).filter(function (c) { return bandId(c) === selState; });
+    if (!rows.length) {
+      list.innerHTML = '<div style="padding:12px;color:#8491a1;font-size:12px">No coins in this state on ' + (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) + '.</div>';
       return;
     }
-    list.innerHTML = g.list.map(renderCard).join('');
+    list.innerHTML = rows.map(renderCard).join('');
   }
-  function pickCoin(ca) {
-    selCa = String(ca || '').toLowerCase();
+  function pickState(id) {
+    selState = String(id || '');
     try {
-      localStorage.setItem('ew_ca', selCa);
+      localStorage.setItem('ew_state', selState);
     } catch (e) {}
-    paintCoins(lastCards);
+    paintStateTabs(lastCards);
+    paintLooking();
     paintDetail(lastCards);
   }
 
@@ -327,7 +340,7 @@
             nSetup +
             ' with a setup';
       lastCards = j.cards || [];
-      paintCoins(lastCards);
+      paintStateTabs(lastCards);
       paintLooking();
       paintDetail(lastCards);
       if (paper) paper.innerHTML = renderPaper(j.paper);
@@ -387,12 +400,12 @@
   };
 
 
-  const coins = document.getElementById('ew-coins');
-  if (coins) {
-    coins.addEventListener('click', function (ev) {
-      const b = ev.target && ev.target.closest && ev.target.closest('[data-ca]');
+  const states = document.getElementById('ew-states');
+  if (states) {
+    states.addEventListener('click', function (ev) {
+      const b = ev.target && ev.target.closest && ev.target.closest('[data-ew-st]');
       if (!b) return;
-      pickCoin(b.getAttribute('data-ca'));
+      pickState(b.getAttribute('data-ew-st'));
     });
   }
   const tabs = document.getElementById('tf-tabs');

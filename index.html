@@ -206,9 +206,10 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 .ew-sticky-tf::-webkit-scrollbar{height:0}
 .ew-looking{margin:0 0 10px;font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
 .ew-looking span{font-size:11px;font-weight:700;color:#8491a1;margin-left:6px}
-.ew-coins{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
-.ew-coin{padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.ew-coin.on{background:#1a9b6c;color:#fff;border-color:#1a9b6c}
+.ew-states{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ew-st{padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ew-st.on{background:#1a9b6c;color:#fff;border-color:#1a9b6c}
+.ew-st b{font-size:10px;margin-left:4px;opacity:.9}
 
 .mac-ref-sticky{
   position:sticky;top:52px;z-index:45;
@@ -1053,6 +1054,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
         <button type="button" class="ew-tf" data-ew-tf="1d" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1d')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1D</button>
         <button type="button" class="ew-tf" data-ew-tf="1w" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1w')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1W</button>
       </div>
+      <div class="ew-looking" id="ew-looking">Looking at ALL TF</div>
+      <div class="ew-states" id="ew-states"></div>
     </div>
 <section class="section">
   <div class="head">
@@ -1061,9 +1064,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
   <div class="card">
     <div style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:12px">Good setup is not buy-now. If price already ran, wait the printed pullback zone. ACTIVE only when price is in the zone and existing WINDOW confirmation passes.</div>
-    <div id="ew-sticky-pad" style="height:56px"></div>
-    <div class="ew-looking" id="ew-looking">Pick a TF · then a coin</div>
-    <div class="ew-coins" id="ew-coins"></div>
+    <div id="ew-sticky-pad" style="height:96px"></div>
     <div id="ew-list" style="display:flex;flex-direction:column;gap:10px"></div>
     <div style="margin-top:18px;font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">PAPER · BREAKOUT vs PULLBACK</div>
     <div id="ew-paper" style="margin-top:8px"></div>
@@ -1171,7 +1172,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="keep-tab.js?v=20260915-k2"></script>
 <script src="sentiment-tab.js?v=20260916-s7"></script>
 <script src="verdict-tab.js?v=20260915-v6"></script>
-<script src="entry-window-tab.js?v=20260917-ew6"></script>
+<script src="entry-window-tab.js?v=20260918-ew7"></script>
 <script src="position-tab.js?v=20260917-pm1"></script>
 <script src="site-nav.js?v=20260917-pm1"></script>
 </body></html>
