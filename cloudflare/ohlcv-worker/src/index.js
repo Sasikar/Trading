@@ -36,6 +36,11 @@ function storeFromSql(sql) {
   } catch (e) {
     /* Durable Object write quota: keep serving reads. */
   }
+  try {
+    sql.exec('ALTER TABLE ticks ADD COLUMN mcap REAL');
+  } catch (e) {
+    /* column already exists */
+  }
 
   const one = (q, ...b) => {
     try {
@@ -90,34 +95,61 @@ function storeFromSql(sql) {
         prev.h1 === tick.h1 &&
         prev.h6 === tick.h6 &&
         prev.liq === tick.liq &&
-        prev.vol5m === tick.vol5m
+        prev.vol5m === tick.vol5m &&
+        prev.mcap === tick.mcap
       ) {
         tickMem.set(k, tick);
         return;
       }
       tickMem.set(k, tick);
-      sql.exec(
-        `INSERT OR REPLACE INTO ticks
-         (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        k,
-        tick.t,
-        tick.price,
-        tick.vol5m,
-        tick.vol1h,
-        tick.vol24h,
-        tick.buys5m,
-        tick.sells5m,
-        tick.liq,
-        tick.m5,
-        tick.h1,
-        tick.h6,
-        tick.h24,
-        tick.pairAddress || '',
-        tick.dexUrl || '',
-        tick.chain || '',
-        tick.name || ''
-      );
+      try {
+        sql.exec(
+          `INSERT OR REPLACE INTO ticks
+           (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name,mcap)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          k,
+          tick.t,
+          tick.price,
+          tick.vol5m,
+          tick.vol1h,
+          tick.vol24h,
+          tick.buys5m,
+          tick.sells5m,
+          tick.liq,
+          tick.m5,
+          tick.h1,
+          tick.h6,
+          tick.h24,
+          tick.pairAddress || '',
+          tick.dexUrl || '',
+          tick.chain || '',
+          tick.name || '',
+          +tick.mcap || 0
+        );
+      } catch (e) {
+        sql.exec(
+          `INSERT OR REPLACE INTO ticks
+           (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          k,
+          tick.t,
+          tick.price,
+          tick.vol5m,
+          tick.vol1h,
+          tick.vol24h,
+          tick.buys5m,
+          tick.sells5m,
+          tick.liq,
+          tick.m5,
+          tick.h1,
+          tick.h6,
+          tick.h24,
+          tick.pairAddress || '',
+          tick.dexUrl || '',
+          tick.chain || '',
+          tick.name || ''
+        );
+      }
     },
     allTicks() {
       return all('SELECT * FROM ticks');

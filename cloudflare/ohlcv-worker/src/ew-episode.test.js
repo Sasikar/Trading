@@ -9,7 +9,9 @@ import {
   entryWindow,
   entryQuality,
   Engine,
-  MemoryStore
+  MemoryStore,
+  fmtUsdCompact,
+  alertPxMcLine
 } from './engine.js';
 
 const CA = 'Ai66catebreakoutxxxxxxxxxxxxxxxxxxxxxxxxpump';
@@ -405,4 +407,12 @@ test('CATE 2H example: LIVE break, freshness expired → BREAKOUT MISSED not NO 
   assert.equal(ew.state, 'MISSED');
   assert.equal(ew.label, 'BREAKOUT MISSED');
   assert.match(ew.why, /not opened in time/i);
+});
+
+test('alert line shows current price and compact MC', () => {
+  assert.equal(fmtUsdCompact(1.081e9), '$1.08B');
+  assert.equal(fmtUsdCompact(12.4e6), '$12.4M');
+  assert.equal(fmtUsdCompact(8500), '$8.5k');
+  assert.equal(fmtUsdCompact(0), '—');
+  assert.equal(alertPxMcLine({ spot: 0.1701, mcap: 2.4e6 }), 'Price 0.1701 · MC $2.40M');
 });

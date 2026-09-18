@@ -848,6 +848,31 @@ export function fmtPx(p) {
   return x.toExponential(3);
 }
 
+/** Compact USD: $12.4M / $1.08B / $850k — not a raw dollar string. */
+export function fmtUsdCompact(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x) || x <= 0) return '—';
+  if (x >= 1e9) {
+    const n = x / 1e9;
+    return '$' + (n >= 10 ? n.toFixed(1) : n.toFixed(2)) + 'B';
+  }
+  if (x >= 1e6) {
+    const n = x / 1e6;
+    return '$' + (n >= 10 ? n.toFixed(1) : n.toFixed(2)) + 'M';
+  }
+  if (x >= 1e3) {
+    const n = x / 1e3;
+    return '$' + (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + 'k';
+  }
+  return '$' + x.toFixed(2);
+}
+
+export function alertPxMcLine(src) {
+  const price = +((src && (src.spot || src.price)) || 0);
+  const mc = +((src && (src.mcap || src.mc)) || 0);
+  return 'Price ' + (fmtPx(price) || '—') + ' · MC ' + fmtUsdCompact(mc);
+}
+
 export function rangeHighFromBars(bars) {
   if (!bars || bars.length < 2) return 0;
   const prior = bars.slice(Math.max(0, bars.length - 1 - 20), bars.length - 1);
@@ -1613,6 +1638,7 @@ export function hitFrom(row, tick, det, tf, focus) {
     need: det.need || 0,
     tapeMin: det.bars ? Math.round(((det.bars || 0) * (TF_SEC[tf] || 0)) / 60) : 0,
     spot: tick ? tick.price : 0,
+    mcap: tick ? +tick.mcap || 0 : 0,
     liq: tick ? tick.liq : 0,
     m5: tick ? tick.m5 : 0,
     h1: tick ? tick.h1 : 0,
@@ -2094,6 +2120,7 @@ export class Engine {
     const title = '🚀 ' + name + ' · PARABOLIC';
     const msg = [
       name + ' (' + (chainIdOf(chain) === 'solana' ? 'SOL' : chainIdOf(chain) === 'ethereum' ? 'ETH' : String(chain).toUpperCase()) + ')',
+      alertPxMcLine(tick),
       p.why,
       'Dex 5m ' + pctStr(p.m5) + ' · 1h ' + pctStr(p.h1) + ' · 6h ' + pctStr(p.h6) + ' · 24h ' + pctStr(p.h24),
       'Do not wait for a higher-TF close. This is the smash.',
@@ -2139,6 +2166,7 @@ export class Engine {
     const msg = [
       hit.name + ' (' + (hit.chain === 'solana' ? 'SOL' : 'ETH') + ')',
       hit.state + ' · score ' + hit.score + '/100 · TF (' + tfu + ')',
+      alertPxMcLine(hit),
       '',
       'Why it fired',
       hit.why || 'Range break on ' + tf,
@@ -2206,6 +2234,7 @@ export class Engine {
     const msg = [
       hit.name + ' · BREAKOUT: ' + tfu + ' ' + (hit.section || hit.state || ''),
       'ENTRY: ' + e.paint,
+      alertPxMcLine(hit),
       '',
       e.why || '',
       e.internal ? 'Note: ' + e.internal : '',
@@ -2962,6 +2991,7 @@ export class Engine {
     const msg = [
       hit.name + ' · ' + String(hit.tf).toUpperCase(),
       ew.label,
+      alertPxMcLine({ spot: ew.spot || hit.spot, mcap: hit.mcap }),
       ew.why,
       '',
       'Breakout ' + fmtPx(ew.level) + ' · spot ' + fmtPx(ew.spot),
@@ -3047,6 +3077,7 @@ export class Engine {
     const msg = [
       name + ' · POSITION MONITOR',
       p.label,
+      alertPxMcLine({ spot: card.spot || (tick && tick.price), mcap: (tick && tick.mcap) || card.mcap }),
       p.why || '',
       'Dex 5m ' + pctStr(card.m5) + ' · 1h ' + pctStr(card.h1) + ' · vol ' + (card.volX != null ? Number(card.volX).toFixed(1) : '—') + 'x',
       card.stretched ? 'STRETCHED — existing-position monitor only.' : 'Existing-position monitor.',
