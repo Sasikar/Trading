@@ -226,16 +226,59 @@ for (const tf of EW_SETUP_TFS) {
     const now = breakT + tfMs(tf) + 3 * 3600e3;
     const det = detectTapeBreakout(bars, tf, tickAt(high * 1.003, now));
     const r = resolveEwEpisode({ ca: CA, tf, det, prev: null, dead: [], now });
-    assert.equal(r.action, 'none');
+    assert.equal(r.action, 'missed');
+    assert.equal(r.ep, null);
     const ew = entryWindow({
       hit: { tf, level: det.level, spot: high * 1.005, event: det.event, section: 'live' },
       episode: r.ep,
+      action: r.action,
       barsTf: bars
     });
-    assert.ok(ew.state === 'NO_SETUP' || ew.state === 'NEAR' || ew.state === 'WARMING');
+    assert.equal(ew.state, 'MISSED');
+    assert.equal(ew.label, 'BREAKOUT MISSED');
+    assert.notEqual(ew.state, 'NO_SETUP');
     assert.notEqual(ew.state, 'ACTIVE');
     assert.notEqual(ew.state, 'RETEST');
     assert.notEqual(ew.state, 'RECLAIM');
+    assert.notEqual(ew.state, 'WAIT_RETEST');
+  });
+
+  test(tf + ': genuine breakout outside freshness → BREAKOUT MISSED, not chase', () => {
+    const { bars, breakT, high } = strictBreakBars(tf, 0.08395);
+    const now = breakT + tfMs(tf) + EW_OPEN_MS + 1000;
+    const det = detectTapeBreakout(bars, tf, tickAt(0.08587, now));
+    assert.equal(det.event, 'NEW BREAKOUT');
+    assert.equal(det.strict, true);
+    const r = resolveEwEpisode({ ca: CA, tf, det, prev: null, dead: [], now });
+    assert.equal(r.action, 'missed');
+    const ew = entryWindow({
+      hit: { tf, level: det.level, spot: 0.08587, event: 'NEW BREAKOUT', section: 'live' },
+      episode: r.ep,
+      action: r.action
+    });
+    assert.equal(ew.state, 'MISSED');
+    assert.equal(ew.label, 'BREAKOUT MISSED');
+    assert.notEqual(ew.state, 'NO_SETUP');
+    assert.notEqual(ew.state, 'RETEST');
+    assert.notEqual(ew.state, 'RECLAIM');
+    assert.notEqual(ew.state, 'ACTIVE');
+  });
+
+  test(tf + ': no genuine breakout stays NO BREAKOUT', () => {
+    const { bars, high } = heldBarsOnly(tf, 0.08395);
+    const last = bars[bars.length - 1];
+    const now = last.t + tfMs(tf) + 1000;
+    const det = detectTapeBreakout(bars, tf, tickAt(last.c, now));
+    const r = resolveEwEpisode({ ca: CA, tf, det, prev: null, dead: [], now });
+    assert.equal(r.action, 'none');
+    const ew = entryWindow({
+      hit: { tf, level: det.level || high, spot: last.c, event: det.event, section: '' },
+      episode: r.ep,
+      action: r.action
+    });
+    assert.ok(ew.state === 'NO_SETUP' || ew.state === 'NEAR' || ew.state === 'WARMING');
+    assert.notEqual(ew.state, 'MISSED');
+    assert.notEqual(ew.state, 'WAIT_RETEST');
   });
 
   test(tf + ': invalidated + level moves >1% stays dead', () => {
@@ -331,4 +374,35 @@ for (const tf of EW_SETUP_TFS) {
 
 test('EW_SETUP_TFS matches Entry Window supported list', () => {
   assert.deepEqual(EW_SETUP_TFS, ['5m', '15m', '1h', '2h', '4h', '1d', '1w']);
+});
+
+test('EW_OPEN_MS is 20 minutes fixed for every EW TF', () => {
+  assert.equal(EW_OPEN_MS, 20 * 60e3);
+  for (const tf of EW_SETUP_TFS) {
+    const { bars, breakT, high } = strictBreakBars(tf, 0.08395);
+    const inside = breakT + tfMs(tf) + EW_OPEN_MS - 1000;
+    const outside = breakT + tfMs(tf) + EW_OPEN_MS + 1000;
+    const detIn = detectTapeBreakout(bars, tf, tickAt(0.08587, inside));
+    const detOut = detectTapeBreakout(bars, tf, tickAt(0.08587, outside));
+    assert.equal(resolveEwEpisode({ ca: CA, tf, det: detIn, prev: null, dead: [], now: inside }).action, 'open');
+    assert.equal(resolveEwEpisode({ ca: CA, tf, det: detOut, prev: null, dead: [], now: outside }).action, 'missed');
+  }
+});
+
+test('CATE 2H example: LIVE break, freshness expired → BREAKOUT MISSED not NO BREAKOUT', () => {
+  const tf = '2h';
+  const { bars, breakT } = strictBreakBars(tf, 0.08395);
+  const now = breakT + tfMs(tf) + EW_OPEN_MS + 60e3;
+  const det = detectTapeBreakout(bars, tf, tickAt(0.08587, now));
+  assert.equal(det.event, 'NEW BREAKOUT');
+  const r = resolveEwEpisode({ ca: CA, tf, det, prev: null, dead: [], now });
+  const ew = entryWindow({
+    hit: { tf, level: 0.08395, spot: 0.08587, event: 'NEW BREAKOUT', section: 'live' },
+    episode: r.ep,
+    action: r.action
+  });
+  assert.equal(r.action, 'missed');
+  assert.equal(ew.state, 'MISSED');
+  assert.equal(ew.label, 'BREAKOUT MISSED');
+  assert.match(ew.why, /not opened in time/i);
 });

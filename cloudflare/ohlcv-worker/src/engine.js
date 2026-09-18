@@ -28,6 +28,7 @@ export const AUTO_EVERY_MS = 5 * 60e3;
 export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'];
 /** Timeframes Entry Window actually serves (UI chips + /entry-window?tf=). */
 export const EW_SETUP_TFS = ['5m', '15m', '1h', '2h', '4h', '1d', '1w'];
+/** Fail-closed open window. Same 20 minutes on every EW TF — not scaled to candle size. */
 export const EW_OPEN_MS = 20 * 60e3;
 export const ALIGN_MIN = 2;
 export const KEEP_LONG_MS = 730 * 86400e3;
@@ -1197,6 +1198,9 @@ export function resolveEwEpisode(args) {
   if (strictNew && barT && level > 0 && ewBarClosedAgo(det, tf, now) <= EW_OPEN_MS) {
     return { ep: open(), action: 'open' };
   }
+  if (strictNew && barT && level > 0) {
+    return { ep: null, action: 'missed', level };
+  }
   return { ep: null, action: 'none' };
 }
 
@@ -1272,8 +1276,24 @@ export function entryWindow(args) {
     return empty;
   }
   if (!live) {
+    const missed = (args && args.action) === 'missed';
     const near = !!(hit.near || hit.event === 'CLOSE TO BREAK');
     const warming = !!(hit.warming || hit.state === 'WARMING');
+    if (missed) {
+      const lv = +level || 0;
+      empty.state = 'MISSED';
+      empty.label = 'BREAKOUT MISSED';
+      empty.color = '#f0a060';
+      empty.trigger = lv;
+      empty.why =
+        String(tf).toUpperCase() +
+        ' breakout confirmed' +
+        (lv > 0 ? ' at ' + fmtPx(lv) : '') +
+        ', but the Entry Window was not opened in time. Do not chase. Wait for a NEW ' +
+        String(tf).toUpperCase() +
+        ' breakout.';
+      return empty;
+    }
     empty.state = warming ? 'WARMING' : near ? 'NEAR' : 'NO_SETUP';
     empty.label = warming ? 'WARMING' : near ? 'CLOSE TO BREAK' : 'NO BREAKOUT';
     empty.color = near ? '#f0a060' : '#8491a1';
@@ -2295,6 +2315,7 @@ export class Engine {
     hit.ew = entryWindow({
       hit,
       episode: ep,
+      action: resolved.action,
       bars5m: this.store.bars(row.ca, '5m', 30),
       bars1h: this.store.bars(row.ca, '1h', 30),
       bars4h: this.store.bars(row.ca, '4h', 30),
@@ -2864,7 +2885,7 @@ export class Engine {
   touchEwPaper(hit) {
     const ew = hit && hit.ew;
     if (!ew || !ew.state) return;
-    if (ew.state === 'NO_SETUP' || ew.state === 'WARMING' || ew.state === 'NEAR') return;
+    if (ew.state === 'NO_SETUP' || ew.state === 'WARMING' || ew.state === 'NEAR' || ew.state === 'MISSED') return;
     const k = String(hit.ca || '').toLowerCase() + '|' + String(hit.tf || '').toLowerCase();
     let list = [];
     try {
@@ -3105,14 +3126,18 @@ export class Engine {
     const pickTfs = tfn === 'all' ? EW_SETUP_TFS.slice() : [tfn];
     const rank = {
       ACTIVE: 0,
-      APPROACHING: 1,
-      WAIT: 2,
-      NO_CHASE: 3,
-      NEAR: 4,
-      INVALIDATED: 5,
-      EXPIRED: 6,
-      WARMING: 7,
-      NO_SETUP: 8
+      RECLAIM: 1,
+      RETEST: 2,
+      WAIT_RETEST: 3,
+      WAIT: 3,
+      APPROACHING: 4,
+      NO_CHASE: 5,
+      MISSED: 6,
+      NEAR: 7,
+      INVALIDATED: 8,
+      EXPIRED: 9,
+      WARMING: 10,
+      NO_SETUP: 11
     };
     const slim = (h) => ({
       name: h.name,

@@ -34,6 +34,7 @@
     { id: 'WAIT_RETEST', lab: 'WAIT RETEST' },
     { id: 'APPROACHING', lab: 'APPROACHING' },
     { id: 'NO_CHASE', lab: 'NO CHASE' },
+    { id: 'MISSED', lab: 'BREAKOUT MISSED' },
     { id: 'NEAR', lab: 'CLOSE TO BREAK' },
     { id: 'INVALIDATED', lab: 'INVALIDATED' },
     { id: 'EXPIRED', lab: 'EXPIRED' },
@@ -61,7 +62,7 @@
     const st = String((e && e.state) || '');
     if (!e || !e.level || st === 'NO_SETUP' || st === 'NEAR' || st === 'WARMING' || !st)
       return '—';
-    if (st === 'INVALIDATED' || st === 'EXPIRED')
+    if (st === 'INVALIDATED' || st === 'EXPIRED' || st === 'MISSED')
       return 'Setup cancelled · wait NEW breakout';
     if (st === 'ACTIVE') return px(e.trigger) + ' held';
     if (st === 'RECLAIM') return px(e.trigger) + ' reclaimed · wait confirm';
@@ -244,6 +245,7 @@
     if (s === 'WAIT_RETEST' || s === 'WAIT') return 'WAIT_RETEST';
     if (s === 'APPROACHING') return 'APPROACHING';
     if (s === 'NO_CHASE') return 'NO_CHASE';
+    if (s === 'MISSED') return 'MISSED';
     if (s === 'NEAR') return 'NEAR';
     if (s === 'INVALIDATED') return 'INVALIDATED';
     if (s === 'EXPIRED') return 'EXPIRED';
