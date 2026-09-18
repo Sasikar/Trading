@@ -575,10 +575,10 @@ export function parabolicFromTick(tick) {
   const h1 = +(tick && tick.h1) || 0;
   const h6 = +(tick && tick.h6) || 0;
   const h24 = +(tick && tick.h24) || 0;
-  if (!(h1 >= 20 || m5 >= 10)) return { on: false, m5, h1, h6, h24 };
+  if (!(h1 >= 10 || m5 >= 10)) return { on: false, m5, h1, h6, h24 };
   const bits = [];
   if (m5 >= 10) bits.push('5m ' + pctStr(m5));
-  if (h1 >= 20) bits.push('1h ' + pctStr(h1));
+  if (h1 >= 10) bits.push('1h ' + pctStr(h1));
   if (h6 >= 25) bits.push('6h ' + pctStr(h6));
   if (h24 >= 40) bits.push('24h ' + pctStr(h24));
   return { on: true, m5, h1, h6, h24, why: 'Parabolic Dex tape · ' + bits.join(' · ') };
@@ -616,11 +616,14 @@ export function positionObserve(args) {
       });
     }
   }
-  if (m5 >= 2) {
+  if (m5 >= 2 || h1 >= 8) {
     events.push({
       type: 'ACCELERATION',
       label: 'ACCELERATION',
-      why: (m5 >= 0 ? '+' : '') + m5.toFixed(1) + '% / 5m · volume ' + (Number.isFinite(volX) ? volX.toFixed(1) : '—') + 'x. Existing-position monitor only.'
+      why:
+        h1 >= 8 && m5 < 2
+          ? (h1 >= 0 ? '+' : '') + h1.toFixed(1) + '% / 1h · 5m quiet. Dex hour expansion. Existing-position monitor only.'
+          : (m5 >= 0 ? '+' : '') + m5.toFixed(1) + '% / 5m · volume ' + (Number.isFinite(volX) ? volX.toFixed(1) : '—') + 'x. Existing-position monitor only.'
     });
   }
   if (ret15 >= 3) {
