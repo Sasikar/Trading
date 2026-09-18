@@ -30,6 +30,9 @@ export const ALIGN_TFS = ['5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w
 export const EW_SETUP_TFS = ['5m', '15m', '1h', '2h', '4h', '1d', '1w'];
 /** Fail-closed open window. Same 20 minutes on every EW TF — not scaled to candle size. */
 export const EW_OPEN_MS = 20 * 60e3;
+/** Parabolic + WOW DIP rows stay on the OMG tab this long. */
+export const OMG_KEEP_MS = 7 * 86400e3;
+export const OMG_MERGE_MS = 6 * 3600e3;
 export const ALIGN_MIN = 2;
 export const KEEP_LONG_MS = 730 * 86400e3;
 /** One Gecko 1D page per this interval. Auto Dex poll is 5m (1m on-demand). */
@@ -964,6 +967,45 @@ export function alertPxMcLine(src) {
   const price = +((src && (src.spot || src.price)) || 0);
   const mc = +((src && (src.mcap || src.mc)) || 0);
   return 'Price ' + (fmtPx(price) || '—') + ' · MC ' + fmtUsdCompact(mc);
+}
+
+export function pruneOmgLog(list, now) {
+  now = +now || Date.now();
+  return (list || []).filter((x) => now - (+x.at || 0) < OMG_KEEP_MS);
+}
+
+export function upsertOmgLog(list, entry, now) {
+  now = +now || Date.now();
+  const next = pruneOmgLog(list, now);
+  const k = String((entry && entry.k) || '');
+  if (!k) return next;
+  const row = Object.assign({}, entry, { lastAt: now, at: +(entry.at || now) });
+  const i = next.findIndex((x) => x.k === k && now - (+x.at || 0) < OMG_MERGE_MS);
+  if (i >= 0) {
+    const prev = next[i];
+    const kind = String(row.kind || prev.kind || '');
+    const peakH1 =
+      kind === 'PARABOLIC'
+        ? Math.max(+(prev.peakH1 != null ? prev.peakH1 : prev.h1) || -999, +row.h1 || -999)
+        : Math.min(+(prev.peakH1 != null ? prev.peakH1 : prev.h1) || 999, +row.h1 || 999);
+    const peakM5 =
+      kind === 'PARABOLIC'
+        ? Math.max(+(prev.peakM5 != null ? prev.peakM5 : prev.m5) || -999, +row.m5 || -999)
+        : Math.min(+(prev.peakM5 != null ? prev.peakM5 : prev.m5) || 999, +row.m5 || 999);
+    next[i] = Object.assign({}, prev, row, {
+      at: prev.at,
+      lastAt: now,
+      n: (prev.n || 1) + 1,
+      peakH1,
+      peakM5
+    });
+    return next.slice(-200);
+  }
+  row.n = 1;
+  row.peakH1 = +row.h1 || 0;
+  row.peakM5 = +row.m5 || 0;
+  next.push(row);
+  return next.slice(-200);
 }
 
 export function rangeHighFromBars(bars) {
@@ -3206,6 +3248,32 @@ export class Engine {
       note: 'WOW DIP · crash surveillance. Quiet coins hidden. Not a buy. Entry Window suppressed on AVOID.'
     };
   }
+  omgList() {
+    try {
+      const a = JSON.parse(this.store.getMeta('omg_log') || '[]') || [];
+      return Array.isArray(a) ? a : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  touchOmg(entry) {
+    const now = Date.now();
+    const list = upsertOmgLog(this.omgList(), entry, now);
+    this.store.setMeta('omg_log', JSON.stringify(list));
+    return list;
+  }
+  snapshotOmg() {
+    const now = Date.now();
+    const entries = pruneOmgLog(this.omgList(), now).slice().sort((a, b) => (+b.at || 0) - (+a.at || 0));
+    if (entries.length !== this.omgList().length) this.store.setMeta('omg_log', JSON.stringify(entries));
+    return {
+      entries,
+      n: entries.length,
+      keepDays: 7,
+      updated: new Date(now).toISOString(),
+      note: 'Parabolic + WOW DIP log. Kept 7 days. Not a buy board.'
+    };
+  }
   async maybeCrashAlert(row, card) {
     if (this.alertMode() === 'off') return false;
     if (!this.alertsAllowed(row && row.ca)) return false;
@@ -4305,6 +4373,47 @@ export class Engine {
           if (!avoid && (await this.maybeEntryAlert(hit))) nAlert++;
           if (!avoid && (await this.maybeEwAlert(hit))) nAlert++;
         }
+        const p = parabolicFromTick(tick);
+        if (p.on) {
+          this.touchOmg({
+            k: String(row.ca || '').toLowerCase() + '|parab',
+            kind: 'PARABOLIC',
+            name: tick.name || row.name,
+            ca: row.ca,
+            chain: tick.chain || row.chain,
+            dexUrl: tick.dexUrl || '',
+            spot: +tick.price || 0,
+            mcap: +tick.mcap || 0,
+            m5: p.m5,
+            h1: p.h1,
+            h6: p.h6,
+            h24: p.h24,
+            why: p.why
+          });
+        }
+        if (crash.status && crash.status !== 'QUIET') {
+          this.touchOmg({
+            k: String(row.ca || '').toLowerCase() + '|crash|' + (crash.severity || crash.status),
+            kind: 'WOWDIP',
+            name: crash.name || row.name,
+            ca: row.ca,
+            chain: crash.chain || row.chain,
+            dexUrl: crash.dexUrl || tick.dexUrl || '',
+            spot: crash.spot,
+            mcap: crash.mcap,
+            m5: crash.m5,
+            h1: crash.h1,
+            h6: crash.h6,
+            h24: crash.h24,
+            status: crash.status,
+            severity: crash.severity,
+            structural: !!crash.structural,
+            liqShock: !!crash.liqShock,
+            deadCat: !!crash.deadCat,
+            liq: crash.liq,
+            why: crash.why
+          });
+        }
         if (await this.maybeParabolicAlert(row, tick)) nAlert++;
         if (await this.maybePositionAlert(row, tick)) nAlert++;
         if (await this.maybeCrashAlert(row, crash)) nAlert++;
@@ -4621,6 +4730,12 @@ export async function handleApi(engine, request) {
     const out = engine.snapshotCrash();
     if (engine.lastErr) out.error = engine.lastErr;
     return json(out);
+  }
+  if (path === '/omg' || path === '/api/omg') {
+    try {
+      if (!(engine.store.getWatch() || []).length) await engine.refreshWatch();
+    } catch (e) {}
+    return json(engine.snapshotOmg());
   }
   if (path === '/entry-window' || path === '/api/entry-window') {
     const tf = (url.searchParams.get('tf') || '4h').toLowerCase();

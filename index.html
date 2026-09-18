@@ -310,7 +310,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card,#wowdip-panel .card,#omg-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 .hu-band-now{position:fixed;top:52px;left:0;right:0;z-index:80;display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:rgba(8,13,19,.96);border-bottom:1px solid #2a3644;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px #0006}
 .hu-band-now[hidden]{display:none!important}
 .hu-band-now b{font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
@@ -567,6 +567,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
   <button type="button" class="tab" data-tf="position">Position</button>
   <button type="button" class="tab" data-tf="wowdip">WOW DIP</button>
+  <button type="button" class="tab" data-tf="omg">OMG</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
@@ -1061,6 +1062,23 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="omg-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>OMG</h2><p>Parabolic + WOW DIP log · kept 7 days</p></div>
+    <span class="source" id="omg-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45;margin-bottom:10px">Every smash and dump on saved CAs stays here for a week. Same move updates in-place for 6 hours, then a new row. Not a buy list.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="omg-kind" data-omg="all" onclick="try{window.setOmgKind&&window.setOmgKind('all')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:11px;cursor:pointer">All</button>
+      <button type="button" class="omg-kind" data-omg="PARABOLIC" onclick="try{window.setOmgKind&&window.setOmgKind('PARABOLIC')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">Parabolic</button>
+      <button type="button" class="omg-kind" data-omg="WOWDIP" onclick="try{window.setOmgKind&&window.setOmgKind('WOWDIP')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">WOW DIP</button>
+    </div>
+    <div id="omg-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
 <div id="entrywindow-panel" class="trend-panel" style="display:none">
 <div class="ew-sticky">
       <div class="ew-sticky-tf">
@@ -1198,5 +1216,6 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="entry-window-tab.js?v=20260918-ew14"></script>
 <script src="position-tab.js?v=20260917-pm1"></script>
 <script src="crash-tab.js?v=20260918-wd2"></script>
-<script src="site-nav.js?v=20260918-wd1"></script>
+<script src="omg-tab.js?v=20260919-omg1"></script>
+<script src="site-nav.js?v=20260919-omg1"></script>
 </body></html>
