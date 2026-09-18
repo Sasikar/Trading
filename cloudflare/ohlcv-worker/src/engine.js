@@ -1849,7 +1849,7 @@ export class Engine {
     return closed.concat([open]);
   }
   async maybeParabolicAlert(row, tick) {
-    if (!this.alertsAllowed(row && row.ca)) return false;
+    if (this.alertMode() === 'off') return false;
     const p = parabolicFromTick(tick || {});
     if (!p.on) return false;
     const key = String(row.ca || '').toLowerCase() + '|parab';
@@ -2655,7 +2655,7 @@ export class Engine {
     return { cards, saved: cards.length, updated: new Date().toISOString(), note: 'Position monitor. STRETCHED never blinds this. Not entry alerts.' };
   }
   async maybePositionAlert(row, tick) {
-    if (!this.alertsAllowed(row && row.ca)) return false;
+    if (this.alertMode() === 'off') return false;
     const card = this.observePosition(row);
     const p = card.primary || {};
     if (!p.type || p.type === 'QUIET' || p.type === 'STRETCHED_WATCH') return false;
