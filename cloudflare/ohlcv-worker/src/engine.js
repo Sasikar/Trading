@@ -2820,6 +2820,12 @@ export class Engine {
     const ew = hit && hit.ew;
     let ep = resolved && resolved.ep ? Object.assign({}, resolved.ep) : null;
     if (!ep) return;
+    if (resolved && resolved.action === 'open') {
+      const k = this.ewEpisodeKey(ca, tf);
+      for (const s of ['NO_CHASE', 'APPROACHING', 'RETEST', 'RECLAIM', 'ACTIVE', 'INVALIDATED']) {
+        this.store.setAlert(k + '|ew|' + s, 0);
+      }
+    }
     if (ew) {
       ep.state = ew.state || ep.state;
       ep.left = !!(ep.left || ew.left);
@@ -3150,7 +3156,7 @@ export class Engine {
     return { ok: true, n };
   }
 
-  snapshotEntryWindow(tf) {
+  async snapshotEntryWindow(tf) {
     const tfn = String(tf || 'all').toLowerCase();
     const watch = this.store.getWatch() || [];
     const focus = this.store.getMeta('focus_ca') || '';
@@ -3183,11 +3189,17 @@ export class Engine {
       need: h.need,
       ew: h.ew || { state: 'NO_SETUP', label: 'NO BREAKOUT', color: '#8491a1', why: 'No entry window yet.' }
     });
+    const hits = [];
     const cards = watch.map((r) => {
-      if (tfn !== 'all') return slim(this.evaluateRow(r, tfn, focus));
+      if (tfn !== 'all') {
+        const h = this.evaluateRow(r, tfn, focus);
+        hits.push(h);
+        return slim(h);
+      }
       let best = null;
       for (const tf0 of pickTfs) {
         const h = this.evaluateRow(r, tf0, focus);
+        hits.push(h);
         const st = (h.ew && h.ew.state) || 'NO_SETUP';
         if (!best) {
           best = h;
@@ -3204,6 +3216,19 @@ export class Engine {
         (rank[(a.ew && a.ew.state) || 'NO_SETUP'] ?? 9) - (rank[(b.ew && b.ew.state) || 'NO_SETUP'] ?? 9) ||
         (b.ew && b.ew.extPct ? b.ew.extPct : 0) - (a.ew && a.ew.extPct ? a.ew.extPct : 0)
     );
+    for (const h of hits) {
+      const st = h.ew && h.ew.state;
+      if (st === 'ACTIVE' || st === 'RECLAIM' || st === 'RETEST' || st === 'INVALIDATED') {
+        try {
+          await this.maybeEwAlert(h);
+        } catch (e) {}
+      }
+      if (st === 'ACTIVE') {
+        try {
+          await this.maybeEntryAlert(h);
+        } catch (e) {}
+      }
+    }
     let paper = [];
     try {
       paper = JSON.parse(this.store.getMeta('ew_paper') || '[]') || [];
@@ -4411,7 +4436,7 @@ export async function handleApi(engine, request) {
     try {
       await engine.refreshSpotIfStale(20000);
     } catch (e) {}
-    const out = engine.snapshotEntryWindow(tf);
+    const out = await engine.snapshotEntryWindow(tf);
     if (engine.lastErr) out.error = engine.lastErr;
     const sr = +engine.store.getMeta('spot_refresh') || 0;
     out.spotAgeMs = sr ? Date.now() - sr : null;
