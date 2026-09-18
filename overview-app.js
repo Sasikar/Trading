@@ -5268,11 +5268,12 @@ function afNeedBars(tf){
   if(tf==='1d') return 20;
   return 30;
 }
-function afClassifyQuality(kl, tf){
+function afClassifyQuality(kl, tf, liveSpot){
   const need=afNeedBars(tf);
   if(!kl||kl.length<need) return {tag:'unknown', label:'Insufficient data', color:'#8491a1', scorePart:30, detail:'Need more closed candles ('+((kl&&kl.length)||0)+'/'+need+' on '+(tf||'').toUpperCase()+')'};
   const closes=kl.map(k=>+k[4]);
-  const spot=closes[closes.length-1];
+  const lastClose=closes[closes.length-1];
+  const spot=(+liveSpot>0)?+liveSpot:lastClose;
   const rsi=typeof calcRSI==='function'?calcRSI(closes,14):null;
   const e50=typeof emaArr==='function'?emaArr(closes,Math.min(50,closes.length-1)):[];
   const a50=e50[e50.length-1];
@@ -5293,7 +5294,7 @@ function afClassifyQuality(kl, tf){
   }catch(e){}
 
   const px=function(v){ return v!=null&&isFinite(v)?Number(v).toPrecision(6):'—'; };
-  const srLine='S $'+px(sup)+' / R $'+px(res)+' · spot $'+px(spot);
+  const srLine='S $'+px(sup)+' / R $'+px(res)+' · spot $'+px(spot)+(liveSpot>0?' (live)':'');
   let tag, label, color, scorePart, detail;
   if(stretched){
     tag='stretched'; label="🔴 Stretched / Extended — Don't chase"; color='#ff6f7c'; scorePart=40;
@@ -5315,6 +5316,43 @@ function afClassifyQuality(kl, tf){
   return {tag,label,color,scorePart,detail,rsi,aboveEma,sup,res,spot,stretched,nearSup,nearRes,broke};
 }
 
+async function afLiveSpot(asset){
+  asset=(asset||'btc').toLowerCase();
+  if(asset==='ca'){
+    if(coinPool && +coinPool.price>0) return +coinPool.price;
+    const ca=coinCA||(($('coin-ca')||{}).value||'').trim();
+    if(!ca) return 0;
+    try{
+      const r=await fetch('https://api.dexscreener.com/latest/dex/tokens/'+encodeURIComponent(ca),{cache:'no-store'});
+      const j=await r.json();
+      const pairs=j.pairs||[];
+      let best=0;
+      for(let i=0;i<pairs.length;i++){
+        const p=+pairs[i].priceUsd||0;
+        if(p>best) best=p;
+      }
+      if(best>0) return best;
+    }catch(e){}
+    try{
+      const base=(function(){try{if(window.BREAKOUT_API)return String(window.BREAKOUT_API).replace(/\/+$/,'');}catch(e){}return 'https://trading-ohlcv.sasipudi.workers.dev';})();
+      const r=await fetch(base+'/tick?ca='+encodeURIComponent(ca),{cache:'no-store'});
+      const j=await r.json();
+      const p=+(j.price||j.spot||(j.tick&&j.tick.price)||0);
+      if(p>0) return p;
+    }catch(e){}
+    return 0;
+  }
+  try{
+    const sym=asset==='eth'?'ETHUSDT':'BTCUSDT';
+    const j=await jget('https://api.binance.com/api/v3/ticker/price?symbol='+sym);
+    const p=+((j&&j.price)||0);
+    if(p>0) return p;
+  }catch(e){}
+  if(asset==='btc' && typeof fetchPrice==='function'){
+    try{ const p=await fetchPrice(); if(+p>0) return +p; }catch(e){}
+  }
+  return 0;
+}
 async function afAssess(){
   const asset=($('af-asset')&&$('af-asset').value)||'btc';
   const tf=($('af-tf')&&$('af-tf').value)||'4h';
@@ -5325,14 +5363,15 @@ async function afAssess(){
     const kl=await afGetKl(asset, tf);
     // closed only: drop last if live
     const closed=kl.length>2?kl.slice(0,-1):kl;
-    afQuality=afClassifyQuality(closed, tf);
+    const live=await afLiveSpot(asset);
+    afQuality=afClassifyQuality(closed, tf, live);
     afQuality.asset=asset; afQuality.tf=tf;
     if(box){
       box.innerHTML='<div style="font-size:16px;font-weight:900;color:'+afQuality.color+'">'+afQuality.label+'</div>'
         +'<div style="margin-top:8px;font-size:12px;color:#c5d0dc;line-height:1.5">'+afQuality.detail+'</div>'
-        +'<div style="margin-top:8px;font-size:11px;color:#8491a1">'+asset.toUpperCase()+' · '+(tf==='1M'?'1M':/m$/.test(tf)?tf:tf.toUpperCase())+' · closed candles · S/R + EMA50 extension</div>';
+        +'<div style="margin-top:8px;font-size:11px;color:#8491a1">'+asset.toUpperCase()+' · '+(tf==='1M'?'1M':/m$/.test(tf)?tf:tf.toUpperCase())+' · RSI/S/R from closed candles · spot is live Dex/ticker</div>';
     }
-    if($('af-source')) $('af-source').textContent='LIVE · '+asset.toUpperCase()+' '+tf.toUpperCase();
+    if($('af-source')) $('af-source').textContent='LIVE SPOT · '+asset.toUpperCase()+' '+tf.toUpperCase();
     afSaveState();
     afDecide();
   }catch(e){
