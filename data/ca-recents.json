@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-19T17:44:43.245Z",
+  "updated": "2026-09-19T17:46:54.914Z",
   "count": 19,
   "items": [
+    {
+      "chain": "eth",
+      "ca": "0x68BbEd6A47194EFf1CF514B50Ea91895597fc91E",
+      "name": "ANDY",
+      "base": "ANDY",
+      "t": 1789839943729,
+      "poolAddress": "0xa1bF0e900FB272089c9fd299EA14BFccb1D1C2c0",
+      "poolNetwork": "eth",
+      "poolLiq": 1545125.39,
+      "poolCachedAt": 1789839943729
+    },
     {
       "chain": "solana",
       "ca": "DtR4D9FtVoTX2569gaL837ZgrB6wNjj6tkmnX9Rdk9B2",
@@ -195,13 +206,6 @@
       "name": "TROLL",
       "base": "TROLL",
       "t": 1789213217514
-    },
-    {
-      "chain": "eth",
-      "ca": "0x68BbEd6A47194EFf1CF514B50Ea91895597fc91E",
-      "name": "ANDY",
-      "base": "ANDY",
-      "t": 1789209026079
     }
   ]
 }
