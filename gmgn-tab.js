@@ -39,6 +39,38 @@
     if (!Number.isFinite(n)) return '—';
     return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
   }
+  function clock(t) {
+    if (!+t) return '—';
+    const d = new Date(+t);
+    const p = (n) => (n < 10 ? '0' : '') + n;
+    return p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function inMin(t) {
+    if (!+t) return '';
+    const m = Math.round((+t - Date.now()) / 60000);
+    if (m <= 0) return 'due now';
+    if (m < 60) return 'in ' + m + 'm';
+    return 'in ' + Math.round(m / 60) + 'h';
+  }
+  function paintSched(j) {
+    const el = $('gmgn-sched');
+    if (!el) return;
+    const every = j.everyMin || 20;
+    const paused = j.until && +j.until > Date.now();
+    el.innerHTML =
+      '<div style="padding:12px;border-radius:12px;border:1px solid #243041;background:#0b121a;margin-bottom:10px">' +
+      '<div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">AUTO SCAN</div>' +
+      '<div style="margin-top:6px;font-size:14px;font-weight:900;color:#e8eef6">Every ' +
+      every +
+      ' min</div>' +
+      '<div style="margin-top:6px;font-size:12px;color:#c5d0dc">Last ' +
+      (j.at ? clock(j.at) + ' · ' + ago(j.at) : 'not yet') +
+      '</div>' +
+      '<div style="margin-top:2px;font-size:12px;color:#62e3a0">Next ' +
+      (j.next ? clock(j.next) + ' · ' + inMin(j.next) : 'on next worker tick') +
+      (paused ? ' · backoff' : '') +
+      '</div></div>';
+  }
   function ago(t) {
     if (!+t) return 'never';
     const s = Math.round((Date.now() - +t) / 1000);
@@ -165,14 +197,15 @@
     try {
       const j = await api('/gmgn' + (force ? '?force=1' : ''));
       const rows = inner === 'trend' ? j.trending || [] : j.hot || [];
+      paintSched(j);
       if (st)
         st.textContent =
           (j.at ? ago(j.at) : 'waiting') +
+          ' · next ' +
+          (j.next ? clock(j.next) : '—') +
           ' · ' +
           (inner === 'trend' ? (j.trending || []).length : (j.hot || []).length) +
-          ' coins · poll ' +
-          (j.everyMin || 20) +
-          'm' +
+          ' coins' +
           (j.err ? ' · ' + j.err : '');
       if (list)
         list.innerHTML = rows.length

@@ -3419,14 +3419,17 @@ export class Engine {
       trending = [];
     }
     const at = +this.store.getMeta('gmgn_at') || 0;
+    const until = +this.store.getMeta('gmgn_until') || 0;
+    const next = until && until > Date.now() ? until : at ? at + GMGN_EVERY_MS : 0;
     return {
       hot: Array.isArray(hot) ? hot : [],
       trending: Array.isArray(trending) ? trending : [],
       at,
-      next: at ? at + GMGN_EVERY_MS : 0,
+      next,
+      until,
       everyMin: Math.round(GMGN_EVERY_MS / 60000),
       err: this.store.getMeta('gmgn_err') || '',
-      note: 'GMGN hot searches + trending. SOL, 1h, volume + quality filter. Poll every 20 min (API weight 3+3).'
+      note: 'GMGN hot searches + trending. SOL, 1h, volume + quality filter. Auto scan every 20 min.'
     };
   }
   async refreshGmgn(now, force) {
