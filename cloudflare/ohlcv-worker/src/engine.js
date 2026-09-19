@@ -4,6 +4,22 @@
  */
 import { decisionCheck, pickDecisionHit } from './decision-check.js';
 import { GMGN_EVERY_MS, GMGN_MIN_GAP_MS, fetchGmgnHot, fetchGmgnTrending } from './gmgn.js';
+import {
+  FOMO_HOLD_MS,
+  FOMO_LEADERS_MS,
+  FOMO_MIN_GAP_MS,
+  FOMO_TOP100,
+  FOMO_API,
+  SOL_RPC,
+  TOKEN_PROGRAM,
+  TOKEN_2022,
+  parseFomoTop100,
+  slimFomoApiTrader,
+  mintsFromTokenAccounts,
+  newMints,
+  clusterBuys,
+  signalOf
+} from './fomo-wallets.js';
 export const WATCHLIST_DEFAULT = 'https://sasikar.github.io/Trading/data/ca-recents.json';
 export const WATCHLIST_FALLBACK =
   'https://raw.githubusercontent.com/Sasikar/Trading/master/data/ca-recents.json';
@@ -3456,6 +3472,220 @@ export class Engine {
       return { ok: false, error: m };
     }
   }
+  snapshotWallets() {
+    let leaders = [];
+    let buys = [];
+    try {
+      leaders = JSON.parse(this.store.getMeta('fomo_leaders') || '[]') || [];
+    } catch (e) {
+      leaders = [];
+    }
+    try {
+      buys = JSON.parse(this.store.getMeta('fomo_buys') || '[]') || [];
+    } catch (e) {
+      buys = [];
+    }
+    const clustered = clusterBuys(buys);
+    const signals = clustered.filter((c) => signalOf(c));
+    const at = +this.store.getMeta('fomo_at') || 0;
+    const leadAt = +this.store.getMeta('fomo_leaders_at') || 0;
+    return {
+      leaders: Array.isArray(leaders) ? leaders : [],
+      buys: clustered.slice(0, 40),
+      signals: signals.slice(0, 20),
+      at,
+      leadAt,
+      next: at ? at + FOMO_HOLD_MS : 0,
+      everyMin: Math.round(FOMO_HOLD_MS / 60000),
+      source: this.store.getMeta('fomo_src') || 'top100',
+      err: this.store.getMeta('fomo_err') || '',
+      note: 'FOMO top wallets. No public FOMO API — leaders from the public top-100 list, buys from on-chain token accounts. CA / Entry Window overlay only on saved coins.'
+    };
+  }
+  async fetchFomoLeaders() {
+    const key = String(this.env.FOMO_API_KEY || '').trim();
+    if (key) {
+      const r = await fetch(FOMO_API + '/v2/leaderboard/24h?limit=50', {
+        headers: { accept: 'application/json', authorization: 'Bearer ' + key }
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && (j.traders || j.leaderboard)) {
+        const list = j.traders || j.leaderboard || [];
+        this.store.setMeta('fomo_src', 'fomoapi');
+        return list.map((t, i) => slimFomoApiTrader(t, i + 1));
+      }
+    }
+    const r = await fetch(FOMO_TOP100, { headers: { accept: 'text/html', 'user-agent': 'MemeGateWalletTracker/1' } });
+    const html = await r.text();
+    if (!r.ok) throw new Error('top100 HTTP ' + r.status);
+    const rows = parseFomoTop100(html);
+    if (!rows.length) throw new Error('top100 parse empty');
+    this.store.setMeta('fomo_src', 'top100');
+    return rows;
+  }
+  async solTokenMints(wallet) {
+    const out = [];
+    for (const prog of [TOKEN_PROGRAM, TOKEN_2022]) {
+      const r = await fetch(SOL_RPC, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getTokenAccountsByOwner',
+          params: [wallet, { programId: prog }, { encoding: 'jsonParsed' }]
+        })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (j.error) throw new Error(String((j.error && j.error.message) || 'rpc'));
+      out.push.apply(out, mintsFromTokenAccounts(j));
+    }
+    return out;
+  }
+  overlaySaved(mint, row) {
+    const watch = this.store.getWatch() || [];
+    const hitRow = watch.find((w) => String(w.ca || '').toLowerCase() === String(mint || '').toLowerCase());
+    if (!hitRow) return row;
+    try {
+      const hit = this.evaluateRow(hitRow, '1h', '');
+      row.saved = true;
+      row.ew = (hit.ew && (hit.ew.label || hit.ew.state)) || '';
+      row.caState = hit.state || '';
+      row.name = hit.name || row.name;
+    } catch (e) {}
+    return row;
+  }
+  async refreshFomo(now, force) {
+    now = now || Date.now();
+    const last = +this.store.getMeta('fomo_at') || 0;
+    const leadAt = +this.store.getMeta('fomo_leaders_at') || 0;
+    if (force && last && now - last < FOMO_MIN_GAP_MS) return { skipped: true, gap: true };
+    const needLeaders = force || !leadAt || now - leadAt >= FOMO_LEADERS_MS;
+    const needHold = force || !last || now - last >= FOMO_HOLD_MS;
+    if (!needLeaders && !needHold) return { skipped: true, age: now - last };
+    try {
+      let leaders = [];
+      try {
+        leaders = JSON.parse(this.store.getMeta('fomo_leaders') || '[]') || [];
+      } catch (e) {
+        leaders = [];
+      }
+      if (needLeaders || !leaders.length) {
+        leaders = await this.fetchFomoLeaders();
+        this.store.setMeta('fomo_leaders', JSON.stringify(leaders));
+        this.store.setMeta('fomo_leaders_at', String(now));
+      }
+      let nBuy = 0;
+      if (needHold) {
+        let prevHold = {};
+        try {
+          prevHold = JSON.parse(this.store.getMeta('fomo_hold') || '{}') || {};
+        } catch (e) {
+          prevHold = {};
+        }
+        let buys = [];
+        try {
+          buys = JSON.parse(this.store.getMeta('fomo_buys') || '[]') || [];
+        } catch (e) {
+          buys = [];
+        }
+        buys = buys.filter((b) => now - (+b.at || 0) < 7 * 86400e3);
+        const wallets = leaders.filter((l) => l.sol).slice(0, 8);
+        const fresh = [];
+        for (let i = 0; i < wallets.length; i++) {
+          const w = wallets[i];
+          try {
+            const held = await this.solTokenMints(w.sol);
+            const prev = (prevHold[w.sol] && prevHold[w.sol].mints) || [];
+            const added = prev.length ? newMints(prev, held) : [];
+            prevHold[w.sol] = { mints: held.map((x) => x.mint).slice(0, 120), at: now };
+            for (let k = 0; k < added.length && k < 8; k++) {
+              fresh.push({ mint: added[k], handle: w.handle, wallet: w.sol, at: now });
+            }
+          } catch (e) {
+            this.logFail('fomo_rpc', String(e && e.message ? e.message : e).slice(0, 80));
+          }
+        }
+        if (fresh.length) {
+          const byCa = await fetchDexPairsForCas(
+            fresh.map((f) => f.mint),
+            12
+          );
+          for (let i = 0; i < fresh.length; i++) {
+            const f = fresh[i];
+            const pairs = byCa.get(f.mint);
+            if (pairs && !(pairs instanceof Error) && pairs[0]) {
+              const p = pickBestPair(pairs, 'solana', f.mint) || pairs[0];
+              f.name = (p.baseToken && p.baseToken.symbol) || f.mint.slice(0, 6);
+              f.liq = +((p.liquidity && p.liquidity.usd) || 0);
+              f.volume = +((p.volume && p.volume.h24) || 0);
+              f.mcap = +(p.fdv || p.marketCap || 0);
+              f.dexUrl = p.url || dexHref(f.mint, 'solana', '');
+            } else {
+              f.name = f.mint.slice(0, 6);
+              f.dexUrl = dexHref(f.mint, 'solana', '');
+            }
+            this.overlaySaved(f.mint, f);
+            buys.push(f);
+            nBuy++;
+          }
+        }
+        this.store.setMeta('fomo_hold', JSON.stringify(prevHold));
+        this.store.setMeta('fomo_buys', JSON.stringify(buys.slice(-300)));
+        this.store.setMeta('fomo_at', String(now));
+        try {
+          await this.maybeWalletAlert(clusterBuys(fresh.map((x) => this.overlaySaved(x.mint, x))));
+        } catch (e) {}
+      }
+      this.store.setMeta('fomo_err', '');
+      return { ok: true, leaders: leaders.length, buys: nBuy };
+    } catch (e) {
+      const m = String(e && e.message ? e.message : e).slice(0, 160);
+      this.store.setMeta('fomo_err', m);
+      this.logFail('fomo_err', m);
+      return { ok: false, error: m };
+    }
+  }
+  async maybeWalletAlert(clustered) {
+    if (this.alertMode() === 'off') return false;
+    const hits = (clustered || []).filter((c) => signalOf(c) === 'WATCHLIST' || signalOf(c) === 'CLUSTER');
+    if (!hits.length) return false;
+    const now = Date.now();
+    let n = 0;
+    const token = this.telegramToken();
+    if (!token) return false;
+    let chat = this.telegramChatId();
+    if (!chat) chat = await this.resolveTelegramChat();
+    if (!chat) return false;
+    for (let i = 0; i < hits.length && i < 3; i++) {
+      const c = hits[i];
+      const key = 'fomo|' + String(c.mint || '').toLowerCase() + '|' + signalOf(c);
+      if (now - this.store.getAlert(key) < 30 * 60e3) continue;
+      if (!this.alertsAllowed(c.mint)) continue;
+      const sig = signalOf(c);
+      const msg = [
+        'Wallet tracker — ' + (c.name || 'token') + ' · ' + sig,
+        (c.handles || []).slice(0, 6).map((h) => '@' + h).join(' ') + ' · ' + (c.wallets || []).length + ' wallets',
+        c.ew ? 'Entry Window ' + c.ew : '',
+        c.caState ? 'CA ' + c.caState : '',
+        alertPxMcLine({ spot: 0, mcap: c.mcap }),
+        'Not a buy. CA / Entry Window still decide.',
+        'CA: ' + c.mint,
+        c.dexUrl || dexHref(c.mint, 'solana', '')
+      ]
+        .filter(Boolean)
+        .join('\n');
+      try {
+        await sendTelegram(token, chat, msg);
+        this.store.setAlert(key, now);
+        n++;
+      } catch (e) {
+        this.markTelegramFail(e);
+        break;
+      }
+    }
+    return n > 0;
+  }
   snapshotDecisionHistory() {
     const now = Date.now();
     const list = this.decisionLog();
@@ -4786,6 +5016,13 @@ export class Engine {
         this.logFail('gmgn_err', m.slice(0, 180));
       }
       try {
+        await this.refreshFomo(now);
+      } catch (e) {
+        const m = String(e && e.message ? e.message : e);
+        this.store.setMeta('fomo_err', m);
+        this.logFail('fomo_err', m.slice(0, 180));
+      }
+      try {
         await this.maybeHolders(now);
       } catch (e) {
         const m = String(e && e.message ? e.message : e).slice(0, 120);
@@ -5088,6 +5325,19 @@ export async function handleApi(engine, request) {
       await engine.refreshGmgn(Date.now(), force);
     } catch (e) {}
     return json(engine.snapshotGmgn());
+  }
+  if (path === '/wallets' || path === '/api/wallets' || path === '/wallet-tracker' || path === '/api/wallet-tracker') {
+    const force = method === 'POST' || url.searchParams.get('force') === '1';
+    try {
+      if (force) {
+        await engine.refreshFomo(Date.now(), true);
+      } else if (!(+engine.store.getMeta('fomo_leaders_at') || 0)) {
+        const rows = await engine.fetchFomoLeaders();
+        engine.store.setMeta('fomo_leaders', JSON.stringify(rows));
+        engine.store.setMeta('fomo_leaders_at', String(Date.now()));
+      }
+    } catch (e) {}
+    return json(engine.snapshotWallets());
   }
   if (path === '/strategy' || path === '/api/strategy') {
     if (method === 'POST') {

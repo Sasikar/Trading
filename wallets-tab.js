@@ -1,4 +1,4 @@
-/* GMGN — hot searches + trending. Worker caches a 20 min poll. */
+/* Wallet tracker — FOMO leaders + on-chain buys. Not a buy signal. */
 (function () {
   function apiBase() {
     try {
@@ -13,11 +13,11 @@
   const $ = (id) => document.getElementById(id);
   let timer = null;
   let busy = false;
-  let inner = 'hot';
+  let inner = 'leaders';
   try {
-    inner = localStorage.getItem('gmgn_inner') || 'hot';
+    inner = localStorage.getItem('wt_inner') || 'leaders';
   } catch (e) {}
-  if (inner !== 'trend') inner = 'hot';
+  if (inner !== 'buys' && inner !== 'signals') inner = 'leaders';
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
       if (c === '&') return '&' + 'amp;';
@@ -29,47 +29,15 @@
   function usd(n) {
     n = +n;
     if (!(n > 0)) return '—';
-    if (n >= 1e9) return '$' + (n / 1e9).toFixed(n >= 10e9 ? 1 : 2) + 'B';
     if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 10e6 ? 1 : 2) + 'M';
     if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 100e3 ? 0 : 1) + 'k';
     return '$' + n.toFixed(0);
-  }
-  function pct(n) {
-    n = +n;
-    if (!Number.isFinite(n)) return '—';
-    return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
   }
   function clock(t) {
     if (!+t) return '—';
     const d = new Date(+t);
     const p = (n) => (n < 10 ? '0' : '') + n;
     return p(d.getHours()) + ':' + p(d.getMinutes());
-  }
-  function inMin(t) {
-    if (!+t) return '';
-    const m = Math.round((+t - Date.now()) / 60000);
-    if (m <= 0) return 'due now';
-    if (m < 60) return 'in ' + m + 'm';
-    return 'in ' + Math.round(m / 60) + 'h';
-  }
-  function paintSched(j) {
-    const el = $('gmgn-sched');
-    if (!el) return;
-    const every = j.everyMin || 20;
-    const paused = j.until && +j.until > Date.now();
-    el.innerHTML =
-      '<div style="padding:12px;border-radius:12px;border:1px solid #243041;background:#0b121a;margin-bottom:10px">' +
-      '<div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">AUTO SCAN</div>' +
-      '<div style="margin-top:6px;font-size:14px;font-weight:900;color:#e8eef6">Every ' +
-      every +
-      ' min</div>' +
-      '<div style="margin-top:6px;font-size:12px;color:#c5d0dc">Last ' +
-      (j.at ? clock(j.at) + ' · ' + ago(j.at) : 'not yet') +
-      '</div>' +
-      '<div style="margin-top:2px;font-size:12px;color:#62e3a0">Next ' +
-      (j.next ? clock(j.next) + ' · ' + inMin(j.next) : 'on next worker tick') +
-      (paused ? ' · backoff' : '') +
-      '</div></div>';
   }
   function ago(t) {
     if (!+t) return 'never';
@@ -108,7 +76,7 @@
       'showPitfalls',
       'showStrategy',
       'showDecisionCheck',
-      'showWallets'
+      'showGmgn'
     ].forEach(function (fn) {
       try {
         window[fn](false);
@@ -138,7 +106,7 @@
       'pitfalls-panel',
       'strategy-panel',
       'decision-panel',
-      'wallets-panel'
+      'gmgn-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
@@ -148,72 +116,87 @@
     });
   }
   function paintChips() {
-    document.querySelectorAll('.gmgn-tab').forEach(function (b) {
-      const on = b.getAttribute('data-gmgn') === inner;
+    document.querySelectorAll('.wt-tab').forEach(function (b) {
+      const on = b.getAttribute('data-wt') === inner;
       b.style.background = on ? '#1a9b6c' : '#121a24';
       b.style.color = on ? '#fff' : '#c5d0dc';
     });
   }
-  function renderCard(c) {
-    const col = +c.h1 >= 0 ? '#62e3a0' : '#ff6f7c';
+  function leaderCard(c) {
     return (
       '<div style="padding:14px;border-radius:14px;border:1px solid #243041;background:#0b121a">' +
-      '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
       '<div style="font-weight:900;font-size:16px;color:#e8eef6">#' +
       esc(c.rank) +
-      ' ' +
-      esc(c.name) +
+      ' @' +
+      esc(c.handle) +
       '</div>' +
-      '<div style="font-size:13px;font-weight:900;color:' +
-      col +
-      '">1h ' +
-      pct(c.h1) +
+      '<div style="font-size:13px;font-weight:800;color:#62e3a0">' +
+      usd(c.pnl) +
       '</div></div>' +
-      '<div style="margin-top:8px;font-size:12px;color:#c5d0dc">Vol ' +
-      usd(c.volume) +
-      ' · liq ' +
-      usd(c.liq) +
-      ' · MC ' +
-      usd(c.mcap) +
-      '</div>' +
-      '<div style="margin-top:4px;font-size:12px;color:#8491a1">Holders ' +
-      (c.holders ? Number(c.holders).toLocaleString() : '—') +
-      (c.visiting ? ' · heat ' + Number(c.visiting).toLocaleString() : '') +
-      (c.launchpad ? ' · ' + esc(c.launchpad) : '') +
+      '<div style="margin-top:8px;font-size:11px;color:#8491a1;word-break:break-all">' +
+      (c.sol ? 'SOL ' + esc(c.sol) : 'no SOL wallet') +
       '</div>' +
       '<div style="margin-top:8px;display:flex;gap:12px;flex-wrap:wrap">' +
-      (c.gmgnUrl
-        ? '<a href="' + esc(c.gmgnUrl) + '" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800;font-size:12px">GMGN</a>'
-        : '') +
-      (c.dexUrl
-        ? '<a href="' + esc(c.dexUrl) + '" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800;font-size:12px">DexScreener</a>'
-        : '') +
+      (c.fomoUrl ? '<a href="' + esc(c.fomoUrl) + '" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800;font-size:12px">FOMO</a>' : '') +
+      (c.solscan ? '<a href="' + esc(c.solscan) + '" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800;font-size:12px">Solscan</a>' : '') +
+      (c.gmgnUrl ? '<a href="' + esc(c.gmgnUrl) + '" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800;font-size:12px">GMGN</a>' : '') +
       '</div></div>'
+    );
+  }
+  function buyCard(c) {
+    return (
+      '<div style="padding:14px;border-radius:14px;border:1px solid #243041;background:#0b121a">' +
+      '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
+      '<div style="font-weight:900;font-size:16px;color:#e8eef6">' +
+      esc(c.name || c.mint) +
+      (c.saved ? ' · saved' : '') +
+      '</div>' +
+      '<div style="font-size:12px;color:#8491a1">' +
+      (c.handles || []).length +
+      ' traders</div></div>' +
+      '<div style="margin-top:6px;font-size:12px;color:#c5d0dc">' +
+      esc((c.handles || []).map(function (h) { return '@' + h; }).join(' ')) +
+      '</div>' +
+      '<div style="margin-top:6px;font-size:12px;color:#8491a1">liq ' +
+      usd(c.liq) +
+      ' · vol ' +
+      usd(c.volume) +
+      ' · MC ' +
+      usd(c.mcap) +
+      (c.ew ? ' · EW ' + esc(c.ew) : '') +
+      (c.caState ? ' · CA ' + esc(c.caState) : '') +
+      '</div>' +
+      (c.dexUrl
+        ? '<div style="margin-top:8px"><a href="' + esc(c.dexUrl) + '" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800;font-size:12px">DexScreener</a></div>'
+        : '') +
+      '</div>'
     );
   }
   async function load(force) {
     if (busy) return;
     busy = true;
-    const st = $('gmgn-status');
-    const list = $('gmgn-list');
+    const st = $('wt-status');
+    const list = $('wt-list');
     try {
-      const j = await api('/gmgn' + (force ? '?force=1' : ''));
-      const rows = inner === 'trend' ? j.trending || [] : j.hot || [];
-      paintSched(j);
+      const j = await api('/wallets' + (force ? '?force=1' : ''));
       if (st)
         st.textContent =
           (j.at ? ago(j.at) : 'waiting') +
           ' · next ' +
           (j.next ? clock(j.next) : '—') +
           ' · ' +
-          (inner === 'trend' ? (j.trending || []).length : (j.hot || []).length) +
-          ' coins' +
+          (j.source || '') +
           (j.err ? ' · ' + j.err : '');
+      let rows = [];
+      if (inner === 'signals') rows = j.signals || [];
+      else if (inner === 'buys') rows = j.buys || [];
+      else rows = j.leaders || [];
       if (list)
         list.innerHTML = rows.length
-          ? rows.map(renderCard).join('')
+          ? rows.map(inner === 'leaders' ? leaderCard : buyCard).join('')
           : '<div style="color:#8491a1;font-size:12px">' +
-            (j.err ? esc(j.err) : 'No GMGN rows yet. Worker polls every ' + (j.everyMin || 20) + ' min.') +
+            (j.err ? esc(j.err) : inner === 'leaders' ? 'No leaders yet. Worker loads the public top-100 list.' : 'No new buys yet. First scan stores holdings; the next 30m scan diffs them.') +
             '</div>';
       paintChips();
     } catch (e) {
@@ -223,14 +206,14 @@
     busy = false;
   }
   function setInner(id) {
-    inner = id === 'trend' ? 'trend' : 'hot';
+    inner = id === 'buys' || id === 'signals' ? id : 'leaders';
     try {
-      localStorage.setItem('gmgn_inner', inner);
+      localStorage.setItem('wt_inner', inner);
     } catch (e) {}
     load(false);
   }
-  function showGmgn(on) {
-    const p = $('gmgn-panel');
+  function showWallets(on) {
+    const p = $('wallets-panel');
     if (on) {
       hideOthers();
       if (p) {
@@ -240,7 +223,7 @@
       load(false);
       if (timer) clearInterval(timer);
       timer = setInterval(function () {
-        const onp = $('gmgn-panel');
+        const onp = $('wallets-panel');
         if (!onp || onp.style.display === 'none') return;
         load(false);
       }, 60000);
@@ -255,9 +238,9 @@
       }
     }
   }
-  window.showGmgn = showGmgn;
-  window.setGmgnInner = setInner;
-  window.refreshGmgnTab = function () {
+  window.showWallets = showWallets;
+  window.setWalletInner = setInner;
+  window.refreshWalletsTab = function () {
     load(true);
   };
   const tabs = document.getElementById('tf-tabs');
@@ -268,8 +251,8 @@
       setTimeout(function () {
         const act = document.querySelector('#tf-tabs .tab.active');
         const tf = act && act.getAttribute('data-tf');
-        if (tf === 'gmgn') showGmgn(true);
-        else showGmgn(false);
+        if (tf === 'wallets') showWallets(true);
+        else showWallets(false);
       }, 0);
     });
   }
