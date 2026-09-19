@@ -310,7 +310,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card,#wowdip-panel .card,#omg-panel .card,#pitfalls-panel .card,#strategy-panel .card,#decision-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card,#wowdip-panel .card,#omg-panel .card,#pitfalls-panel .card,#strategy-panel .card,#decision-panel .card,#gmgn-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 .hu-band-now{position:fixed;top:52px;left:0;right:0;z-index:80;display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:rgba(8,13,19,.96);border-bottom:1px solid #2a3644;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px #0006}
 .hu-band-now[hidden]{display:none!important}
 .hu-band-now b{font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
@@ -571,6 +571,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="pitfalls">Pitfalls</button>
   <button type="button" class="tab" data-tf="strategy">Strategy</button>
   <button type="button" class="tab" data-tf="decision">Decision Check</button>
+  <button type="button" class="tab" data-tf="gmgn">GMGN</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
@@ -1138,6 +1139,23 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="gmgn-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>GMGN</h2><p>Hot searches · trending · SOL 1h · volume + quality</p></div>
+    <span class="source" id="gmgn-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45;margin-bottom:10px">Worker polls GMGN every 20 min (2 API calls, weight 3 each). Keeps names with real volume and liquidity — not stables, not thin pools. Not a buy list.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="gmgn-tab" data-gmgn="hot" onclick="try{window.setGmgnInner&&window.setGmgnInner('hot')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:12px;cursor:pointer">Hot searches</button>
+      <button type="button" class="gmgn-tab" data-gmgn="trend" onclick="try{window.setGmgnInner&&window.setGmgnInner('trend')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Trending</button>
+      <button type="button" onclick="try{window.refreshGmgnTab&&window.refreshGmgnTab()}catch(e){}" style="padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer">Scan now</button>
+    </div>
+    <div id="gmgn-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
 <div id="entrywindow-panel" class="trend-panel" style="display:none">
 <div class="ew-sticky">
       <div class="ew-sticky-tf">
@@ -1279,5 +1297,6 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="pitfalls-tab.js?v=20260919-pf1"></script>
 <script src="strategy-tab.js?v=20260919-st1"></script>
 <script src="decision-tab.js?v=20260919-dc1"></script>
-<script src="site-nav.js?v=20260919-dc1"></script>
+<script src="gmgn-tab.js?v=20260919-g1"></script>
+<script src="site-nav.js?v=20260919-g1"></script>
 </body></html>

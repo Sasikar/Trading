@@ -62,7 +62,8 @@
       'showWowDip',
       'showOmg',
       'showPitfalls',
-      'showStrategy'
+      'showStrategy',
+      'showGmgn'
     ].forEach(function (fn) {
       try {
         window[fn](false);
@@ -90,7 +91,8 @@
       'wowdip-panel',
       'omg-panel',
       'pitfalls-panel',
-      'strategy-panel'
+      'strategy-panel',
+      'gmgn-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;

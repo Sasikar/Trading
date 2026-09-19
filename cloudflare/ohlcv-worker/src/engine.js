@@ -3,6 +3,7 @@
  * DexScreener is the quote tape. We own the candles.
  */
 import { decisionCheck, pickDecisionHit } from './decision-check.js';
+import { GMGN_EVERY_MS, GMGN_MIN_GAP_MS, fetchGmgnHot, fetchGmgnTrending } from './gmgn.js';
 export const WATCHLIST_DEFAULT = 'https://sasikar.github.io/Trading/data/ca-recents.json';
 export const WATCHLIST_FALLBACK =
   'https://raw.githubusercontent.com/Sasikar/Trading/master/data/ca-recents.json';
@@ -39,6 +40,7 @@ export const KEEP_LONG_MS = 730 * 86400e3;
 /** One Gecko 1D page per this interval. Auto Dex poll is 5m (1m on-demand). */
 export const GECKO_EVERY_MS = 3600e3;
 export const HOLDERS_EVERY_MS = 15 * 60e3;
+export { GMGN_EVERY_MS } from './gmgn.js';
 /** Hunter Dex discover + score. Not the 60s saved-CA tape. */
 export const HUNTER_EVERY_MS = 20 * 60e3;
 /** On-demand sentiment (CoinGecko + Binance listings). Not the 60s tape. */
@@ -3403,6 +3405,54 @@ export class Engine {
       note: 'Decision Check is not a buy or sell. Review execution conditions only.'
     };
   }
+  snapshotGmgn() {
+    let hot = [];
+    let trending = [];
+    try {
+      hot = JSON.parse(this.store.getMeta('gmgn_hot') || '[]') || [];
+    } catch (e) {
+      hot = [];
+    }
+    try {
+      trending = JSON.parse(this.store.getMeta('gmgn_trend') || '[]') || [];
+    } catch (e) {
+      trending = [];
+    }
+    const at = +this.store.getMeta('gmgn_at') || 0;
+    return {
+      hot: Array.isArray(hot) ? hot : [],
+      trending: Array.isArray(trending) ? trending : [],
+      at,
+      next: at ? at + GMGN_EVERY_MS : 0,
+      everyMin: Math.round(GMGN_EVERY_MS / 60000),
+      err: this.store.getMeta('gmgn_err') || '',
+      note: 'GMGN hot searches + trending. SOL, 1h, volume + quality filter. Poll every 20 min (API weight 3+3).'
+    };
+  }
+  async refreshGmgn(now, force) {
+    now = now || Date.now();
+    const last = +this.store.getMeta('gmgn_at') || 0;
+    const until = +this.store.getMeta('gmgn_until') || 0;
+    if (!force && until && now < until) return { skipped: true, paused: true };
+    if (!force && last && now - last < GMGN_EVERY_MS) return { skipped: true, age: now - last };
+    if (force && last && now - last < GMGN_MIN_GAP_MS) return { skipped: true, gap: true, age: now - last };
+    try {
+      const trending = await fetchGmgnTrending(this.env, '1h');
+      const hot = await fetchGmgnHot(this.env, '1h');
+      this.store.setMeta('gmgn_trend', JSON.stringify(trending));
+      this.store.setMeta('gmgn_hot', JSON.stringify(hot));
+      this.store.setMeta('gmgn_at', String(now));
+      this.store.setMeta('gmgn_until', '0');
+      this.store.setMeta('gmgn_err', '');
+      return { ok: true, trending: trending.length, hot: hot.length };
+    } catch (e) {
+      const m = String(e && e.message ? e.message : e).slice(0, 160);
+      this.store.setMeta('gmgn_err', m);
+      if (e && e.status === 429) this.store.setMeta('gmgn_until', String(now + GMGN_EVERY_MS));
+      this.logFail('gmgn_err', m);
+      return { ok: false, error: m };
+    }
+  }
   snapshotDecisionHistory() {
     const now = Date.now();
     const list = this.decisionLog();
@@ -4726,6 +4776,13 @@ export class Engine {
         this.logFail('hunter_err', m.slice(0, 180));
       }
       try {
+        await this.refreshGmgn(now);
+      } catch (e) {
+        const m = String(e && e.message ? e.message : e);
+        this.store.setMeta('gmgn_err', m);
+        this.logFail('gmgn_err', m.slice(0, 180));
+      }
+      try {
         await this.maybeHolders(now);
       } catch (e) {
         const m = String(e && e.message ? e.message : e).slice(0, 120);
@@ -5021,6 +5078,13 @@ export async function handleApi(engine, request) {
       await engine.refreshSpotIfStale(20000);
     } catch (e) {}
     return json(engine.snapshotDecisionCheck());
+  }
+  if (path === '/gmgn' || path === '/api/gmgn') {
+    const force = method === 'POST' || url.searchParams.get('force') === '1';
+    try {
+      await engine.refreshGmgn(Date.now(), force);
+    } catch (e) {}
+    return json(engine.snapshotGmgn());
   }
   if (path === '/strategy' || path === '/api/strategy') {
     if (method === 'POST') {
