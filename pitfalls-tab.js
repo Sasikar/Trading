@@ -67,7 +67,8 @@
       'showPositionMonitor',
       'showWowDip',
       'showOmg',
-      'showStrategy'
+      'showStrategy',
+      'showDecisionCheck'
     ].forEach(function (fn) {
       try {
         window[fn](false);
@@ -94,7 +95,8 @@
       'position-panel',
       'wowdip-panel',
       'omg-panel',
-      'strategy-panel'
+      'strategy-panel',
+      'decision-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;

@@ -115,7 +115,7 @@
   }
 
   function hideOthers() {
-    ['showBreakoutMemes', 'showHunter', 'showKeep', 'showHolders', 'showSentiment', 'showFailures', 'showInMemory', 'showVerdict', 'showPositionMonitor', 'showWowDip', 'showOmg', 'showPitfalls', 'showStrategy'].forEach(
+    ['showBreakoutMemes', 'showHunter', 'showKeep', 'showHolders', 'showSentiment', 'showFailures', 'showInMemory', 'showVerdict', 'showPositionMonitor', 'showWowDip', 'showOmg', 'showPitfalls', 'showStrategy', 'showDecisionCheck'].forEach(
       function (fn) {
         try {
           window[fn](false);
@@ -143,7 +143,8 @@
       'wowdip-panel',
       'omg-panel',
       'pitfalls-panel',
-      'strategy-panel'
+      'strategy-panel',
+      'decision-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;

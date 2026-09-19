@@ -2,6 +2,7 @@
  * Candle + breakout engine. Works in Cloudflare Workers and Node.
  * DexScreener is the quote tape. We own the candles.
  */
+import { decisionCheck, pickDecisionHit } from './decision-check.js';
 export const WATCHLIST_DEFAULT = 'https://sasikar.github.io/Trading/data/ca-recents.json';
 export const WATCHLIST_FALLBACK =
   'https://raw.githubusercontent.com/Sasikar/Trading/master/data/ca-recents.json';
@@ -3298,6 +3299,197 @@ export class Engine {
       note: 'Tap a coin → DexScreener token page (Website / Twitter).'
     };
   }
+  observeDecision(row, opts) {
+    const tick = (opts && opts.tick) || this.store.getTick(row.ca) || {};
+    let hitsByTf = (opts && opts.hitsByTf) || null;
+    if (!hitsByTf) {
+      hitsByTf = {};
+      const focus = this.store.getMeta('focus_ca') || '';
+      for (const tf of ['5m', '15m', '1h', '2h', '4h', '1d']) {
+        try {
+          hitsByTf[tf] = this.evaluateRow(row, tf, focus);
+        } catch (e) {}
+      }
+    }
+    const hit = pickDecisionHit(hitsByTf);
+    const crash = (opts && opts.crash) || this.observeCrash(row);
+    let paper = [];
+    try {
+      paper = JSON.parse(this.store.getMeta('ew_paper') || '[]') || [];
+    } catch (e) {
+      paper = [];
+    }
+    const card = decisionCheck({
+      hit,
+      hitsByTf,
+      tick,
+      crash,
+      parabolic: (opts && opts.parabolic) || parabolicFromTick(tick),
+      bars5m: this.store.bars(row.ca, '5m', 40),
+      paper,
+      now: Date.now()
+    });
+    card.name = tick.name || row.name || String(row.ca || '').slice(0, 8);
+    card.ca = row.ca;
+    card.chain = tick.chain || row.chain;
+    card.dexUrl = tick.dexUrl || '';
+    card.mcap = +tick.mcap || 0;
+    this.touchDecisionLog(row, card);
+    return card;
+  }
+  decisionLog() {
+    try {
+      const a = JSON.parse(this.store.getMeta('dc_log') || '[]') || [];
+      return Array.isArray(a) ? a : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  touchDecisionLog(row, card) {
+    if (!card || !card.overall) return;
+    const now = Date.now();
+    const k = String((row && row.ca) || card.ca || '').toLowerCase();
+    if (!k) return;
+    let list = this.decisionLog().filter((x) => now - (+x.at || 0) < 14 * 86400e3);
+    const last = list.filter((x) => x.ca === k).slice(-1)[0];
+    if (card.overall === 'CLEAR' && (!last || last.overall === 'CLEAR')) return;
+    if (last && last.overall === card.overall && now - (+last.at || 0) < 30 * 60e3) {
+      last.lastAt = now;
+      last.n = (last.n || 1) + 1;
+      last.spot = card.spot;
+      last.attention = card.attention;
+      this.store.setMeta('dc_log', JSON.stringify(list.slice(-400)));
+      return;
+    }
+    list.push({
+      k: k + '|dc|' + card.overall,
+      ca: k,
+      name: card.name,
+      overall: card.overall,
+      action: card.action,
+      tf: card.tf,
+      ewState: card.ewState,
+      caState: card.caState,
+      attention: card.attention,
+      internals: (card.checks || []).map((c) => c.internal).filter(Boolean),
+      spot: card.spot,
+      mcap: card.mcap,
+      at: now,
+      lastAt: now,
+      n: 1
+    });
+    this.store.setMeta('dc_log', JSON.stringify(list.slice(-400)));
+  }
+  snapshotDecisionCheck() {
+    const watch = this.store.getWatch() || [];
+    const cards = watch.map((r) => this.observeDecision(r));
+    const rank = { WAIT: 0, CHECK: 1, CLEAR: 2 };
+    cards.sort((a, b) => (rank[a.overall] ?? 9) - (rank[b.overall] ?? 9) || String(a.name).localeCompare(String(b.name)));
+    const nWait = cards.filter((c) => c.overall === 'WAIT').length;
+    const nCheck = cards.filter((c) => c.overall === 'CHECK').length;
+    const nClear = cards.filter((c) => c.overall === 'CLEAR').length;
+    let board = 'CLEAR';
+    if (nWait) board = 'WAIT';
+    else if (nCheck) board = 'CHECK';
+    return {
+      board,
+      nWait,
+      nCheck,
+      nClear,
+      cards,
+      saved: cards.length,
+      history: this.snapshotDecisionHistory(),
+      updated: new Date().toISOString(),
+      note: 'Decision Check is not a buy or sell. Review execution conditions only.'
+    };
+  }
+  snapshotDecisionHistory() {
+    const now = Date.now();
+    const list = this.decisionLog();
+    const byKind = {};
+    let nCheck = 0,
+      nWait = 0,
+      nClear = 0;
+    const after = { n: 0, plus20: 0, plus50: 0, minus20: 0 };
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
+      if (e.overall === 'CHECK') nCheck++;
+      else if (e.overall === 'WAIT') nWait++;
+      else if (e.overall === 'CLEAR') nClear++;
+      (e.internals || []).forEach((k) => {
+        if (!k) return;
+        byKind[k] = (byKind[k] || 0) + 1;
+      });
+      (e.attention || []).forEach((a) => {
+        const id = a && a.id;
+        if (!id) return;
+        byKind[id] = (byKind[id] || 0) + 1;
+      });
+      if (e.spot > 0 && now - (+e.at || 0) > 6 * 3600e3) {
+        const tick = this.store.getTick(e.ca);
+        const px = tick && +tick.price;
+        if (px > 0) {
+          const chg = ((px - e.spot) / e.spot) * 100;
+          after.n++;
+          if (chg >= 50) after.plus50++;
+          else if (chg >= 20) after.plus20++;
+          if (chg <= -20) after.minus20++;
+        }
+      }
+    }
+    return { nCheck, nWait, nClear, byKind, after, n: list.length };
+  }
+  async maybeDecisionAlert(row, card) {
+    if (this.alertMode() === 'off') return false;
+    if (!this.alertsAllowed(row && row.ca)) return false;
+    if (!card || !card.overall) return false;
+    const k = String(row.ca || '').toLowerCase();
+    const prevKey = k + '|dc|prev';
+    const prev = this.store.getMeta(prevKey) || 'CLEAR';
+    if (prev === card.overall) return false;
+    const trans = prev + '→' + card.overall;
+    if (!(trans === 'CLEAR→CHECK' || trans === 'CHECK→WAIT' || trans === 'WAIT→CLEAR' || trans === 'CLEAR→WAIT' || trans === 'WAIT→CHECK' || trans === 'CHECK→CLEAR')) {
+      this.store.setMeta(prevKey, card.overall);
+      return false;
+    }
+    const key = k + '|dc|' + trans;
+    const now = Date.now();
+    if (now - this.store.getAlert(key) < 30 * 60e3) {
+      this.store.setMeta(prevKey, card.overall);
+      return false;
+    }
+    const bits = (card.attention || []).slice(0, 3).map((a) => a.label + ': ' + a.why);
+    const title = 'Decision Check — ' + (card.name || row.name);
+    const msg = [
+      title,
+      card.overall + ' · ' + card.action,
+      alertPxMcLine({ spot: card.spot, mcap: card.mcap }),
+      bits.join('\n'),
+      card.extPct != null ? 'Price from breakout: ' + (card.extPct >= 0 ? '+' : '') + Number(card.extPct).toFixed(1) + '%' : '',
+      'Suggested action: ' + card.action,
+      'Not a buy or sell. CA / Entry Window still decide.',
+      'CA: ' + row.ca,
+      dexHref(row.ca, card.chain || row.chain, card.dexUrl)
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const token = this.telegramToken();
+    if (!token) return false;
+    try {
+      let chat = this.telegramChatId();
+      if (!chat) chat = await this.resolveTelegramChat();
+      if (!chat) return false;
+      await sendTelegram(token, chat, msg);
+      this.telegramErr = '';
+      this.store.setMeta('telegram_err', '');
+    } catch (e) {
+      this.markTelegramFail(e);
+      return false;
+    }
+    this.store.setAlert(key, now);
+    this.store.setMeta(prevKey, card.overall);
+    return true;
+  }
   strategyState() {
     let s = {};
     try {
@@ -4438,8 +4630,10 @@ export class Engine {
         }
         const crash = this.observeCrash(row, { commitLiq: true });
         const avoid = crash.status === 'AVOID';
+        const hitsByTf = {};
         for (const tf of tfsToCheck) {
           const hit = this.evaluateRow(row, tf, focus);
+          hitsByTf[tf] = hit;
           const long = tf === '1d' || tf === '1w' || tf === '1M';
           const justClosed = closed.some((c) => c.tf === tf);
           if (long && !justClosed) continue;
@@ -4491,6 +4685,8 @@ export class Engine {
         if (await this.maybeParabolicAlert(row, tick)) nAlert++;
         if (await this.maybePositionAlert(row, tick)) nAlert++;
         if (await this.maybeCrashAlert(row, crash)) nAlert++;
+        const dc = this.observeDecision(row, { hitsByTf, tick, crash, parabolic: p });
+        if (await this.maybeDecisionAlert(row, dc)) nAlert++;
       }
       if (scanned > 0) {
         this.rateLimitedUntil = 0;
@@ -4816,6 +5012,15 @@ export async function handleApi(engine, request) {
       if (!(engine.store.getWatch() || []).length) await engine.refreshWatch();
     } catch (e) {}
     return json(engine.snapshotPitfalls());
+  }
+  if (path === '/decision' || path === '/api/decision' || path === '/decision-check' || path === '/api/decision-check') {
+    try {
+      if (!(engine.store.getWatch() || []).length) await engine.refreshWatch();
+    } catch (e) {}
+    try {
+      await engine.refreshSpotIfStale(20000);
+    } catch (e) {}
+    return json(engine.snapshotDecisionCheck());
   }
   if (path === '/strategy' || path === '/api/strategy') {
     if (method === 'POST') {
