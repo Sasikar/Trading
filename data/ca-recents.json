@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-20T03:25:36.075Z",
-  "count": 28,
+  "updated": "2026-09-20T03:28:53.426Z",
+  "count": 29,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "Tqj8yFmagrg7oorpQkVGYR52r96RFTamvWfth9bpump",
+      "name": "KINS",
+      "base": "KINS",
+      "t": 1789874930809,
+      "poolAddress": "F42tZnKPavq1VUcrL6ymhc6YqVpt84fWwgzbNTv2wb3W",
+      "poolNetwork": "solana",
+      "poolLiq": 190221.85,
+      "poolCachedAt": 1789874930807
+    },
     {
       "chain": "solana",
       "ca": "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82",
