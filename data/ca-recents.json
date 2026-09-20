@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-20T02:39:36.710Z",
-  "count": 25,
+  "updated": "2026-09-20T02:39:52.610Z",
+  "count": 26,
   "items": [
+    {
+      "chain": "eth",
+      "ca": "0x95AF4aF910c28E8EcE4512BFE46F1F33687424ce",
+      "name": "MANYU",
+      "base": "MANYU",
+      "t": 1789871990839,
+      "poolAddress": "0xc4704f13d5E08b27B039d53873E813dD2fAD99d9",
+      "poolNetwork": "eth",
+      "poolLiq": 685180.56,
+      "poolCachedAt": 1789871990839
+    },
     {
       "chain": "eth",
       "ca": "0xaaeE1A9723aaDB7afA2810263653A34bA2C21C7a",
