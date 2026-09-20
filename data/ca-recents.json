@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-20T02:39:28.596Z",
-  "count": 24,
+  "updated": "2026-09-20T02:39:36.710Z",
+  "count": 25,
   "items": [
+    {
+      "chain": "eth",
+      "ca": "0xaaeE1A9723aaDB7afA2810263653A34bA2C21C7a",
+      "name": "Mog",
+      "base": "Mog",
+      "t": 1789871974717,
+      "poolAddress": "0xc2eaB7d33d3cB97692eCB231A5D0e4A649Cb539d",
+      "poolNetwork": "eth",
+      "poolLiq": 5500102.34,
+      "poolCachedAt": 1789871974717
+    },
     {
       "chain": "solana",
       "ca": "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
