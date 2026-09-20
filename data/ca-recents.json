@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-20T02:38:55.091Z",
-  "count": 23,
+  "updated": "2026-09-20T02:39:28.596Z",
+  "count": 24,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "0x6982508145454Ce325dDbE47a25d4ec3d2311933",
+      "name": "PEPE",
+      "base": "PEPE",
+      "t": 1789871955052,
+      "poolAddress": "0xA43fe16908251ee70EF74718545e4FE6C5cCEc9f",
+      "poolNetwork": "eth",
+      "poolLiq": 29964534.52,
+      "poolCachedAt": 1789871955051
+    },
     {
       "chain": "solana",
       "ca": "A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump",
