@@ -1,7 +1,29 @@
 {
-  "updated": "2026-09-20T02:37:30.731Z",
-  "count": 19,
+  "updated": "2026-09-20T02:38:07.957Z",
+  "count": 21,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
+      "name": "Fartcoin ",
+      "base": "Fartcoin ",
+      "t": 1789871884327,
+      "poolAddress": "Bzc9NZfMqkXR6fz1DBph7BDf9BroyEf6pnzESP7v5iiw",
+      "poolNetwork": "solana",
+      "poolLiq": 8106304.1,
+      "poolCachedAt": 1789871884326
+    },
+    {
+      "chain": "solana",
+      "ca": "8J69rbLTzWWgUJziFY8jeu5tDwEPBwUz4pKBMr5rpump",
+      "name": "WOJAK",
+      "base": "WOJAK",
+      "t": 1789871863630,
+      "poolAddress": "FDrY5i5kuadZ1ik8gPS26qjj9Rw9mpufXMegGC2HNSP7",
+      "poolNetwork": "solana",
+      "poolLiq": 363668.62,
+      "poolCachedAt": 1789871863629
+    },
     {
       "chain": "eth",
       "ca": "0x68BbEd6A47194EFf1CF514B50Ea91895597fc91E",
