@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-20T02:38:24.950Z",
+  "updated": "2026-09-20T02:38:38.791Z",
   "count": 22,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump",
+      "name": "Jotchua",
+      "base": "Jotchua",
+      "t": 1789871916709,
+      "poolAddress": "AKQyQgEifBBhQmANuKzrRuRGoKSkKBv8NVdccc87FrR8",
+      "poolNetwork": "solana",
+      "poolLiq": 200612.88,
+      "poolCachedAt": 1789871916708
+    },
     {
       "chain": "solana",
       "ca": "Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jpump",
@@ -177,17 +188,6 @@
       "poolNetwork": "solana",
       "poolLiq": 4503310,
       "poolCachedAt": 1789353674189
-    },
-    {
-      "chain": "solana",
-      "ca": "BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump",
-      "name": "Jotchua",
-      "base": "Jotchua",
-      "t": 1789347192923,
-      "poolAddress": "AKQyQgEifBBhQmANuKzrRuRGoKSkKBv8NVdccc87FrR8",
-      "poolNetwork": "solana",
-      "poolLiq": 182285.93,
-      "poolCachedAt": 1789347192922
     },
     {
       "chain": "eth",
