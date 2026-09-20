@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-20T02:38:07.957Z",
-  "count": 21,
+  "updated": "2026-09-20T02:38:24.950Z",
+  "count": 22,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "Df6yfrKC8kZE3KNkrHERKzAetSxbrWeniQfyJY4Jpump",
+      "name": "CHILLGUY",
+      "base": "CHILLGUY",
+      "t": 1789871902947,
+      "poolAddress": "93tjgwff5Ac5ThyMi8C4WejVVQq4tuMeMuYW1LEYZ7bu",
+      "poolNetwork": "solana",
+      "poolLiq": 1559590.97,
+      "poolCachedAt": 1789871902947
+    },
     {
       "chain": "solana",
       "ca": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump",
