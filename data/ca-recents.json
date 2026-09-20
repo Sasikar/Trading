@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-20T02:40:19.445Z",
-  "count": 27,
+  "updated": "2026-09-20T02:40:35.588Z",
+  "count": 28,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82",
+      "name": "BOME",
+      "base": "BOME",
+      "t": 1789872033276,
+      "poolAddress": "DSUvc5qf5LJHHV5e2tD184ixotSnCnwj7i4jJa4Xsrmt",
+      "poolNetwork": "solana",
+      "poolLiq": 16478947.02,
+      "poolCachedAt": 1789872033275
+    },
     {
       "chain": "eth",
       "ca": "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82",
