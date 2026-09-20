@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-20T02:38:38.791Z",
-  "count": 22,
+  "updated": "2026-09-20T02:38:55.091Z",
+  "count": 23,
   "items": [
+    {
+      "chain": "solana",
+      "ca": "A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump",
+      "name": "FWOG",
+      "base": "FWOG",
+      "t": 1789871933243,
+      "poolAddress": "AB1eu2L1Jr3nfEft85AuD2zGksUbam1Kr8MR3uM2sjwt",
+      "poolNetwork": "solana",
+      "poolLiq": 1384321.15,
+      "poolCachedAt": 1789871933242
+    },
     {
       "chain": "solana",
       "ca": "BcHEaaTCvycPwwsJ9yQTXdHP9X2gCLkznDbZ8VySpump",
