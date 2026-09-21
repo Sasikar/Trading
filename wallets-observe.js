@@ -19,18 +19,7 @@
     return +c.score || (c.wallets || []).length || 0;
   }
   function dexHref(mint) {
-    mint = String(mint || '').trim();
-    const web = 'https://dexscreener.com/solana/' + mint;
-    if (/android/i.test(navigator.userAgent || '')) {
-      return (
-        'intent://dexscreener.com/solana/' +
-        mint +
-        '#Intent;scheme=https;package=com.dexscreener;S.browser_fallback_url=' +
-        encodeURIComponent(web) +
-        ';end'
-      );
-    }
-    return web;
+    return 'https://dexscreener.com/solana/' + String(mint || '').trim();
   }
   function copyText(t) {
     t = String(t || '');
@@ -110,7 +99,7 @@
       const h = handles[i] || '';
       const w = wallets[i] || '';
       const label = h ? '@' + h : shortCa(w);
-      const copyVal = w || h;
+      const copyVal = h || '';
       bits.push(
         '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0">' +
           '<span>' +
@@ -135,7 +124,7 @@
       (c.mint
         ? '<div><a href="' +
           esc(dexHref(c.mint)) +
-          '" style="color:#6eb6ff;font-size:11px">Dex app</a></div>'
+          '" target="_blank" rel="noopener" style="color:#6eb6ff;font-size:11px">DexScreener</a></div>'
         : '') +
       '</td>' +
       '<td style="padding:10px 8px;border-bottom:1px solid #243041;text-align:center;font-weight:900;color:#e6c878">' +
