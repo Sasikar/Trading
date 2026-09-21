@@ -1,10 +1,10 @@
 /**
  * API-only Worker. Does NOT host GitHub Pages. No login gate.
- * GitHub Pages (sasikar.github.io/Trading) GETs this for breakout cards.
  */
 import { Engine, MemoryStore, handleApi, CORS, json, AUTO_EVERY_MS } from './engine.js';
 import { coinsAndCommon } from './fomo-wallets.js';
 import { buysFromHeliusTx, parseHeliusPayload, mergeEvents, scoreCoins, overlapOnly, watchSet, HELIUS_BUYS_KEY, HELIUS_SEEN_KEY } from './helius-coins.js';
+import { syncHeliusWebhook, HELIUS_HOOK_ID_KEY } from './helius-sync.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -34,9 +34,7 @@ Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
 
 function storeFromSql(sql) {
   try {
-    const has = [
-      ...sql.exec("SELECT 1 AS n FROM sqlite_master WHERE type='table' AND name='meta' LIMIT 1")
-    ];
+    const has = [...sql.exec("SELECT 1 AS n FROM sqlite_master WHERE type='table' AND name='meta' LIMIT 1")];
     if (!has.length) {
       sql.exec(`
     CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
@@ -61,35 +59,15 @@ function storeFromSql(sql) {
     );
   `);
     }
-  } catch (e) {
-    /* Durable Object write quota: keep serving reads. */
-  }
-  try {
-    sql.exec('ALTER TABLE ticks ADD COLUMN mcap REAL');
-  } catch (e) {
-    /* column already exists */
-  }
-
-  const one = (q, ...b) => {
-    try {
-      const it = sql.exec(q, ...b);
-      for (const row of it) return row;
-    } catch (e) {}
-    return null;
-  };
-  const all = (q, ...b) => {
-    try {
-      return [...sql.exec(q, ...b)];
-    } catch (e) {
-      return [];
-    }
-  };
+  } catch (e) {}
+  try { sql.exec('ALTER TABLE ticks ADD COLUMN mcap REAL'); } catch (e) {}
+  const one = (q, ...b) => { try { const it = sql.exec(q, ...b); for (const row of it) return row; } catch (e) {} return null; };
+  const all = (q, ...b) => { try { return [...sql.exec(q, ...b)]; } catch (e) { return []; } };
   const metaMem = new Map();
   const tickMem = new Map();
   const openMem = new Map();
   let watchJson = null;
   let lastOpenFlush = 0;
-
   return {
     getMeta(k) {
       if (metaMem.has(k)) return metaMem.get(k);
@@ -102,9 +80,7 @@ function storeFromSql(sql) {
       const s = String(v ?? '');
       if (metaMem.get(k) === s) return;
       metaMem.set(k, s);
-      try {
-        sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', k, s);
-      } catch (e) {}
+      try { sql.exec('INSERT OR REPLACE INTO meta (k, v) VALUES (?, ?)', k, s); } catch (e) {}
     },
     getTick(ca) {
       const k = ca.toLowerCase();
@@ -115,35 +91,13 @@ function storeFromSql(sql) {
     },
     setTick(ca, tick) {
       const k = ca.toLowerCase();
-      const prev = tickMem.get(k);
-      if (
-        prev &&
-        prev.price === tick.price &&
-        prev.m5 === tick.m5 &&
-        prev.h1 === tick.h1 &&
-        prev.h6 === tick.h6 &&
-        prev.liq === tick.liq &&
-        prev.vol5m === tick.vol5m &&
-        prev.mcap === tick.mcap
-      ) {
-        tickMem.set(k, tick);
-        return;
-      }
       tickMem.set(k, tick);
       try {
-        sql.exec(
-          `INSERT OR REPLACE INTO ticks
-           (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name,mcap)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          k, tick.t, tick.price, tick.vol5m, tick.vol1h, tick.vol24h, tick.buys5m, tick.sells5m, tick.liq, tick.m5, tick.h1, tick.h6, tick.h24, tick.pairAddress || '', tick.dexUrl || '', tick.chain || '', tick.name || '', +tick.mcap || 0
-        );
+        sql.exec(`INSERT OR REPLACE INTO ticks (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name,mcap) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, k, tick.t, tick.price, tick.vol5m, tick.vol1h, tick.vol24h, tick.buys5m, tick.sells5m, tick.liq, tick.m5, tick.h1, tick.h6, tick.h24, tick.pairAddress || '', tick.dexUrl || '', tick.chain || '', tick.name || '', +tick.mcap || 0);
       } catch (e) {
-        sql.exec(
-          `INSERT OR REPLACE INTO ticks
-           (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          k, tick.t, tick.price, tick.vol5m, tick.vol1h, tick.vol24h, tick.buys5m, tick.sells5m, tick.liq, tick.m5, tick.h1, tick.h6, tick.h24, tick.pairAddress || '', tick.dexUrl || '', tick.chain || '', tick.name || ''
-        );
+        try {
+          sql.exec(`INSERT OR REPLACE INTO ticks (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, k, tick.t, tick.price, tick.vol5m, tick.vol1h, tick.vol24h, tick.buys5m, tick.sells5m, tick.liq, tick.m5, tick.h1, tick.h6, tick.h24, tick.pairAddress || '', tick.dexUrl || '', tick.chain || '', tick.name || '');
+        } catch (e2) {}
       }
     },
     allTicks() { return all('SELECT * FROM ticks'); },
@@ -153,23 +107,13 @@ function storeFromSql(sql) {
       watchJson = j;
       try {
         sql.exec('DELETE FROM watch');
-        for (const r of rows || []) {
-          sql.exec('INSERT OR REPLACE INTO watch (ca, chain, name, poolAddress) VALUES (?,?,?,?)', r.ca, r.chain, r.name || '', r.poolAddress || '');
-        }
+        for (const r of rows || []) sql.exec('INSERT OR REPLACE INTO watch (ca, chain, name, poolAddress) VALUES (?,?,?,?)', r.ca, r.chain, r.name || '', r.poolAddress || '');
       } catch (e) {}
     },
     getWatch() {
-      if (watchJson) {
-        try {
-          const cached = JSON.parse(watchJson);
-          if (cached && cached.length) return cached;
-        } catch (e) {}
-      }
+      if (watchJson) { try { const cached = JSON.parse(watchJson); if (cached && cached.length) return cached; } catch (e) {} }
       const rows = all('SELECT ca, chain, name, poolAddress FROM watch');
-      if (rows && rows.length) {
-        watchJson = JSON.stringify(rows);
-        return rows;
-      }
+      if (rows && rows.length) { watchJson = JSON.stringify(rows); return rows; }
       return [];
     },
     openBar(ca, tf) {
@@ -211,10 +155,7 @@ function storeFromSql(sql) {
       sql.exec("DELETE FROM ohlcv WHERE tf IN ('5m','10m','15m','30m') AND t < ?", now - 30 * 86400e3);
       sql.exec("DELETE FROM ohlcv WHERE tf IN ('1d','1w','1M') AND t < ?", now - 730 * 86400e3);
     },
-    getAlert(key) {
-      const r = one('SELECT t FROM alerts WHERE k = ?', key);
-      return r ? r.t : 0;
-    },
+    getAlert(key) { const r = one('SELECT t FROM alerts WHERE k = ?', key); return r ? r.t : 0; },
     setAlert(key, t) {
       const r = one('SELECT t FROM alerts WHERE k = ?', key);
       if (r && r.t === t) return;
@@ -224,11 +165,7 @@ function storeFromSql(sql) {
 }
 
 export class OhlcvEngine {
-  constructor(ctx, env) {
-    this.ctx = ctx;
-    this.env = env;
-  }
-
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; }
   boot() {
     if (this.engine) return;
     try {
@@ -241,144 +178,97 @@ export class OhlcvEngine {
       this.engine.lastErr = 'sqlite: ' + String(e && e.message ? e.message : e).slice(0, 120);
     }
   }
-
   async ensureAlarm() {
     const next = await this.ctx.storage.getAlarm();
     const now = Date.now();
-    if (!next || next <= now + 2000) {
-      await this.ctx.storage.setAlarm(now + (AUTO_EVERY_MS || 300000));
-    }
+    if (!next || next <= now + 2000) await this.ctx.storage.setAlarm(now + (AUTO_EVERY_MS || 300000));
   }
-
   async alarm() {
-    try {
-      this.boot();
-      await this.engine.tick('auto');
-    } catch (e) {
-      try {
-        if (this.engine) this.engine.lastErr = String(e && e.message ? e.message : e);
-      } catch (e2) {}
+    try { this.boot(); await this.engine.tick('auto'); } catch (e) {
+      try { if (this.engine) this.engine.lastErr = String(e && e.message ? e.message : e); } catch (e2) {}
     }
-    try {
-      await this.ctx.storage.setAlarm(Date.now() + (AUTO_EVERY_MS || 300000));
-    } catch (e3) {}
+    try { await this.ctx.storage.setAlarm(Date.now() + (AUTO_EVERY_MS || 300000)); } catch (e3) {}
   }
-
-  async handleHelius(request) {
-    const secret = (this.env && this.env.HELIUS_WEBHOOK_SECRET) || '';
-    const url = new URL(request.url);
-    if (secret) {
-      const got = url.searchParams.get('secret') || request.headers.get('x-helius-secret') || '';
-      if (got !== secret) {
-        return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), {
-          status: 401,
-          headers: { ...CORS, 'content-type': 'application/json' }
-        });
-      }
+  leadersNow() {
+    let leaders = [];
+    try { leaders = JSON.parse(this.store.getMeta('fomo_leaders') || '[]') || []; } catch (e) {}
+    if (!leaders.length) {
+      try { leaders = (this.engine.snapshotWallets() || {}).leaders || []; } catch (e2) {}
     }
+    return leaders;
+  }
+  async handleHelius(request) {
+    const url = new URL(request.url);
     if (request.method === 'GET') {
       let n = 0;
-      try {
-        n = (JSON.parse(this.store.getMeta(HELIUS_BUYS_KEY) || '[]') || []).length;
-      } catch (e) {}
-      return new Response(JSON.stringify({ ok: true, path: '/helius', events: n }), {
-        status: 200,
-        headers: { ...CORS, 'content-type': 'application/json' }
-      });
+      try { n = (JSON.parse(this.store.getMeta(HELIUS_BUYS_KEY) || '[]') || []).length; } catch (e) {}
+      const wantSync = url.searchParams.get('sync') === '1';
+      let sync = { skipped: !wantSync };
+      if (wantSync) {
+        const id = this.store.getMeta(HELIUS_HOOK_ID_KEY) || '';
+        sync = await syncHeliusWebhook(this.env, this.leadersNow(), id);
+        if (sync.webhookId) this.store.setMeta(HELIUS_HOOK_ID_KEY, sync.webhookId);
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        path: '/helius',
+        events: n,
+        hasKey: !!(this.env && this.env.HELIUS_API_KEY),
+        sync
+      }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
     if (request.method !== 'POST') {
-      return new Response(JSON.stringify({ ok: false, error: 'POST only' }), {
-        status: 405,
-        headers: { ...CORS, 'content-type': 'application/json' }
-      });
+      return new Response(JSON.stringify({ ok: false, error: 'POST only' }), { status: 405, headers: { ...CORS, 'content-type': 'application/json' } });
     }
     let body = null;
-    try {
-      body = await request.json();
-    } catch (e) {
-      return new Response(JSON.stringify({ ok: true, ingested: 0 }), {
-        status: 200,
-        headers: { ...CORS, 'content-type': 'application/json' }
-      });
+    try { body = await request.json(); } catch (e) {
+      return new Response(JSON.stringify({ ok: true, ingested: 0 }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
-    let leaders = [];
-    try {
-      leaders = JSON.parse(this.store.getMeta('fomo_leaders') || '[]') || [];
-    } catch (e) {
-      leaders = [];
-    }
-    if (!leaders.length) {
-      try {
-        const snap = this.engine.snapshotWallets() || {};
-        leaders = snap.leaders || [];
-      } catch (e2) {}
-    }
+    const leaders = this.leadersNow();
     const watch = watchSet(leaders);
     const txs = parseHeliusPayload(body);
     const incoming = [];
     for (let i = 0; i < txs.length; i++) incoming.push(...buysFromHeliusTx(txs[i], watch));
-    let prev = [];
-    let seen = [];
-    try {
-      prev = JSON.parse(this.store.getMeta(HELIUS_BUYS_KEY) || '[]') || [];
-    } catch (e) {}
-    try {
-      seen = JSON.parse(this.store.getMeta(HELIUS_SEEN_KEY) || '[]') || [];
-    } catch (e) {}
+    let prev = []; let seen = [];
+    try { prev = JSON.parse(this.store.getMeta(HELIUS_BUYS_KEY) || '[]') || []; } catch (e) {}
+    try { seen = JSON.parse(this.store.getMeta(HELIUS_SEEN_KEY) || '[]') || []; } catch (e) {}
     const merged = mergeEvents(prev, incoming, seen);
     this.store.setMeta(HELIUS_BUYS_KEY, JSON.stringify(merged.events));
     this.store.setMeta(HELIUS_SEEN_KEY, JSON.stringify(merged.seen));
-    return new Response(JSON.stringify({ ok: true, ingested: incoming.length, stored: merged.events.length }), {
-      status: 200,
-      headers: { ...CORS, 'content-type': 'application/json' }
-    });
+    return new Response(JSON.stringify({ ok: true, ingested: incoming.length, stored: merged.events.length }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
   }
-
   async fetch(request) {
     const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
     if (path === '/health' || path === '/api/health') {
-      return new Response(
-        JSON.stringify({ ok: true, engine: 'ohlcv', ts: new Date().toISOString() }),
-        { status: 200, headers: { ...CORS, 'content-type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ ok: true, engine: 'ohlcv', ts: new Date().toISOString() }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
     try {
       this.boot();
       if (path !== '/holders' && path !== '/api/holders') {
-        try {
-          await this.ensureAlarm();
-        } catch (e) {}
+        try { await this.ensureAlarm(); } catch (e) {}
       }
-      if (path === '/helius' || path === '/api/helius') {
-        return this.handleHelius(request);
-      }
+      if (path === '/helius' || path === '/api/helius') return this.handleHelius(request);
       const out = await handleApi(this.engine, request);
       return new Response(out.body, { status: out.status, headers: out.headers });
     } catch (e) {
-      const msg = String(e && e.stack ? e.stack : e);
-      return new Response(JSON.stringify({ ok: false, error: msg }), {
-        status: 200,
-        headers: { ...CORS, 'content-type': 'application/json' }
-      });
+      return new Response(JSON.stringify({ ok: false, error: String(e && e.stack ? e.stack : e) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
   }
 }
 
 function stub(request) {
-  const id = 'https://ohlcv.local' + new URL(request.url).pathname + new URL(request.url).search;
-  return new Request(id, request);
+  return new Request('https://ohlcv.local' + new URL(request.url).pathname + new URL(request.url).search, request);
 }
 
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-    const id = env.ENGINE.idFromName('main');
-    const stubReq = stub(request);
-    return env.ENGINE.get(id).fetch(stubReq);
+    return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
   },
   async scheduled(event, env, ctx) {
-    const id = env.ENGINE.idFromName('main');
-    ctx.waitUntil(env.ENGINE.get(id).fetch(new Request('https://ohlcv.local/status')));
+    const stubId = env.ENGINE.get(env.ENGINE.idFromName('main'));
+    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/status')));
+    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/helius?sync=1')));
   }
 };
 
