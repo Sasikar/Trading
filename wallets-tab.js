@@ -1,4 +1,4 @@
-/* Wallet tracker — FOMO leaders + on-chain buys. Not a buy signal. */
+/* Wallet tracker — leaders + Helius overlap coins. Not a buy signal. */
 (function () {
   function apiBase() {
     try {
@@ -17,9 +17,10 @@
   try {
     inner = localStorage.getItem('wt_inner') || 'leaders';
   } catch (e) {}
-  if (inner !== 'buys' && inner !== 'signals') inner = 'leaders';
+  if (inner === 'buys' || inner === 'signals') inner = 'leaders';
+  if (inner !== 'coins' && inner !== 'common') inner = 'leaders';
   function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+    return String(s == null ? '' : s).replace(/[&<">]/g, function (c) {
       if (c === '&') return '&' + 'amp;';
       if (c === '<') return '&' + 'lt;';
       if (c === '>') return '&' + 'gt;';
@@ -61,53 +62,11 @@
   }
   function hideOthers() {
     [
-      'showBreakoutMemes',
-      'showHunter',
-      'showKeep',
-      'showHolders',
-      'showSentiment',
-      'showFailures',
-      'showInMemory',
-      'showVerdict',
-      'showEntryWindow',
-      'showPositionMonitor',
-      'showWowDip',
-      'showOmg',
-      'showPitfalls',
-      'showStrategy',
-      'showDecisionCheck',
-      'showGmgn'
+      'showBreakoutMemes','showHunter','showKeep','showHolders','showSentiment','showFailures','showInMemory','showVerdict','showEntryWindow','showPositionMonitor','showWowDip','showOmg','showPitfalls','showStrategy','showDecisionCheck','showGmgn'
     ].forEach(function (fn) {
-      try {
-        window[fn](false);
-      } catch (e) {}
+      try { window[fn](false); } catch (e) {}
     });
-    [
-      'tf-panels',
-      'trend-panel',
-      'struct-panel',
-      'macro-panel',
-      'signal-panel',
-      'memegate-panel',
-      'coin-panel',
-      'antifomo-panel',
-      'hunter-panel',
-      'breakouts-panel',
-      'holders-panel',
-      'failures-panel',
-      'inmemory-panel',
-      'sentiment-panel',
-      'keep-panel',
-      'verdict-panel',
-      'entrywindow-panel',
-      'position-panel',
-      'wowdip-panel',
-      'omg-panel',
-      'pitfalls-panel',
-      'strategy-panel',
-      'decision-panel',
-      'gmgn-panel'
-    ].forEach(function (id) {
+    ['tf-panels','trend-panel','struct-panel','macro-panel','signal-panel','memegate-panel','coin-panel','antifomo-panel','hunter-panel','breakouts-panel','holders-panel','failures-panel','inmemory-panel','sentiment-panel','keep-panel','verdict-panel','entrywindow-panel','position-panel','wowdip-panel','omg-panel','pitfalls-panel','strategy-panel','decision-panel','gmgn-panel'].forEach(function (id) {
       const el = $(id);
       if (!el) return;
       el.style.display = 'none';
@@ -116,7 +75,7 @@
     });
   }
   function paintChips() {
-    document.querySelectorAll('.wt-tab').forEach(function (b) {
+    document.querySelectorAll('#wallets-panel .wt-tab').forEach(function (b) {
       const on = b.getAttribute('data-wt') === inner;
       b.style.background = on ? '#1a9b6c' : '#121a24';
       b.style.color = on ? '#fff' : '#c5d0dc';
@@ -144,59 +103,33 @@
       '</div></div>'
     );
   }
-  function buyCard(c) {
-    return (
-      '<div style="padding:14px;border-radius:14px;border:1px solid #243041;background:#0b121a">' +
-      '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">' +
-      '<div style="font-weight:900;font-size:16px;color:#e8eef6">' +
-      esc(c.name || c.mint) +
-      (c.saved ? ' · saved' : '') +
-      '</div>' +
-      '<div style="font-size:12px;color:#8491a1">' +
-      (c.handles || []).length +
-      ' traders</div></div>' +
-      '<div style="margin-top:6px;font-size:12px;color:#c5d0dc">' +
-      esc((c.handles || []).map(function (h) { return '@' + h; }).join(' ')) +
-      '</div>' +
-      '<div style="margin-top:6px;font-size:12px;color:#8491a1">liq ' +
-      usd(c.liq) +
-      ' · vol ' +
-      usd(c.volume) +
-      ' · MC ' +
-      usd(c.mcap) +
-      (c.ew ? ' · EW ' + esc(c.ew) : '') +
-      (c.caState ? ' · CA ' + esc(c.caState) : '') +
-      '</div>' +
-      (c.dexUrl
-        ? '<div style="margin-top:8px"><a href="' + esc(c.dexUrl) + '" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800;font-size:12px">DexScreener</a></div>'
-        : '') +
-      '</div>'
-    );
-  }
   async function load(force) {
     if (busy) return;
     busy = true;
     const st = $('wt-status');
     const list = $('wt-list');
     try {
+      if (inner === 'coins' || inner === 'common') {
+        paintChips();
+        if (window.setWalletInnerCoins) window.setWalletInnerCoins(inner);
+        busy = false;
+        return;
+      }
       const j = await api('/wallets' + (force ? '?force=1' : ''));
       if (st)
         st.textContent =
           (j.at ? ago(j.at) : 'waiting') +
           ' · next ' +
           (j.next ? clock(j.next) : '—') +
-          ' · ' +
-          (j.source || '') +
+          ' · top100' +
+          (j.heliusEvents ? ' · helius ' + j.heliusEvents : '') +
           (j.err ? ' · ' + j.err : '');
-      let rows = [];
-      if (inner === 'signals') rows = j.signals || [];
-      else if (inner === 'buys') rows = j.buys || [];
-      else rows = j.leaders || [];
+      const rows = j.leaders || [];
       if (list)
         list.innerHTML = rows.length
-          ? rows.map(inner === 'leaders' ? leaderCard : buyCard).join('')
+          ? rows.map(leaderCard).join('')
           : '<div style="color:#8491a1;font-size:12px">' +
-            (j.err ? esc(j.err) : inner === 'leaders' ? 'No leaders yet. Worker loads the public top-100 list.' : 'No new buys yet. First scan stores holdings; the next 30m scan diffs them.') +
+            (j.err ? esc(j.err) : 'No leaders yet. Worker loads the public top-100 list.') +
             '</div>';
       paintChips();
     } catch (e) {
@@ -206,7 +139,8 @@
     busy = false;
   }
   function setInner(id) {
-    inner = id === 'buys' || id === 'signals' ? id : 'leaders';
+    if (id === 'buys' || id === 'signals') id = 'leaders';
+    inner = id === 'coins' || id === 'common' ? id : 'leaders';
     try {
       localStorage.setItem('wt_inner', inner);
     } catch (e) {}
