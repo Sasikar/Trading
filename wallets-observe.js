@@ -1,4 +1,4 @@
-/* Overlay — Coin selection = overlap score. Not a buy signal. */
+/* Overlay — Coin selection + Old Coins. Not a buy signal. */
 (function () {
   function apiBase() {
     try {
@@ -8,7 +8,7 @@
   }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c];
+      return ({ '&': '&', '<': '<', '>': '>', '"': '"' })[c];
     });
   }
   function shortCa(ca) {
@@ -52,15 +52,20 @@
     hideDead();
     const card = document.querySelector('#wallets-panel .card');
     if (!card) return;
-    if (!document.querySelector('#wallets-panel .wt-tab[data-wt="coins"]')) {
-      const row = card.querySelector('.wt-tab') && card.querySelector('.wt-tab').parentNode;
-      if (row) {
-        const html =
-          '<button type="button" class="wt-tab" data-wt="coins" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Coin selection</button>';
-        const lead = row.querySelector('.wt-tab[data-wt="leaders"]');
-        if (lead) lead.insertAdjacentHTML('afterend', html);
-        else row.insertAdjacentHTML('afterbegin', html);
-      }
+    const row = card.querySelector('.wt-tab') && card.querySelector('.wt-tab').parentNode;
+    if (row && !document.querySelector('#wallets-panel .wt-tab[data-wt="coins"]')) {
+      const html =
+        '<button type="button" class="wt-tab" data-wt="coins" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Coin selection</button>';
+      const lead = row.querySelector('.wt-tab[data-wt="leaders"]');
+      if (lead) lead.insertAdjacentHTML('afterend', html);
+      else row.insertAdjacentHTML('afterbegin', html);
+    }
+    if (row && !document.querySelector('#wallets-panel .wt-tab[data-wt="old"]')) {
+      const html =
+        '<button type="button" class="wt-tab" data-wt="old" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Old Coins</button>';
+      const coins = row.querySelector('.wt-tab[data-wt="coins"]');
+      if (coins) coins.insertAdjacentHTML('afterend', html);
+      else row.insertAdjacentHTML('beforeend', html);
     }
     if (!card.getAttribute('data-wt-bound')) {
       card.setAttribute('data-wt-bound', '1');
@@ -82,12 +87,12 @@
     const b = ev.target && ev.target.closest && ev.target.closest('.wt-tab');
     if (!b) return;
     const wt = b.getAttribute('data-wt');
-    if (wt === 'coins') {
+    if (wt === 'coins' || wt === 'old') {
       ev.preventDefault();
       if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
       ev.stopPropagation();
-      if (window.setWalletInner) window.setWalletInner('coins');
-      else paint();
+      if (window.setWalletInner) window.setWalletInner(wt);
+      else paint(wt);
     }
   }
   function walletCell(c) {
@@ -176,9 +181,10 @@
       '</tr>'
     );
   }
-  async function paint() {
+  async function paint(mode) {
+    mode = mode === 'old' ? 'old' : 'coins';
     ensure();
-    paintChips('coins');
+    paintChips(mode);
     const list = document.getElementById('wt-list');
     if (list) list.innerHTML = '<div style="color:#8491a1;font-size:12px">Loading\u2026</div>';
     let j = {};
@@ -190,18 +196,30 @@
       return;
     }
     if (!list) return;
-    let coins = await enrich(j.coins || []);
-    coins = coins
-      .filter(function (c) {
-        return +c.mcap >= 50000;
-      })
-      .sort(function (a, b) {
+    let coins;
+    if (mode === 'old') {
+      coins = (j.oldCoins || []).slice().sort(function (a, b) {
         return scoreOf(b) - scoreOf(a);
       });
-    if (!coins.length) {
-      list.innerHTML =
-        '<div style="color:#8491a1;font-size:12px">No overlap coins with MC \u2265 $50k yet.</div>';
-      return;
+      if (!coins.length) {
+        list.innerHTML =
+          '<div style="color:#8491a1;font-size:12px">Old Coins: daily bag scan. 5+ wallets and MC ≥ $1M. First scan takes about an hour.</div>';
+        return;
+      }
+    } else {
+      coins = await enrich(j.coins || []);
+      coins = coins
+        .filter(function (c) {
+          return +c.mcap >= 50000;
+        })
+        .sort(function (a, b) {
+          return scoreOf(b) - scoreOf(a);
+        });
+      if (!coins.length) {
+        list.innerHTML =
+          '<div style="color:#8491a1;font-size:12px">No overlap coins with MC ≥ $50k yet.</div>';
+        return;
+      }
     }
     list.innerHTML =
       '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">' +
@@ -213,8 +231,8 @@
       coins.map(rowHtml).join('') +
       '</tbody></table></div>';
   }
-  window.setWalletInnerCoins = function () {
-    paint();
+  window.setWalletInnerCoins = function (mode) {
+    paint(mode);
   };
   if (document.getElementById('wallets-panel')) ensure();
 })();
