@@ -5,6 +5,7 @@ import { Engine, MemoryStore, handleApi, CORS, json, AUTO_EVERY_MS } from './eng
 import { coinsAndCommon } from './fomo-wallets.js';
 import { buysFromHeliusTx, parseHeliusPayload, mergeEvents, scoreCoins, overlapOnly, watchSet, HELIUS_BUYS_KEY, HELIUS_SEEN_KEY } from './helius-coins.js';
 import { syncHeliusWebhook, HELIUS_HOOK_ID_KEY } from './helius-sync.js';
+import { notifyNewOverlap } from './helius-tg.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -235,6 +236,10 @@ export class OhlcvEngine {
     const merged = mergeEvents(prev, incoming, seen);
     this.store.setMeta(HELIUS_BUYS_KEY, JSON.stringify(merged.events));
     this.store.setMeta(HELIUS_SEEN_KEY, JSON.stringify(merged.seen));
+    if (incoming.length) {
+      const scored = overlapOnly(scoreCoins(merged.events));
+      try { this.ctx.waitUntil(notifyNewOverlap(this.env, this.store, scored)); } catch (e) {}
+    }
     return new Response(JSON.stringify({ ok: true, ingested: incoming.length, stored: merged.events.length }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
   }
   async fetch(request) {
