@@ -4,6 +4,7 @@
  */
 import { Engine, MemoryStore, handleApi, CORS, json, AUTO_EVERY_MS } from './engine.js';
 import { coinsAndCommon } from './fomo-wallets.js';
+import { buysFromHeliusTx, parseHeliusPayload, mergeEvents, scoreCoins, overlapOnly, watchSet, HELIUS_BUYS_KEY, HELIUS_SEEN_KEY } from './helius-coins.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -14,11 +15,20 @@ Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
   } catch (e) {
     holdMap = {};
   }
-  const extra = coinsAndCommon(holdMap, snap.leaders || [], snap.buys || []);
-  snap.coins = extra.coins || [];
+  let heliusBuys = [];
+  try {
+    heliusBuys = JSON.parse(this.store.getMeta(HELIUS_BUYS_KEY) || '[]') || [];
+  } catch (e) {
+    heliusBuys = [];
+  }
+  const heliusBuyRows = (heliusBuys || []).filter((r) => r && r.side !== 'sell');
+  const extra = coinsAndCommon(holdMap, snap.leaders || [], (snap.buys || []).concat(heliusBuyRows));
+  const scored = overlapOnly(scoreCoins(heliusBuyRows));
+  snap.coins = scored.length ? scored : extra.coins || [];
   snap.common = extra.common || [];
+  snap.heliusEvents = heliusBuyRows.length;
   snap.note =
-    'FOMO top wallets. Leaders = public top-100. Coins = new buys + tokens 2+ scanned wallets still hold. Common = those overlapping wallets as observe tabs. Not a buy list.';
+    'Coins = overlap only (score = how many FOMO wallets bought the mint), sorted score ascending. Helius webhook /helius. Not a buy list.';
   return snap;
 };
 
@@ -125,53 +135,18 @@ function storeFromSql(sql) {
           `INSERT OR REPLACE INTO ticks
            (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name,mcap)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          k,
-          tick.t,
-          tick.price,
-          tick.vol5m,
-          tick.vol1h,
-          tick.vol24h,
-          tick.buys5m,
-          tick.sells5m,
-          tick.liq,
-          tick.m5,
-          tick.h1,
-          tick.h6,
-          tick.h24,
-          tick.pairAddress || '',
-          tick.dexUrl || '',
-          tick.chain || '',
-          tick.name || '',
-          +tick.mcap || 0
+          k, tick.t, tick.price, tick.vol5m, tick.vol1h, tick.vol24h, tick.buys5m, tick.sells5m, tick.liq, tick.m5, tick.h1, tick.h6, tick.h24, tick.pairAddress || '', tick.dexUrl || '', tick.chain || '', tick.name || '', +tick.mcap || 0
         );
       } catch (e) {
         sql.exec(
           `INSERT OR REPLACE INTO ticks
            (ca,t,price,vol5m,vol1h,vol24h,buys5m,sells5m,liq,m5,h1,h6,h24,pairAddress,dexUrl,chain,name)
            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          k,
-          tick.t,
-          tick.price,
-          tick.vol5m,
-          tick.vol1h,
-          tick.vol24h,
-          tick.buys5m,
-          tick.sells5m,
-          tick.liq,
-          tick.m5,
-          tick.h1,
-          tick.h6,
-          tick.h24,
-          tick.pairAddress || '',
-          tick.dexUrl || '',
-          tick.chain || '',
-          tick.name || ''
+          k, tick.t, tick.price, tick.vol5m, tick.vol1h, tick.vol24h, tick.buys5m, tick.sells5m, tick.liq, tick.m5, tick.h1, tick.h6, tick.h24, tick.pairAddress || '', tick.dexUrl || '', tick.chain || '', tick.name || ''
         );
       }
     },
-    allTicks() {
-      return all('SELECT * FROM ticks');
-    },
+    allTicks() { return all('SELECT * FROM ticks'); },
     setWatch(rows) {
       const j = JSON.stringify(rows || []);
       if (j === watchJson) return;
@@ -179,17 +154,9 @@ function storeFromSql(sql) {
       try {
         sql.exec('DELETE FROM watch');
         for (const r of rows || []) {
-          sql.exec(
-            'INSERT OR REPLACE INTO watch (ca, chain, name, poolAddress) VALUES (?,?,?,?)',
-            r.ca,
-            r.chain,
-            r.name || '',
-            r.poolAddress || ''
-          );
+          sql.exec('INSERT OR REPLACE INTO watch (ca, chain, name, poolAddress) VALUES (?,?,?,?)', r.ca, r.chain, r.name || '', r.poolAddress || '');
         }
-      } catch (e) {
-        /* quota: keep memory watch */
-      }
+      } catch (e) {}
     },
     getWatch() {
       if (watchJson) {
@@ -212,52 +179,17 @@ function storeFromSql(sql) {
       if (r) openMem.set(k, r);
       return r;
     },
-    setOpenBar(ca, tf, bar) {
-      openMem.set(ca.toLowerCase() + '|' + tf, bar);
-    },
+    setOpenBar(ca, tf, bar) { openMem.set(ca.toLowerCase() + '|' + tf, bar); },
     closeBar(ca, tf, bar) {
       const k = ca.toLowerCase() + '|' + tf;
       openMem.delete(k);
-      sql.exec(
-        `INSERT OR REPLACE INTO ohlcv (ca,tf,t,o,h,l,c,vol,buys,sells,n)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        ca.toLowerCase(),
-        tf,
-        bar.t,
-        bar.o,
-        bar.h,
-        bar.l,
-        bar.c,
-        bar.vol,
-        bar.buys,
-        bar.sells,
-        bar.n
-      );
+      sql.exec(`INSERT OR REPLACE INTO ohlcv (ca,tf,t,o,h,l,c,vol,buys,sells,n) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, ca.toLowerCase(), tf, bar.t, bar.o, bar.h, bar.l, bar.c, bar.vol, bar.buys, bar.sells, bar.n);
       sql.exec('DELETE FROM open_bar WHERE ca = ? AND tf = ?', ca.toLowerCase(), tf);
     },
     insertBar(ca, tf, bar) {
-      const r = one(
-        'SELECT t FROM ohlcv WHERE ca = ? AND tf = ? AND t = ?',
-        ca.toLowerCase(),
-        tf,
-        bar.t
-      );
+      const r = one('SELECT t FROM ohlcv WHERE ca = ? AND tf = ? AND t = ?', ca.toLowerCase(), tf, bar.t);
       if (r) return false;
-      sql.exec(
-        `INSERT OR REPLACE INTO ohlcv (ca,tf,t,o,h,l,c,vol,buys,sells,n)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        ca.toLowerCase(),
-        tf,
-        bar.t,
-        bar.o,
-        bar.h,
-        bar.l,
-        bar.c,
-        bar.vol || 0,
-        bar.buys || 0,
-        bar.sells || 0,
-        bar.n || 1
-      );
+      sql.exec(`INSERT OR REPLACE INTO ohlcv (ca,tf,t,o,h,l,c,vol,buys,sells,n) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, ca.toLowerCase(), tf, bar.t, bar.o, bar.h, bar.l, bar.c, bar.vol || 0, bar.buys || 0, bar.sells || 0, bar.n || 1);
       return true;
     },
     flushOpens(now) {
@@ -268,41 +200,16 @@ function storeFromSql(sql) {
         const i = k.indexOf('|');
         const tf = k.slice(i + 1);
         if (tf === '1m' || tf === '1d' || tf === '1w' || tf === '1M') continue;
-        sql.exec(
-          `INSERT OR REPLACE INTO open_bar (ca,tf,t,o,h,l,c,vol,buys,sells,n)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-          k.slice(0, i),
-          k.slice(i + 1),
-          bar.t,
-          bar.o,
-          bar.h,
-          bar.l,
-          bar.c,
-          bar.vol,
-          bar.buys,
-          bar.sells,
-          bar.n
-        );
+        sql.exec(`INSERT OR REPLACE INTO open_bar (ca,tf,t,o,h,l,c,vol,buys,sells,n) VALUES (?,?,?,?,?,?,?,?,?,?,?)`, k.slice(0, i), k.slice(i + 1), bar.t, bar.o, bar.h, bar.l, bar.c, bar.vol, bar.buys, bar.sells, bar.n);
       }
     },
     bars(ca, tf, limit) {
-      return all(
-        'SELECT * FROM ohlcv WHERE ca = ? AND tf = ? ORDER BY t DESC LIMIT ?',
-        ca.toLowerCase(),
-        tf,
-        limit || 40
-      ).reverse();
+      return all('SELECT * FROM ohlcv WHERE ca = ? AND tf = ? ORDER BY t DESC LIMIT ?', ca.toLowerCase(), tf, limit || 40).reverse();
     },
     prune(now) {
       sql.exec("DELETE FROM ohlcv WHERE tf = '1m' AND t < ?", now - 7 * 86400e3);
-      sql.exec(
-        "DELETE FROM ohlcv WHERE tf IN ('5m','10m','15m','30m') AND t < ?",
-        now - 30 * 86400e3
-      );
-      sql.exec(
-        "DELETE FROM ohlcv WHERE tf IN ('1d','1w','1M') AND t < ?",
-        now - 730 * 86400e3
-      );
+      sql.exec("DELETE FROM ohlcv WHERE tf IN ('5m','10m','15m','30m') AND t < ?", now - 30 * 86400e3);
+      sql.exec("DELETE FROM ohlcv WHERE tf IN ('1d','1w','1M') AND t < ?", now - 730 * 86400e3);
     },
     getAlert(key) {
       const r = one('SELECT t FROM alerts WHERE k = ?', key);
@@ -357,6 +264,76 @@ export class OhlcvEngine {
     } catch (e3) {}
   }
 
+  async handleHelius(request) {
+    const secret = (this.env && this.env.HELIUS_WEBHOOK_SECRET) || '';
+    const url = new URL(request.url);
+    if (secret) {
+      const got = url.searchParams.get('secret') || request.headers.get('x-helius-secret') || '';
+      if (got !== secret) {
+        return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), {
+          status: 401,
+          headers: { ...CORS, 'content-type': 'application/json' }
+        });
+      }
+    }
+    if (request.method === 'GET') {
+      let n = 0;
+      try {
+        n = (JSON.parse(this.store.getMeta(HELIUS_BUYS_KEY) || '[]') || []).length;
+      } catch (e) {}
+      return new Response(JSON.stringify({ ok: true, path: '/helius', events: n }), {
+        status: 200,
+        headers: { ...CORS, 'content-type': 'application/json' }
+      });
+    }
+    if (request.method !== 'POST') {
+      return new Response(JSON.stringify({ ok: false, error: 'POST only' }), {
+        status: 405,
+        headers: { ...CORS, 'content-type': 'application/json' }
+      });
+    }
+    let body = null;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return new Response(JSON.stringify({ ok: true, ingested: 0 }), {
+        status: 200,
+        headers: { ...CORS, 'content-type': 'application/json' }
+      });
+    }
+    let leaders = [];
+    try {
+      leaders = JSON.parse(this.store.getMeta('fomo_leaders') || '[]') || [];
+    } catch (e) {
+      leaders = [];
+    }
+    if (!leaders.length) {
+      try {
+        const snap = this.engine.snapshotWallets() || {};
+        leaders = snap.leaders || [];
+      } catch (e2) {}
+    }
+    const watch = watchSet(leaders);
+    const txs = parseHeliusPayload(body);
+    const incoming = [];
+    for (let i = 0; i < txs.length; i++) incoming.push(...buysFromHeliusTx(txs[i], watch));
+    let prev = [];
+    let seen = [];
+    try {
+      prev = JSON.parse(this.store.getMeta(HELIUS_BUYS_KEY) || '[]') || [];
+    } catch (e) {}
+    try {
+      seen = JSON.parse(this.store.getMeta(HELIUS_SEEN_KEY) || '[]') || [];
+    } catch (e) {}
+    const merged = mergeEvents(prev, incoming, seen);
+    this.store.setMeta(HELIUS_BUYS_KEY, JSON.stringify(merged.events));
+    this.store.setMeta(HELIUS_SEEN_KEY, JSON.stringify(merged.seen));
+    return new Response(JSON.stringify({ ok: true, ingested: incoming.length, stored: merged.events.length }), {
+      status: 200,
+      headers: { ...CORS, 'content-type': 'application/json' }
+    });
+  }
+
   async fetch(request) {
     const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
     if (path === '/health' || path === '/api/health') {
@@ -371,6 +348,9 @@ export class OhlcvEngine {
         try {
           await this.ensureAlarm();
         } catch (e) {}
+      }
+      if (path === '/helius' || path === '/api/helius') {
+        return this.handleHelius(request);
       }
       const out = await handleApi(this.engine, request);
       return new Response(out.body, { status: out.status, headers: out.headers });
