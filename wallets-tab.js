@@ -17,8 +17,8 @@
   try {
     inner = localStorage.getItem('wt_inner') || 'leaders';
   } catch (e) {}
-  if (inner === 'buys' || inner === 'signals') inner = 'leaders';
-  if (inner !== 'coins' && inner !== 'common') inner = 'leaders';
+  if (inner === 'buys' || inner === 'signals' || inner === 'common') inner = 'leaders';
+  if (inner !== 'coins' && inner !== 'old') inner = 'leaders';
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<">]/g, function (c) {
       if (c === '&') return '&' + 'amp;';
@@ -109,7 +109,7 @@
     const st = $('wt-status');
     const list = $('wt-list');
     try {
-      if (inner === 'coins' || inner === 'common') {
+      if (inner === 'coins' || inner === 'old') {
         paintChips();
         if (window.setWalletInnerCoins) window.setWalletInnerCoins(inner);
         busy = false;
@@ -139,8 +139,8 @@
     busy = false;
   }
   function setInner(id) {
-    if (id === 'buys' || id === 'signals') id = 'leaders';
-    inner = id === 'coins' || id === 'common' ? id : 'leaders';
+    if (id === 'buys' || id === 'signals' || id === 'common') id = 'leaders';
+    inner = id === 'coins' || id === 'old' ? id : 'leaders';
     try {
       localStorage.setItem('wt_inner', inner);
     } catch (e) {}
