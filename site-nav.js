@@ -29,4 +29,9 @@ document.head.appendChild(style);
 const nav=document.createElement('nav');nav.id='site-nav';
 nav.innerHTML=`<a class="site-brand" href="index.html">TRADING<i>.</i></a><div class="site-links">${primary.map(([l,h,pri])=>`<a class="site-link${pri?' pri':''}${isActive(h)?' active':''}" href="${h}">${l}</a>`).join('')}</div>`;
 document.body.insertBefore(nav,document.body.firstChild);
+if(!document.querySelector('script[src*="wallets-observe"]')){
+  const s=document.createElement('script');
+  s.src='wallets-observe.js?v=20260921-wt3';
+  document.body.appendChild(s);
+}
 })();
