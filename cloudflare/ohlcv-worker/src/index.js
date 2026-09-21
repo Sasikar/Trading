@@ -6,6 +6,7 @@ import { coinsAndCommon } from './fomo-wallets.js';
 import { buysFromHeliusTx, parseHeliusPayload, mergeEvents, scoreCoins, overlapOnly, watchSet, HELIUS_BUYS_KEY, HELIUS_SEEN_KEY } from './helius-coins.js';
 import { syncHeliusWebhook, HELIUS_HOOK_ID_KEY } from './helius-sync.js';
 import { notifyNewOverlap } from './helius-tg.js';
+import { scanOldTick, readOldCoins, OLD_SCAN_AT_KEY } from './helius-old.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -28,8 +29,10 @@ Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
   snap.coins = scored.length ? scored : extra.coins || [];
   snap.common = extra.common || [];
   snap.heliusEvents = heliusBuyRows.length;
+  snap.oldCoins = readOldCoins(this.store);
+  snap.oldAt = +this.store.getMeta(OLD_SCAN_AT_KEY) || 0;
   snap.note =
-    'Coins = overlap only (score = how many FOMO wallets bought the mint), sorted score ascending. Helius webhook /helius. Not a buy list.';
+    'Coins = overlap buys. Old Coins = holdings 5+ wallets and MC $1M+. Not a buy list.';
   return snap;
 };
 
@@ -253,6 +256,14 @@ export class OhlcvEngine {
         try { await this.ensureAlarm(); } catch (e) {}
       }
       if (path === '/helius' || path === '/api/helius') return this.handleHelius(request);
+      if (path === '/oldcoins' || path === '/api/oldcoins') {
+        const want = new URL(request.url).searchParams.get('scan') === '1';
+        if (want) {
+          const r = await scanOldTick(this.env, this.store, this.leadersNow());
+          return new Response(JSON.stringify(r), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ ok: true, coins: readOldCoins(this.store), at: +this.store.getMeta(OLD_SCAN_AT_KEY) || 0 }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
       const out = await handleApi(this.engine, request);
       return new Response(out.body, { status: out.status, headers: out.headers });
     } catch (e) {
@@ -274,6 +285,7 @@ export default {
     const stubId = env.ENGINE.get(env.ENGINE.idFromName('main'));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/status')));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/helius?sync=1')));
+    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/oldcoins?scan=1')));
   }
 };
 
