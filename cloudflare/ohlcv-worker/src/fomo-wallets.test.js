@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseFomoTop100, newMints, clusterBuys, signalOf, skipMint } from './fomo-wallets.js';
+import { parseFomoTop100, newMints, clusterBuys, signalOf, skipMint, coinsAndCommon } from './fomo-wallets.js';
 
 test('parse FOMO top100 data-h rows', () => {
   const html =
@@ -30,4 +30,21 @@ test('cluster buys and watchlist signal', () => {
   assert.equal(c[0].handles.length, 2);
   assert.equal(signalOf(c[0]), 'WATCHLIST');
   assert.equal(signalOf({ wallets: ['1', '2', '3'] }), 'CLUSTER');
+});
+
+test('coins and common wallets from shared bags', () => {
+  const hold = {
+    w1: { mints: ['MintA', 'MintB'] },
+    w2: { mints: ['MintA', 'MintC'] }
+  };
+  const leaders = [
+    { handle: 'alpha', sol: 'w1', rank: 1, pnl: 10 },
+    { handle: 'beta', sol: 'w2', rank: 2, pnl: 9 }
+  ];
+  const out = coinsAndCommon(hold, leaders, [{ mint: 'MintD', handle: 'alpha', wallet: 'w1', at: 9, name: 'NEW' }]);
+  const shared = out.coins.find((c) => String(c.mint).toLowerCase() === 'minta');
+  assert.equal(shared.shared, true);
+  assert.equal(shared.handles.length, 2);
+  assert.ok(out.common[0].sharedN >= 1);
+  assert.ok(out.coins.some((c) => c.fresh && String(c.name) === 'NEW'));
 });

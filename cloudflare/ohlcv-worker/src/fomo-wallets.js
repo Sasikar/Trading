@@ -137,3 +137,114 @@ export function signalOf(buy) {
   if (buy && (buy.wallets || []).length >= 2) return 'OVERLAP';
   return '';
 }
+
+export function holdMints(entry) {
+  if (!entry) return [];
+  if (Array.isArray(entry)) return entry;
+  if (Array.isArray(entry.mints)) return entry.mints;
+  return [];
+}
+
+export function coinsAndCommon(holdMap, leaders, buys) {
+  const handleOf = {};
+  const leaderOf = {};
+  for (let i = 0; i < (leaders || []).length; i++) {
+    const l = leaders[i];
+    if (!l || !l.sol) continue;
+    handleOf[l.sol] = l.handle || '';
+    leaderOf[l.sol] = l;
+  }
+  const mintMap = new Map();
+  function touch(mint, wallet, handle, extra) {
+    const raw = mint || (extra && extra.mint);
+    const k = String(raw || '').toLowerCase();
+    if (!k || skipMint(k)) return;
+    let c = mintMap.get(k);
+    if (!c) {
+      c = {
+        mint: raw,
+        handles: [],
+        wallets: [],
+        at: 0,
+        name: '',
+        liq: 0,
+        volume: 0,
+        mcap: 0,
+        dexUrl: extra && extra.dexUrl ? extra.dexUrl : '',
+        ew: '',
+        caState: '',
+        saved: false,
+        fresh: false,
+        shared: false
+      };
+      mintMap.set(k, c);
+    }
+    if (wallet && c.wallets.indexOf(wallet) < 0) c.wallets.push(wallet);
+    if (handle && c.handles.indexOf(handle) < 0) c.handles.push(handle);
+    if (extra) {
+      if (extra.at && extra.at > c.at) c.at = extra.at;
+      if (extra.name) c.name = extra.name;
+      if (extra.liq) c.liq = extra.liq;
+      if (extra.volume) c.volume = extra.volume;
+      if (extra.mcap) c.mcap = extra.mcap;
+      if (extra.dexUrl) c.dexUrl = extra.dexUrl;
+      if (extra.ew) c.ew = extra.ew;
+      if (extra.caState) c.caState = extra.caState;
+      if (extra.saved) c.saved = true;
+      if (extra.at) c.fresh = true;
+    }
+  }
+  const keys = Object.keys(holdMap || {});
+  for (let i = 0; i < keys.length; i++) {
+    const wallet = keys[i];
+    const mints = holdMints(holdMap[wallet]);
+    const handle = handleOf[wallet] || '';
+    for (let j = 0; j < mints.length; j++) touch(mints[j], wallet, handle, null);
+  }
+  const clustered = clusterBuys(buys);
+  for (let i = 0; i < clustered.length; i++) {
+    const b = clustered[i];
+    const ws = b.wallets || [];
+    if (!ws.length) touch(b.mint, '', (b.handles && b.handles[0]) || '', b);
+    for (let j = 0; j < ws.length; j++) {
+      touch(b.mint, ws[j], handleOf[ws[j]] || (b.handles && b.handles[j]) || '', b);
+    }
+  }
+  const coins = Array.from(mintMap.values());
+  for (let i = 0; i < coins.length; i++) coins[i].shared = (coins[i].wallets || []).length >= 2;
+  coins.sort((a, b) => (b.shared ? 1 : 0) - (a.shared ? 1 : 0) || b.wallets.length - a.wallets.length || b.at - a.at);
+
+  const stats = {};
+  for (let i = 0; i < coins.length; i++) {
+    const c = coins[i];
+    for (let j = 0; j < (c.wallets || []).length; j++) {
+      const w = c.wallets[j];
+      if (!stats[w]) {
+        const L = leaderOf[w] || {};
+        stats[w] = {
+          wallet: w,
+          handle: handleOf[w] || L.handle || '',
+          rank: L.rank || 0,
+          pnl: L.pnl || 0,
+          fomoUrl: L.fomoUrl || '',
+          solscan: L.solscan || (w ? 'https://solscan.io/account/' + w : ''),
+          gmgnUrl: L.gmgnUrl || (w ? 'https://gmgn.ai/sol/address/' + w : ''),
+          n: 0,
+          sharedN: 0,
+          freshN: 0,
+          coins: []
+        };
+      }
+      stats[w].n++;
+      if (c.shared) stats[w].sharedN++;
+      if (c.fresh) stats[w].freshN++;
+      stats[w].coins.push({ mint: c.mint, name: c.name, shared: c.shared, fresh: c.fresh, dexUrl: c.dexUrl });
+    }
+  }
+  const common = Object.values(stats).sort((a, b) => b.sharedN - a.sharedN || b.freshN - a.freshN || b.n - a.n);
+  const listed = coins.filter((c) => c.shared || c.fresh).slice(0, 80);
+  return {
+    coins: listed.length ? listed : coins.slice(0, 40),
+    common: common.filter((w) => w.sharedN >= 1 || w.freshN >= 1 || w.n >= 4).slice(0, 12)
+  };
+}
