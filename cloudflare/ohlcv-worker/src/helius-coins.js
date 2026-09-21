@@ -102,7 +102,7 @@ export function scoreCoins(buyRows) {
     const n = (c.wallets || []).length;
     return { ...c, score: n, shared: n >= 2, fresh: true, overlap: n };
   });
-  coins.sort((a, b) => (a.score || 0) - (b.score || 0) || (a.at || 0) - (b.at || 0));
+  coins.sort((a, b) => (b.score || 0) - (a.score || 0) || (b.at || 0) - (a.at || 0));
   return coins;
 }
 

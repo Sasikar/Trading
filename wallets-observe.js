@@ -1,4 +1,4 @@
-/* Overlay — Coins = overlap score. Not a buy signal. */
+/* Overlay — Coin selection = overlap score. Not a buy signal. */
 (function () {
   function apiBase() {
     try {
@@ -18,10 +18,25 @@
   function scoreOf(c) {
     return +c.score || (c.wallets || []).length || 0;
   }
+  function copyText(t) {
+    t = String(t || '');
+    if (!t) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).catch(function () {
+        window.prompt('Copy', t);
+      });
+    } else {
+      window.prompt('Copy', t);
+    }
+  }
   function hideDead() {
-    document.querySelectorAll('#wallets-panel .wt-tab[data-wt="buys"], #wallets-panel .wt-tab[data-wt="signals"]').forEach(function (b) {
+    document.querySelectorAll(
+      '#wallets-panel .wt-tab[data-wt="buys"], #wallets-panel .wt-tab[data-wt="signals"], #wallets-panel .wt-tab[data-wt="common"]'
+    ).forEach(function (b) {
       b.style.display = 'none';
     });
+    const coinsBtn = document.querySelector('#wallets-panel .wt-tab[data-wt="coins"]');
+    if (coinsBtn) coinsBtn.textContent = 'Coin selection';
   }
   function paintChips(mode) {
     document.querySelectorAll('#wallets-panel .wt-tab').forEach(function (b) {
@@ -38,8 +53,7 @@
       const row = card.querySelector('.wt-tab') && card.querySelector('.wt-tab').parentNode;
       if (row) {
         const html =
-          '<button type="button" class="wt-tab" data-wt="coins" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Coins</button>' +
-          '<button type="button" class="wt-tab" data-wt="common" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Common</button>';
+          '<button type="button" class="wt-tab" data-wt="coins" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Coin selection</button>';
         const lead = row.querySelector('.wt-tab[data-wt="leaders"]');
         if (lead) lead.insertAdjacentHTML('afterend', html);
         else row.insertAdjacentHTML('afterbegin', html);
@@ -51,62 +65,77 @@
     }
   }
   function onClick(ev) {
+    const copyBtn = ev.target && ev.target.closest && ev.target.closest('[data-copy]');
+    if (copyBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      copyText(copyBtn.getAttribute('data-copy'));
+      copyBtn.textContent = 'copied';
+      setTimeout(function () {
+        copyBtn.textContent = copyBtn.getAttribute('data-copy-label') || 'copy';
+      }, 900);
+      return;
+    }
     const b = ev.target && ev.target.closest && ev.target.closest('.wt-tab');
     if (!b) return;
     const wt = b.getAttribute('data-wt');
-    if (wt === 'coins' || wt === 'common') {
+    if (wt === 'coins') {
       ev.preventDefault();
       if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
       ev.stopPropagation();
-      if (window.setWalletInner) window.setWalletInner(wt);
-      else paint(wt);
+      if (window.setWalletInner) window.setWalletInner('coins');
+      else paint();
     }
   }
-  function cardCoin(c) {
+  function walletCell(c) {
+    const handles = c.handles || [];
+    const wallets = c.wallets || [];
+    const bits = [];
+    const n = Math.max(handles.length, wallets.length);
+    for (let i = 0; i < n; i++) {
+      const h = handles[i] || '';
+      const w = wallets[i] || '';
+      const label = h ? '@' + h : shortCa(w);
+      const copyVal = w || h;
+      bits.push(
+        '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0">' +
+          '<span>' +
+          esc(label) +
+          '</span>' +
+          (copyVal
+            ? '<button type="button" data-copy="' +
+              esc(copyVal) +
+              '" data-copy-label="copy" style="border:0;background:#1a2430;color:#6eb6ff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:800;cursor:pointer">copy</button>'
+            : '') +
+          '</span>'
+      );
+    }
+    return bits.join('') || '—';
+  }
+  function rowHtml(c) {
     const n = scoreOf(c);
-    const tag = n >= 3 ? 'CLUSTER' : n >= 2 ? 'OVERLAP' : 'SINGLE';
     return (
-      '<div style="padding:14px;border-radius:14px;border:1px solid #243041;background:#0b121a;margin-bottom:10px">' +
-      '<div style="font-weight:900;color:#e8eef6">' +
+      '<tr>' +
+      '<td style="padding:10px 8px;border-bottom:1px solid #243041;font-weight:800;color:#e8eef6;word-break:break-word">' +
       esc(c.name || shortCa(c.mint)) +
-      ' <span style="color:#e6c878;font-size:11px">score ' +
-      n +
-      ' \u00b7 ' +
-      tag +
-      '</span></div>' +
-      '<div style="margin-top:6px;font-size:12px;color:#c5d0dc">' +
-      n +
-      ' wallets \u00b7 ' +
-      esc((c.handles || []).map(function (h) { return '@' + h; }).join(' ')) +
-      '</div>' +
-      '<div style="margin-top:6px;font-size:11px;color:#8491a1;word-break:break-all">' +
-      esc(c.mint) +
-      '</div>' +
       (c.dexUrl
-        ? '<div style="margin-top:8px"><a href="' +
+        ? '<div><a href="' +
           esc(c.dexUrl) +
-          '" target="_blank" rel="noopener" style="color:#6eb6ff;font-weight:800;font-size:12px">DexScreener</a></div>'
+          '" target="_blank" rel="noopener" style="color:#6eb6ff;font-size:11px">Dex</a></div>'
         : '') +
-      '</div>'
+      '</td>' +
+      '<td style="padding:10px 8px;border-bottom:1px solid #243041;text-align:center;font-weight:900;color:#e6c878">' +
+      n +
+      '</td>' +
+      '<td style="padding:10px 8px;border-bottom:1px solid #243041;font-size:12px;color:#c5d0dc">' +
+      walletCell(c) +
+      '</td>' +
+      '</tr>'
     );
   }
-  function cardWal(c) {
-    return (
-      '<div style="padding:14px;border-radius:14px;border:1px solid #243041;background:#0b121a;margin-bottom:10px">' +
-      '<div style="font-weight:900;color:#e8eef6">' +
-      (c.handle ? '@' + esc(c.handle) : esc(shortCa(c.wallet))) +
-      '</div>' +
-      '<div style="margin-top:6px;font-size:12px;color:#e6c878">' +
-      (c.sharedN || 0) +
-      ' overlap coins</div>' +
-      '<div style="margin-top:8px;font-size:11px;color:#8491a1;word-break:break-all">' +
-      esc(c.wallet) +
-      '</div></div>'
-    );
-  }
-  async function paint(mode) {
+  async function paint() {
     ensure();
-    paintChips(mode);
+    paintChips('coins');
     const list = document.getElementById('wt-list');
     if (list) list.innerHTML = '<div style="color:#8491a1;font-size:12px">Loading\u2026</div>';
     let j = {};
@@ -118,22 +147,26 @@
       return;
     }
     if (!list) return;
-    if (mode === 'common') {
-      const common = j.common || [];
-      list.innerHTML = common.length
-        ? common.map(cardWal).join('')
-        : '<div style="color:#8491a1;font-size:12px">No shared wallets yet. Appears when 2+ FOMO wallets buy the same mint.</div>';
+    const coins = (j.coins || []).slice().sort(function (a, b) {
+      return scoreOf(b) - scoreOf(a);
+    });
+    if (!coins.length) {
+      list.innerHTML =
+        '<div style="color:#8491a1;font-size:12px">No overlap coins yet. A mint shows when 2+ watched wallets buy it.</div>';
       return;
     }
-    const coins = (j.coins || []).slice().sort(function (a, b) {
-      return scoreOf(a) - scoreOf(b);
-    });
-    list.innerHTML = coins.length
-      ? coins.map(cardCoin).join('')
-      : '<div style="color:#8491a1;font-size:12px">No overlap coins yet. A mint shows when 2+ watched wallets buy it.</div>';
+    list.innerHTML =
+      '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">' +
+      '<thead><tr>' +
+      '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">NAME</th>' +
+      '<th style="text-align:center;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLETS</th>' +
+      '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLETS / COPY</th>' +
+      '</tr></thead><tbody>' +
+      coins.map(rowHtml).join('') +
+      '</tbody></table></div>';
   }
-  window.setWalletInnerCoins = function (mode) {
-    paint(mode === 'common' ? 'common' : 'coins');
+  window.setWalletInnerCoins = function () {
+    paint();
   };
   if (document.getElementById('wallets-panel')) ensure();
 })();
