@@ -1,11 +1,9 @@
-/* Overlay on wallets-tab.js — Coins / Common inner tabs. Not a buy signal. */
+/* Overlay — Coins = overlap score. Not a buy signal. */
 (function () {
   function apiBase() {
     try {
       if (window.BREAKOUT_API) return String(window.BREAKOUT_API).replace(/\/+$/, '');
     } catch (e) {}
-    const h = location.hostname;
-    if (h === 'sasikar.github.io' || /\.github.io$/.test(h)) return 'https://trading-ohlcv.sasipudi.workers.dev';
     return 'https://trading-ohlcv.sasipudi.workers.dev';
   }
   function esc(s) {
@@ -16,6 +14,9 @@
   function shortCa(ca) {
     ca = String(ca || '');
     return ca.length < 12 ? ca : ca.slice(0, 4) + '\u2026' + ca.slice(-4);
+  }
+  function scoreOf(c) {
+    return +c.score || (c.wallets || []).length || 0;
   }
   function ensure() {
     const card = document.querySelector('#wallets-panel .card');
@@ -55,16 +56,19 @@
     }
   }
   function cardCoin(c) {
-    const tag = c.fresh && c.shared ? 'NEW \u00b7 SHARED' : c.fresh ? 'NEW BUY' : c.shared ? 'SHARED HOLD' : 'HOLD';
+    const n = scoreOf(c);
+    const tag = n >= 3 ? 'CLUSTER' : n >= 2 ? 'OVERLAP' : 'SINGLE';
     return (
       '<div style="padding:14px;border-radius:14px;border:1px solid #243041;background:#0b121a;margin-bottom:10px">' +
       '<div style="font-weight:900;color:#e8eef6">' +
       esc(c.name || shortCa(c.mint)) +
-      ' <span style="color:#e6c878;font-size:11px">' +
+      ' <span style="color:#e6c878;font-size:11px">score ' +
+      n +
+      ' \u00b7 ' +
       tag +
       '</span></div>' +
       '<div style="margin-top:6px;font-size:12px;color:#c5d0dc">' +
-      (c.wallets || []).length +
+      n +
       ' wallets \u00b7 ' +
       esc((c.handles || []).map(function (h) { return '@' + h; }).join(' ')) +
       '</div>' +
@@ -87,11 +91,7 @@
       '</div>' +
       '<div style="margin-top:6px;font-size:12px;color:#e6c878">' +
       (c.sharedN || 0) +
-      ' shared \u00b7 ' +
-      (c.freshN || 0) +
-      ' new \u00b7 ' +
-      (c.n || 0) +
-      ' bag</div>' +
+      ' overlap coins</div>' +
       '<div style="margin-top:8px;font-size:11px;color:#8491a1;word-break:break-all">' +
       esc(c.wallet) +
       '</div>' +
@@ -128,7 +128,7 @@
             esc(c.handle || shortCa(c.wallet)) +
             ' \u00b7 ' +
             (c.sharedN || 0) +
-            ' shared</button>'
+            '</button>'
           );
         })
         .join('');
@@ -137,18 +137,20 @@
     if (mode === 'common') {
       list.innerHTML = common.length
         ? common.map(cardWal).join('')
-        : '<div style="color:#8491a1;font-size:12px">No overlapping bags yet. Scan now, then wait until 2 of the top 8 FOMO wallets hold the same mint.</div>';
+        : '<div style="color:#8491a1;font-size:12px">No overlap yet. Point a Helius webhook at /helius. Score = how many FOMO wallets bought the same mint.</div>';
     } else if (mode === 'obs' && wallet) {
       const w = common.find(function (c) { return c.wallet === wallet; });
-      const coins = (j.coins || j.buys || []).filter(function (c) {
+      const coins = (j.coins || []).filter(function (c) {
         return (c.wallets || []).indexOf(wallet) >= 0;
       });
-      list.innerHTML = (w ? cardWal(w) : '') + (coins.length ? coins.map(cardCoin).join('') : '<div style="color:#8491a1;font-size:12px">No shared/new coins on this wallet yet.</div>');
+      list.innerHTML = (w ? cardWal(w) : '') + (coins.length ? coins.map(cardCoin).join('') : '<div style="color:#8491a1;font-size:12px">No overlap coins on this wallet yet.</div>');
     } else {
-      const coins = j.coins && j.coins.length ? j.coins : j.buys || [];
+      const coins = (j.coins || []).slice().sort(function (a, b) {
+        return scoreOf(a) - scoreOf(b);
+      });
       list.innerHTML = coins.length
         ? coins.map(cardCoin).join('')
-        : '<div style="color:#8491a1;font-size:12px">No coin list yet. First scan stores bags; next 30m scan marks new buys. Shared holds appear when 2 scanned wallets own the same mint.</div>';
+        : '<div style="color:#8491a1;font-size:12px">No overlap coins yet. Create a free Helius enhanced webhook (SWAP) to https://trading-ohlcv.sasipudi.workers.dev/helius with the top-100 SOL addresses. Coins appear when 2+ watched wallets buy the same mint. Not a buy list.</div>';
     }
   }
   window.setWalletInnerCoins = function () {
