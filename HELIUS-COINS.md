@@ -1,30 +1,22 @@
-# Helius → Coins (overlap only)
+# Helius → Coins (auto top-100)
 
-Coin selection list. Not candles. Not a buy signal.
+You do **not** paste 100 addresses by hand. After the API key is on the Worker, `GET /helius?sync=1` creates/updates one Enhanced SWAP webhook with whatever SOL leaders are live.
 
-## What you get
-- `POST /helius` stores SWAP/TRANSFER buys for FOMO SOL leaders
-- `GET /wallets` `coins[]` = mints bought by **2+** watched wallets
-- `score` = number of those wallets (sorted **ascending**: 2, then 3, then 4…)
-
-## One-time setup (free Helius)
-1. https://dashboard.helius.dev → API key
-2. Webhooks → Enhanced → transaction types `SWAP`
-3. URL:
+## One secret (Cloudflare, not git)
+Worker `trading-ohlcv` → Settings → Variables → Encrypt:
 
 ```
-https://trading-ohlcv.sasipudi.workers.dev/helius
+HELIUS_API_KEY = <paste from dashboard.helius.dev>
 ```
 
-4. Addresses: every `sol` field from `/wallets` `leaders` (skip blank)
-5. One webhook can hold all ~100 addresses on the free plan
-
-Optional Worker secret:
+Then open:
 
 ```
-HELIUS_WEBHOOK_SECRET = any string
+https://trading-ohlcv.sasipudi.workers.dev/helius?sync=1
 ```
 
-Then append `?secret=THAT_STRING` to the webhook URL. Do not commit the API key.
+Expect `{ ok:true, addresses:~90+, webhookId:"..." }`.
 
-Hard-refresh Wallets → Coins after deploy. Empty until two watched wallets buy the same mint.
+Leaders already refresh every 6h. Hit `?sync=1` again after that (or we sync when you open `/helius?sync=1`). Free plan: 1 webhook, enough for ~100 addresses.
+
+Do not commit the key. Test app still: put it only in Cloudflare secrets.
