@@ -115,12 +115,52 @@
     }
     return bits.join('') || '—';
   }
+  function coinLabel(c) {
+    const n = String(c.symbol || c.name || '').trim();
+    if (n && n.length <= 24 && n.indexOf('...') < 0 && !/^[1-9A-HJ-NP-Za-km-z]{20,}/.test(n)) return n;
+    return '—';
+  }
+  async function enrich(coins) {
+    const mints = [];
+    const seen = {};
+    for (let i = 0; i < (coins || []).length; i++) {
+      const m = coins[i] && coins[i].mint;
+      if (!m || seen[m]) continue;
+      seen[m] = 1;
+      mints.push(m);
+    }
+    const meta = {};
+    for (let i = 0; i < mints.length; i += 25) {
+      const chunk = mints.slice(i, i + 25);
+      try {
+        const r = await fetch('https://api.dexscreener.com/tokens/v1/solana/' + chunk.join(','), { cache: 'no-store' });
+        const arr = await r.json();
+        const list = Array.isArray(arr) ? arr : [];
+        for (let j = 0; j < list.length; j++) {
+          const p = list[j] || {};
+          const mint = (p.baseToken && p.baseToken.address) || '';
+          if (!mint) continue;
+          const mcap = +p.marketCap || +p.fdv || 0;
+          const symbol = (p.baseToken && (p.baseToken.symbol || p.baseToken.name)) || '';
+          if (!meta[mint] || mcap > (meta[mint].mcap || 0)) meta[mint] = { name: symbol, symbol: symbol, mcap: mcap };
+        }
+      } catch (e) {}
+    }
+    return (coins || []).map(function (c) {
+      const x = meta[c.mint] || {};
+      return Object.assign({}, c, {
+        name: x.name || c.name || '',
+        symbol: x.symbol || c.symbol || '',
+        mcap: x.mcap || c.mcap || 0
+      });
+    });
+  }
   function rowHtml(c) {
     const n = scoreOf(c);
     return (
       '<tr>' +
       '<td style="padding:10px 8px;border-bottom:1px solid #243041;font-weight:800;color:#e8eef6;word-break:break-word">' +
-      esc(c.name || shortCa(c.mint)) +
+      esc(coinLabel(c)) +
       (c.mint
         ? '<div><a href="' +
           esc(dexHref(c.mint)) +
@@ -150,12 +190,17 @@
       return;
     }
     if (!list) return;
-    const coins = (j.coins || []).slice().sort(function (a, b) {
-      return scoreOf(b) - scoreOf(a);
-    });
+    let coins = await enrich(j.coins || []);
+    coins = coins
+      .filter(function (c) {
+        return +c.mcap >= 50000;
+      })
+      .sort(function (a, b) {
+        return scoreOf(b) - scoreOf(a);
+      });
     if (!coins.length) {
       list.innerHTML =
-        '<div style="color:#8491a1;font-size:12px">No overlap coins yet. A mint shows when 2+ watched wallets buy it.</div>';
+        '<div style="color:#8491a1;font-size:12px">No overlap coins with MC \u2265 $50k yet.</div>';
       return;
     }
     list.innerHTML =
