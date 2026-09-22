@@ -949,6 +949,35 @@ const TABS = [
       return "&" + "quot;";
     });
   }
+  function dexHref(symbol, mint) {
+    const sym = String(symbol || "").replace(/^\$/, "").trim();
+    const m = String(mint || "").trim();
+    if (m && m.length >= 32 && !/(?:fomo|pump)$/i.test(m)) {
+      return "https://dexscreener.com/solana/" + m;
+    }
+    if (sym) return "https://dexscreener.com/search?q=" + encodeURIComponent(sym);
+    if (m) return "https://dexscreener.com/solana/" + encodeURIComponent(m);
+    return "https://dexscreener.com/";
+  }
+  function openDex(symbol, mint, href) {
+    const url = href || dexHref(symbol, mint);
+    if (!url) return;
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+  function tickerA(symbol, mint) {
+    const sym = String(symbol || "").replace(/^\$/, "");
+    return (
+      '<a class="fp-dex" data-symbol="' +
+      esc(sym) +
+      '" data-mint="' +
+      esc(mint || "") +
+      '" href="' +
+      esc(dexHref(sym, mint)) +
+      '" target="_blank" rel="noopener noreferrer" style="color:#6eb6ff;font-weight:800;text-decoration:none">$' +
+      esc(sym) +
+      "</a>"
+    );
+  }
   function chip(label, tone) {
     const map = {
       green: "background:rgba(98,227,160,.16);color:#62e3a0",
@@ -1004,6 +1033,7 @@ const TABS = [
         handle: w.handle,
         address: w.address,
         symbol: t.symbol,
+        mint: t.mint,
         side: i % 3 === 0 ? "sell" : "buy",
         sizeUsd: t.sizeUsd,
         agoSec: 8 + i * 17,
@@ -1268,8 +1298,8 @@ const TABS = [
           chip(t.side === "buy" ? "Buy" : "Sell", t.side === "buy" ? "green" : "red") +
           '<div style="flex:1;min-width:0"><div style="font-weight:800;color:#e8eef6">' +
           esc(t.handle) +
-          '</div><div style="font-size:11px;color:#8491a1">$' +
-          esc(t.symbol) +
+          '</div><div style="font-size:11px;color:#8491a1">' +
+          tickerA(t.symbol, t.mint) +
           " · " +
           esc(shortAddr(t.address)) +
           '</div></div><div style="text-align:right;font-weight:800;font-variant-numeric:tabular-nums">' +
@@ -1326,8 +1356,8 @@ const TABS = [
         html += td(winPct(w.winRate));
         html += extraCells(w);
         html +=
-          '<td style="padding:10px 8px;border-bottom:1px solid #16202a"><div style="font-weight:800">$' +
-          esc(w.last.symbol) +
+          '<td style="padding:10px 8px;border-bottom:1px solid #16202a"><div>' +
+          tickerA(w.last.symbol, w.last.mint) +
           '</div><div style="font-size:11px;color:#8491a1">' +
           esc(w.last.side) +
           " " +
@@ -1393,7 +1423,18 @@ const TABS = [
         esc(sel.address) +
         '" target="_blank" rel="noopener" style="' +
         btnStyle(false) +
-        ';text-decoration:none">Solscan</a></div>' +
+        ';text-decoration:none">Solscan</a>' +
+        '<a class="fp-dex" data-symbol="' +
+        esc(sel.last.symbol) +
+        '" data-mint="' +
+        esc(sel.last.mint || "") +
+        '" href="' +
+        esc(dexHref(sel.last.symbol, sel.last.mint)) +
+        '" target="_blank" rel="noopener noreferrer" style="' +
+        btnStyle(false) +
+        ';text-decoration:none">DexScreener $' +
+        esc(sel.last.symbol) +
+        "</a></div>" +
         '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">' +
         [
           ["24h", usdSigned(sel.pnl24h), sel.pnl24h],
@@ -1459,8 +1500,8 @@ const TABS = [
       html += '<div style="margin-top:14px;font-size:12px;font-weight:800;letter-spacing:.08em;color:#8491a1">HOLDINGS</div>';
       sel.holdings.forEach(function (h) {
         html +=
-          '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #16202a"><div style="font-weight:800">$' +
-          esc(h.symbol) +
+          '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #16202a;gap:10px"><div>' +
+          tickerA(h.symbol, h.mint) +
           '</div><div style="font-weight:800;color:' +
           (h.pnlPct >= 0 ? "#62e3a0" : "#ff6f7c") +
           '">' +
@@ -1475,9 +1516,9 @@ const TABS = [
         html +=
           '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #16202a"><div>' +
           chip(t.side, t.side === "buy" ? "green" : "red") +
-          ' <b>$' +
-          esc(t.symbol) +
-          "</b> · " +
+          " " +
+          tickerA(t.symbol, t.mint) +
+          " · " +
           ago(t.agoSec) +
           '</div><div style="font-weight:800">' +
           usd(t.sizeUsd) +
@@ -1496,6 +1537,13 @@ const TABS = [
     if (!root || root.dataset.bound === "1") return;
     root.dataset.bound = "1";
     root.addEventListener("click", function (ev) {
+      const dex = ev.target && ev.target.closest && ev.target.closest("a.fp-dex");
+      if (dex) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openDex(dex.getAttribute("data-symbol"), dex.getAttribute("data-mint"), dex.getAttribute("href"));
+        return;
+      }
       const t = ev.target && ev.target.closest && ev.target.closest("button, a, tr.fp-open");
       if (!t) return;
       if (t.classList.contains("fp-plat")) {
@@ -1595,6 +1643,7 @@ const TABS = [
             handle: w.handle,
             address: w.address,
             symbol: tr.symbol,
+            mint: tr.mint,
             side: Math.random() > 0.42 ? "buy" : "sell",
             sizeUsd: tr.sizeUsd,
             agoSec: 1,
