@@ -98,18 +98,32 @@
   function walletCell(c) {
     const handles = c.handles || [];
     const wallets = c.wallets || [];
+    const apes = c.apes || [];
     const bits = [];
-    const n = Math.max(handles.length, wallets.length);
+    const n = Math.max(handles.length, wallets.length, apes.length);
     for (let i = 0; i < n; i++) {
-      const h = handles[i] || '';
-      const w = wallets[i] || '';
+      const h = handles[i] || (apes[i] && apes[i].handle) || '';
+      const w = wallets[i] || (apes[i] && apes[i].wallet) || '';
+      const ape =
+        (w &&
+          apes.filter(function (a) {
+            return a && a.wallet === w;
+          })[0]) ||
+        apes[i] ||
+        null;
+      const dollars = apeUsd(ape, c.solUsd, c.priceUsd);
       const label = h ? '@' + h : shortCa(w);
       const copyVal = h || '';
       bits.push(
-        '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 2px 0">' +
+        '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 6px 0;flex-wrap:wrap">' +
           '<span>' +
           esc(label) +
           '</span>' +
+          (dollars > 0
+            ? '<span style="color:#62e3a0;font-weight:900;font-variant-numeric:tabular-nums">' +
+              esc(fmtUsd(dollars)) +
+              '</span>'
+            : '') +
           (copyVal
             ? '<button type="button" data-copy="' +
               esc(copyVal) +
@@ -132,6 +146,46 @@
     if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 10e6 ? 1 : 2) + 'M';
     if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 100e3 ? 0 : 1) + 'k';
     return '$' + n.toFixed(0);
+  }
+  function fmtUsd(n) {
+    n = +n;
+    if (!(n > 0)) return '';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 10e6 ? 1 : 2) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 100e3 ? 0 : 1) + 'k';
+    if (n >= 100) return '$' + Math.round(n);
+    if (n >= 10) return '$' + n.toFixed(1);
+    return '$' + n.toFixed(2);
+  }
+  function apeUsd(ape, solPx, tokenPx) {
+    if (!ape) return 0;
+    const fromSol = (+ape.sol || 0) * (+solPx || 0);
+    const fromUsdc = +ape.usdc || 0;
+    if (fromSol > 0 || fromUsdc > 0) return fromSol + fromUsdc;
+    return (+ape.tokens || 0) * (+tokenPx || 0);
+  }
+  function coinApeTotal(c) {
+    const apes = c.apes || [];
+    let s = 0;
+    for (let i = 0; i < apes.length; i++) s += apeUsd(apes[i], c.solUsd, c.priceUsd);
+    return s;
+  }
+  async function fetchSolUsd() {
+    try {
+      const r = await fetch(
+        'https://api.dexscreener.com/tokens/v1/solana/So11111111111111111111111111111111111111112',
+        { cache: 'no-store' }
+      );
+      const arr = await r.json();
+      const list = Array.isArray(arr) ? arr : [];
+      let best = 0;
+      for (let i = 0; i < list.length; i++) {
+        const px = +(list[i] && list[i].priceUsd) || 0;
+        if (px > best) best = px;
+      }
+      return best;
+    } catch (e) {
+      return 0;
+    }
   }
   function isSolQuote(p) {
     const chain = String(p.chainId || p.chain || '').toLowerCase();
@@ -162,7 +216,14 @@
           if (!mint) continue;
           const mcap = +p.marketCap || +p.fdv || 0;
           const symbol = (p.baseToken && (p.baseToken.symbol || p.baseToken.name)) || '';
-          if (!meta[mint] || mcap > (meta[mint].mcap || 0)) meta[mint] = { name: symbol, symbol: symbol, mcap: mcap, solPair: true };
+          if (!meta[mint] || mcap > (meta[mint].mcap || 0))
+            meta[mint] = {
+              name: symbol,
+              symbol: symbol,
+              mcap: mcap,
+              priceUsd: +p.priceUsd || 0,
+              solPair: true
+            };
         }
       } catch (e) {}
     }
@@ -172,12 +233,14 @@
         name: x.name || c.name || '',
         symbol: x.symbol || c.symbol || '',
         mcap: x.mcap || c.mcap || 0,
+        priceUsd: x.priceUsd || c.priceUsd || 0,
         solPair: !!x.solPair
       });
     });
   }
   function rowHtml(c) {
     const n = scoreOf(c);
+    const apeTot = coinApeTotal(c);
     return (
       '<tr>' +
       '<td style="padding:10px 8px;border-bottom:1px solid #243041;font-weight:800;color:#e8eef6;white-space:nowrap">' +
@@ -193,6 +256,9 @@
       '</td>' +
       '<td style="padding:10px 8px;border-bottom:1px solid #243041;text-align:center;font-weight:900;color:#e6c878">' +
       n +
+      (apeTot > 0
+        ? '<div style="font-size:11px;color:#62e3a0;font-weight:800">' + esc(fmtUsd(apeTot)) + '</div>'
+        : '') +
       '</td>' +
       '<td style="padding:10px 8px;border-bottom:1px solid #243041;font-size:12px;color:#c5d0dc">' +
       walletCell(c) +
@@ -245,12 +311,16 @@
         return;
       }
     }
+    const solPx = await fetchSolUsd();
+    coins = coins.map(function (c) {
+      return Object.assign({}, c, { solUsd: solPx });
+    });
     list.innerHTML =
       '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">' +
       '<thead><tr>' +
       '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">NAME / MC</th>' +
-      '<th style="text-align:center;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLETS</th>' +
-      '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLETS / COPY</th>' +
+      '<th style="text-align:center;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLETS / APE</th>' +
+      '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLET · USD APE</th>' +
       '</tr></thead><tbody>' +
       coins.map(rowHtml).join('') +
       '</tbody></table></div>';

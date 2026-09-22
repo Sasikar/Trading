@@ -13,6 +13,11 @@ const STABLES = new Set([
   'usd1ttk2fx1eqezrpkz8md9wfvaqvygm6cg3w5sj',
   'ekjqqd7r6gnv6ccauhu3nfux4pqhqgs6p9f6qeqkpump'
 ]);
+const STABLE_USD = new Set([
+  'epjfwdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v',
+  'es9vmfrzacermjfrf4h2fyd4kconky11mcce8benwnyb',
+  'usd1ttk2fx1eqezrpkz8md9wfvaqvygm6cg3w5sj'
+]);
 
 export function solLeaders(leaders) {
   return (leaders || []).filter((l) => l && l.sol);
@@ -29,6 +34,66 @@ function isSkip(mint) {
   return !k || skipMint(k) || STABLES.has(k);
 }
 
+function num(x) {
+  const n = +x;
+  return Number.isFinite(n) ? n : 0;
+}
+
+function tokenUi(t) {
+  const raw = (t && (t.tokenAmount || t.amount)) || {};
+  if (raw && typeof raw === 'object') {
+    const ui = raw.uiAmount ?? raw.uiAmountString;
+    const n = num(ui);
+    if (n) return n;
+    const amt = num(raw.amount);
+    const dec = num(raw.decimals);
+    if (amt && dec >= 0 && dec <= 18) return amt / Math.pow(10, dec);
+  }
+  if (typeof raw === 'number') return num(raw);
+  return num(t && t.uiAmount);
+}
+
+function acct(t, which) {
+  if (which === 'to') return t.toUserAccount || t.toUser || t.to || t.account || '';
+  return t.fromUserAccount || t.fromUser || t.from || t.account || '';
+}
+
+export function netSol(tx, wallet) {
+  if (!tx || !wallet) return 0;
+  const sw = (tx.events && (tx.events.swap || (tx.events[0] && tx.events[0].swap))) || null;
+  if (sw && sw.nativeInput) {
+    const acc = sw.nativeInput.account || sw.nativeInput.userAccount || '';
+    if (acc === wallet) {
+      const lamports = num(sw.nativeInput.amount);
+      if (lamports > 0) return lamports / 1e9;
+    }
+  }
+  let out = 0;
+  let inn = 0;
+  const ns = tx.nativeTransfers || tx.native_transfers || [];
+  for (let i = 0; i < ns.length; i++) {
+    const n = ns[i] || {};
+    const amt = num(n.amount);
+    if ((n.fromUserAccount || n.fromUser || n.from) === wallet) out += amt;
+    if ((n.toUserAccount || n.toUser || n.to) === wallet) inn += amt;
+  }
+  return Math.max(0, (out - inn) / 1e9);
+}
+
+export function stableSpent(tx, wallet) {
+  if (!tx || !wallet) return 0;
+  let usd = 0;
+  const transfers = tx.tokenTransfers || tx.token_transfers || [];
+  for (let i = 0; i < transfers.length; i++) {
+    const t = transfers[i] || {};
+    const mint = String(t.mint || (t.tokenAmount && t.tokenAmount.mint) || '').toLowerCase();
+    if (!STABLE_USD.has(mint)) continue;
+    if (acct(t, 'from') !== wallet) continue;
+    usd += tokenUi(t);
+  }
+  return usd;
+}
+
 export function buysFromHeliusTx(tx, watch) {
   const out = [];
   if (!tx || !watch || !watch.size) return out;
@@ -39,17 +104,11 @@ export function buysFromHeliusTx(tx, watch) {
     const t = transfers[i] || {};
     const mint = t.mint || (t.tokenAmount && t.tokenAmount.mint) || '';
     if (isSkip(mint)) continue;
-    const to = t.toUserAccount || t.toUser || t.to || '';
-    const from = t.fromUserAccount || t.fromUser || t.from || '';
+    const to = acct(t, 'to');
+    const from = acct(t, 'from');
     const Lto = watch.get(to);
     const Lfrom = watch.get(from);
-    const rawAmt = t.tokenAmount || t.amount || {};
-    const amount = +(
-      (rawAmt && typeof rawAmt === 'object' && (rawAmt.uiAmount ?? rawAmt.uiAmountString)) ||
-      (typeof rawAmt === 'number' ? rawAmt : 0) ||
-      t.uiAmount ||
-      0
-    );
+    const amount = tokenUi(t);
     if (Lto && !Lfrom) {
       out.push({
         mint,
@@ -59,6 +118,8 @@ export function buysFromHeliusTx(tx, watch) {
         at,
         sig,
         amount,
+        sol: 0,
+        usdc: 0,
         name: t.symbol || '',
         dexUrl: mint ? 'https://dexscreener.com/solana/' + mint : ''
       });
@@ -71,10 +132,30 @@ export function buysFromHeliusTx(tx, watch) {
         at,
         sig,
         amount,
+        sol: 0,
+        usdc: 0,
         name: t.symbol || '',
         dexUrl: mint ? 'https://dexscreener.com/solana/' + mint : ''
       });
     }
+  }
+  const buyers = {};
+  for (let i = 0; i < out.length; i++) {
+    if (out[i].side !== 'buy') continue;
+    const w = out[i].wallet;
+    buyers[w] = (buyers[w] || 0) + 1;
+  }
+  const solOf = {};
+  const usdOf = {};
+  Object.keys(buyers).forEach((w) => {
+    solOf[w] = netSol(tx, w);
+    usdOf[w] = stableSpent(tx, w);
+  });
+  for (let i = 0; i < out.length; i++) {
+    if (out[i].side !== 'buy') continue;
+    const n = buyers[out[i].wallet] || 1;
+    out[i].sol = (solOf[out[i].wallet] || 0) / n;
+    out[i].usdc = (usdOf[out[i].wallet] || 0) / n;
   }
   return out;
 }

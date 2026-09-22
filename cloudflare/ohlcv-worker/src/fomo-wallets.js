@@ -104,6 +104,7 @@ export function clusterBuys(rows) {
         mint: r.mint,
         handles: [],
         wallets: [],
+        apes: [],
         at: r.at || 0,
         name: r.name || '',
         liq: r.liq || 0,
@@ -118,6 +119,24 @@ export function clusterBuys(rows) {
     }
     if (r.handle && c.handles.indexOf(r.handle) < 0) c.handles.push(r.handle);
     if (r.wallet && c.wallets.indexOf(r.wallet) < 0) c.wallets.push(r.wallet);
+    if (r.wallet) {
+      if (!c.apes) c.apes = [];
+      let a = null;
+      for (let j = 0; j < c.apes.length; j++) {
+        if (c.apes[j].wallet === r.wallet) {
+          a = c.apes[j];
+          break;
+        }
+      }
+      if (!a) {
+        a = { wallet: r.wallet, handle: r.handle || '', sol: 0, usdc: 0, tokens: 0 };
+        c.apes.push(a);
+      }
+      if (r.handle) a.handle = r.handle;
+      a.sol += +r.sol || 0;
+      a.usdc += +r.usdc || 0;
+      a.tokens += +r.amount || 0;
+    }
     if (r.at && r.at > c.at) c.at = r.at;
     if (r.liq) c.liq = r.liq;
     if (r.volume) c.volume = r.volume;
