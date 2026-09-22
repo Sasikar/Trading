@@ -30,7 +30,7 @@ nav.innerHTML=`<a class="site-brand" href="index.html">TRADING<i>.</i></a><div c
 document.body.insertBefore(nav,document.body.firstChild);
 if(!document.querySelector('script[src*="wallets-observe"]')){
   const s=document.createElement('script');
-  s.src='wallets-observe.js?v=20260922-ape2';
+  s.src='wallets-observe.js?v=20260922-ape3';
   document.body.appendChild(s);
 }
 })();

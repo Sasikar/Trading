@@ -91,5 +91,7 @@ test('scoreCoins sums ape per wallet', () => {
   const ape2 = coins[0].apes.find((x) => x.wallet === 'w2');
   assert.equal(ape1.sol, 2);
   assert.equal(ape1.tokens, 15);
+  assert.equal(ape1.at, 3);
   assert.equal(ape2.usdc, 40);
+  assert.equal(ape2.at, 4);
 });

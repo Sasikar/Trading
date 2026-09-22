@@ -95,6 +95,40 @@
       else paint(wt);
     }
   }
+  function toMs(at) {
+    at = +at || 0;
+    if (at > 0 && at < 1e12) at *= 1000;
+    return at;
+  }
+  function ago(at) {
+    const t = toMs(at);
+    if (!(t > 0)) return '';
+    const ms = Date.now() - t;
+    if (ms < 0) return 'just now';
+    const s = Math.floor(ms / 1000);
+    if (s < 8) return 'just now';
+    if (s < 60) return s + 's ago';
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    const rm = m % 60;
+    if (h < 24) return rm ? h + 'h ' + rm + 'm ago' : h + 'h ago';
+    const d = Math.floor(h / 24);
+    const rh = h % 24;
+    return rh ? d + 'd ' + rh + 'h ago' : d + 'd ago';
+  }
+  let agoTimer = 0;
+  function tickAgo() {
+    document.querySelectorAll('#wallets-panel [data-bought-at]').forEach(function (el) {
+      const txt = ago(el.getAttribute('data-bought-at'));
+      if (txt && el.textContent !== txt) el.textContent = txt;
+    });
+  }
+  function startAgo() {
+    tickAgo();
+    if (agoTimer) return;
+    agoTimer = setInterval(tickAgo, 1000);
+  }
   function walletCell(c) {
     const handles = c.handles || [];
     const wallets = c.wallets || [];
@@ -112,6 +146,8 @@
         apes[i] ||
         null;
       const dollars = apeUsd(ape, c.solUsd, c.priceUsd);
+      const boughtAt = ape && ape.at ? toMs(ape.at) : 0;
+      const when = boughtAt ? ago(boughtAt) : '';
       const label = h ? '@' + h : shortCa(w);
       const btn =
         'border:0;background:#1a2430;color:#6eb6ff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:800;cursor:pointer';
@@ -123,6 +159,13 @@
           (dollars > 0
             ? '<span style="color:#62e3a0;font-weight:900;font-variant-numeric:tabular-nums">' +
               esc(fmtUsd(dollars)) +
+              '</span>'
+            : '') +
+          (when
+            ? '<span data-bought-at="' +
+              boughtAt +
+              '" title="last buy" style="color:#8491a1;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums">' +
+              esc(when) +
               '</span>'
             : '') +
           (h
@@ -330,10 +373,11 @@
       '<thead><tr>' +
       '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">NAME / MC</th>' +
       '<th style="text-align:center;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLETS / APE</th>' +
-      '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLET · USD APE</th>' +
+      '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLET · USD APE · AGO</th>' +
       '</tr></thead><tbody>' +
       coins.map(rowHtml).join('') +
       '</tbody></table></div>';
+    startAgo();
   }
   window.setWalletInnerCoins = function (mode) {
     paint(mode);
