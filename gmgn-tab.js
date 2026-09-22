@@ -108,7 +108,8 @@
       'showPitfalls',
       'showStrategy',
       'showDecisionCheck',
-      'showWallets'
+      'showWallets',
+      'showFirstprint'
     ].forEach(function (fn) {
       try {
         window[fn](false);
@@ -138,7 +139,8 @@
       'pitfalls-panel',
       'strategy-panel',
       'decision-panel',
-      'wallets-panel'
+      'wallets-panel',
+      'firstprint-panel'
     ].forEach(function (id) {
       const el = $(id);
       if (!el) return;
