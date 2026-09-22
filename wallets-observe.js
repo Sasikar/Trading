@@ -113,7 +113,8 @@
         null;
       const dollars = apeUsd(ape, c.solUsd, c.priceUsd);
       const label = h ? '@' + h : shortCa(w);
-      const copyVal = h || '';
+      const btn =
+        'border:0;background:#1a2430;color:#6eb6ff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:800;cursor:pointer';
       bits.push(
         '<span style="display:inline-flex;align-items:center;gap:4px;margin:2px 8px 6px 0;flex-wrap:wrap">' +
           '<span>' +
@@ -124,10 +125,19 @@
               esc(fmtUsd(dollars)) +
               '</span>'
             : '') +
-          (copyVal
+          (h
             ? '<button type="button" data-copy="' +
-              esc(copyVal) +
-              '" data-copy-label="copy" style="border:0;background:#1a2430;color:#6eb6ff;border-radius:6px;padding:2px 6px;font-size:10px;font-weight:800;cursor:pointer">copy</button>'
+              esc(h) +
+              '" data-copy-label="handle" style="' +
+              btn +
+              '">handle</button>'
+            : '') +
+          (w
+            ? '<button type="button" data-copy="' +
+              esc(w) +
+              '" data-copy-label="wallet" style="' +
+              btn +
+              '">wallet</button>'
             : '') +
           '</span>'
       );
