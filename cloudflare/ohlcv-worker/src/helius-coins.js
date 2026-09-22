@@ -43,6 +43,13 @@ export function buysFromHeliusTx(tx, watch) {
     const from = t.fromUserAccount || t.fromUser || t.from || '';
     const Lto = watch.get(to);
     const Lfrom = watch.get(from);
+    const rawAmt = t.tokenAmount || t.amount || {};
+    const amount = +(
+      (rawAmt && typeof rawAmt === 'object' && (rawAmt.uiAmount ?? rawAmt.uiAmountString)) ||
+      (typeof rawAmt === 'number' ? rawAmt : 0) ||
+      t.uiAmount ||
+      0
+    );
     if (Lto && !Lfrom) {
       out.push({
         mint,
@@ -51,6 +58,7 @@ export function buysFromHeliusTx(tx, watch) {
         side: 'buy',
         at,
         sig,
+        amount,
         name: t.symbol || '',
         dexUrl: mint ? 'https://dexscreener.com/solana/' + mint : ''
       });
@@ -62,6 +70,7 @@ export function buysFromHeliusTx(tx, watch) {
         side: 'sell',
         at,
         sig,
+        amount,
         name: t.symbol || '',
         dexUrl: mint ? 'https://dexscreener.com/solana/' + mint : ''
       });
