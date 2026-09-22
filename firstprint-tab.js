@@ -949,8 +949,12 @@ const TABS = [
       return "&" + "quot;";
     });
   }
+  const dexCache = {};
+  const dexBusy = {};
   function dexHref(symbol, mint) {
     const sym = String(symbol || "").replace(/^\$/, "").trim();
+    const key = sym.toUpperCase();
+    if (dexCache[key]) return dexCache[key];
     const m = String(mint || "").trim();
     if (m && m.length >= 32 && !/(?:fomo|pump)$/i.test(m)) {
       return "https://dexscreener.com/solana/" + m;
@@ -959,10 +963,117 @@ const TABS = [
     if (m) return "https://dexscreener.com/solana/" + encodeURIComponent(m);
     return "https://dexscreener.com/";
   }
-  function openDex(symbol, mint, href) {
-    const url = href || dexHref(symbol, mint);
-    if (!url) return;
-    window.open(url, "_blank", "noopener,noreferrer");
+  function pairScore(p, symbol) {
+    const q = String(symbol || "").toUpperCase();
+    const base = String((p.baseToken && p.baseToken.symbol) || "").toUpperCase();
+    const quote = String((p.quoteToken && p.quoteToken.symbol) || "").toUpperCase();
+    const liq = parseFloat((p.liquidity && p.liquidity.usd) || 0);
+    const vol = parseFloat((p.volume && p.volume.h24) || 0);
+    let n = liq * 3 + vol;
+    if (base === q) n += 1e9;
+    if (String(p.chainId || "").toLowerCase() === "solana") n += 5e8;
+    if (quote === "SOL" || quote === "USDC" || quote === "USDT") n += 1e6;
+    return n;
+  }
+  function pickPair(pairs, symbol) {
+    const list = (pairs || []).filter(function (p) {
+      return p && (p.url || p.pairAddress);
+    });
+    if (!list.length) return "";
+    list.sort(function (a, b) {
+      return pairScore(b, symbol) - pairScore(a, symbol);
+    });
+    const p = list[0];
+    if (p.url) return String(p.url).split("?")[0].replace(/\/$/, "");
+    const chain = String(p.chainId || "solana").toLowerCase();
+    return "https://dexscreener.com/" + chain + "/" + p.pairAddress;
+  }
+  function applyDexHrefs() {
+    const root = $("fp-root");
+    if (!root) return;
+    root.querySelectorAll("a.fp-dex").forEach(function (a) {
+      const k = String(a.getAttribute("data-symbol") || "").toUpperCase();
+      if (dexCache[k]) a.setAttribute("href", dexCache[k]);
+    });
+  }
+  function resolveDex(symbol, mint) {
+    const sym = String(symbol || "").replace(/^\$/, "").trim();
+    const key = sym.toUpperCase();
+    if (dexCache[key]) return Promise.resolve(dexCache[key]);
+    const m = String(mint || "").trim();
+    if (m && m.length >= 32 && !/(?:fomo|pump)$/i.test(m)) {
+      dexCache[key] = "https://dexscreener.com/solana/" + m;
+      return Promise.resolve(dexCache[key]);
+    }
+    if (!key) return Promise.resolve("https://dexscreener.com/");
+    if (dexBusy[key]) return dexBusy[key];
+    const path = "/latest/dex/search?q=" + encodeURIComponent(sym);
+    dexBusy[key] = (async function () {
+      let j = null;
+      try {
+        const r = await fetch("https://api.dexscreener.com" + path, { cache: "no-store" });
+        if (r.ok) j = await r.json();
+      } catch (e) {}
+      if (!j || !(j.pairs && j.pairs.length)) {
+        try {
+          const pr = await fetch(
+            "https://trading-proxy.sasipudi.workers.dev/dex?path=" + encodeURIComponent(path),
+            { cache: "no-store" }
+          );
+          if (pr.ok) j = await pr.json();
+        } catch (e) {}
+      }
+      const url =
+        pickPair(j && j.pairs, sym) ||
+        "https://dexscreener.com/search?q=" + encodeURIComponent(sym);
+      dexCache[key] = url;
+      delete dexBusy[key];
+      applyDexHrefs();
+      return url;
+    })();
+    return dexBusy[key];
+  }
+  let openingDex = false;
+  function openDex(symbol, mint) {
+    const sym = String(symbol || "").replace(/^\$/, "").trim();
+    if (!sym || openingDex) return;
+    openingDex = true;
+    const st = $("fp-status");
+    if (st) st.textContent = "Opening $" + sym + "…";
+    resolveDex(symbol, mint)
+      .then(function (url) {
+        if (st) st.textContent = platLabel(state.platform) + " · $" + sym;
+        window.open(url, "_blank", "noopener,noreferrer");
+      })
+      .catch(function () {
+        if (st) st.textContent = "Dex miss · $" + sym;
+        window.open(dexHref(symbol, mint), "_blank", "noopener,noreferrer");
+      })
+      .then(function () {
+        openingDex = false;
+      });
+  }
+  function prefetchDex() {
+    const items = [];
+    const seen = {};
+    WALLETS.forEach(function (w) {
+      (w.holdings || []).forEach(function (h) {
+        const k = String(h.symbol || "").toUpperCase();
+        if (k && !seen[k]) {
+          seen[k] = 1;
+          items.push(h);
+        }
+      });
+    });
+    let i = 0;
+    function next() {
+      if (i >= items.length) return;
+      const h = items[i++];
+      resolveDex(h.symbol, h.mint).finally(function () {
+        setTimeout(next, 240);
+      });
+    }
+    next();
   }
   function tickerA(symbol, mint) {
     const sym = String(symbol || "").replace(/^\$/, "");
@@ -978,6 +1089,7 @@ const TABS = [
       "</a>"
     );
   }
+
   function chip(label, tone) {
     const map = {
       green: "background:rgba(98,227,160,.16);color:#62e3a0",
@@ -1528,6 +1640,7 @@ const TABS = [
     }
 
     root.innerHTML = html;
+    applyDexHrefs();
     const st = $("fp-status");
     if (st) st.textContent = platLabel(state.platform) + " · " + state.tab;
   }
@@ -1541,7 +1654,7 @@ const TABS = [
       if (dex) {
         ev.preventDefault();
         ev.stopPropagation();
-        openDex(dex.getAttribute("data-symbol"), dex.getAttribute("data-mint"), dex.getAttribute("href"));
+        openDex(dex.getAttribute("data-symbol"), dex.getAttribute("data-mint"));
         return;
       }
       const t = ev.target && ev.target.closest && ev.target.closest("button, a, tr.fp-open");
@@ -1625,6 +1738,7 @@ const TABS = [
       }
       bind();
       paint();
+      prefetchDex();
       if (timer) clearInterval(timer);
       timer = setInterval(function () {
         const onp = $("firstprint-panel");
