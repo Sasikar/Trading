@@ -7,6 +7,7 @@ import { buysFromHeliusTx, parseHeliusPayload, mergeEvents, scoreCoins, overlapO
 import { syncHeliusWebhook, HELIUS_HOOK_ID_KEY } from './helius-sync.js';
 import { notifyNewOverlap } from './helius-tg.js';
 import { scanOldTick, readOldCoins, OLD_SCAN_AT_KEY } from './helius-old.js';
+import { lookupBuy } from './helius-lookup.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -245,6 +246,18 @@ export class OhlcvEngine {
     }
     return new Response(JSON.stringify({ ok: true, ingested: incoming.length, stored: merged.events.length }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
   }
+  async handleBuyLookup(request) {
+    const url = new URL(request.url);
+    const wallet = (url.searchParams.get('wallet') || '').trim();
+    const q = (url.searchParams.get('q') || url.searchParams.get('coin') || url.searchParams.get('mint') || '').trim();
+    let out;
+    try {
+      out = await lookupBuy(this.env, wallet, q);
+    } catch (e) {
+      out = { ok: false, error: String(e && e.message ? e.message : e).slice(0, 200) };
+    }
+    return new Response(JSON.stringify(out), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+  }
   async fetch(request) {
     const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
     if (path === '/health' || path === '/api/health') {
@@ -256,6 +269,7 @@ export class OhlcvEngine {
         try { await this.ensureAlarm(); } catch (e) {}
       }
       if (path === '/helius' || path === '/api/helius') return this.handleHelius(request);
+      if (path === '/buy-lookup' || path === '/api/buy-lookup') return this.handleBuyLookup(request);
       if (path === '/oldcoins' || path === '/api/oldcoins') {
         const want = new URL(request.url).searchParams.get('scan') === '1';
         if (want) {
