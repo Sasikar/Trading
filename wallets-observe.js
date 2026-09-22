@@ -120,10 +120,24 @@
     }
     return bits.join('') || '—';
   }
+  const WSOL = 'so11111111111111111111111111111111111111112';
   function coinLabel(c) {
     const n = String(c.symbol || c.name || '').trim();
     if (n && n.length <= 24 && n.indexOf('...') < 0 && !/^[1-9A-HJ-NP-Za-km-z]{20,}/.test(n)) return n;
     return '—';
+  }
+  function fmtMc(n) {
+    n = +n;
+    if (!(n > 0)) return '';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(n >= 10e6 ? 1 : 2) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(n >= 100e3 ? 0 : 1) + 'k';
+    return '$' + n.toFixed(0);
+  }
+  function isSolQuote(p) {
+    const chain = String(p.chainId || p.chain || '').toLowerCase();
+    if (chain && chain !== 'solana') return false;
+    const q = ((p.quoteToken && (p.quoteToken.address || p.quoteToken.symbol)) || '').toLowerCase();
+    return q === WSOL || q === 'sol';
   }
   async function enrich(coins) {
     const mints = [];
@@ -143,11 +157,12 @@
         const list = Array.isArray(arr) ? arr : [];
         for (let j = 0; j < list.length; j++) {
           const p = list[j] || {};
+          if (!isSolQuote(p)) continue;
           const mint = (p.baseToken && p.baseToken.address) || '';
           if (!mint) continue;
           const mcap = +p.marketCap || +p.fdv || 0;
           const symbol = (p.baseToken && (p.baseToken.symbol || p.baseToken.name)) || '';
-          if (!meta[mint] || mcap > (meta[mint].mcap || 0)) meta[mint] = { name: symbol, symbol: symbol, mcap: mcap };
+          if (!meta[mint] || mcap > (meta[mint].mcap || 0)) meta[mint] = { name: symbol, symbol: symbol, mcap: mcap, solPair: true };
         }
       } catch (e) {}
     }
@@ -156,7 +171,8 @@
       return Object.assign({}, c, {
         name: x.name || c.name || '',
         symbol: x.symbol || c.symbol || '',
-        mcap: x.mcap || c.mcap || 0
+        mcap: x.mcap || c.mcap || 0,
+        solPair: !!x.solPair
       });
     });
   }
@@ -164,12 +180,15 @@
     const n = scoreOf(c);
     return (
       '<tr>' +
-      '<td style="padding:10px 8px;border-bottom:1px solid #243041;font-weight:800;color:#e8eef6;word-break:break-word">' +
+      '<td style="padding:10px 8px;border-bottom:1px solid #243041;font-weight:800;color:#e8eef6;white-space:nowrap">' +
+      '<span>' +
       esc(coinLabel(c)) +
+      '</span>' +
+      (fmtMc(c.mcap) ? '<span style="margin-left:8px;color:#62e3a0;font-size:12px">' + esc(fmtMc(c.mcap)) + '</span>' : '') +
       (c.mint
-        ? '<div><a href="' +
+        ? '<a href="' +
           esc(dexHref(c.mint)) +
-          '" target="_blank" rel="noopener" style="color:#6eb6ff;font-size:11px">DexScreener</a></div>'
+          '" target="_blank" rel="noopener" style="margin-left:8px;color:#6eb6ff;font-size:11px;font-weight:800">Dex</a>'
         : '') +
       '</td>' +
       '<td style="padding:10px 8px;border-bottom:1px solid #243041;text-align:center;font-weight:900;color:#e6c878">' +
@@ -198,33 +217,38 @@
     if (!list) return;
     let coins;
     if (mode === 'old') {
-      coins = (j.oldCoins || []).slice().sort(function (a, b) {
-        return scoreOf(b) - scoreOf(a);
-      });
-      if (!coins.length) {
-        list.innerHTML =
-          '<div style="color:#8491a1;font-size:12px">Old Coins: daily bag scan. 5+ wallets and MC ≥ $1M. First scan takes about an hour.</div>';
-        return;
-      }
-    } else {
-      coins = await enrich(j.coins || []);
+      coins = await enrich(j.oldCoins || []);
       coins = coins
         .filter(function (c) {
-          return +c.mcap >= 50000;
+          return c.solPair && +c.mcap >= 1e6;
         })
         .sort(function (a, b) {
           return scoreOf(b) - scoreOf(a);
         });
       if (!coins.length) {
         list.innerHTML =
-          '<div style="color:#8491a1;font-size:12px">No overlap coins with MC ≥ $50k yet.</div>';
+          '<div style="color:#8491a1;font-size:12px">Old Coins: SOL pairs only, 5+ wallets, MC ≥ $1M.</div>';
+        return;
+      }
+    } else {
+      coins = await enrich(j.coins || []);
+      coins = coins
+        .filter(function (c) {
+          return c.solPair && +c.mcap >= 50000;
+        })
+        .sort(function (a, b) {
+          return scoreOf(b) - scoreOf(a);
+        });
+      if (!coins.length) {
+        list.innerHTML =
+          '<div style="color:#8491a1;font-size:12px">No SOL-pair overlap coins with MC ≥ $50k yet.</div>';
         return;
       }
     }
     list.innerHTML =
       '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">' +
       '<thead><tr>' +
-      '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">NAME</th>' +
+      '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">NAME / MC</th>' +
       '<th style="text-align:center;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLETS</th>' +
       '<th style="text-align:left;padding:8px;color:#8491a1;font-size:11px;letter-spacing:.06em">WALLETS / COPY</th>' +
       '</tr></thead><tbody>' +
