@@ -1,5 +1,4 @@
 (()=>{if(document.getElementById('site-nav'))return;
-// Unregister stale service workers that pin old HTML
 if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
   if(window.caches)caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});
@@ -31,7 +30,7 @@ nav.innerHTML=`<a class="site-brand" href="index.html">TRADING<i>.</i></a><div c
 document.body.insertBefore(nav,document.body.firstChild);
 if(!document.querySelector('script[src*="wallets-observe"]')){
   const s=document.createElement('script');
-  s.src='wallets-observe.js?v=20260922-old1';
+  s.src='wallets-observe.js?v=20260922-old2';
   document.body.appendChild(s);
 }
 })();
