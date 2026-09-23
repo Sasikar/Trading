@@ -1,5 +1,7 @@
-/* Pumpfun Movers — video screen: MC ≤ $150k, age ≤ 60m, Twitter + a social. Not a buy list. */
+/* Pumpfun Movers. Inline loader in index.html owns the tab when present. */
 (function () {
+  if (window.__pfInline) return;
+
   function apiBase() {
     try {
       if (window.BREAKOUT_API) return String(window.BREAKOUT_API).replace(/\/+$/, '');

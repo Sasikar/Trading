@@ -41,7 +41,7 @@ export async function pumpfunFeed() {
   const coins = [];
   const seen = new Set();
   let err = '';
-  for (let page = 0; page < 3; page++) {
+  for (let page = 0; page < 2; page++) {
     const url =
       PUMP +
       '?offset=' +
@@ -49,7 +49,8 @@ export async function pumpfunFeed() {
       '&limit=50&sort=created_timestamp&order=DESC&includeNsfw=false';
     try {
       const r = await fetch(url, {
-        headers: { accept: 'application/json', 'user-agent': 'TradingPumpfun/1' }
+        headers: { accept: 'application/json', 'user-agent': 'TradingPumpfun/1' },
+        signal: AbortSignal.timeout(8000)
       });
       if (!r.ok) {
         err = 'pump HTTP ' + r.status;
