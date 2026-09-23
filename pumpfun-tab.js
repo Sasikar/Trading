@@ -178,7 +178,7 @@
     );
   }
   function paint() {
-    const list = $('pf-list');
+    const list = $('pump-list');
     if (!list) return;
     const hit = rows.filter(pass);
     hit.sort(function (a, b) {
@@ -207,8 +207,8 @@
     if (soc) f.social = !!soc.checked;
   }
   async function load() {
-    const st = $('pf-status');
-    const list = $('pf-list');
+    const st = $('pump-status');
+    const list = $('pump-list');
     if (st) st.textContent = 'loading';
     if (list && !rows.length) list.innerHTML = '<div style="color:#e8eef6;font-size:13px;font-weight:800">Loading coins…</div>';
     const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
