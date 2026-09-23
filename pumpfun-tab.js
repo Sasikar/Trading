@@ -134,11 +134,13 @@
   }
   function card(c) {
     const x = mult(c.mc);
-    const img = c.image
+    const img = c.image && String(c.image).indexOf('https://') === 0
       ? '<img src="' +
         esc(c.image) +
-        '" alt="" width="42" height="42" style="width:42px;height:42px;border-radius:10px;object-fit:cover;background:#121a24" referrerpolicy="no-referrer">'
-      : '<div style="width:42px;height:42px;border-radius:10px;background:#121a24"></div>';
+        '" alt="" width="42" height="42" style="width:42px;height:42px;border-radius:10px;object-fit:cover;background:#121a24" referrerpolicy="no-referrer" loading="lazy">'
+      : '<div style="width:42px;height:42px;border-radius:10px;background:#1a2430;color:#62e3a0;font-weight:900;display:flex;align-items:center;justify-content:center">' +
+        esc(String(c.symbol || c.name || '?').slice(0, 1)) +
+        '</div>';
     return (
       '<div style="display:flex;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid #243041">' +
       img +
@@ -205,18 +207,27 @@
   async function load() {
     const st = $('pf-status');
     const list = $('pf-list');
-    if (list && !rows.length) list.innerHTML = '<div style="color:#8491a1;font-size:12px">Loading Pump.fun…</div>';
+    if (st) st.textContent = 'loading';
+    if (list && !rows.length) list.innerHTML = '<div style="color:#e8eef6;font-size:13px;font-weight:800">Loading coins…</div>';
+    const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    const killer = ctrl ? setTimeout(function () { ctrl.abort(); }, 12000) : null;
     try {
-      const r = await fetch(apiBase() + '/pumpfun', { cache: 'no-store' });
+      const r = await fetch(apiBase() + '/pumpfun', { cache: 'no-store', signal: ctrl ? ctrl.signal : undefined });
       const j = await r.json();
       rows = j.coins || [];
       note = j.note || j.err || j.error || '';
-      if (st) st.textContent = rows.length ? rows.length + ' fresh' : j.err || j.error || 'empty';
+      if (!r.ok && !rows.length) throw new Error('HTTP ' + r.status);
+      if (st) st.textContent = rows.length ? rows.length + ' fresh' : (j.err || j.error || 'empty');
       paint();
+      if (!rows.length && (j.err || j.error)) {
+        if (list) list.innerHTML = '<div style="color:#ff6f7c;font-weight:800">' + esc(j.err || j.error) + '</div>';
+      }
     } catch (e) {
-      if (st) st.textContent = String(e.message || e);
-      if (list) list.innerHTML = '<div style="color:#ff6f7c">' + esc(e.message || e) + '</div>';
+      const msg = e && e.name === 'AbortError' ? 'Timed out reaching the feed' : (e.message || e);
+      if (st) st.textContent = 'error';
+      if (list) list.innerHTML = '<div style="color:#ff6f7c;font-size:13px;font-weight:800">' + esc(msg) + '</div>';
     }
+    if (killer) clearTimeout(killer);
   }
   function onClick(ev) {
     const go = ev.target && ev.target.closest && ev.target.closest('#pf-go');
@@ -270,4 +281,8 @@
       }, 0);
     });
   }
+  setTimeout(function () {
+    const act = document.querySelector('#tf-tabs .tab.active');
+    if (act && act.getAttribute('data-tf') === 'pumpfun') showPumpfun(true);
+  }, 0);
 })();
