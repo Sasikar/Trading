@@ -8,6 +8,7 @@ import { syncHeliusWebhook, HELIUS_HOOK_ID_KEY } from './helius-sync.js';
 import { notifyNewOverlap } from './helius-tg.js';
 import { scanOldTick, readOldCoins, OLD_SCAN_AT_KEY } from './helius-old.js';
 import { lookupBuy } from './helius-lookup.js';
+import { pumpfunFeed } from './pumpfun.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -258,6 +259,15 @@ export class OhlcvEngine {
     }
     return new Response(JSON.stringify(out), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
   }
+  async handlePumpfun() {
+    let out;
+    try {
+      out = await pumpfunFeed();
+    } catch (e) {
+      out = { ok: false, coins: [], error: String(e && e.message ? e.message : e).slice(0, 160) };
+    }
+    return new Response(JSON.stringify(out), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+  }
   async fetch(request) {
     const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
     if (path === '/health' || path === '/api/health') {
@@ -270,6 +280,7 @@ export class OhlcvEngine {
       }
       if (path === '/helius' || path === '/api/helius') return this.handleHelius(request);
       if (path === '/buy-lookup' || path === '/api/buy-lookup') return this.handleBuyLookup(request);
+      if (path === '/pumpfun' || path === '/api/pumpfun') return this.handlePumpfun();
       if (path === '/oldcoins' || path === '/api/oldcoins') {
         const want = new URL(request.url).searchParams.get('scan') === '1';
         if (want) {
