@@ -16,6 +16,10 @@ test('movers filter matches the video rules we can see', () => {
   });
   assert.equal(passMovers(ok, { maxMc: 150000, maxAge: 60, twitter: true, social: true }, now), true);
   assert.equal(passMovers(ok, { maxMc: 10000, maxAge: 60, twitter: true, social: true }, now), false);
+  const tiny = Object.assign({}, ok, { mc: 4200 });
+  assert.equal(passMovers(tiny, { maxMc: 150000, maxAge: 60, twitter: true, social: true }, now), false);
+  const tooBig = Object.assign({}, ok, { mc: 488000 });
+  assert.equal(passMovers(tooBig, { maxMc: 150000, maxAge: 60, twitter: true, social: true }, now), false);
   const old = Object.assign({}, ok, { created: now - 90 * 60000 });
   assert.equal(passMovers(old, { maxMc: 150000, maxAge: 60, twitter: true, social: true }, now), false);
   const bare = Object.assign({}, ok, { twitter: '' });

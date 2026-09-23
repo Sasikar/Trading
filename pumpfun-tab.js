@@ -36,7 +36,10 @@
   function pass(c) {
     const age = (Date.now() - (+c.created || 0)) / 60000;
     if (!(age >= 0) || age > f.maxAge) return false;
-    if (!(+c.mc > 0) || +c.mc > f.maxMc) return false;
+    const mc = +c.mc || 0;
+    const cap = +f.maxMc || 150000;
+    const floor = Math.min(10000, cap);
+    if (mc < floor || mc > cap) return false;
     if (f.twitter && !c.twitter) return false;
     const socials = [c.twitter, c.telegram, c.website].filter(Boolean).length;
     if (f.social && socials < 1) return false;
