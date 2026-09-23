@@ -273,6 +273,14 @@ export class OhlcvEngine {
     if (path === '/health' || path === '/api/health') {
       return new Response(JSON.stringify({ ok: true, engine: 'ohlcv', ts: new Date().toISOString() }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
+    if (path === '/nasdaq' || path === '/api/nasdaq') {
+      try {
+        const q = await nasdaqLive();
+        return new Response(JSON.stringify(q), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 160) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
     try {
       this.boot();
       if (path !== '/holders' && path !== '/api/holders') {
@@ -295,6 +303,69 @@ export class OhlcvEngine {
       return new Response(JSON.stringify({ ok: false, error: String(e && e.stack ? e.stack : e) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
   }
+}
+
+let ndxCache = { at: 0, body: null };
+
+function ndxNum(s) {
+  const n = parseFloat(String(s == null ? '' : s).replace(/[%,$]/g, '').replace(/,/g, ''));
+  return Number.isFinite(n) ? n : null;
+}
+
+async function nasdaqLive() {
+  if (ndxCache.body && Date.now() - ndxCache.at < 20000) return ndxCache.body;
+  let out = null;
+  try {
+    const res = await fetch('https://api.nasdaq.com/api/quote/COMP/info?assetclass=index', {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+        Origin: 'https://www.nasdaq.com',
+        Referer: 'https://www.nasdaq.com/'
+      },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (res.ok) {
+      const j = await res.json();
+      const p = j && j.data && j.data.primaryData;
+      const price = ndxNum(p && p.lastSalePrice);
+      if (price != null) {
+        out = {
+          symbol: '^IXIC',
+          name: 'NASDAQ',
+          price,
+          chg: ndxNum(p.netChange),
+          pct: ndxNum(p.percentageChange),
+          updated: Date.now(),
+          source: 'nasdaq.com',
+          live: true
+        };
+      }
+    }
+  } catch (e) {}
+  if (!out) {
+    const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EIXIC?interval=1m&range=1d', {
+      headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!res.ok) throw new Error('nasdaq ' + res.status);
+    const meta = (await res.json()).chart.result[0].meta;
+    const price = +meta.regularMarketPrice;
+    const prev = +(meta.previousClose || meta.chartPreviousClose || price);
+    const chg = price - prev;
+    out = {
+      symbol: '^IXIC',
+      name: 'NASDAQ',
+      price,
+      chg,
+      pct: prev ? (chg / prev) * 100 : 0,
+      updated: Date.now(),
+      source: 'yahoo',
+      live: true
+    };
+  }
+  ndxCache = { at: Date.now(), body: out };
+  return out;
 }
 
 function stub(request) {

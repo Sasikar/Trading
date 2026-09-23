@@ -50,10 +50,19 @@ async function loadMarket(){
     if($('market-source')) $('market-source').textContent=src||'OFFLINE';
   }catch(e){console.warn('btc/eth',e);}
 
-  // NASDAQ — static snapshot first (Pages-stable)
+  // NASDAQ — live quote, static snapshot only if the feed misses
   try{
     let snap=null;
-    try{ snap=await jget('./nasdaq.json'); }catch(e){ try{snap=await jget('/nasdaq.json');}catch(e2){} }
+    const bases=[];
+    try{ if(window.BREAKOUT_API) bases.push(String(window.BREAKOUT_API).replace(/\/+$/,'')); }catch(e){}
+    bases.push('https://trading-ohlcv.sasipudi.workers.dev');
+    for(const b of bases){
+      const live=await jget(b+'/nasdaq');
+      if(live&&live.price!=null&&!live.error){ snap=live; break; }
+    }
+    if(!snap){
+      try{ snap=await jget('./nasdaq.json'); }catch(e){ try{snap=await jget('/nasdaq.json');}catch(e2){} }
+    }
     if(snap&&snap.price!=null){
       const pct=snap.pct!=null?+snap.pct:(snap.change_pct!=null?+snap.change_pct:null);
       set('ndx-price', money(+snap.price));
