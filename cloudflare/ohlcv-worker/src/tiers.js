@@ -9,25 +9,38 @@ function u64le(b64) {
   return n;
 }
 
-async function market(mint) {
-  const res = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + mint, { signal: AbortSignal.timeout(12000) });
-  if (!res.ok) throw new Error("Price feed failed");
-  const dex = await res.json();
-  const pairs = (dex.pairs || []).filter((p) => p.baseToken && p.baseToken.address === mint && Number(p.priceUsd) > 0);
-  pairs.sort((a, b) => ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0));
-  if (!pairs.length) throw new Error("No trading pair for that address yet");
-  const top = pairs[0];
-  return {
-    name: (top.baseToken && top.baseToken.name) || "Token",
-    symbol: (top.baseToken && top.baseToken.symbol) || "",
-    price: Number(top.priceUsd),
-    mcap: Number(top.marketCap || top.fdv || 0)
-  };
+async function market(mint, rugPrice, rugMcap) {
+  try {
+    const res = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + mint, {
+      headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(12000)
+    });
+    if (res.ok) {
+      const dex = await res.json();
+      const pairs = (dex.pairs || []).filter((p) => p.baseToken && p.baseToken.address === mint && Number(p.priceUsd) > 0);
+      pairs.sort((a, b) => ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0));
+      if (pairs.length) {
+        const top = pairs[0];
+        return {
+          name: (top.baseToken && top.baseToken.name) || "Token",
+          symbol: (top.baseToken && top.baseToken.symbol) || "",
+          price: Number(top.priceUsd),
+          mcap: Number(top.marketCap || top.fdv || 0)
+        };
+      }
+    }
+  } catch (e) {}
+  if (rugPrice > 0) {
+    return { name: "Token", symbol: "", price: rugPrice, mcap: rugMcap || 0 };
+  }
+  throw new Error("Price feed failed");
 }
 
 async function meta(mint) {
   let decimals = 6;
   let program = TOKEN;
+  let price = 0;
+  let mcap = 0;
   try {
     const res = await fetch("https://api.rugcheck.xyz/v1/tokens/" + mint + "/report", { signal: AbortSignal.timeout(12000) });
     if (res.ok) {
@@ -37,9 +50,13 @@ async function meta(mint) {
       for (const h of holders) {
         if (typeof h.decimals === "number") { decimals = h.decimals; break; }
       }
+      if (rug.token && typeof rug.token.decimals === "number") decimals = rug.token.decimals;
+      price = Number(rug.price) || 0;
+      const supply = Number(rug.token && rug.token.supply);
+      if (price > 0 && supply > 0) mcap = (supply / Math.pow(10, decimals)) * price;
     }
   } catch (e) {}
-  return { decimals, program };
+  return { decimals, program, price, mcap };
 }
 
 async function rpc(key, method, params) {
@@ -114,7 +131,8 @@ export async function scanTiers(env, mint) {
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) throw new Error("Paste a Solana token address.");
   const key = env && env.HELIUS_API_KEY;
   if (!key) throw new Error("Helius key is missing on the worker.");
-  const [mkt, info] = await Promise.all([market(mint), meta(mint)]);
+  const info = await meta(mint);
+  const mkt = await market(mint, info.price, info.mcap);
   let amounts;
   try {
     amounts = await amountsViaGpa(key, mint, info.program);
