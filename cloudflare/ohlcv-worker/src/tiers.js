@@ -152,7 +152,7 @@ export function bookFromRows(rows, decimals, n) {
 
 function bucket(rows, price, decimals) {
   const scale = Math.pow(10, decimals);
-  const buckets = BANDS.map(() => ({ count: 0, value: 0 }));
+  const buckets = BANDS.map(() => ({ count: 0, value: 0, tokens: 0 }));
   let total = 0;
   for (const row of rows) {
     total += row.raw;
@@ -163,6 +163,7 @@ function bucket(rows, price, decimals) {
     }
     buckets[idx].count += 1;
     buckets[idx].value += usd;
+    buckets[idx].tokens += row.raw / scale;
   }
   const sorted = rows.slice().sort((a, b) => b.raw - a.raw);
   const slicePct = (n) => {

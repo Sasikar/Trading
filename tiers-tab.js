@@ -156,9 +156,37 @@ function stat(label, value, note) {
     paintHistory(result.history);
   }
 
-  function shortWallet(addr) {
-    addr = String(addr || "");
-    return addr.length < 10 ? addr : addr.slice(0, 4) + "…" + addr.slice(-4);
+  var BAND_COLORS = ["#7c5cff", "#e06a2c", "#3d8bfd", "#3dbe7a", "#e0a02c", "#8b97a8"];
+
+  function bandChart(chart) {
+    var points = (chart && chart.points) || [];
+    if (points.length < 2) return "";
+    var w = 320;
+    var h = 140;
+    var pad = 4;
+    var max = 1;
+    points.forEach(function (p) {
+      var sum = (p.bands || []).reduce(function (s, b) { return s + (b.value || 0); }, 0);
+      if (sum > max) max = sum;
+    });
+    var html = "<svg viewBox=\"0 0 " + w + " " + h + "\" width=\"100%\" height=\"140\" role=\"img\">";
+    var floor = points.map(function () { return 0; });
+    for (var i = 5; i >= 0; i--) {
+      var top = [];
+      var bot = [];
+      points.forEach(function (p, idx) {
+        var x = pad + (idx / (points.length - 1)) * (w - pad * 2);
+        var v = (p.bands[i] && p.bands[i].value) || 0;
+        var y1 = h - pad - ((floor[idx] + v) / max) * (h - pad * 2);
+        var y0 = h - pad - (floor[idx] / max) * (h - pad * 2);
+        top.push(x.toFixed(1) + "," + y1.toFixed(1));
+        bot.push(x.toFixed(1) + "," + y0.toFixed(1));
+        floor[idx] += v;
+      });
+      html += "<polygon points=\"" + top.concat(bot.reverse()).join(" ") + "\" fill=\"" + BAND_COLORS[i] + "\"></polygon>";
+    }
+    html += "</svg>";
+    return html;
   }
 
   function paintHistory(history) {
@@ -166,29 +194,44 @@ function stat(label, value, note) {
     if (!box) return;
     if (!history) { box.innerHTML = ""; return; }
     var html = "<div style=\"margin-top:18px;padding-top:12px;border-top:1px solid #243041\">";
-    html += "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">HOLDER HISTORY</div>";
-    if (!history.baselineAt || !history.diff) {
-      html += "<div style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">Saved. The next daily check compares how many tokens the top 15 wallets hold. A price move alone does not count as a new dolphin.</div>";
-    } else {
-      var d = history.diff;
-      var when = new Date(d.at).toISOString().slice(0, 16).replace("T", " ") + " UTC";
-      var price = d.pricePct == null ? "price was not saved" : ((d.pricePct > 0 ? "+" : "") + pct(d.pricePct));
-      html += "<div style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#e8eef6\">Since " + esc(when) + ": price " + esc(price) + ".</div>";
-      if (d.changed && d.changed.length) {
-        d.changed.slice(0, 8).forEach(function (r) {
-          var verb = r.cut ? "cut" : "added";
-          html += "<div style=\"margin-top:6px;font-size:13px;color:" + (r.cut ? "#ff8a7a" : "#3dbe7a") + "\"><a href=\"https://solscan.io/account/" + esc(r.owner) + "\" target=\"_blank\" rel=\"noreferrer\" style=\"color:#8eb4ff\">" + esc(shortWallet(r.owner)) + "</a> " + verb + " " + esc(pct(Math.abs(r.pct))) + " of their tokens.</div>";
-        });
-      } else {
-        html += "<div style=\"margin-top:6px;font-size:13px;color:#8491a1\">No top wallet changed its token amount by more than 0.5%.</div>";
-      }
-      (d.added || []).slice(0, 3).forEach(function (r) {
-        html += "<div style=\"margin-top:6px;font-size:13px;color:#c5d0dc\"><a href=\"https://solscan.io/account/" + esc(r.owner) + "\" target=\"_blank\" rel=\"noreferrer\" style=\"color:#8eb4ff\">" + esc(shortWallet(r.owner)) + "</a> is new in the top 15. Their earlier balance was not saved.</div>";
+    html += "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">BAND HISTORY</div>";
+    if (!history.diff) {
+      html += "<div style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">Saved the dollar value in each band. The next scan, about an hour later, shows which band's value moved.</div>";
+      html += "</div>";
+      box.innerHTML = html;
+      return;
+    }
+    var d = history.diff;
+    var when = new Date(d.at).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+    var price = d.pricePct == null ? "price was not saved" : ((d.pricePct > 0 ? "+" : "") + pct(d.pricePct));
+    html += "<div style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#e8eef6\">Since " + esc(when) + ": price " + esc(price) + ".</div>";
+    if (d.pricePct > 1 && d.lead) {
+      html += "<div style=\"margin-top:6px;font-size:13px;line-height:1.45;color:#e8eef6\">" + esc(d.lead.label) + " took the most extra share of the coin (" + (d.lead.dShare > 0 ? "+" : "") + d.lead.dShare.toFixed(2) + " pts) while price rose.</div>";
+    } else if (d.pricePct > 1) {
+      html += "<div style=\"margin-top:6px;font-size:13px;line-height:1.45;color:#c5d0dc\">No band took a bigger share. The dollar rise is the price mark-up.</div>";
+    } else if (d.pricePct < -1 && d.lead) {
+      html += "<div style=\"margin-top:6px;font-size:13px;line-height:1.45;color:#e8eef6\">" + esc(d.lead.label) + " gave up the most share (" + d.lead.dShare.toFixed(2) + " pts) while price fell.</div>";
+    }
+    html += "<table style=\"width:100%;border-collapse:collapse;font-size:12px;margin-top:10px\"><thead><tr style=\"color:#8491a1;text-align:left\"><th style=\"padding:6px 6px 6px 0\">Band</th><th>Was</th><th>Now</th><th>Delta</th><th>Share</th></tr></thead><tbody>";
+    (d.bands || []).forEach(function (b, i) {
+      if (!b.prev && !b.value) return;
+      var color = b.dValue < 0 ? "#ff8a7a" : "#3dbe7a";
+      html += "<tr style=\"border-top:1px solid #243041\">" +
+        "<td style=\"padding:8px 6px 8px 0;color:" + BAND_COLORS[i] + "\">" + esc(b.label) + "</td>" +
+        "<td>" + money(b.prev) + "</td><td>" + money(b.value) + "</td>" +
+        "<td style=\"color:" + color + "\">" + (b.dValue > 0 ? "+" : "") + money(b.dValue) + "</td>" +
+        "<td style=\"color:#8491a1\">" + (b.dShare > 0 ? "+" : "") + b.dShare.toFixed(2) + " pts</td></tr>";
+    });
+    html += "</tbody></table>";
+    if (history.chart && history.chart.points && history.chart.points.length > 1) {
+      html += "<div style=\"margin-top:12px;font-size:11px;color:#8491a1\">" + (history.chart.mode === "day" ? "DAILY" : "HOURLY") + " · dollar value held in each band</div>";
+      html += bandChart(history.chart);
+      html += "<div style=\"display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;font-size:11px;color:#8491a1\">";
+      BANDS.forEach(function (b, i) {
+        html += "<span><span style=\"color:" + BAND_COLORS[i] + "\">●</span> " + esc(b.label) + "</span>";
       });
-      (d.left || []).slice(0, 3).forEach(function (r) {
-        html += "<div style=\"margin-top:6px;font-size:13px;color:#c5d0dc\"><a href=\"https://solscan.io/account/" + esc(r.owner) + "\" target=\"_blank\" rel=\"noreferrer\" style=\"color:#8eb4ff\">" + esc(shortWallet(r.owner)) + "</a> left the top 15. That is not a confirmed sale.</div>";
-      });
-      if (d.holderDelta) html += "<div style=\"margin-top:8px;font-size:12px;color:#8491a1\">Holder count " + (d.holderDelta > 0 ? "+" : "") + d.holderDelta.toLocaleString() + " since that save. That is wallets, not who moved the price.</div>";
+      html += "</div>";
+      html += "<div style=\"margin-top:6px;font-size:11px;color:#8491a1;line-height:1.45\">A thicker slice took a bigger share of the coin. A slice that only grows because the whole stack grew was marked up by price.</div>";
     }
     html += "</div>";
     box.innerHTML = html;

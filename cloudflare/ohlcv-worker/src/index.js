@@ -404,7 +404,7 @@ export default {
               price: data.price,
               mcap: data.mcap,
               holderCount: data.holderCount,
-              book: data.book
+              bands: data.buckets || []
             })
           }));
           history = await res.json();

@@ -1,9 +1,10 @@
 import { scanTiers } from './tiers.js';
 
 const WATCH = 'tier_watch';
-const GAP = 20 * 60 * 60 * 1000;
+const GAP = 60 * 60 * 1000;
 const MAX_COINS = 15;
-const MAX_DAYS = 14;
+const MAX_POINTS = 24 * 14;
+const LABELS = ['Whale', 'Shark', 'Dolphin', 'Fish', 'Crab', 'Shrimp'];
 
 function readJson(store, key, fallback) {
   try {
@@ -20,38 +21,61 @@ function histKey(mint) {
   return 'tier_hist:' + mint;
 }
 
-export function diffBooks(prev, next) {
-  const before = new Map((prev.book || []).map((r) => [r.owner, Number(r.raw) || 0]));
-  const after = new Map((next.book || []).map((r) => [r.owner, Number(r.raw) || 0]));
-  const changed = [];
-  const added = [];
-  const left = [];
-  for (const [owner, raw] of after) {
-    if (!before.has(owner)) {
-      added.push({ owner, tokens: next.book.find((r) => r.owner === owner).tokens });
-      continue;
-    }
-    const was = before.get(owner);
-    if (!(was > 0)) continue;
-    const pct = ((raw - was) / was) * 100;
-    if (Math.abs(pct) < 0.5) continue;
-    const row = next.book.find((r) => r.owner === owner);
-    changed.push({ owner, pct, tokens: row ? row.tokens : 0, cut: pct < 0 });
-  }
-  for (const [owner] of before) {
-    if (!after.has(owner)) left.push({ owner });
-  }
-  changed.sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct));
+export function normalizeBands(raw) {
+  const list = raw || [];
+  const sum = list.reduce((s, b) => s + (Number(b && b.value) || 0), 0);
+  return LABELS.map((label, i) => {
+    const b = list[i] || {};
+    const value = Number(b.value) || 0;
+    return {
+      label,
+      value: Math.round(value),
+      tokens: Math.round(Number(b.tokens) || 0),
+      pct: sum ? (value / sum) * 100 : 0
+    };
+  });
+}
+
+export function diffBands(prev, next) {
   const pricePct = prev.price > 0 ? ((next.price - prev.price) / prev.price) * 100 : null;
+  const bands = LABELS.map((label, i) => {
+    const a = (prev.bands || [])[i] || {};
+    const b = (next.bands || [])[i] || {};
+    return {
+      label,
+      prev: Number(a.value) || 0,
+      value: Number(b.value) || 0,
+      dValue: (Number(b.value) || 0) - (Number(a.value) || 0),
+      share: Number(b.pct) || 0,
+      dShare: (Number(b.pct) || 0) - (Number(a.pct) || 0)
+    };
+  });
+  let lead = null;
+  if (pricePct != null && pricePct > 1) {
+    lead = bands.filter((b) => b.dShare > 0.3).sort((a, b) => b.dShare - a.dShare)[0] || null;
+  } else if (pricePct != null && pricePct < -1) {
+    lead = bands.filter((b) => b.dShare < -0.3).sort((a, b) => a.dShare - b.dShare)[0] || null;
+  }
+  return { at: prev.at, pricePct, prevPrice: prev.price, nextPrice: next.price, bands, lead };
+}
+
+export function chartSeries(points) {
+  const rows = (points || []).filter((p) => p && p.bands && p.bands.length);
+  if (rows.length < 2) return { mode: 'hour', points: rows };
+  const span = rows[rows.length - 1].at - rows[0].at;
+  if (span < 36 * 60 * 60 * 1000) return { mode: 'hour', points: rows };
+  const days = new Map();
+  rows.forEach((p) => days.set(new Date(p.at).toISOString().slice(0, 10), p));
+  return { mode: 'day', points: Array.from(days.values()) };
+}
+
+function point(snap) {
   return {
-    at: prev.at,
-    pricePct,
-    prevPrice: prev.price,
-    nextPrice: next.price,
-    holderDelta: (next.holderCount || 0) - (prev.holderCount || 0),
-    changed,
-    added,
-    left
+    at: snap.at,
+    price: snap.price || 0,
+    mcap: snap.mcap || 0,
+    holderCount: snap.holderCount || 0,
+    bands: normalizeBands(snap.bands)
   };
 }
 
@@ -68,28 +92,27 @@ export function applySnapshot(store, snap) {
   const kept = watch.slice(0, MAX_COINS);
   const hist = readJson(store, histKey(snap.mint), []);
   const last = hist[hist.length - 1];
-  const fresh = !last || now - last.at >= GAP;
-  const saved = {
-    at: now,
-    price: snap.price || 0,
-    mcap: snap.mcap || 0,
-    holderCount: snap.holderCount || 0,
-    book: (snap.book || []).slice(0, 15).map((r) => ({ owner: r.owner, raw: String(r.raw), tokens: r.tokens }))
-  };
+  const lastOk = last && last.bands && last.bands.length;
+  const fresh = !lastOk || now - last.at >= GAP;
+  const saved = point({ ...snap, at: now });
   if (fresh && kept.some((w) => w.mint === snap.mint)) {
     hist.push(saved);
-    while (hist.length > MAX_DAYS) hist.shift();
+    while (hist.length > MAX_POINTS) hist.shift();
     store.setMeta(histKey(snap.mint), JSON.stringify(hist));
     row.lastAt = now;
   }
   store.setMeta(WATCH, JSON.stringify(kept));
-  const baseline = fresh ? hist[hist.length - 2] : last;
+  const series = fresh ? hist.slice() : hist.concat([saved]);
+  const withBands = series.filter((p) => p.bands && p.bands.length);
+  const baseline = withBands.length > 1 ? withBands[withBands.length - 2] : null;
+  const latest = withBands[withBands.length - 1];
   return {
     saved: fresh && kept.some((w) => w.mint === snap.mint),
-    days: hist.length,
+    points: withBands.length,
     tracked: kept.length,
     baselineAt: baseline ? baseline.at : 0,
-    diff: baseline ? diffBooks(baseline, saved) : null
+    diff: baseline && latest ? diffBands(baseline, latest) : null,
+    chart: chartSeries(withBands)
   };
 }
 
@@ -110,7 +133,7 @@ export async function tierDailyTick(env, store) {
     price: data.price,
     mcap: data.mcap,
     holderCount: data.holderCount,
-    book: data.book
+    bands: data.buckets || []
   });
   return { ok: true, mint: data.mint, saved: history.saved };
 }
