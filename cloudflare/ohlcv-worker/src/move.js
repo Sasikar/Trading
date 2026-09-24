@@ -1,5 +1,43 @@
 const SOL = "So11111111111111111111111111111111111111112";
 
+function uiAmount(entry) {
+  if (!entry) return 0;
+  if (typeof entry.tokenAmount === "number") return entry.tokenAmount;
+  const raw = entry.rawTokenAmount || entry.tokenAmount;
+  if (raw && typeof raw === "object") {
+    const amt = Number(raw.tokenAmount != null ? raw.tokenAmount : raw.amount);
+    const dec = Number(raw.decimals);
+    if (amt > 0 && dec >= 0 && dec <= 18) return amt / Math.pow(10, dec);
+  }
+  const n = Number(entry.tokenAmount);
+  return n > 0 ? n : 0;
+}
+
+export function readSwapRows(tx, mint, price, pool) {
+  const ts = Number(tx && tx.timestamp) || 0;
+  const swap = tx && tx.events && tx.events.swap;
+  const rows = [];
+  if (swap) {
+    (swap.tokenInputs || []).forEach(function (t) {
+      if (!t || t.mint !== mint) return;
+      const wallet = t.userAccount || tx.feePayer;
+      const tokens = uiAmount(t);
+      if (!wallet || wallet === pool || !(tokens > 0)) return;
+      rows.push({ wallet, side: "sell", tokens, usd: tokens * (Number(price) || 0), ts });
+    });
+    (swap.tokenOutputs || []).forEach(function (t) {
+      if (!t || t.mint !== mint) return;
+      const wallet = t.userAccount || tx.feePayer;
+      const tokens = uiAmount(t);
+      if (!wallet || wallet === pool || !(tokens > 0)) return;
+      rows.push({ wallet, side: "buy", tokens, usd: tokens * (Number(price) || 0), ts });
+    });
+    if (rows.length) return rows;
+  }
+  const one = readSwap(tx, mint, price);
+  return one && one.wallet !== pool ? [one] : [];
+}
+
 export function readSwap(tx, mint, price) {
   const wallet = tx && (tx.feePayer || tx.fee_payer);
   if (!wallet || !mint) return null;
@@ -125,7 +163,7 @@ async function heliusWindow(key, pair, mint, price) {
   let oldest = null;
   let complete = false;
   for (let page = 0; page < 8; page++) {
-    let url = "https://api.helius.xyz/v0/addresses/" + pair + "/transactions?api-key=" + encodeURIComponent(key) + "&limit=100";
+    let url = "https://api.helius.xyz/v0/addresses/" + pair + "/transactions?api-key=" + encodeURIComponent(key) + "&limit=100&type=SWAP";
     if (before) url += "&before=" + encodeURIComponent(before);
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
     const list = await res.json();
@@ -137,8 +175,8 @@ async function heliusWindow(key, pair, mint, price) {
       const ts = Number(tx.timestamp) || 0;
       if (!oldest || (ts && ts < oldest)) oldest = ts;
       if (ts && ts < since) { complete = true; continue; }
-      const row = readSwap(tx, mint, price);
-      if (row && row.wallet !== pair) rows.push(row);
+      const row = readSwapRows(tx, mint, price, pair);
+      if (row.length) rows.push.apply(rows, row);
     }
     if (complete || list.length < 100) { complete = true; break; }
   }
@@ -189,7 +227,17 @@ export async function scanMove(env, mint) {
       window = null;
     }
   }
-  if (!window) window = await geckoWindow(pair.pair, mint, pair.price);
+  if (!window || !window.rows.length) {
+    try {
+      const gecko = await geckoWindow(pair.pair, mint, pair.price);
+      if (!window || gecko.rows.length) {
+        window = gecko;
+        source = "geckoterminal";
+      }
+    } catch (e) {
+      if (!window) throw e;
+    }
+  }
   const ranked = rankWallets(window.rows);
   const span = coverage(window);
   return {
