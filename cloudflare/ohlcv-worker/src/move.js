@@ -126,12 +126,19 @@ async function mainPair(mint) {
       }
     }
   } catch (e) {}
-  const res = await fetch("https://api.geckoterminal.com/api/v2/networks/solana/tokens/" + mint + "/pools?page=1", {
-    headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
-    signal: AbortSignal.timeout(12000)
-  });
-  if (!res.ok) throw new Error("Price feed failed");
-  const body = await res.json();
+  let geckoStatus = 0;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch("https://api.geckoterminal.com/api/v2/networks/solana/tokens/" + mint + "/pools?page=1", {
+      headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(12000)
+    });
+    geckoStatus = res.status;
+    if (res.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      continue;
+    }
+    if (!res.ok) throw new Error("Price feed failed (" + res.status + ")");
+    const body = await res.json();
   const rows = body.data || [];
   if (!rows.length) throw new Error("No trading pair for that address yet");
   rows.sort((a, b) => Number(b.attributes.reserve_in_usd) - Number(a.attributes.reserve_in_usd));
@@ -154,6 +161,8 @@ async function mainPair(mint) {
     change6: ch.h6 == null ? null : Number(ch.h6),
     change1: ch.h1 == null ? null : Number(ch.h1)
   };
+  }
+  throw new Error("Price feed failed (" + geckoStatus + ")");
 }
 
 async function heliusWindow(key, pair, mint, price) {
