@@ -10,7 +10,6 @@ import { scanOldTick, readOldCoins, OLD_SCAN_AT_KEY } from './helius-old.js';
 import { lookupBuy } from './helius-lookup.js';
 import { pumpfunFeed } from './pumpfun.js';
 import { scanTiers } from './tiers.js';
-import { scanMove } from './move.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -382,30 +381,6 @@ export default {
       const mint = (new URL(request.url).searchParams.get('mint') || '').trim();
       try {
         const data = await scanTiers(env, mint);
-        return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
-      } catch (e) {
-        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
-      }
-    }
-    if (path === '/move' || path === '/api/move') {
-      const url = new URL(request.url);
-      const mint = (url.searchParams.get('mint') || '').trim();
-      const hints = {
-        pair: (url.searchParams.get('pair') || '').trim(),
-        price: url.searchParams.get('price') || '',
-        name: url.searchParams.get('name') || '',
-        symbol: url.searchParams.get('symbol') || '',
-        dex: url.searchParams.get('dex') || '',
-        liquidity: url.searchParams.get('liquidity') || '',
-        volume24: url.searchParams.get('volume24') || '',
-        buys: url.searchParams.get('buys') || '',
-        sells: url.searchParams.get('sells') || '',
-        change24: url.searchParams.get('change24') || '',
-        change6: url.searchParams.get('change6') || '',
-        change1: url.searchParams.get('change1') || ''
-      };
-      try {
-        const data = await scanMove(env, mint, hints);
         return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });

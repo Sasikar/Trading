@@ -246,70 +246,6 @@ function stat(label, value, note) {
     return "<details style=\"margin-top:12px\"><summary style=\"cursor:pointer;color:#8491a1;font-size:12px\">" + title + " (" + rows.length + ")</summary><div style=\"font-size:12px;color:#c5d0dc;line-height:1.45\">" + body + "</div></details>";
   }
 
-  function loadMove(mint) {
-    return fetch("https://api.dexscreener.com/latest/dex/tokens/" + encodeURIComponent(mint), { cache: "no-store" }).then(function (res) {
-      if (!res.ok) throw new Error("Price feed failed");
-      return res.json();
-    }).then(function (body) {
-      var pairs = (body.pairs || []).filter(function (p) {
-        return p.chainId === "solana" && p.baseToken && p.baseToken.address === mint && p.liquidity && Number(p.liquidity.usd) > 0;
-      });
-      pairs.sort(function (a, b) { return (b.liquidity.usd || 0) - (a.liquidity.usd || 0); });
-      if (!pairs.length) throw new Error("No trading pair for that address yet");
-      var top = pairs[0];
-      var tx = (top.txns && top.txns.h24) || {};
-      var ch = top.priceChange || {};
-      var q = "mint=" + encodeURIComponent(mint) +
-        "&pair=" + encodeURIComponent(top.pairAddress) +
-        "&price=" + encodeURIComponent(top.priceUsd || "") +
-        "&name=" + encodeURIComponent((top.baseToken && top.baseToken.name) || "") +
-        "&symbol=" + encodeURIComponent((top.baseToken && top.baseToken.symbol) || "") +
-        "&dex=" + encodeURIComponent(top.dexId || "") +
-        "&liquidity=" + encodeURIComponent((top.liquidity && top.liquidity.usd) || "") +
-        "&volume24=" + encodeURIComponent((top.volume && top.volume.h24) || "") +
-        "&buys=" + encodeURIComponent(tx.buys || 0) +
-        "&sells=" + encodeURIComponent(tx.sells || 0) +
-        "&change24=" + encodeURIComponent(ch.h24 == null ? "" : ch.h24) +
-        "&change6=" + encodeURIComponent(ch.h6 == null ? "" : ch.h6) +
-        "&change1=" + encodeURIComponent(ch.h1 == null ? "" : ch.h1);
-      return fetch("https://trading-ohlcv.sasipudi.workers.dev/move?" + q, { cache: "no-store" }).then(function (res) { return res.json(); });
-    }).then(function (body) {
-      if (!body || body.ok === false) throw new Error((body && body.error) || "Move scan failed");
-      return body;
-    });
-  }
-
-  function shortAddr(addr) {
-    addr = String(addr || "");
-    return addr.length < 10 ? addr : addr.slice(0, 4) + "…" + addr.slice(-4);
-  }
-
-  function sideList(title, rows, color) {
-    var html = "<div style=\"margin-top:12px\"><div style=\"font-size:11px;letter-spacing:.04em;color:" + color + "\">" + title + "</div>";
-    if (!rows || !rows.length) return html + "<div style=\"margin-top:4px;font-size:12px;color:#8491a1\">None read.</div></div>";
-    rows.forEach(function (r) {
-      html += "<div style=\"display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:13px\">" +
-        "<a href=\"https://solscan.io/account/" + esc(r.wallet) + "\" target=\"_blank\" rel=\"noreferrer\" style=\"color:#8eb4ff\">" + esc(shortAddr(r.wallet)) + "</a>" +
-        "<span style=\"color:#e8eef6\">" + money(r.usd) + " · " + r.trades + "</span></div>";
-    });
-    return html + "</div>";
-  }
-
-  function paintMove(result) {
-    var box = $("tier-move");
-    if (!box) return;
-    var chg = Number(result.change24);
-    var color = chg < 0 ? "#ff8a7a" : "#3dbe7a";
-    var html = "<div style=\"margin-top:18px;padding-top:12px;border-top:1px solid #243041\">";
-    html += "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">24H MOVE</div>";
-    html += "<div style=\"margin-top:6px;font-size:22px;font-weight:800;color:" + color + "\">" + (chg > 0 ? "+" : "") + pct(chg) + "</div>";
-    html += "<div style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">" + esc(result.reason || "") + "</div>";
-    html += sideList("BIGGEST SELLERS", result.sellers, "#ff8a7a");
-    html += sideList("BIGGEST BUYERS", result.buyers, "#3dbe7a");
-    html += "</div>";
-    box.innerHTML = html;
-  }
-
   function boot() {
     var tabs = $("tf-tabs");
     if (tabs) tabs.addEventListener("click", onTabClick);
@@ -331,18 +267,11 @@ function stat(label, value, note) {
         if (table) table.innerHTML = "<div style=\"font-size:12px;color:#8491a1\">Reading every holder…</div>";
         var box = $("tier-commentary");
         if (box) box.innerHTML = "";
-        var moveBox = $("tier-move");
-        if (moveBox) moveBox.innerHTML = "<div style=\"margin-top:14px;font-size:12px;color:#8491a1\">Reading the 24 hour move…</div>";
-        var pending = 2;
-        function done() { pending -= 1; if (pending <= 0) busy = false; }
         scan(mint).then(paint).catch(function (err) {
           if (st) st.textContent = "FAILED";
           if (table) table.innerHTML = "<div style=\"font-size:12px;color:#e07a7a\">" + esc(err.message || "Could not load holders") + "</div>";
           if (box) box.innerHTML = "";
-        }).then(done);
-        loadMove(mint).then(paintMove).catch(function (err) {
-          if (moveBox) moveBox.innerHTML = "<div style=\"margin-top:14px;font-size:12px;color:#e07a7a\">" + esc(err.message || "Could not read the 24 hour move") + "</div>";
-        }).then(done);
+        }).then(function () { busy = false; });
       });
     }
     var act = document.querySelector("#tf-tabs .tab.active");
