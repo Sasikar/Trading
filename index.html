@@ -982,17 +982,20 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <div id="tier-view-bundle-panel" style="display:none;margin-top:12px"></div>
     <div id="tier-view-bubble-panel" style="display:none;margin-top:12px">
       <div style="font-size:11px;letter-spacing:.04em;color:#8491a1">BUBBLE MAPS</div>
-      <div style="margin-top:6px;font-size:12px;color:#8491a1;line-height:1.45">Your mark for this coin. It comes back when you paste the same address.</div>
+      <div id="tier-bubble-help" style="margin-top:6px;font-size:12px;color:#8491a1;line-height:1.45">Your mark for this coin. It comes back when you paste the same address.</div>
       <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;color:#3dbe7a;font-size:14px;line-height:1.4"><input type="radio" name="tier-bubble" value="ok"> Manually verified and successfully</label>
       <label style="display:flex;gap:10px;align-items:flex-start;margin-top:10px;color:#ff8a7a;font-size:14px;line-height:1.4"><input type="radio" name="tier-bubble" value="rug"> Manual verification failed BIG RUG</label>
       <label style="display:flex;gap:10px;align-items:flex-start;margin-top:10px;color:#e6c878;font-size:14px;line-height:1.4"><input type="radio" name="tier-bubble" value="lazy"> Lazy fellow yet to verify</label>
+      <button type="button" id="tier-bubble-change" style="display:none;margin-top:10px;padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Change</button>
       <div id="tier-bubble-status" style="margin-top:10px;font-size:12px;color:#8491a1"></div>
     </div>
     <div id="tier-view-dex-panel" style="display:none;margin-top:12px">
       <div style="font-size:11px;letter-spacing:.04em;color:#8491a1">DEX LIKES</div>
-      <div style="margin-top:6px;font-size:12px;color:#8491a1;line-height:1.45">Type what you liked on Dex. Saved for this coin only.</div>
+      <div id="tier-dex-help" style="margin-top:6px;font-size:12px;color:#8491a1;line-height:1.45">Type what you liked on Dex. Saved for this coin only.</div>
+      <div id="tier-dex-saved" style="display:none;margin-top:12px;font-size:22px;font-weight:800;color:#e8eef6"></div>
       <textarea id="tier-dex-text" rows="6" placeholder="What you liked on Dexscreener" style="width:100%;margin-top:10px;padding:12px;border-radius:10px;border:0;background:#1a2330;color:#e8eef6;font:600 14px Inter,system-ui,sans-serif;resize:vertical"></textarea>
       <button type="button" id="tier-dex-save" style="margin-top:10px;padding:12px 16px;border-radius:10px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Save</button>
+      <button type="button" id="tier-dex-change" style="display:none;margin-top:10px;padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Change</button>
       <div id="tier-dex-status" style="margin-top:8px;font-size:12px;color:#8491a1"></div>
     </div>
   </div>
@@ -1485,7 +1488,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
 <script src="commentary.js?v=20260924-c3"></script>
-<script src="tiers-tab.js?v=20260924-t15"></script>
+<script src="tiers-tab.js?v=20260924-t16"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260916-im10"></script>
 <script src="keep-tab.js?v=20260915-k2"></script>

@@ -360,17 +360,42 @@ function stat(label, value, note) {
     all[mint] = { bubble: note.bubble || "", dex: note.dex || "", at: note.at || Date.now() };
     try { localStorage.setItem("tier_notes_v1", JSON.stringify(all)); } catch (e) {}
   }
+  var editBubble = false;
+  var editDex = false;
+
   function paintNotes(mint, note) {
     if (notesFor !== mint) return;
     var picked = note && note.bubble;
-    document.querySelectorAll("input[name=tier-bubble]").forEach(function (el) { el.checked = el.value === picked; });
+    var help = $("tier-bubble-help");
+    if (help) help.style.display = picked && !editBubble ? "none" : "";
+    document.querySelectorAll("input[name=tier-bubble]").forEach(function (el) {
+      el.checked = el.value === picked;
+      el.style.display = picked && !editBubble ? "none" : "";
+      var label = el.parentElement;
+      if (label) label.style.display = picked && !editBubble && el.value !== picked ? "none" : "flex";
+    });
+    var changeB = $("tier-bubble-change");
+    if (changeB) changeB.style.display = picked && !editBubble ? "" : "none";
     var box = $("tier-dex-text");
-    if (box && document.activeElement !== box) box.value = (note && note.dex) || "";
+    var text = (note && note.dex) || "";
+    if (box && document.activeElement !== box) box.value = text;
+    var showSaved = !!text && !editDex;
+    var dexHelp = $("tier-dex-help");
+    var saved = $("tier-dex-saved");
+    var saveBtn = $("tier-dex-save");
+    var changeD = $("tier-dex-change");
+    if (dexHelp) dexHelp.style.display = showSaved ? "none" : "";
+    if (box) box.style.display = showSaved ? "none" : "";
+    if (saveBtn) saveBtn.style.display = showSaved ? "none" : "";
+    if (saved) {
+      saved.style.display = showSaved ? "" : "none";
+      saved.textContent = text;
+    }
+    if (changeD) changeD.style.display = showSaved ? "" : "none";
     var bubble = $("tier-bubble-status");
     var dex = $("tier-dex-status");
-    var when = note && note.at ? "Saved for this coin." : "Nothing saved for this coin yet.";
-    if (bubble) bubble.textContent = when;
-    if (dex) dex.textContent = when;
+    if (bubble) bubble.textContent = picked ? "Saved for this coin." : "Nothing saved for this coin yet.";
+    if (dex) dex.textContent = text ? "Saved for this coin." : "Nothing saved for this coin yet.";
   }
   function loadNotes(mint) {
     notesFor = mint;
@@ -503,6 +528,7 @@ function stat(label, value, note) {
           el.checked = false;
           return;
         }
+        editBubble = false;
         saveNotes(notesFor, { bubble: el.value });
       });
     });
@@ -513,7 +539,18 @@ function stat(label, value, note) {
         if (st) st.textContent = "Check a token first.";
         return;
       }
+      editDex = false;
       saveNotes(notesFor, { dex: ($("tier-dex-text") && $("tier-dex-text").value) || "" });
+    });
+    var bubbleChange = $("tier-bubble-change");
+    if (bubbleChange) bubbleChange.addEventListener("click", function () {
+      editBubble = true;
+      paintNotes(notesFor, localNotes()[notesFor] || {});
+    });
+    var dexChange = $("tier-dex-change");
+    if (dexChange) dexChange.addEventListener("click", function () {
+      editDex = true;
+      paintNotes(notesFor, localNotes()[notesFor] || {});
     });
     paintBundle(null, false);
     var act = document.querySelector("#tf-tabs .tab.active");
