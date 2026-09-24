@@ -332,6 +332,71 @@ function stat(label, value, note) {
     return "<details style=\"margin-top:12px\"><summary style=\"cursor:pointer;color:#8491a1;font-size:12px\">" + title + " (" + rows.length + ")</summary><div style=\"font-size:12px;color:#c5d0dc;line-height:1.45\">" + body + "</div></details>";
   }
 
+  var bundleFor = "";
+  var tierView = "bands";
+
+  function setTierView(next) {
+    tierView = next === "bundle" ? "bundle" : "bands";
+    var bands = $("tier-view-bands-panel");
+    var bundle = $("tier-view-bundle-panel");
+    var b1 = $("tier-view-bands");
+    var b2 = $("tier-view-bundle");
+    if (bands) bands.style.display = tierView === "bands" ? "" : "none";
+    if (bundle) bundle.style.display = tierView === "bundle" ? "" : "none";
+    if (b1) {
+      b1.style.background = tierView === "bands" ? "#1a9b6c" : "#121a24";
+      b1.style.color = tierView === "bands" ? "#fff" : "#c5d0dc";
+    }
+    if (b2) {
+      b2.style.background = tierView === "bundle" ? "#1a9b6c" : "#121a24";
+      b2.style.color = tierView === "bundle" ? "#fff" : "#c5d0dc";
+    }
+  }
+
+  function paintBundle(result, loading) {
+    var box = $("tier-view-bundle-panel");
+    if (!box) return;
+    if (loading) {
+      box.innerHTML = "<div style=\"font-size:12px;color:#8491a1\">Reading bundle checks…</div>";
+      return;
+    }
+    if (!result) {
+      box.innerHTML = "<div style=\"font-size:12px;color:#8491a1\">Check a token. These lines load with that address.</div>";
+      return;
+    }
+    if (result.ok === false) {
+      box.innerHTML = "<div style=\"font-size:12px;color:#e07a7a\">" + esc(result.error || "Bundle check failed") + "</div>";
+      return;
+    }
+    var color = { pass: "#3dbe7a", fail: "#ff8a7a", grey: "#8491a1" };
+    var word = { pass: "PASS", fail: "FAIL", grey: "GREY" };
+    var html = "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">BUNDLE CHECK</div>";
+    html += "<div style=\"margin-top:6px;font-size:12px;color:#8491a1;line-height:1.45\">Green pass, red fail, grey means that read did not come back. Insider and phishing stay grey. They are GMGN labels, not chain data." + (result.skipped ? " Largest account left out as the likely pool." : "") + "</div>";
+    (result.checks || []).forEach(function (c) {
+      var col = color[c.state] || color.grey;
+      html += "<div style=\"display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #243041\">" +
+        "<div><div style=\"font-size:14px;font-weight:800;color:#e8eef6\">" + esc(c.label) + "</div>" +
+        "<div style=\"margin-top:4px;font-size:12px;color:#c5d0dc;line-height:1.4\">" + esc(c.detail) + "</div></div>" +
+        "<div style=\"font-size:12px;font-weight:800;color:" + col + "\">" + (word[c.state] || "GREY") + "</div></div>";
+    });
+    box.innerHTML = html;
+  }
+
+  function loadBundle(mint) {
+    bundleFor = mint;
+    paintBundle(null, true);
+    fetch("https://trading-ohlcv.sasipudi.workers.dev/bundle?mint=" + encodeURIComponent(mint), { cache: "no-store" })
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        if (bundleFor !== mint) return;
+        paintBundle(body || { ok: false, error: "Bundle check failed" }, false);
+      })
+      .catch(function (err) {
+        if (bundleFor !== mint) return;
+        paintBundle({ ok: false, error: err.message || "Bundle check failed" }, false);
+      });
+  }
+
   function boot() {
     var tabs = $("tf-tabs");
     if (tabs) tabs.addEventListener("click", onTabClick);
@@ -355,6 +420,7 @@ function stat(label, value, note) {
         if (box) box.innerHTML = "";
         var hist = $("tier-history");
         if (hist) hist.innerHTML = "";
+        loadBundle(mint);
         scan(mint).then(paint).catch(function (err) {
           if (st) st.textContent = "FAILED";
           if (table) table.innerHTML = "<div style=\"font-size:12px;color:#e07a7a\">" + esc(err.message || "Could not load holders") + "</div>";
@@ -363,6 +429,11 @@ function stat(label, value, note) {
         }).then(function () { busy = false; });
       });
     }
+    var bandsBtn = $("tier-view-bands");
+    var bundleBtn = $("tier-view-bundle");
+    if (bandsBtn) bandsBtn.addEventListener("click", function () { setTierView("bands"); });
+    if (bundleBtn) bundleBtn.addEventListener("click", function () { setTierView("bundle"); });
+    paintBundle(null, false);
     var act = document.querySelector("#tf-tabs .tab.active");
     if (act && act.getAttribute("data-tf") === "tiers") show(true);
   }

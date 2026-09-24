@@ -967,10 +967,17 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
       <button type="submit" style="padding:12px 16px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Check</button>
     </form>
     <div style="font-size:11px;color:#8491a1;margin-top:10px;line-height:1.45">Same dollar bands as Solscan. A wallet is a dolphin when this coin in that wallet is worth $10k–$100k.</div>
+    <div id="tier-switch" style="display:flex;gap:6px;margin-top:12px">
+      <button type="button" id="tier-view-bands" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:12px;cursor:pointer">Bands</button>
+      <button type="button" id="tier-view-bundle" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Bundle check</button>
+    </div>
+    <div id="tier-view-bands-panel">
     <div id="tier-meta" style="font-size:12px;color:#8491a1;margin-top:10px"></div>
     <div id="tier-table" style="margin-top:12px;overflow-x:auto"></div>
     <div id="tier-commentary"></div>
     <div id="tier-history"></div>
+    </div>
+    <div id="tier-view-bundle-panel" style="display:none;margin-top:12px"></div>
   </div>
 </section>
 </div>
@@ -1461,7 +1468,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
 <script src="commentary.js?v=20260924-c3"></script>
-<script src="tiers-tab.js?v=20260924-t12"></script>
+<script src="tiers-tab.js?v=20260924-t13"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
 <script src="inmemory-tab.js?v=20260916-im10"></script>
 <script src="keep-tab.js?v=20260915-k2"></script>
