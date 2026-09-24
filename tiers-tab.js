@@ -203,6 +203,8 @@ function stat(label, value, note) {
     var html = "<div style=\"margin-top:18px;padding-top:8px;border-top:1px solid #243041\">";
     html += "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">COMMENTARY</div>";
     html += "<div style=\"display:inline-block;margin-top:8px;padding:6px 12px;border-radius:999px;font-weight:800;background:#1a2330;color:" + color + "\">" + esc(out.verdict) + "</div>";
+    if (out.reason) html += "<div style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#e8eef6\">" + esc(out.reason) + "</div>";
+    html += scoreTable(out.checks || []);
     if (!out.flags.length) html += "<div style=\"margin-top:10px;font-size:13px;color:#8491a1\">No tier flag fired.</div>";
     out.flags.forEach(function (f) {
       html += "<div style=\"margin-top:10px;font-size:13px;line-height:1.45;color:" + (sevColor[f.severity] || "#e8eef6") + "\"><b>" + esc(f.severity) + "</b> · " + esc(f.message) + "</div>";
@@ -212,6 +214,22 @@ function stat(label, value, note) {
     html += "<div style=\"margin-top:12px;font-size:11px;color:#8491a1;line-height:1.45\">Tier-based flags only. They can't detect split insider supply. Not financial advice.</div>";
     html += "</div>";
     box.innerHTML = html;
+  }
+
+  function scoreTable(rows) {
+    if (!rows.length) return "";
+    var html = "<table style=\"width:100%;border-collapse:collapse;font-size:12px;margin-top:12px\"><thead><tr style=\"color:#8491a1;text-align:left\"><th style=\"padding:6px 6px 6px 0\">Check</th><th>Value</th><th>Rule</th><th>Hit</th></tr></thead><tbody>";
+    rows.forEach(function (r) {
+      var value = r.value == null ? "—" : (r.unit === "count" ? String(Math.round(r.value)) : (Math.round(r.value * 100) / 100).toFixed(2) + "%");
+      var rule = !r.used ? r.note : (r.threshold == null ? "—" : (r.op === ">" ? "over " : "under ") + (r.unit === "count" ? String(r.threshold) : (Math.round(r.threshold * 100) / 100).toFixed(2) + "%"));
+      var hit = !r.used ? "—" : (r.hit ? "Yes" : "No");
+      var color = r.hit ? "#ff8a7a" : "#c5d0dc";
+      html += "<tr style=\"border-top:1px solid #243041;color:" + color + "\">" +
+        "<td style=\"padding:8px 6px 8px 0\">" + esc(r.label) + "</td>" +
+        "<td>" + esc(value) + "</td><td>" + esc(rule) + "</td><td>" + hit + "</td></tr>";
+    });
+    html += "</tbody></table>";
+    return html;
   }
 
   function fold(title, rows) {

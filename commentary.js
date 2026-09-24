@@ -186,7 +186,7 @@
 
     if (mid != null && mid > cfg.midTierWarnPct) {
       var sev4 = mid > cfg.midTierVeryHighPct || mid > cfg.midTierHighPct ? "HIGH" : "WARN";
-      var who = midN == null ? "Mid-size wallets hold " : fmtCount(midN) + " wallets hold ";
+      var who = midN == null ? "Dolphins + sharks + whales hold " : fmtCount(midN) + " wallets (dolphins + sharks + whales) hold ";
       flag("T4", sev4, who + fmt(mid) + "% of supply. If even a fraction are linked, real concentration is higher.");
     }
 
@@ -226,7 +226,7 @@
 
     var shape = top10 != null && mid != null && top10 < cfg.top10CleanPct && mid > cfg.midTierWarnPct;
     if (shape) {
-      flag("T12", "INFO", "Top 10 looks clean but supply sits in many mid-size wallets. This pattern can hide split insider supply. Check Bubblemaps and the mint creator.");
+      flag("T12", "INFO", "Top 10 looks clean but supply sits in dolphins, sharks, and whales. This pattern can hide split insider supply. Check Bubblemaps and the mint creator.");
     }
 
     if (top10 != null && top10 < cfg.top10CleanPct) positives.push("Top 10 hold under 20%.");
@@ -241,10 +241,102 @@
     if (src.lpExcluded !== true) unverified.push("Whether the LP is excluded from these figures");
     unverified.push("Balance trend over time");
 
+    var fishCrab = fish.present && crab.present ? fish.pctOfCoin + crab.pctOfCoin : null;
+    var checks = scorecard(cfg, {
+      top5: top5, top10: top10, top100: top100, holders: holders, mid: mid,
+      sharkWhale: sharkWhale, retail: retail, fishCrab: fishCrab,
+      tokenWhale: tokenWhale === null || typeof tokenWhale === "number" ? (tokenWhale || 0) : null,
+      port: port, shrimpShare: shrimpShare, mcapPer: mcapPer, shape: shape
+    });
+    var verdict = judge(cfg, { top5: top5, top10: top10, holders: holders, mid: mid, sharkWhale: sharkWhale, retail: retail, tokenWhale: tokenWhale, port: port, shrimpShare: shrimpShare, mcapPer: mcapPer, shape: shape, top100: top100, core: corePresent && top10 != null && top5 != null && holders != null });
+
     var rank = { HIGH: 0, WARN: 1, INFO: 2 };
     flags.sort(function (a, b) { return rank[a.severity] - rank[b.severity]; });
 
-    return { verdict: judge(cfg, { top5: top5, top10: top10, holders: holders, mid: mid, sharkWhale: sharkWhale, retail: retail, tokenWhale: tokenWhale, port: port, shrimpShare: shrimpShare, mcapPer: mcapPer, shape: shape, top100: top100, core: corePresent && top10 != null && top5 != null && holders != null }), flags: flags, positives: positives, unverified: dedupe(unverified) };
+    return { verdict: verdict, reason: reasonFor(verdict, checks), checks: checks, flags: flags, positives: positives, unverified: dedupe(unverified) };
+  }
+
+  function scorecard(cfg, c) {
+    var rows = [];
+    function row(label, value, unit, rules, note) {
+      var hit = null;
+      var nearest = null;
+      var gap = Infinity;
+      (rules || []).forEach(function (rule) {
+        if (value == null) return;
+        var fired = rule.op === ">" ? value > rule.threshold : value < rule.threshold;
+        if (fired && !hit) hit = rule;
+        var room = rule.op === ">" ? rule.threshold - value : value - rule.threshold;
+        if (rule.threshold === 0) return;
+        if (room >= 0 && room < gap) { gap = room; nearest = rule; }
+      });
+      rows.push({
+        label: label,
+        value: value,
+        unit: unit,
+        used: !note,
+        note: note || "",
+        hit: !!hit,
+        verdict: hit ? hit.verdict : null,
+        op: hit ? hit.op : nearest && nearest.op,
+        threshold: hit ? hit.threshold : nearest && nearest.threshold,
+        gap: gap,
+        nearest: nearest
+      });
+    }
+    row("Top 5", c.top5, "pct", [
+      { op: ">", threshold: cfg.top5RugPct, verdict: "RUG" },
+      { op: ">", threshold: cfg.top5VeryHighPct, verdict: "Very High Risk" },
+      { op: ">", threshold: cfg.top5WarnPct, verdict: "Cautious" }
+    ]);
+    row("Top 10", c.top10, "pct", [
+      { op: ">", threshold: cfg.top10RugPct, verdict: "RUG" },
+      { op: ">", threshold: cfg.top10VeryHighPct, verdict: "Very High Risk" },
+      { op: ">", threshold: cfg.top10HighPct, verdict: "High Risk" },
+      { op: ">", threshold: cfg.top10WarnPct, verdict: "Cautious" }
+    ]);
+    row("Sharks + whales", c.sharkWhale, "pct", [
+      { op: ">", threshold: cfg.sharkWhaleVeryHighPct, verdict: "Very High Risk" },
+      { op: ">", threshold: cfg.sharkWhaleWarnPct, verdict: "High Risk" }
+    ]);
+    row("Dolphins + sharks + whales", c.mid, "pct", [
+      { op: ">", threshold: cfg.midTierVeryHighPct, verdict: "Very High Risk" },
+      { op: ">", threshold: cfg.midTierHighPct, verdict: "High Risk" },
+      { op: ">", threshold: cfg.midTierWarnPct, verdict: "Cautious" }
+    ]);
+    row("Fish + crab", c.fishCrab, "pct", [], "Not a risk rule. Fish is $1k–$10k and crab is $100–$1k.");
+    row("Crab + shrimp", c.retail, "pct", [
+      { op: "<", threshold: cfg.retailThinHighPct, verdict: "High Risk" },
+      { op: "<", threshold: cfg.retailThinWarnPct, verdict: "Cautious" }
+    ]);
+    row("Holders", c.holders, "count", [
+      { op: "<", threshold: cfg.minHoldersRug, verdict: "RUG" },
+      { op: "<", threshold: cfg.minHoldersVeryHigh, verdict: "Very High Risk" },
+      { op: "<", threshold: cfg.minHoldersHigh, verdict: "High Risk" },
+      { op: "<", threshold: cfg.minHoldersWarn, verdict: "Cautious" }
+    ]);
+    row("$1M wallets", c.tokenWhale, "pct", [
+      { op: ">", threshold: 0, verdict: "High Risk" }
+    ]);
+    return rows;
+  }
+
+  function reasonFor(verdict, checks) {
+    var order = ["RUG", "Very High Risk", "High Risk", "Cautious"];
+    if (order.indexOf(verdict) !== -1) {
+      var hit = checks.filter(function (c) { return c.hit && c.verdict === verdict; })[0];
+      if (hit) return hit.label + ": " + showNum(hit.value, hit.unit) + " " + hit.op + " " + showNum(hit.threshold, hit.unit);
+    }
+    var near = checks.filter(function (c) { return c.used && c.nearest && isFinite(c.gap); }).sort(function (a, b) { return a.gap - b.gap; })[0];
+    if (!near) return "No rule fired.";
+    var way = near.nearest.op === ">" ? "over " : "under ";
+    return "No rule fired. Closest: " + near.label + " " + showNum(near.value, near.unit) + " vs " + way + showNum(near.nearest.threshold, near.unit) + ".";
+  }
+
+  function showNum(n, unit) {
+    if (unit === "count") return fmtCount(n);
+    if (unit === "usd") return "$" + fmt(n);
+    return fmt(n) + "%";
   }
 
   function field(src, key, label, unverified) {

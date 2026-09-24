@@ -121,6 +121,43 @@ test("tier percents that do not add up raise an info flag", () => {
   assert.ok(out.flags.some((f) => f.id === "SUM" && f.severity === "INFO"));
 });
 
+test("fish plus crab is not the concentration rule", () => {
+  const out = commentary({
+    holderCount: 4779,
+    mcapUsd: 2000000,
+    top5Pct: 11.37,
+    top10Pct: 17.44,
+    top100Pct: 40,
+    tokenWhaleConcentration: null,
+    portfolioWhaleConcentrationPct: 1,
+    tiers: [
+      { tier: "Shark", holders: 0, pctHolders: 0, pctOfCoin: 0 },
+      { tier: "Dolphin", holders: 70, pctHolders: 1.5, pctOfCoin: 42.21 },
+      { tier: "Fish", holders: 500, pctHolders: 10, pctOfCoin: 42.26 },
+      { tier: "Crab", holders: 900, pctHolders: 18, pctOfCoin: 12.82 },
+      { tier: "Shrimp", holders: 3309, pctHolders: 69, pctOfCoin: 2.71 }
+    ]
+  });
+  assert.equal(out.verdict, "Safe");
+  const fishCrab = out.checks.find((c) => c.label === "Fish + crab");
+  assert.ok(Math.abs(fishCrab.value - 55.08) < 0.02);
+  assert.equal(fishCrab.used, false);
+  assert.equal(fishCrab.hit, false);
+  const mid = out.checks.find((c) => c.label === "Dolphins + sharks + whales");
+  assert.ok(Math.abs(mid.value - 42.21) < 0.02);
+  assert.equal(mid.hit, false);
+  assert.match(out.reason, /No rule fired/);
+});
+
+test("a real mid-tier breach names the metric", () => {
+  const input = clean();
+  input.tiers.find((t) => t.tier === "Dolphin").pctOfCoin = 56;
+  input.tiers.find((t) => t.tier === "Fish").pctOfCoin = 10;
+  const out = commentary(input);
+  assert.equal(out.verdict, "High Risk");
+  assert.match(out.reason, /Dolphins \+ sharks \+ whales: 62\.00% > 55\.00%/);
+});
+
 test("missing shark is not treated as a clean pass", () => {
   const input = clean();
   input.tiers = input.tiers.filter((t) => t.tier !== "Shark");
