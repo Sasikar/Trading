@@ -10,6 +10,7 @@ import { scanOldTick, readOldCoins, OLD_SCAN_AT_KEY } from './helius-old.js';
 import { lookupBuy } from './helius-lookup.js';
 import { pumpfunFeed } from './pumpfun.js';
 import { scanTiers } from './tiers.js';
+import { scanMove } from './move.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -381,6 +382,15 @@ export default {
       const mint = (new URL(request.url).searchParams.get('mint') || '').trim();
       try {
         const data = await scanTiers(env, mint);
+        return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
+    if (path === '/move' || path === '/api/move') {
+      const mint = (new URL(request.url).searchParams.get('mint') || '').trim();
+      try {
+        const data = await scanMove(env, mint);
         return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
