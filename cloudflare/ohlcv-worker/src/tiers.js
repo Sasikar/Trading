@@ -224,8 +224,9 @@ async function portfolioWhales(key, rows, mint, price, decimals) {
     const thisUsd = (row.raw / scale) * price;
     const looksLikeLp = bag.solUsd > Math.max(50000, thisUsd * 0.3) && bag.otherUsd < bag.solUsd;
     const wealth = bag.otherUsd + (looksLikeLp ? 0 : bag.solUsd);
-    return { raw: row.raw, whale: wealth >= 1000000, lp: looksLikeLp };
+    return { raw: row.raw, whale: wealth >= 1000000, lp: looksLikeLp, priced: bag.solUsd + bag.otherUsd > 1 };
   }));
+  if (!checks.some((c) => c.priced)) return null;
   const whales = checks.filter((c) => c.whale && !c.lp);
   const rawSum = whales.reduce((s, c) => s + c.raw, 0);
   return {
