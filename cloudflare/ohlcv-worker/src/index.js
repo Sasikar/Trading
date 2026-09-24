@@ -9,6 +9,7 @@ import { notifyNewOverlap } from './helius-tg.js';
 import { scanOldTick, readOldCoins, OLD_SCAN_AT_KEY } from './helius-old.js';
 import { lookupBuy } from './helius-lookup.js';
 import { pumpfunFeed } from './pumpfun.js';
+import { scanTiers } from './tiers.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -375,6 +376,16 @@ function stub(request) {
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
+    if (path === '/tiers' || path === '/api/tiers') {
+      const mint = (new URL(request.url).searchParams.get('mint') || '').trim();
+      try {
+        const data = await scanTiers(env, mint);
+        return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
     return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
   },
   async scheduled(event, env, ctx) {

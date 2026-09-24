@@ -76,94 +76,10 @@
   }
 
   async function scan(mint) {
-    var dexRes = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + mint, { cache: "no-store" });
-    if (!dexRes.ok) throw new Error("Price feed failed");
-    var dex = await dexRes.json();
-    var pairs = (dex.pairs || []).filter(function (p) {
-      return p.baseToken && p.baseToken.address === mint && Number(p.priceUsd) > 0;
-    });
-    pairs.sort(function (a, b) {
-      return ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0);
-    });
-    if (!pairs.length) throw new Error("No trading pair for that address yet");
-    var top = pairs[0];
-    var price = Number(top.priceUsd);
-    var name = (top.baseToken && top.baseToken.name) || "Token";
-    var symbol = (top.baseToken && top.baseToken.symbol) || "";
-    var mcap = Number(top.marketCap || top.fdv || 0);
-
-    var decimals = 6;
-    var program = TOKEN;
-    try {
-      var rugRes = await fetch("https://api.rugcheck.xyz/v1/tokens/" + mint + "/report", { cache: "no-store" });
-      if (rugRes.ok) {
-        var rug = await rugRes.json();
-        if (rug.tokenProgram) program = rug.tokenProgram;
-        var holders = rug.topHolders || [];
-        for (var i = 0; i < holders.length; i++) {
-          if (typeof holders[i].decimals === "number") { decimals = holders[i].decimals; break; }
-        }
-      }
-    } catch (e) {}
-
-    var filters = program === TOKEN22
-      ? [{ memcmp: { offset: 0, bytes: mint } }]
-      : [{ dataSize: 165 }, { memcmp: { offset: 0, bytes: mint } }];
-    var payload = {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "getProgramAccounts",
-      params: [
-        program === TOKEN22 ? TOKEN22 : TOKEN,
-        { encoding: "base64", dataSlice: { offset: 64, length: 8 }, filters: filters }
-      ]
-    };
-    var rows = null;
-    var last = "Holder list did not load";
-    for (var r = 0; r < RPCS.length && !rows; r++) {
-      try {
-        var rpcRes = await fetch(RPCS[r], {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        var body = await rpcRes.json();
-        if (!rpcRes.ok || body.error) { last = (body.error && body.error.message) || ("RPC " + rpcRes.status); continue; }
-        rows = body.result || [];
-      } catch (err) { last = err.message || last; }
-    }
-    if (!rows) throw new Error(last);
-
-    var scale = Math.pow(10, decimals);
-    var buckets = BANDS.map(function () { return { count: 0, value: 0 }; });
-    var holderCount = 0;
-    rows.forEach(function (row) {
-      var data = row.account && row.account.data;
-      var b64 = Array.isArray(data) ? data[0] : (typeof data === "string" ? data : "");
-      if (!b64) return;
-      var raw = u64le(b64);
-      if (!(raw > 0)) return;
-      holderCount++;
-      var usd = (raw / scale) * price;
-      var idx = 5;
-      for (var b = 0; b < BANDS.length; b++) {
-        if (usd >= BANDS[b].min) { idx = b; break; }
-      }
-      buckets[idx].count++;
-      buckets[idx].value += usd;
-    });
-    if (!holderCount) throw new Error("No holders found for that mint");
-    var sum = buckets.reduce(function (s, b) { return s + b.value; }, 0);
-    return {
-      name: name,
-      symbol: symbol,
-      price: price,
-      mcap: mcap || sum,
-      holderCount: holderCount,
-      buckets: buckets,
-      sum: sum,
-      mint: mint
-    };
+    var res = await fetch("https://trading-ohlcv.sasipudi.workers.dev/tiers?mint=" + encodeURIComponent(mint), { cache: "no-store" });
+    var body = await res.json();
+    if (!body || body.ok === false) throw new Error((body && body.error) || "Tier scan failed");
+    return body;
   }
 
   function paint(result) {
