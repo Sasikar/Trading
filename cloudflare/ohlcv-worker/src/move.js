@@ -58,26 +58,58 @@ function reason(pair, ranked, coverage) {
 }
 
 async function mainPair(mint) {
-  const res = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + mint, {
+  try {
+    const res = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + mint, {
+      headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (res.ok) {
+      const body = await res.json();
+      const pairs = (body.pairs || []).filter((p) => p.chainId === "solana" && p.baseToken && p.baseToken.address === mint && Number(p.liquidity && p.liquidity.usd) > 0);
+      pairs.sort((a, b) => (b.liquidity.usd || 0) - (a.liquidity.usd || 0));
+      if (pairs.length) {
+        const top = pairs[0];
+        const tx = (top.txns && top.txns.h24) || {};
+        const ch = top.priceChange || {};
+        return {
+          name: top.baseToken.name || "Token",
+          symbol: top.baseToken.symbol || "",
+          pair: top.pairAddress,
+          dex: top.dexId || "",
+          price: Number(top.priceUsd) || 0,
+          liquidity: Number(top.liquidity && top.liquidity.usd) || 0,
+          volume24: Number(top.volume && top.volume.h24) || 0,
+          buys: Number(tx.buys) || 0,
+          sells: Number(tx.sells) || 0,
+          change24: Number(ch.h24) || 0,
+          change6: ch.h6 == null ? null : Number(ch.h6),
+          change1: ch.h1 == null ? null : Number(ch.h1)
+        };
+      }
+    }
+  } catch (e) {}
+  const res = await fetch("https://api.geckoterminal.com/api/v2/networks/solana/tokens/" + mint + "/pools?page=1", {
     headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" },
     signal: AbortSignal.timeout(12000)
   });
   if (!res.ok) throw new Error("Price feed failed");
   const body = await res.json();
-  const pairs = (body.pairs || []).filter((p) => p.chainId === "solana" && p.baseToken && p.baseToken.address === mint && Number(p.liquidity && p.liquidity.usd) > 0);
-  pairs.sort((a, b) => (b.liquidity.usd || 0) - (a.liquidity.usd || 0));
-  if (!pairs.length) throw new Error("No trading pair for that address yet");
-  const top = pairs[0];
-  const tx = (top.txns && top.txns.h24) || {};
-  const ch = top.priceChange || {};
+  const rows = body.data || [];
+  if (!rows.length) throw new Error("No trading pair for that address yet");
+  rows.sort((a, b) => Number(b.attributes.reserve_in_usd) - Number(a.attributes.reserve_in_usd));
+  const top = rows[0];
+  const a = top.attributes;
+  const tx = (a.transactions && a.transactions.h24) || {};
+  const ch = a.price_change_percentage || {};
+  const vol = a.volume_usd || {};
   return {
-    name: top.baseToken.name || "Token",
-    symbol: top.baseToken.symbol || "",
-    pair: top.pairAddress,
-    dex: top.dexId || "",
-    price: Number(top.priceUsd) || 0,
-    liquidity: Number(top.liquidity && top.liquidity.usd) || 0,
-    volume24: Number(top.volume && top.volume.h24) || 0,
+    name: (a.name || "Token").split(" / ")[0],
+    symbol: (a.name || "").split(" / ")[0],
+    pair: a.address,
+    dex: "pool",
+    price: Number(a.base_token_price_usd) || 0,
+    liquidity: Number(a.reserve_in_usd) || 0,
+    volume24: Number(vol.h24) || 0,
     buys: Number(tx.buys) || 0,
     sells: Number(tx.sells) || 0,
     change24: Number(ch.h24) || 0,
