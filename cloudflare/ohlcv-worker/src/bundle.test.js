@@ -36,7 +36,7 @@ test('old wallets with no launch buys stay grey or pass and do not invent a bot'
   const out = scoreBundle(rows, launch);
   const by = Object.fromEntries(out.checks.map((c) => [c.id, c.state]));
   assert.equal(by.fresh, 'pass');
-  assert.equal(by.age, 'grey');
+  assert.equal(by.age, 'pass');
   assert.equal(by.linked, 'grey');
   assert.equal(by.bot, 'grey');
   assert.equal(by.hold, 'grey');

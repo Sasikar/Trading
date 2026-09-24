@@ -27,6 +27,7 @@ export function scoreBundle(rows, launchAt) {
   else freshLine = line('fresh', 'Fresh wallets', 'pass', fresh.length + ' of ' + known.length + ' top wallets were first seen within a day of launch.');
 
   const stamped = list.filter((r) => !r.old && r.firstAt);
+  const olds = list.filter((r) => r.old);
   const hours = new Map();
   stamped.forEach((r) => {
     const key = Math.floor(r.firstAt / HOUR);
@@ -34,11 +35,11 @@ export function scoreBundle(rows, launchAt) {
   });
   let sameHour = 0;
   hours.forEach((n) => { if (n > sameHour) sameHour = n; });
-  const ageLine = stamped.length < 3
+  const ageLine = stamped.length + olds.length < 3
     ? line('age', 'Same wallet age', 'grey', 'Fewer than 3 wallet ages came back.')
     : sameHour >= 3
       ? line('age', 'Same wallet age', 'fail', sameHour + ' top wallets were created in the same hour.')
-      : line('age', 'Same wallet age', 'pass', 'Creation times are spread out.');
+      : line('age', 'Same wallet age', 'pass', stamped.length < 3 ? 'Most top wallets are already old, not created in the same hour.' : 'Creation times are spread out.');
 
   const slots = new Map();
   list.forEach((r) => { if (r.buySlot) slots.set(r.buySlot, (slots.get(r.buySlot) || 0) + 1); });
@@ -204,11 +205,13 @@ async function fundersOf(key, sigs) {
   return out;
 }
 
-export async function scanBundle(env, mint) {
+export async function scanBundle(env, mint, launchHint) {
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) throw new Error('Paste a Solana token address.');
   const key = env && env.HELIUS_API_KEY;
   if (!key) throw new Error('Helius key is missing on the worker.');
-  const launchAt = await launchOf(mint);
+  let launchAt = await launchOf(mint);
+  const hint = Number(launchHint);
+  if (!launchAt && hint > 1e11) launchAt = hint;
   const found = await ownersOf(key, mint);
   const rows = await Promise.all(found.rows.map(async (row) => {
     const out = { owner: row.owner, nowTokens: row.nowTokens, old: false, firstAt: 0, buySlot: 0, buyTokens: 0, bot: '', funder: '' };

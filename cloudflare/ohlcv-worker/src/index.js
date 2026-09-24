@@ -421,7 +421,7 @@ export default {
     if (path === '/bundle' || path === '/api/bundle') {
       const mint = (new URL(request.url).searchParams.get('mint') || '').trim();
       try {
-        const data = await scanBundle(env, mint);
+        const data = await scanBundle(env, mint, new URL(request.url).searchParams.get('launch'));
         return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });

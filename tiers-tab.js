@@ -385,8 +385,20 @@ function stat(label, value, note) {
   function loadBundle(mint) {
     bundleFor = mint;
     paintBundle(null, true);
-    fetch("https://trading-ohlcv.sasipudi.workers.dev/bundle?mint=" + encodeURIComponent(mint), { cache: "no-store" })
-      .then(function (res) { return res.json(); })
+    var launch = fetch("https://api.dexscreener.com/latest/dex/tokens/" + encodeURIComponent(mint), { cache: "no-store" })
+      .then(function (res) { return res.ok ? res.json() : {}; })
+      .then(function (body) {
+        var pairs = ((body && body.pairs) || []).filter(function (p) {
+          return p.chainId === "solana" && p.baseToken && p.baseToken.address === mint && p.pairCreatedAt;
+        });
+        pairs.sort(function (a, b) { return a.pairCreatedAt - b.pairCreatedAt; });
+        return pairs.length ? pairs[0].pairCreatedAt : 0;
+      })
+      .catch(function () { return 0; });
+    launch.then(function (at) {
+      var q = "mint=" + encodeURIComponent(mint) + (at ? "&launch=" + encodeURIComponent(at) : "");
+      return fetch("https://trading-ohlcv.sasipudi.workers.dev/bundle?" + q, { cache: "no-store" });
+    }).then(function (res) { return res.json(); })
       .then(function (body) {
         if (bundleFor !== mint) return;
         paintBundle(body || { ok: false, error: "Bundle check failed" }, false);
