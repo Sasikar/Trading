@@ -25,10 +25,14 @@
   }
   function money(n) {
     if (!isFinite(n)) return "—";
-    if (n >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
-    if (n >= 1e3) return "$" + (n / 1e3).toFixed(2) + "K";
-    if (n >= 1) return "$" + n.toFixed(2);
-    return "$" + n.toFixed(4);
+    var sign = n < 0 ? "-" : "";
+    var v = Math.abs(n);
+    var body;
+    if (v >= 1e6) body = (v / 1e6).toFixed(2) + "M";
+    else if (v >= 1e3) body = (v / 1e3).toFixed(2) + "K";
+    else if (v >= 1) body = v.toFixed(2);
+    else body = v.toFixed(2);
+    return sign + "$" + body;
   }
   function pct(n) { return (isFinite(n) ? n : 0).toFixed(2) + "%"; }
 function tokens(n) {
