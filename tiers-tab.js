@@ -153,6 +153,45 @@ function stat(label, value, note) {
     html += "</div>";
     table.innerHTML = html;
     paintCommentary(result);
+    paintHistory(result.history);
+  }
+
+  function shortWallet(addr) {
+    addr = String(addr || "");
+    return addr.length < 10 ? addr : addr.slice(0, 4) + "…" + addr.slice(-4);
+  }
+
+  function paintHistory(history) {
+    var box = $("tier-history");
+    if (!box) return;
+    if (!history) { box.innerHTML = ""; return; }
+    var html = "<div style=\"margin-top:18px;padding-top:12px;border-top:1px solid #243041\">";
+    html += "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">HOLDER HISTORY</div>";
+    if (!history.baselineAt || !history.diff) {
+      html += "<div style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">Saved. The next daily check compares how many tokens the top 15 wallets hold. A price move alone does not count as a new dolphin.</div>";
+    } else {
+      var d = history.diff;
+      var when = new Date(d.at).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+      var price = d.pricePct == null ? "price was not saved" : ((d.pricePct > 0 ? "+" : "") + pct(d.pricePct));
+      html += "<div style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#e8eef6\">Since " + esc(when) + ": price " + esc(price) + ".</div>";
+      if (d.changed && d.changed.length) {
+        d.changed.slice(0, 8).forEach(function (r) {
+          var verb = r.cut ? "cut" : "added";
+          html += "<div style=\"margin-top:6px;font-size:13px;color:" + (r.cut ? "#ff8a7a" : "#3dbe7a") + "\"><a href=\"https://solscan.io/account/" + esc(r.owner) + "\" target=\"_blank\" rel=\"noreferrer\" style=\"color:#8eb4ff\">" + esc(shortWallet(r.owner)) + "</a> " + verb + " " + esc(pct(Math.abs(r.pct))) + " of their tokens.</div>";
+        });
+      } else {
+        html += "<div style=\"margin-top:6px;font-size:13px;color:#8491a1\">No top wallet changed its token amount by more than 0.5%.</div>";
+      }
+      (d.added || []).slice(0, 3).forEach(function (r) {
+        html += "<div style=\"margin-top:6px;font-size:13px;color:#c5d0dc\"><a href=\"https://solscan.io/account/" + esc(r.owner) + "\" target=\"_blank\" rel=\"noreferrer\" style=\"color:#8eb4ff\">" + esc(shortWallet(r.owner)) + "</a> is new in the top 15. Their earlier balance was not saved.</div>";
+      });
+      (d.left || []).slice(0, 3).forEach(function (r) {
+        html += "<div style=\"margin-top:6px;font-size:13px;color:#c5d0dc\"><a href=\"https://solscan.io/account/" + esc(r.owner) + "\" target=\"_blank\" rel=\"noreferrer\" style=\"color:#8eb4ff\">" + esc(shortWallet(r.owner)) + "</a> left the top 15. That is not a confirmed sale.</div>";
+      });
+      if (d.holderDelta) html += "<div style=\"margin-top:8px;font-size:12px;color:#8491a1\">Holder count " + (d.holderDelta > 0 ? "+" : "") + d.holderDelta.toLocaleString() + " since that save. That is wallets, not who moved the price.</div>";
+    }
+    html += "</div>";
+    box.innerHTML = html;
   }
 
   function commentaryInput(result) {
@@ -267,10 +306,13 @@ function stat(label, value, note) {
         if (table) table.innerHTML = "<div style=\"font-size:12px;color:#8491a1\">Reading every holder…</div>";
         var box = $("tier-commentary");
         if (box) box.innerHTML = "";
+        var hist = $("tier-history");
+        if (hist) hist.innerHTML = "";
         scan(mint).then(paint).catch(function (err) {
           if (st) st.textContent = "FAILED";
           if (table) table.innerHTML = "<div style=\"font-size:12px;color:#e07a7a\">" + esc(err.message || "Could not load holders") + "</div>";
           if (box) box.innerHTML = "";
+          if (hist) hist.innerHTML = "";
         }).then(function () { busy = false; });
       });
     }

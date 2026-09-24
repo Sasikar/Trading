@@ -137,6 +137,19 @@ async function amountsViaDas(key, mint) {
   return out;
 }
 
+export function bookFromRows(rows, decimals, n) {
+  const by = new Map();
+  for (const row of rows || []) {
+    if (!row || !row.owner || !(row.raw > 0)) continue;
+    by.set(row.owner, (by.get(row.owner) || 0) + row.raw);
+  }
+  const scale = Math.pow(10, decimals || 0);
+  return Array.from(by.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, n || 15)
+    .map(([owner, raw]) => ({ owner, raw: String(Math.round(raw)), tokens: raw / scale }));
+}
+
 function bucket(rows, price, decimals) {
   const scale = Math.pow(10, decimals);
   const buckets = BANDS.map(() => ({ count: 0, value: 0 }));
@@ -268,6 +281,7 @@ export async function scanTiers(env, mint) {
     sum: grouped.sum,
     mint,
     concentration: grouped.concentration,
-    portfolioWhales: portfolio
+    portfolioWhales: portfolio,
+    book: bookFromRows(rows, info.decimals, 15)
   };
 }

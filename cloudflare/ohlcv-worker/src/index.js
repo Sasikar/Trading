@@ -10,6 +10,7 @@ import { scanOldTick, readOldCoins, OLD_SCAN_AT_KEY } from './helius-old.js';
 import { lookupBuy } from './helius-lookup.js';
 import { pumpfunFeed } from './pumpfun.js';
 import { scanTiers } from './tiers.js';
+import { applySnapshot, tierDailyTick } from './tier-history.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -290,6 +291,16 @@ export class OhlcvEngine {
       if (path === '/helius' || path === '/api/helius') return this.handleHelius(request);
       if (path === '/buy-lookup' || path === '/api/buy-lookup') return this.handleBuyLookup(request);
       if (path === '/pumpfun' || path === '/api/pumpfun') return this.handlePumpfun();
+      if (path === '/tier-hist' || path === '/api/tier-hist') {
+        const url = new URL(request.url);
+        if (url.searchParams.get('tick') === '1') {
+          const r = await tierDailyTick(this.env, this.store);
+          return new Response(JSON.stringify(r), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        const body = await request.json();
+        const history = applySnapshot(this.store, body);
+        return new Response(JSON.stringify(history), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
       if (path === '/oldcoins' || path === '/api/oldcoins') {
         const want = new URL(request.url).searchParams.get('scan') === '1';
         if (want) {
@@ -381,7 +392,27 @@ export default {
       const mint = (new URL(request.url).searchParams.get('mint') || '').trim();
       try {
         const data = await scanTiers(env, mint);
-        return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+        let history = null;
+        try {
+          const res = await env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(new Request('https://ohlcv.local/tier-hist', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              mint: data.mint,
+              name: data.name,
+              symbol: data.symbol,
+              price: data.price,
+              mcap: data.mcap,
+              holderCount: data.holderCount,
+              book: data.book
+            })
+          }));
+          history = await res.json();
+        } catch (e) {
+          history = null;
+        }
+        const { book, ...rest } = data;
+        return new Response(JSON.stringify({ ok: true, ...rest, history }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
@@ -393,6 +424,7 @@ export default {
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/status')));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/helius?sync=1')));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/oldcoins?scan=1')));
+    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/tier-hist?tick=1')));
   }
 };
 
