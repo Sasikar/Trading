@@ -12,6 +12,7 @@ import { pumpfunFeed } from './pumpfun.js';
 import { scanTiers } from './tiers.js';
 import { scanBundle } from './bundle.js';
 import { applySnapshot, tierDailyTick } from './tier-history.js';
+import { readNote, writeNote } from './tier-notes.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -301,6 +302,19 @@ export class OhlcvEngine {
         const body = await request.json();
         const history = applySnapshot(this.store, body);
         return new Response(JSON.stringify(history), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+      if (path === '/tier-notes' || path === '/api/tier-notes') {
+        const url = new URL(request.url);
+        const mint = (url.searchParams.get('mint') || '').trim();
+        if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) {
+          return new Response(JSON.stringify({ ok: false, error: 'Paste a Solana token address.' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        if (request.method === 'POST') {
+          const body = await request.json().catch(() => ({}));
+          const note = writeNote(this.store, mint, body || {});
+          return new Response(JSON.stringify({ ok: true, ...note }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ ok: true, ...readNote(this.store, mint) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/oldcoins' || path === '/api/oldcoins') {
         const want = new URL(request.url).searchParams.get('scan') === '1';

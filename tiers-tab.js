@@ -333,24 +333,73 @@ function stat(label, value, note) {
   }
 
   var bundleFor = "";
+  var notesFor = "";
   var tierView = "bands";
+  var NOTES = "https://trading-ohlcv.sasipudi.workers.dev/tier-notes";
 
   function setTierView(next) {
-    tierView = next === "bundle" ? "bundle" : "bands";
-    var bands = $("tier-view-bands-panel");
-    var bundle = $("tier-view-bundle-panel");
-    var b1 = $("tier-view-bands");
-    var b2 = $("tier-view-bundle");
-    if (bands) bands.style.display = tierView === "bands" ? "" : "none";
-    if (bundle) bundle.style.display = tierView === "bundle" ? "" : "none";
-    if (b1) {
-      b1.style.background = tierView === "bands" ? "#1a9b6c" : "#121a24";
-      b1.style.color = tierView === "bands" ? "#fff" : "#c5d0dc";
-    }
-    if (b2) {
-      b2.style.background = tierView === "bundle" ? "#1a9b6c" : "#121a24";
-      b2.style.color = tierView === "bundle" ? "#fff" : "#c5d0dc";
-    }
+    var views = ["bands", "bundle", "bubble", "dex"];
+    tierView = views.indexOf(next) === -1 ? "bands" : next;
+    views.forEach(function (name) {
+      var panel = $("tier-view-" + name + "-panel");
+      var btn = $("tier-view-" + name);
+      var on = tierView === name;
+      if (panel) panel.style.display = on ? "" : "none";
+      if (btn) {
+        btn.style.background = on ? "#1a9b6c" : "#121a24";
+        btn.style.color = on ? "#fff" : "#c5d0dc";
+      }
+    });
+  }
+
+  function localNotes() {
+    try { return JSON.parse(localStorage.getItem("tier_notes_v1") || "{}"); } catch (e) { return {}; }
+  }
+  function rememberNote(mint, note) {
+    var all = localNotes();
+    all[mint] = { bubble: note.bubble || "", dex: note.dex || "", at: note.at || Date.now() };
+    try { localStorage.setItem("tier_notes_v1", JSON.stringify(all)); } catch (e) {}
+  }
+  function paintNotes(mint, note) {
+    if (notesFor !== mint) return;
+    var picked = note && note.bubble;
+    document.querySelectorAll("input[name=tier-bubble]").forEach(function (el) { el.checked = el.value === picked; });
+    var box = $("tier-dex-text");
+    if (box && document.activeElement !== box) box.value = (note && note.dex) || "";
+    var bubble = $("tier-bubble-status");
+    var dex = $("tier-dex-status");
+    var when = note && note.at ? "Saved for this coin." : "Nothing saved for this coin yet.";
+    if (bubble) bubble.textContent = when;
+    if (dex) dex.textContent = when;
+  }
+  function loadNotes(mint) {
+    notesFor = mint;
+    var cached = localNotes()[mint];
+    if (cached) paintNotes(mint, cached);
+    else paintNotes(mint, { bubble: "", dex: "" });
+    fetch(NOTES + "?mint=" + encodeURIComponent(mint), { cache: "no-store" })
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        if (!body || body.ok === false || notesFor !== mint) return;
+        rememberNote(mint, body);
+        paintNotes(mint, body);
+      })
+      .catch(function () {});
+  }
+  function saveNotes(mint, patch) {
+    var cached = localNotes()[mint] || {};
+    var next = { bubble: patch.bubble != null ? patch.bubble : (cached.bubble || ""), dex: patch.dex != null ? patch.dex : (cached.dex || ""), at: Date.now() };
+    rememberNote(mint, next);
+    paintNotes(mint, next);
+    fetch(NOTES + "?mint=" + encodeURIComponent(mint), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(patch)
+    }).then(function (res) { return res.json(); }).then(function (body) {
+      if (!body || body.ok === false || notesFor !== mint) return;
+      rememberNote(mint, body);
+      paintNotes(mint, body);
+    }).catch(function () {});
   }
 
   function paintBundle(result, loading) {
@@ -433,6 +482,7 @@ function stat(label, value, note) {
         var hist = $("tier-history");
         if (hist) hist.innerHTML = "";
         loadBundle(mint);
+        loadNotes(mint);
         scan(mint).then(paint).catch(function (err) {
           if (st) st.textContent = "FAILED";
           if (table) table.innerHTML = "<div style=\"font-size:12px;color:#e07a7a\">" + esc(err.message || "Could not load holders") + "</div>";
@@ -441,10 +491,30 @@ function stat(label, value, note) {
         }).then(function () { busy = false; });
       });
     }
-    var bandsBtn = $("tier-view-bands");
-    var bundleBtn = $("tier-view-bundle");
-    if (bandsBtn) bandsBtn.addEventListener("click", function () { setTierView("bands"); });
-    if (bundleBtn) bundleBtn.addEventListener("click", function () { setTierView("bundle"); });
+    ["bands", "bundle", "bubble", "dex"].forEach(function (name) {
+      var btn = $("tier-view-" + name);
+      if (btn) btn.addEventListener("click", function () { setTierView(name); });
+    });
+    document.querySelectorAll("input[name=tier-bubble]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        if (!notesFor) {
+          var st = $("tier-bubble-status");
+          if (st) st.textContent = "Check a token first.";
+          el.checked = false;
+          return;
+        }
+        saveNotes(notesFor, { bubble: el.value });
+      });
+    });
+    var dexSave = $("tier-dex-save");
+    if (dexSave) dexSave.addEventListener("click", function () {
+      if (!notesFor) {
+        var st = $("tier-dex-status");
+        if (st) st.textContent = "Check a token first.";
+        return;
+      }
+      saveNotes(notesFor, { dex: ($("tier-dex-text") && $("tier-dex-text").value) || "" });
+    });
     paintBundle(null, false);
     var act = document.querySelector("#tf-tabs .tab.active");
     if (act && act.getAttribute("data-tf") === "tiers") show(true);
