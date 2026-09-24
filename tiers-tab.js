@@ -152,6 +152,73 @@ function stat(label, value, note) {
     );
     html += "</div>";
     table.innerHTML = html;
+    paintCommentary(result);
+  }
+
+  function commentaryInput(result) {
+    var c = result.concentration || {};
+    var tw = c.tokenWhales || {};
+    var pw = result.portfolioWhales;
+    var tiers = (result.buckets || []).map(function (row, i) {
+      var band = BANDS[i];
+      var holders = row && row.count ? row.count : 0;
+      var value = row && row.value ? row.value : 0;
+      return {
+        tier: band ? band.label : "",
+        holders: holders,
+        pctHolders: result.holderCount ? (holders / result.holderCount) * 100 : 0,
+        valueUsd: value,
+        pctOfCoin: result.sum ? (value / result.sum) * 100 : 0
+      };
+    });
+    return {
+      name: result.name,
+      symbol: result.symbol,
+      priceUsd: result.price,
+      mcapUsd: result.mcap,
+      holderCount: result.holderCount,
+      tiers: tiers,
+      top5Pct: c.top5 ? c.top5.pct : null,
+      top10Pct: c.top10 ? c.top10.pct : null,
+      top10Usd: c.top10 ? c.top10.usd : null,
+      top100Pct: c.top100 ? c.top100.pct : null,
+      tokenWhaleConcentration: tw.count ? tw.pct : null,
+      portfolioWhaleConcentrationPct: pw && pw.count != null ? pw.pct : null,
+      lpExcluded: null
+    };
+  }
+
+  function paintCommentary(result) {
+    var box = $("tier-commentary");
+    if (!box || typeof window.tierCommentary !== "function") return;
+    var out = window.tierCommentary(commentaryInput(result));
+    var color = {
+      "RUG": "#ff5d5d",
+      "Very High Risk": "#ff8a3d",
+      "High Risk": "#f0b429",
+      "Cautious": "#e6d36a",
+      "Safe": "#3dbe7a"
+    }[out.verdict] || "#e8eef6";
+    var sevColor = { HIGH: "#ff8a7a", WARN: "#f0b429", INFO: "#9eb6d4" };
+    var html = "<div style=\"margin-top:18px;padding-top:8px;border-top:1px solid #243041\">";
+    html += "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">COMMENTARY</div>";
+    html += "<div style=\"display:inline-block;margin-top:8px;padding:6px 12px;border-radius:999px;font-weight:800;background:#1a2330;color:" + color + "\">" + esc(out.verdict) + "</div>";
+    if (!out.flags.length) html += "<div style=\"margin-top:10px;font-size:13px;color:#8491a1\">No tier flag fired.</div>";
+    out.flags.forEach(function (f) {
+      html += "<div style=\"margin-top:10px;font-size:13px;line-height:1.45;color:" + (sevColor[f.severity] || "#e8eef6") + "\"><b>" + esc(f.severity) + "</b> · " + esc(f.message) + "</div>";
+    });
+    html += fold("Positives", out.positives);
+    html += fold("Not verified", out.unverified);
+    html += "<div style=\"margin-top:12px;font-size:11px;color:#8491a1;line-height:1.45\">Tier-based flags only. They can't detect split insider supply. Not financial advice.</div>";
+    html += "</div>";
+    box.innerHTML = html;
+  }
+
+  function fold(title, rows) {
+    var body = rows.length
+      ? rows.map(function (r) { return "<div style=\"margin-top:6px\">" + esc(r) + "</div>"; }).join("")
+      : "<div style=\"margin-top:6px\">None.</div>";
+    return "<details style=\"margin-top:12px\"><summary style=\"cursor:pointer;color:#8491a1;font-size:12px\">" + title + " (" + rows.length + ")</summary><div style=\"font-size:12px;color:#c5d0dc;line-height:1.45\">" + body + "</div></details>";
   }
 
   function boot() {
@@ -173,9 +240,12 @@ function stat(label, value, note) {
         if (st) st.textContent = "READING";
         var table = $("tier-table");
         if (table) table.innerHTML = "<div style=\"font-size:12px;color:#8491a1\">Reading every holder…</div>";
+        var box = $("tier-commentary");
+        if (box) box.innerHTML = "";
         scan(mint).then(paint).catch(function (err) {
           if (st) st.textContent = "FAILED";
           if (table) table.innerHTML = "<div style=\"font-size:12px;color:#e07a7a\">" + esc(err.message || "Could not load holders") + "</div>";
+          if (box) box.innerHTML = "";
         }).then(function () { busy = false; });
       });
     }
