@@ -177,7 +177,7 @@ async function heliusWindow(key, pair, mint, price) {
     const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
     const list = await res.json();
     if (!res.ok || !Array.isArray(list)) throw new Error("Swap list failed");
-    if (!list.length) { complete = true; break; }
+    if (!list.length) { complete = oldest != null && oldest <= since; break; }
     before = list[list.length - 1].signature || before;
     for (let i = 0; i < list.length; i++) {
       const tx = list[i];
@@ -187,7 +187,8 @@ async function heliusWindow(key, pair, mint, price) {
       const row = readSwapRows(tx, mint, price, pair);
       if (row.length) rows.push.apply(rows, row);
     }
-    if (complete || list.length < 100) { complete = true; break; }
+    if (complete) break;
+    if (list.length < 100) break;
   }
   return { rows, complete, oldest };
 }
@@ -250,10 +251,10 @@ export async function scanMove(env, mint, hints) {
       window = null;
     }
   }
-  if (!window || !window.rows.length) {
+  if (!window || !window.complete) {
     try {
       const gecko = await geckoWindow(pair.pair, mint, pair.price);
-      if (!window || gecko.rows.length) {
+      if (!window || gecko.rows.length > window.rows.length) {
         window = gecko;
         source = "geckoterminal";
       }
