@@ -31,6 +31,20 @@
     return "$" + n.toFixed(4);
   }
   function pct(n) { return (isFinite(n) ? n : 0).toFixed(2) + "%"; }
+function tokens(n) {
+  if (!isFinite(n)) return "—";
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(2) + "K";
+  return n.toFixed(2);
+}
+function stat(label, value, note) {
+  return "<div style=\"padding:12px 0;border-top:1px solid #243041\">" +
+    "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">" + label + "</div>" +
+    "<div style=\"font-size:22px;font-weight:800;color:#e8eef6;margin-top:4px\">" + value + "</div>" +
+    (note ? "<div style=\"font-size:12px;color:#8491a1;margin-top:4px\">" + note + "</div>" : "") +
+    "</div>";
+}
   function u64le(b64) {
     var bin = atob(b64);
     var n = 0;
@@ -108,6 +122,35 @@
         "<td style=\"font-variant-numeric:tabular-nums\">" + pct(mp) + "</td></tr>";
     });
     html += "</tbody></table>";
+    var c = result.concentration || {};
+    var top10 = c.top10 || {};
+    var top5 = c.top5 || {};
+    var top100 = c.top100 || {};
+    var tw = c.tokenWhales || {};
+    var pw = result.portfolioWhales;
+    html += "<div style=\"margin-top:8px\">";
+    html += stat(
+      "TOP 10 CONCENTRATION",
+      pct(top10.pct || 0) + " (" + money(top10.usd || 0) + ")",
+      "Top 5 holders: " + pct(top5.pct || 0) + " · Top 100 holders: " + pct(top100.pct || 0)
+    );
+    html += stat(
+      "TOKEN WHALE CONCENTRATION",
+      tw.count ? pct(tw.pct || 0) + " (" + money(tw.usd || 0) + ")" : "—",
+      tw.count ? (tw.count + " wallet" + (tw.count === 1 ? "" : "s") + " hold $1M or more of this coin") : "No wallet holds $1M of this coin"
+    );
+    html += stat(
+      "PORTFOLIO WHALE CONCENTRATION",
+      pw && pw.count != null ? pct(pw.pct || 0) + " (" + money(pw.usd || 0) + ")" : "cannot verify",
+      pw && pw.count != null
+        ? (pw.count + " of the largest " + pw.checked + " holders have $1M elsewhere, LP excluded")
+        : "Other-wallet wealth did not load"
+    );
+    html += stat(
+      "TOP 10 TOKENS",
+      pct(top10.pct || 0) + " (" + tokens(top10.tokens || 0) + " tokens)"
+    );
+    html += "</div>";
     table.innerHTML = html;
   }
 
