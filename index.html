@@ -572,6 +572,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="pitfalls">Pitfalls</button>
   <button type="button" class="tab" data-tf="strategy">Strategy</button>
   <button type="button" class="tab" data-tf="decision">Decision Check</button>
+  <button type="button" class="tab" data-tf="emotion">Emotional<span class="tab-sub">Checks</span></button>
   <button type="button" class="tab" data-tf="gmgn">GMGN</button>
   <button type="button" class="tab" data-tf="pumpfun" onclick="try{window.showPumpfun&&window.showPumpfun(true)}catch(e){}">Pumpfun</button>
   <button type="button" class="tab" data-tf="wallets">Wallets</button>
@@ -1161,6 +1162,17 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="emotion-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Emotional Checks</h2><p>All ticked is a green day. One miss is red.</p></div>
+    <span class="source" id="em-status">READY</span>
+  </div>
+  <div class="card">
+    <div id="em-board"></div>
+  </div>
+</section>
+</div>
 <div id="gmgn-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
@@ -1444,7 +1456,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </section>
 </div>
 </main></div>
-<script src="overview-app.js?v=20260923-ndx"></script>
+<script src="overview-app.js?v=20260924-em1"></script>
 <script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
@@ -1462,6 +1474,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="pitfalls-tab.js?v=20260919-pf1"></script>
 <script src="strategy-tab.js?v=20260919-st1"></script>
 <script src="decision-tab.js?v=20260919-dc1"></script>
+<script src="emotion-tab.js?v=20260924-em1"></script>
 <script src="gmgn-tab.js?v=20260923-pf1"></script>
 <script src="wallets-tab.js?v=20260923-pf1"></script>
 <script src="pumpfun-tab.js?v=20260923-pf2"></script>
