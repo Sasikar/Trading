@@ -158,6 +158,14 @@ test("a real mid-tier breach names the metric", () => {
   assert.match(out.reason, /Dolphins \+ sharks \+ whales: 62\.00% > 55\.00%/);
 });
 
+test("removing shrimp dust reports the wallets that remain", () => {
+  const out = commentary(jean());
+  assert.equal(out.dust.remaining, 16762 - 14355);
+  assert.equal(out.dust.remainingText, "2,407");
+  assert.match(out.dust.reason, /Remove that dust and 2,407 wallets remain/);
+  assert.match(out.dust.reason, /3\.54% of the coin/);
+});
+
 test("missing shark is not treated as a clean pass", () => {
   const input = clean();
   input.tiers = input.tiers.filter((t) => t.tier !== "Shark");

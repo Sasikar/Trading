@@ -209,6 +209,13 @@ function stat(label, value, note) {
     out.flags.forEach(function (f) {
       html += "<div style=\"margin-top:10px;font-size:13px;line-height:1.45;color:" + (sevColor[f.severity] || "#e8eef6") + "\"><b>" + esc(f.severity) + "</b> · " + esc(f.message) + "</div>";
     });
+    if (out.dust) {
+      html += "<div style=\"margin-top:14px;padding-top:10px;border-top:1px solid #243041\">";
+      html += "<div style=\"font-size:11px;letter-spacing:.04em;color:#8491a1\">WITHOUT DUST</div>";
+      html += "<div style=\"margin-top:4px;font-size:22px;font-weight:800;color:#e8eef6\">" + esc(out.dust.remainingText) + " holders</div>";
+      html += "<div style=\"margin-top:6px;font-size:13px;line-height:1.45;color:#c5d0dc\">" + esc(out.dust.reason) + "</div>";
+      html += "</div>";
+    }
     html += fold("Positives", out.positives);
     html += fold("Not verified", out.unverified);
     html += "<div style=\"margin-top:12px;font-size:11px;color:#8491a1;line-height:1.45\">Tier-based flags only. They can't detect split insider supply. Not financial advice.</div>";

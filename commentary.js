@@ -241,6 +241,7 @@
     if (src.lpExcluded !== true) unverified.push("Whether the LP is excluded from these figures");
     unverified.push("Balance trend over time");
 
+    var dust = dustCut(holders, shrimp, shrimpShare);
     var fishCrab = fish.present && crab.present ? fish.pctOfCoin + crab.pctOfCoin : null;
     var checks = scorecard(cfg, {
       top5: top5, top10: top10, top100: top100, holders: holders, mid: mid,
@@ -253,7 +254,29 @@
     var rank = { HIGH: 0, WARN: 1, INFO: 2 };
     flags.sort(function (a, b) { return rank[a.severity] - rank[b.severity]; });
 
-    return { verdict: verdict, reason: reasonFor(verdict, checks), checks: checks, flags: flags, positives: positives, unverified: dedupe(unverified) };
+    return { verdict: verdict, reason: reasonFor(verdict, checks), checks: checks, dust: dust, flags: flags, positives: positives, unverified: dedupe(unverified) };
+  }
+
+  function dustCut(holders, shrimp, shrimpShare) {
+    if (holders == null || !(holders > 0) || !shrimp || !shrimp.present) return null;
+    var dustN = shrimp.holders != null ? shrimp.holders : (shrimpShare != null ? holders * shrimpShare / 100 : null);
+    if (dustN == null || !(dustN > 0)) return null;
+    if (dustN > holders) dustN = holders;
+    var left = holders - dustN;
+    var supply = shrimp.pctOfCoin != null ? 100 - shrimp.pctOfCoin : null;
+    var share = shrimpShare != null ? shrimpShare : (dustN / holders) * 100;
+    var reason = commas(dustN) + " wallets hold under $100. They are " + fmt(share) + "% of the " + commas(holders) + " holder count";
+    if (shrimp.pctOfCoin != null) reason += ", but only " + fmt(shrimp.pctOfCoin) + "% of the coin";
+    reason += ". Remove that dust and " + commas(left) + " wallets remain.";
+    if (supply != null) reason += " Those " + commas(left) + " still hold " + fmt(supply) + "% of supply.";
+    if (left < 80) reason += " That remaining book is rug-sized.";
+    else if (left < 150) reason += " That remaining book is a high-risk holder count.";
+    else if (left < 300) reason += " That remaining book is thin.";
+    return { removed: dustN, remaining: left, remainingText: commas(left), remainingSupplyPct: supply, reason: reason };
+  }
+
+  function commas(n) {
+    return fmtCount(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
   function scorecard(cfg, c) {
