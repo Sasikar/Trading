@@ -247,8 +247,32 @@ function stat(label, value, note) {
   }
 
   function loadMove(mint) {
-    return fetch("https://trading-ohlcv.sasipudi.workers.dev/move?mint=" + encodeURIComponent(mint), { cache: "no-store" }).then(function (res) {
+    return fetch("https://api.dexscreener.com/latest/dex/tokens/" + encodeURIComponent(mint), { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("Price feed failed");
       return res.json();
+    }).then(function (body) {
+      var pairs = (body.pairs || []).filter(function (p) {
+        return p.chainId === "solana" && p.baseToken && p.baseToken.address === mint && p.liquidity && Number(p.liquidity.usd) > 0;
+      });
+      pairs.sort(function (a, b) { return (b.liquidity.usd || 0) - (a.liquidity.usd || 0); });
+      if (!pairs.length) throw new Error("No trading pair for that address yet");
+      var top = pairs[0];
+      var tx = (top.txns && top.txns.h24) || {};
+      var ch = top.priceChange || {};
+      var q = "mint=" + encodeURIComponent(mint) +
+        "&pair=" + encodeURIComponent(top.pairAddress) +
+        "&price=" + encodeURIComponent(top.priceUsd || "") +
+        "&name=" + encodeURIComponent((top.baseToken && top.baseToken.name) || "") +
+        "&symbol=" + encodeURIComponent((top.baseToken && top.baseToken.symbol) || "") +
+        "&dex=" + encodeURIComponent(top.dexId || "") +
+        "&liquidity=" + encodeURIComponent((top.liquidity && top.liquidity.usd) || "") +
+        "&volume24=" + encodeURIComponent((top.volume && top.volume.h24) || "") +
+        "&buys=" + encodeURIComponent(tx.buys || 0) +
+        "&sells=" + encodeURIComponent(tx.sells || 0) +
+        "&change24=" + encodeURIComponent(ch.h24 == null ? "" : ch.h24) +
+        "&change6=" + encodeURIComponent(ch.h6 == null ? "" : ch.h6) +
+        "&change1=" + encodeURIComponent(ch.h1 == null ? "" : ch.h1);
+      return fetch("https://trading-ohlcv.sasipudi.workers.dev/move?" + q, { cache: "no-store" }).then(function (res) { return res.json(); });
     }).then(function (body) {
       if (!body || body.ok === false) throw new Error((body && body.error) || "Move scan failed");
       return body;

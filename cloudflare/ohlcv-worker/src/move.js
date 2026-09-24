@@ -222,9 +222,23 @@ function coverage(window) {
   return { complete: !!window.complete, from };
 }
 
-export async function scanMove(env, mint) {
+export async function scanMove(env, mint, hints) {
   if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) throw new Error("Paste a Solana token address.");
-  const pair = await mainPair(mint);
+  const hinted = hints && hints.pair && Number(hints.price) > 0;
+  const pair = hinted ? {
+    name: hints.name || "Token",
+    symbol: hints.symbol || "",
+    pair: hints.pair,
+    dex: hints.dex || "",
+    price: Number(hints.price) || 0,
+    liquidity: Number(hints.liquidity) || 0,
+    volume24: Number(hints.volume24) || 0,
+    buys: Number(hints.buys) || 0,
+    sells: Number(hints.sells) || 0,
+    change24: Number(hints.change24) || 0,
+    change6: hints.change6 == null || hints.change6 === "" ? null : Number(hints.change6),
+    change1: hints.change1 == null || hints.change1 === "" ? null : Number(hints.change1)
+  } : await mainPair(mint);
   const key = env && env.HELIUS_API_KEY;
   let window = null;
   let source = "geckoterminal";

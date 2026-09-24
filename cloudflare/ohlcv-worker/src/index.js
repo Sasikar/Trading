@@ -388,9 +388,24 @@ export default {
       }
     }
     if (path === '/move' || path === '/api/move') {
-      const mint = (new URL(request.url).searchParams.get('mint') || '').trim();
+      const url = new URL(request.url);
+      const mint = (url.searchParams.get('mint') || '').trim();
+      const hints = {
+        pair: (url.searchParams.get('pair') || '').trim(),
+        price: url.searchParams.get('price') || '',
+        name: url.searchParams.get('name') || '',
+        symbol: url.searchParams.get('symbol') || '',
+        dex: url.searchParams.get('dex') || '',
+        liquidity: url.searchParams.get('liquidity') || '',
+        volume24: url.searchParams.get('volume24') || '',
+        buys: url.searchParams.get('buys') || '',
+        sells: url.searchParams.get('sells') || '',
+        change24: url.searchParams.get('change24') || '',
+        change6: url.searchParams.get('change6') || '',
+        change1: url.searchParams.get('change1') || ''
+      };
       try {
-        const data = await scanMove(env, mint);
+        const data = await scanMove(env, mint, hints);
         return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
