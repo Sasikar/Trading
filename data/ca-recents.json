@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-25T14:57:58.438Z",
+  "updated": "2026-09-25T15:21:11.010Z",
   "count": 31,
   "items": [
     {
@@ -7,11 +7,11 @@
       "ca": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
       "name": "JEANPHIL",
       "base": "JEANPHIL",
-      "t": 1790334943027,
+      "t": 1790348357789,
       "poolAddress": "4R8CiMnJWDNoes3fQi1ccPFJygPXazaHaWpHrN3rZeNj",
       "poolNetwork": "solana",
-      "poolLiq": 425785.2,
-      "poolCachedAt": 1790334943027
+      "poolLiq": 420073.82,
+      "poolCachedAt": 1790348357786
     },
     {
       "chain": "solana",
