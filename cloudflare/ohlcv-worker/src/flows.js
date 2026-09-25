@@ -136,6 +136,7 @@ async function swapsOf(key, address, mint, price, since) {
   const trades = [];
   let before = '';
   let truncated = false;
+  let sample = null;
   for (let page = 0; page < 10; page++) {
     let url = 'https://api.helius.xyz/v0/addresses/' + encodeURIComponent(address) + '/transactions?api-key=' + encodeURIComponent(key) + '&limit=100';
     if (before) url += '&before=' + encodeURIComponent(before);
@@ -145,6 +146,21 @@ async function swapsOf(key, address, mint, price, since) {
     if (!Array.isArray(rows) || !rows.length) break;
     let old = false;
     rows.forEach((tx) => {
+      if (!sample) {
+        const t0 = (tx.tokenTransfers || [])[0] || {};
+        const swap = tx.events && tx.events.swap;
+        sample = {
+          type: tx.type || '',
+          source: tx.source || '',
+          fee: tx.feePayer ? tx.feePayer.slice(0, 4) : '',
+          transfers: (tx.tokenTransfers || []).length,
+          transferKeys: Object.keys(t0),
+          mint0: t0.mint || '',
+          swap: !!swap,
+          swapKeys: swap ? Object.keys(swap) : [],
+          out0: swap && swap.tokenOutputs && swap.tokenOutputs[0] ? Object.keys(swap.tokenOutputs[0]) : []
+        };
+      }
       const at = (tx.timestamp || 0) * 1000;
       if (at && at < since) old = true;
       else trades.push.apply(trades, tradesFromTx(tx, mint, price));
@@ -153,7 +169,7 @@ async function swapsOf(key, address, mint, price, since) {
     if (old || !before) break;
     if (page === 9) truncated = true;
   }
-  return { trades: trades, truncated: truncated };
+  return { trades: trades, truncated: truncated, sample: sample };
 }
 
 export async function scanFlows(env, mint, hints) {
@@ -168,7 +184,7 @@ export async function scanFlows(env, mint, hints) {
   const holders = await holdersOf(key, mint);
   const since = Date.now() - 24 * 60 * 60 * 1000;
   const book = await swapsOf(key, pair || mint, mint, price, since);
-  return {
+  const out = {
     mint: mint,
     symbol: (live && live.symbol) || hints.symbol || '',
     price: price,
@@ -177,4 +193,6 @@ export async function scanFlows(env, mint, hints) {
     truncated: book.truncated,
     trades: book.trades.length
   };
+  if (hints.debug && book.sample) out.sample = book.sample;
+  return out;
 }

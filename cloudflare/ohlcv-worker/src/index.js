@@ -450,7 +450,8 @@ export default {
           price: url.searchParams.get('price'),
           pair: url.searchParams.get('pair') || '',
           symbol: url.searchParams.get('symbol') || '',
-          change: url.searchParams.get('change')
+          change: url.searchParams.get('change'),
+          debug: url.searchParams.get('debug') === '1'
         });
         return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
