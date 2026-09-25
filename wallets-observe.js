@@ -111,7 +111,8 @@
         el.setAttribute('data-cs-on', on ? '1' : '0');
         el.style.background = on ? '#2a1c0e' : 'transparent';
         el.style.color = on ? '#f5a14a' : '#e8eef6';
-        el.style.borderColor = on ? '#f5a14a' : 'transparent';
+        el.style.borderColor = on ? '#f5a14a' : '#3d4d63';
+        el.textContent = (el.textContent || '').replace(/ · (add|added)$/, '') + (on ? ' · added' : ' · add');
       });
       return;
     }
@@ -485,13 +486,15 @@
       '" data-cs-on="' +
       (on ? '1' : '0') +
       '" style="border:1px solid ' +
-      (on ? '#f5a14a' : 'transparent') +
+      (on ? '#f5a14a' : '#3d4d63') +
       ';background:' +
       (on ? '#2a1c0e' : 'transparent') +
       ';color:' +
       (on ? '#f5a14a' : '#e8eef6') +
       ';border-radius:8px;padding:4px 8px;font-weight:800;font-size:13px;cursor:pointer">' +
       esc(coinLabel(c)) +
+      ' · ' +
+      (on ? 'added' : 'add') +
       '</button>' +
       (fmtMc(c.mcap) ? '<span style="margin-left:8px;color:#62e3a0;font-size:12px">' + esc(fmtMc(c.mcap)) + '</span>' : '') +
       (c.mint
