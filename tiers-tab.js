@@ -516,12 +516,13 @@ function stat(label, value, note) {
     html += "<div style=\"margin-top:4px;font-size:14px;color:#e8eef6\">$" + (Number(result.price) < 1 ? Number(result.price).toFixed(6) : Number(result.price).toFixed(4)) + " " + chTxt + "</div>";
     html += "<div style=\"margin-top:14px;font-size:13px;font-weight:800;color:#e8eef6\">Daily net USD flows</div>";
     (result.rows || []).forEach(function (r) {
-      var pos = r.usd >= 0;
-      var col = pos ? "#3dbe7a" : "#ff5d6c";
-      var width = Math.max(4, Math.round(Math.abs(r.usd) / max * 100));
+      var pos = r.usd > 0;
+      var neg = r.usd < 0;
+      var col = pos ? "#3dbe7a" : neg ? "#ff5d6c" : "#8491a1";
+      var width = r.usd ? Math.max(8, Math.round(Math.abs(r.usd) / max * 100)) : 0;
       html += "<div style=\"display:grid;grid-template-columns:72px 1fr auto;gap:8px;align-items:center;margin-top:10px\">" +
         "<div style=\"font-size:13px;color:#c5d0dc\">" + esc(r.label) + "</div>" +
-        "<div style=\"height:8px;border-radius:99px;background:" + col + ";width:" + width + "%;box-shadow:0 0 10px " + col + "\"></div>" +
+        "<div style=\"height:8px;border-radius:99px;background:" + (width ? col : "transparent") + ";width:" + width + "%;box-shadow:" + (width ? "0 0 10px " + col : "none") + "\"></div>" +
         "<div style=\"font-size:13px;font-weight:800;color:" + col + "\">" + moneySigned(r.usd) + "</div></div>";
     });
     html += "<div style=\"margin-top:12px;font-size:11px;color:#8491a1;line-height:1.45\">Last 24 hours. Green is net buying, red is net selling. A whale holds at least $10k of this coin, a shark $2k–$10k, a dolphin $500–$2k, and a fish is smaller. MM traded both ways. The pool is left out. Sun Flow does not publish its cutoff, so these bars will not match theirs one for one." + (result.truncated ? " This coin traded more than the read covered." : "") + "</div>";

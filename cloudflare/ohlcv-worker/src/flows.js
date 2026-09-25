@@ -85,6 +85,42 @@ export function tradesFromTx(tx, mint, price, pair) {
   return tradesFromBalances(tx, mint, price, pair);
 }
 
+function signerOf(tx) {
+  const keys = tx && tx.transaction && tx.transaction.message && tx.transaction.message.accountKeys;
+  if (!Array.isArray(keys)) return '';
+  const hit = keys.find((k) => k && k.signer);
+  if (hit) return hit.pubkey || '';
+  const first = keys[0];
+  return typeof first === 'string' ? first : (first && first.pubkey) || '';
+}
+
+export function tradesFromMeta(tx, mint, price, pair) {
+  const meta = tx && tx.meta;
+  if (!meta || !(price > 0)) return [];
+  const pre = new Map();
+  const post = new Map();
+  function add(map, row) {
+    if (!row || row.mint !== mint || !row.owner || row.owner === pair) return;
+    const ui = Number(row.uiTokenAmount && row.uiTokenAmount.uiAmount);
+    if (!isFinite(ui)) return;
+    map.set(row.owner, (map.get(row.owner) || 0) + ui);
+  }
+  (meta.preTokenBalances || []).forEach((row) => add(pre, row));
+  (meta.postTokenBalances || []).forEach((row) => add(post, row));
+  const deltas = [];
+  new Set([...pre.keys(), ...post.keys()]).forEach((owner) => {
+    const delta = (post.get(owner) || 0) - (pre.get(owner) || 0);
+    if (delta) deltas.push({ owner: owner, delta: delta });
+  });
+  if (!deltas.length) return [];
+  const signer = signerOf(tx);
+  const own = deltas.find((row) => row.owner === signer);
+  const kept = own ? [own] : deltas;
+  return kept
+    .map((row) => ({ wallet: row.owner, side: row.delta > 0 ? 'buy' : 'sell', usd: Math.abs(row.delta) * price }))
+    .filter((row) => row.usd >= 1);
+}
+
 function tierOf(usd) {
   if (usd >= 10000) return 'whale';
   if (usd >= 2000) return 'shark';
@@ -169,12 +205,37 @@ async function holdersOf(key, mint) {
   return list;
 }
 
+function worthChainRead(tx) {
+  const type = String(tx.type || '');
+  const source = String(tx.source || '');
+  if (type === 'TRANSFER' && !(tx.tokenTransfers || []).length) return false;
+  if (type === 'SWAP') return true;
+  if (/METEORA|RAYDIUM|JUPITER|PUMP|ORCA|FLUXBEAM/i.test(source)) return true;
+  return (tx.tokenTransfers || []).length > 0;
+}
+
+async function chainTrades(key, sigs, mint, price, pair) {
+  const trades = [];
+  let read = 0;
+  for (let i = 0; i < sigs.length; i += 12) {
+    const chunk = sigs.slice(i, i + 12);
+    const rows = await Promise.all(chunk.map((sig) => rpc(key, 'getTransaction', [sig, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }]).catch(() => null)));
+    rows.forEach((tx) => {
+      if (!tx) return;
+      read += 1;
+      trades.push.apply(trades, tradesFromMeta(tx, mint, price, pair));
+    });
+  }
+  return { trades: trades, read: read };
+}
+
 async function swapsOf(key, address, mint, price, since) {
   const trades = [];
+  const pending = [];
   let before = '';
   let truncated = false;
-  let sample = null;
-  for (let page = 0; page < 10; page++) {
+  let scanned = 0;
+  for (let page = 0; page < 15; page++) {
     let url = 'https://api.helius.xyz/v0/addresses/' + encodeURIComponent(address) + '/transactions?api-key=' + encodeURIComponent(key) + '&limit=100';
     if (before) url += '&before=' + encodeURIComponent(before);
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
@@ -183,44 +244,24 @@ async function swapsOf(key, address, mint, price, since) {
     if (!Array.isArray(rows) || !rows.length) break;
     let old = false;
     rows.forEach((tx) => {
-      if (!sample || ((tx.accountData || []).length && !sample.acc)) {
-        const swap = tx.events && tx.events.swap;
-        let changes = 0;
-        let chMint = '';
-        let chKeys = [];
-        const keySet = {};
-        (tx.accountData || []).forEach((acc) => {
-          Object.keys(acc || {}).forEach((k) => { keySet[k] = 1; });
-          const list = (acc && acc.tokenBalanceChanges) || [];
-          changes += list.length;
-          if (list.length && !chKeys.length) {
-            chKeys = Object.keys(list[0]).slice(0, 8);
-            chMint = list[0].mint || '';
-          }
-        });
-        sample = {
-          keys: Object.keys(tx).slice(0, 20),
-          acc: (tx.accountData || []).length,
-          accKeys: Object.keys(keySet),
-          changes: changes,
-          chMint: chMint,
-          chKeys: chKeys,
-          native: (tx.nativeTransfers || []).length,
-          type: tx.type || '',
-          transfers: (tx.tokenTransfers || []).length,
-          swap: !!swap,
-          desc: String(tx.description || '').slice(0, 100)
-        };
-      }
+      scanned += 1;
       const at = (tx.timestamp || 0) * 1000;
-      if (at && at < since) old = true;
-      else trades.push.apply(trades, tradesFromTx(tx, mint, price, address));
+      if (at && at < since) {
+        old = true;
+        return;
+      }
+      const parsed = tradesFromTx(tx, mint, price, address);
+      if (parsed.length) trades.push.apply(trades, parsed);
+      else if (tx.signature && worthChainRead(tx) && pending.length < 120) pending.push(tx.signature);
     });
     before = rows[rows.length - 1] && rows[rows.length - 1].signature;
     if (old || !before) break;
-    if (page === 9) truncated = true;
+    if (page === 14) truncated = true;
   }
-  return { trades: trades, truncated: truncated, sample: sample };
+  const chain = pending.length ? await chainTrades(key, pending, mint, price, address) : { trades: [], read: 0 };
+  trades.push.apply(trades, chain.trades);
+  if (pending.length >= 120) truncated = true;
+  return { trades: trades, truncated: truncated, scanned: scanned, chain: chain.read };
 }
 
 export async function scanFlows(env, mint, hints) {
@@ -242,8 +283,9 @@ export async function scanFlows(env, mint, hints) {
     change: live && live.change != null ? live.change : (hints.change != null ? Number(hints.change) : null),
     rows: netFlows(book.trades, holders, price),
     truncated: book.truncated,
-    trades: book.trades.length
+    trades: book.trades.length,
+    scanned: book.scanned,
+    chain: book.chain
   };
-  if (hints.debug && book.sample) out.sample = book.sample;
   return out;
 }

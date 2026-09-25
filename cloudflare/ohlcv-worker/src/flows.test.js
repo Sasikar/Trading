@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { netFlows, tradesFromTx } from './flows.js';
+import { netFlows, tradesFromTx, tradesFromMeta } from './flows.js';
 
 test('a swap event buy uses the raw token amount', () => {
   const rows = tradesFromTx({
@@ -38,6 +38,26 @@ test('a buy is tokens arriving at the fee payer', () => {
     ]
   }, 'M', 0.01);
   assert.equal(rows.length, 1);
+  assert.equal(rows[0].side, 'buy');
+  assert.equal(rows[0].usd, 10);
+});
+
+test('a chain balance uses the signer, not the pool', () => {
+  const rows = tradesFromMeta({
+    transaction: { message: { accountKeys: [{ pubkey: 'USER', signer: true }, { pubkey: 'POOL', signer: false }] } },
+    meta: {
+      preTokenBalances: [
+        { mint: 'M', owner: 'USER', uiTokenAmount: { uiAmount: 0 } },
+        { mint: 'M', owner: 'VAULT', uiTokenAmount: { uiAmount: 5000 } }
+      ],
+      postTokenBalances: [
+        { mint: 'M', owner: 'USER', uiTokenAmount: { uiAmount: 1000 } },
+        { mint: 'M', owner: 'VAULT', uiTokenAmount: { uiAmount: 4000 } }
+      ]
+    }
+  }, 'M', 0.01, 'PAIR');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].wallet, 'USER');
   assert.equal(rows[0].side, 'buy');
   assert.equal(rows[0].usd, 10);
 });
