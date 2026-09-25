@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { holdingsFromDas, historyRows, labelHistory, writeWallets, readWallets } from './coinstats.js';
+import { holdingsFromDas, historyRows, labelHistory, writeWallets, readWallets, judgeSells, sellLine } from './coinstats.js';
 
 test('holdings keep priced tokens and native sol', () => {
   const out = holdingsFromDas({
@@ -58,4 +58,16 @@ test('wallets add without duplicates', () => {
   const addr = '5sAQ111111111111111111111111111111111k5qe';
   writeWallets(store, [{ address: addr }, { address: addr }]);
   assert.equal(readWallets(store).length, 1);
+});
+
+test('a smaller balance is a sell, and the line names the score', () => {
+  const row = judgeSells(
+    { A: 100, B: 50, C: 20 },
+    { A: 100, B: 10, C: 0 },
+    ['A', 'B', 'C']
+  );
+  assert.equal(row.score, 3);
+  assert.equal(row.sold, 2);
+  assert.equal(row.holding, 2);
+  assert.equal(sellLine(Object.assign({ hadBaseline: true }, row)), 'Score 3. 2 sold. 2 still holding.');
 });

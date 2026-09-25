@@ -3,6 +3,7 @@
   window.__coinstatsTab = 1;
 
   var PICKS = "cs_coin_picks_v1";
+  var NAMES = "cs_coin_names_v1";
   var KEY = "coinstats_wallets_v1";
   var API = "https://trading-ohlcv.sasipudi.workers.dev";
   var wallets = [];
@@ -10,6 +11,7 @@
   var view = "assets";
   var bag = null;
   var query = "";
+  var notes = {};
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -49,8 +51,67 @@
   function savePicks(picks) {
     try { localStorage.setItem(PICKS, JSON.stringify(picks)); } catch (e) {}
   }
+  function loadNames() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(NAMES) || "{}");
+      return raw && typeof raw === "object" ? raw : {};
+    } catch (e) { return {}; }
+  }
+  function coinTitle(mint) {
+    return loadNames()[mint] || short(mint);
+  }
   function trashIcon() {
     return "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13\"/></svg>";
+  }
+  function chip(row) {
+    var on = row.address === selected;
+    return "<span style=\"display:inline-flex;align-items:center;gap:2px;padding:4px 4px 4px 12px;border-radius:999px;border:1px solid " + (on ? "#f5a14a" : "#243041") + ";background:" + (on ? "#2a1c0e" : "#121a24") + "\">" +
+      "<button type=\"button\" data-wallet=\"" + esc(row.address) + "\" style=\"padding:6px 4px;border:0;background:transparent;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer\">" + esc(row.label || short(row.address)) + "</button>" +
+      "<button type=\"button\" data-remove=\"" + esc(row.address) + "\" aria-label=\"Delete wallet\" style=\"width:28px;height:28px;border:0;border-radius:999px;background:transparent;color:#8491a1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center\">" + trashIcon() + "</button></span>";
+  }
+  function groupHtml() {
+    var by = {};
+    var loose = [];
+    wallets.forEach(function (row) {
+      var mints = row.mints || [];
+      if (!mints.length) { loose.push(row); return; }
+      mints.forEach(function (mint) {
+        if (!by[mint]) by[mint] = [];
+        by[mint].push(row);
+      });
+    });
+    var html = "";
+    Object.keys(by).forEach(function (mint) {
+      html += "<div style=\"margin-top:14px\"><div style=\"font-weight:900;color:#e8eef6\">" + esc(coinTitle(mint)) + "</div>" +
+        "<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:8px\">" + by[mint].map(chip).join("") + "</div>" +
+        "<div data-cs-note=\"" + esc(mint) + "\" style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">" + esc(notes[mint] || "Checking sells…") + "</div></div>";
+    });
+    if (loose.length) {
+      html += "<div style=\"margin-top:14px\"><div style=\"font-size:12px;color:#8491a1\">Added by hand</div>" +
+        "<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:8px\">" + loose.map(chip).join("") + "</div></div>";
+    }
+    return html;
+  }
+  function loadNotes() {
+    var seen = {};
+    wallets.forEach(function (row) {
+      (row.mints || []).forEach(function (mint) {
+        if (seen[mint]) return;
+        seen[mint] = 1;
+        var list = wallets.filter(function (item) { return (item.mints || []).indexOf(mint) >= 0; }).map(function (item) { return item.address; });
+        fetch(API + "/coinstats-sells", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mint: mint, wallets: list })
+        }).then(function (res) { return res.json(); }).then(function (body) {
+          var line = (body && body.line) || (body && body.error) || "Sell check failed.";
+          notes[mint] = line;
+          document.querySelectorAll("[data-cs-note]").forEach(function (el) {
+            if (el.getAttribute("data-cs-note") === mint) el.textContent = line;
+          });
+        }).catch(function () {});
+      });
+    });
   }
   function loadLocal() {
     try {
@@ -122,12 +183,7 @@
   function paint() {
     var box = $("cs-board");
     if (!box) return;
-    var chips = wallets.map(function (row) {
-      var on = row.address === selected;
-      return "<span style=\"display:inline-flex;align-items:center;gap:2px;padding:4px 4px 4px 12px;border-radius:999px;border:1px solid " + (on ? "#f5a14a" : "#243041") + ";background:" + (on ? "#2a1c0e" : "#121a24") + "\">" +
-        "<button type=\"button\" data-wallet=\"" + esc(row.address) + "\" style=\"padding:6px 4px;border:0;background:transparent;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer\">" + esc(row.label || short(row.address)) + "</button>" +
-        "<button type=\"button\" data-remove=\"" + esc(row.address) + "\" aria-label=\"Delete wallet\" style=\"width:28px;height:28px;border:0;border-radius:999px;background:transparent;color:#8491a1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center\">" + trashIcon() + "</button></span>";
-    }).join("");
+    var groups = groupHtml();
     var total = bag && isFinite(bag.total) ? money(bag.total) : "—";
     var held = "";
     var hist = "";
@@ -165,7 +221,7 @@
       "<form id=\"cs-add\" style=\"display:flex;gap:8px;flex-wrap:wrap\">" +
       "<input id=\"cs-addr\" placeholder=\"Solana wallet address\" style=\"flex:1;min-width:180px;padding:12px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-size:14px\">" +
       "<button type=\"submit\" style=\"padding:12px 16px;border-radius:12px;border:0;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></form>" +
-      "<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:12px\">" + chips + "</div>" +
+      groups +
       "<div style=\"margin-top:22px;font-size:40px;font-weight:900;letter-spacing:-.04em;color:#f4f7fb\">" + total + "</div>" +
       "<div style=\"margin-top:4px;font-size:12px;color:#8491a1\">Current holdings · Jupiter price · not all-time profit</div>" +
       "<div style=\"display:flex;gap:18px;margin-top:18px;border-bottom:1px solid #243041\">" +
@@ -202,6 +258,7 @@
         removeWallet(btn.getAttribute("data-remove"));
       });
     });
+    loadNotes();
   }
 
   function onAdd(ev) {
@@ -279,13 +336,21 @@
     paint();
   }
 
-  window.coinstatsSetCoin = function (mint, addresses, on) {
+  window.coinstatsSetCoin = function (mint, addresses, on, symbol) {
     if (!valid(mint)) return;
     var list = (addresses || []).filter(valid);
     var picks = loadPicks();
-    if (on) picks[mint] = 1;
-    else delete picks[mint];
+    var names = loadNames();
+    if (on) {
+      picks[mint] = 1;
+      if (symbol) names[mint] = String(symbol).slice(0, 24);
+    } else {
+      delete picks[mint];
+      delete names[mint];
+      delete notes[mint];
+    }
     savePicks(picks);
+    try { localStorage.setItem(NAMES, JSON.stringify(names)); } catch (e) {}
     if (on) {
       list.forEach(function (address) {
         var row = wallets.filter(function (item) { return item.address === address; })[0];
@@ -334,4 +399,9 @@
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
+  setInterval(function () {
+    var panel = $("coinstats-panel");
+    if (!panel || panel.style.display === "none") return;
+    loadNotes();
+  }, 10 * 60 * 1000);
 })();

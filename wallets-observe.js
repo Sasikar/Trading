@@ -106,7 +106,8 @@
       const mint = coinBtn.getAttribute('data-cs-mint') || '';
       const list = (coinBtn.getAttribute('data-cs-wallets') || '').split(',').filter(Boolean);
       const on = coinBtn.getAttribute('data-cs-on') !== '1';
-      if (window.coinstatsSetCoin) window.coinstatsSetCoin(mint, list, on);
+      const symbol = coinBtn.getAttribute('data-cs-symbol') || '';
+      if (window.coinstatsSetCoin) window.coinstatsSetCoin(mint, list, on, symbol);
       document.querySelectorAll('#wallets-panel [data-cs-mint="' + mint + '"]').forEach(function (el) {
         el.setAttribute('data-cs-on', on ? '1' : '0');
         el.style.background = on ? '#2a1c0e' : 'transparent';
@@ -483,6 +484,8 @@
       esc(c.mint || '') +
       '" data-cs-wallets="' +
       esc(wallets.join(',')) +
+      '" data-cs-symbol="' +
+      esc(coinLabel(c)) +
       '" data-cs-on="' +
       (on ? '1' : '0') +
       '" style="border:1px solid ' +

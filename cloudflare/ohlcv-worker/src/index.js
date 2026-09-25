@@ -12,7 +12,7 @@ import { pumpfunFeed } from './pumpfun.js';
 import { scanTiers } from './tiers.js';
 import { scanBundle } from './bundle.js';
 import { scanFlows } from './flows.js';
-import { scanWallet, readWallets, writeWallets } from './coinstats.js';
+import { scanWallet, readWallets, writeWallets, scanSells, tickSells } from './coinstats.js';
 import { applySnapshot, tierDailyTick } from './tier-history.js';
 import { readNote, writeNote } from './tier-notes.js';
 
@@ -326,6 +326,22 @@ export class OhlcvEngine {
         }
         return new Response(JSON.stringify({ ok: true, wallets: readWallets(this.store) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
+      if (path === '/coinstats-sells' || path === '/api/coinstats-sells') {
+        const url = new URL(request.url);
+        if (url.searchParams.get('tick') === '1') {
+          const row = await tickSells(this.env, this.store);
+          return new Response(JSON.stringify(row), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+        const mint = String(body.mint || url.searchParams.get('mint') || '').trim();
+        const wallets = body.wallets || String(url.searchParams.get('wallets') || '').split(',').filter(Boolean);
+        try {
+          const row = await scanSells(this.env, this.store, mint, wallets);
+          return new Response(JSON.stringify({ ok: true, ...row }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+      }
       if (path === '/oldcoins' || path === '/api/oldcoins') {
         const want = new URL(request.url).searchParams.get('scan') === '1';
         if (want) {
@@ -485,6 +501,7 @@ export default {
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/helius?sync=1')));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/oldcoins?scan=1')));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/tier-hist?tick=1')));
+    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/coinstats-sells?tick=1')));
   }
 };
 

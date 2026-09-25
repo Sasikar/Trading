@@ -1,5 +1,5 @@
 const KEY = 'coinstats_wallets';
-const MAX = 30;
+const MAX = 80;
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 
 function valid(address) {
@@ -185,4 +185,116 @@ export async function scanWallet(env, wallet) {
     history: labelHistory(historyRows(book.txs, wallet, since), held.rows),
     truncated: book.truncated
   };
+}
+
+const SNAP_KEY = 'cs_hold_snap';
+const SELL_GAP = 10 * 60 * 1000;
+
+function readSnaps(store) {
+  try {
+    const parsed = JSON.parse(store.getMeta(SNAP_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+export function sellLine(row) {
+  const score = row.score || 0;
+  const holding = row.holding || 0;
+  if (!row.hadBaseline) return 'Score ' + score + '. ' + holding + ' still holding. Next sell check in 10 min.';
+  if (row.sold) return 'Score ' + score + '. ' + row.sold + ' sold. ' + holding + ' still holding.';
+  return 'Score ' + score + '. No new sell. ' + holding + ' still holding.';
+}
+
+export function judgeSells(before, balances, wallets) {
+  const sold = [];
+  let holding = 0;
+  (wallets || []).forEach((wallet) => {
+    const now = Number(balances && balances[wallet]) || 0;
+    const prev = before && before[wallet];
+    if (now > 0) holding += 1;
+    if (prev > 0 && now < prev * 0.995) sold.push(wallet);
+  });
+  return { score: (wallets || []).length, sold: sold.length, holding: holding, soldWallets: sold };
+}
+
+export function applySnap(store, mint, wallets, balances, now) {
+  const all = readSnaps(store);
+  const prev = all[mint];
+  const hadBaseline = !!(prev && prev.balances);
+  const judged = judgeSells(hadBaseline ? prev.balances : null, balances, wallets);
+  const due = !prev || now - (prev.at || 0) >= SELL_GAP;
+  if (due) {
+    all[mint] = {
+      at: now,
+      balances: balances,
+      line: sellLine(Object.assign({ hadBaseline: hadBaseline }, judged)),
+      score: judged.score,
+      sold: judged.sold,
+      holding: judged.holding
+    };
+    const keys = Object.keys(all);
+    if (keys.length > 40) keys.sort((a, b) => (all[a].at || 0) - (all[b].at || 0)).slice(0, keys.length - 40).forEach((key) => { delete all[key]; });
+    store.setMeta(SNAP_KEY, JSON.stringify(all));
+  }
+  const line = due ? all[mint].line : ((prev && prev.line) || sellLine(Object.assign({ hadBaseline: hadBaseline }, judged)));
+  return Object.assign({ mint: mint, hadBaseline: hadBaseline, at: (prev && prev.at) || now, line: line }, judged);
+}
+
+async function balanceOf(key, wallet, mint) {
+  const res = await rpc(key, 'getTokenAccountsByOwner', [wallet, { mint: mint }, { encoding: 'jsonParsed' }]);
+  let total = 0;
+  ((res && res.value) || []).forEach((row) => {
+    const info = row && row.account && row.account.data && row.account.data.parsed && row.account.data.parsed.info;
+    total += Number(info && info.tokenAmount && info.tokenAmount.uiAmount) || 0;
+  });
+  return total;
+}
+
+export async function scanSells(env, store, mint, wallets, now) {
+  if (!valid(mint)) throw new Error('That coin is missing.');
+  const list = (wallets || []).map(String).filter(valid).slice(0, 36);
+  const at = now || Date.now();
+  const prev = readSnaps(store)[mint];
+  if (prev && prev.line && at - (prev.at || 0) < SELL_GAP) {
+    return {
+      mint: mint,
+      score: prev.score || list.length,
+      sold: prev.sold || 0,
+      holding: prev.holding || 0,
+      hadBaseline: true,
+      line: prev.line,
+      at: prev.at
+    };
+  }
+  const key = env && env.HELIUS_API_KEY;
+  if (!key) throw new Error('Helius key is missing on the worker.');
+  const balances = {};
+  for (let i = 0; i < list.length; i += 6) {
+    const chunk = list.slice(i, i + 6);
+    const rows = await Promise.all(chunk.map((wallet) => balanceOf(key, wallet, mint).catch(() => 0)));
+    chunk.forEach((wallet, n) => { balances[wallet] = rows[n]; });
+  }
+  const out = applySnap(store, mint, list, balances, at);
+  return out;
+}
+
+export async function tickSells(env, store) {
+  const grouped = {};
+  readWallets(store).forEach((row) => {
+    (row.mints || []).forEach((mint) => {
+      if (!grouped[mint]) grouped[mint] = [];
+      if (grouped[mint].indexOf(row.address) < 0) grouped[mint].push(row.address);
+    });
+  });
+  const snaps = readSnaps(store);
+  const now = Date.now();
+  const due = Object.keys(grouped)
+    .filter((mint) => !snaps[mint] || now - (snaps[mint].at || 0) >= SELL_GAP)
+    .sort((a, b) => ((snaps[a] && snaps[a].at) || 0) - ((snaps[b] && snaps[b].at) || 0));
+  if (!due.length) return { ok: true, checked: 0 };
+  const mint = due[0];
+  const row = await scanSells(env, store, mint, grouped[mint], now);
+  return { ok: true, checked: 1, mint: mint, line: row.line };
 }
