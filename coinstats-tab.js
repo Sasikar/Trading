@@ -59,7 +59,13 @@
     } catch (e) { return {}; }
   }
   function coinTitle(mint) {
-    return loadNames()[mint] || short(mint);
+    var saved = loadNames()[mint];
+    if (saved && saved !== "—" && saved.indexOf("…") < 0) return saved;
+    var rows = (bag && bag.holdings) || [];
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].mint === mint && rows[i].symbol) return rows[i].symbol;
+    }
+    return saved || short(mint);
   }
   function trashIcon() {
     return "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13\"/></svg>";
@@ -83,7 +89,7 @@
     });
     var html = "";
     Object.keys(by).forEach(function (mint) {
-      html += "<div style=\"margin-top:16px;padding-top:12px;border-top:1px solid #243041\"><div style=\"font-size:18px;font-weight:900;color:#f4f7fb\">" + esc(coinTitle(mint)) + "</div>" +
+      html += "<div style=\"margin-top:16px;padding-top:12px;border-top:1px solid #243041\"><div data-cs-title=\"" + esc(mint) + "\" style=\"font-size:18px;font-weight:900;color:#f4f7fb\">" + esc(coinTitle(mint)) + "</div>" +
         "<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:8px\">" + by[mint].map(chip).join("") + "</div>" +
         "<div data-cs-note=\"" + esc(mint) + "\" style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">" + esc(notes[mint] || "Reading who still holds, and who bought or sold…") + "</div></div>";
     });
@@ -106,10 +112,18 @@
       return fetch(API + "/coinstats?wallet=" + encodeURIComponent(address), { cache: "no-store" })
         .then(function (res) { return res.json(); })
         .then(function (body) {
-          var holds = ((body && body.holdings) || []).some(function (row) { return row.mint === mint; });
+          var held = ((body && body.holdings) || []).filter(function (row) { return row.mint === mint; })[0];
+          if (held && held.symbol) {
+            var names = loadNames();
+            names[mint] = held.symbol;
+            try { localStorage.setItem(NAMES, JSON.stringify(names)); } catch (e) {}
+            document.querySelectorAll("[data-cs-title]").forEach(function (el) {
+              if (el.getAttribute("data-cs-title") === mint) el.textContent = held.symbol;
+            });
+          }
           var hist = (body && body.history) || [];
           out.push({
-            holds: holds,
+            holds: !!held,
             bought: hist.some(function (row) { return row.side === "in" && movedCoin(row, mint, name); }),
             sold: hist.some(function (row) { return row.side === "out" && movedCoin(row, mint, name); })
           });

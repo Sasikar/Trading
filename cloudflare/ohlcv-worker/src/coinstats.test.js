@@ -69,5 +69,5 @@ test('a smaller balance is a sell, and the line names the score', () => {
   assert.equal(row.score, 3);
   assert.equal(row.sold, 2);
   assert.equal(row.holding, 2);
-  assert.equal(sellLine(Object.assign({ hadBaseline: true }, row)), 'Score 3. 2 sold. 2 still holding.');
+  assert.equal(sellLine(Object.assign({ hadBaseline: true, name: 'JEANPHIL' }, row)), 'JEANPHIL. 2 of 3 still holding.');
 });

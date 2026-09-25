@@ -163,6 +163,25 @@ async function recentTxs(key, wallet, since) {
   return { txs: txs, truncated: truncated };
 }
 
+async function priceHoldings(rows) {
+  const sol = 'So11111111111111111111111111111111111111112';
+  const ids = rows.map((row) => (row.mint === 'SOL' ? sol : row.mint)).filter(Boolean).slice(0, 50);
+  if (!ids.length) return rows;
+  try {
+    const res = await fetch('https://lite-api.jup.ag/price/v3?ids=' + ids.join(','), { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return rows;
+    const prices = await res.json();
+    return rows.map((row) => {
+      const key = row.mint === 'SOL' ? sol : row.mint;
+      const px = Number(prices && prices[key] && prices[key].usdPrice);
+      if (!(px > 0)) return row;
+      return Object.assign({}, row, { price: px, value: row.amount * px });
+    });
+  } catch (e) {
+    return rows;
+  }
+}
+
 export async function scanWallet(env, wallet) {
   if (!valid(wallet)) throw new Error('Paste a Solana wallet address.');
   const key = env && env.HELIUS_API_KEY;
@@ -178,11 +197,13 @@ export async function scanWallet(env, wallet) {
     recentTxs(key, wallet, since)
   ]);
   const held = holdingsFromDas(das);
+  const rows = await priceHoldings(held.rows);
+  const total = rows.reduce((sum, row) => sum + (Number(row.value) || 0), 0);
   return {
     wallet: wallet,
-    total: held.total,
-    holdings: held.rows,
-    history: labelHistory(historyRows(book.txs, wallet, since), held.rows),
+    total: total,
+    holdings: rows,
+    history: labelHistory(historyRows(book.txs, wallet, since), rows),
     truncated: book.truncated
   };
 }
@@ -200,11 +221,10 @@ function readSnaps(store) {
 }
 
 export function sellLine(row) {
-  const score = row.score || 0;
   const holding = row.holding || 0;
-  if (!row.hadBaseline) return 'Score ' + score + '. ' + holding + ' still holding. Next sell check in 10 min.';
-  if (row.sold) return 'Score ' + score + '. ' + row.sold + ' sold. ' + holding + ' still holding.';
-  return 'Score ' + score + '. No new sell. ' + holding + ' still holding.';
+  const total = row.score || 0;
+  const name = row.name || 'This coin';
+  return name + '. ' + holding + ' of ' + total + ' still holding.';
 }
 
 export function judgeSells(before, balances, wallets) {
@@ -227,6 +247,7 @@ export function applySnap(store, mint, wallets, balances, now) {
   const due = !prev || now - (prev.at || 0) >= SELL_GAP;
   if (due) {
     all[mint] = {
+      v: 2,
       at: now,
       balances: balances,
       line: sellLine(Object.assign({ hadBaseline: hadBaseline }, judged)),
@@ -242,13 +263,22 @@ export function applySnap(store, mint, wallets, balances, now) {
   return Object.assign({ mint: mint, hadBaseline: hadBaseline, at: (prev && prev.at) || now, line: line }, judged);
 }
 
+const TOKEN_PROGRAMS = [
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+  'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
+];
+
 async function balanceOf(key, wallet, mint) {
-  const res = await rpc(key, 'getTokenAccountsByOwner', [wallet, { mint: mint }, { encoding: 'jsonParsed' }]);
   let total = 0;
-  ((res && res.value) || []).forEach((row) => {
-    const info = row && row.account && row.account.data && row.account.data.parsed && row.account.data.parsed.info;
-    total += Number(info && info.tokenAmount && info.tokenAmount.uiAmount) || 0;
-  });
+  for (let i = 0; i < TOKEN_PROGRAMS.length; i++) {
+    const res = await rpc(key, 'getTokenAccountsByOwner', [wallet, { programId: TOKEN_PROGRAMS[i] }, { encoding: 'jsonParsed' }]).catch(() => null);
+    ((res && res.value) || []).forEach((row) => {
+      const info = row && row.account && row.account.data && row.account.data.parsed && row.account.data.parsed.info;
+      if (!info || info.mint !== mint) return;
+      const amount = info.tokenAmount || {};
+      total += Number(amount.uiAmountString || amount.uiAmount) || 0;
+    });
+  }
   return total;
 }
 
@@ -257,7 +287,7 @@ export async function scanSells(env, store, mint, wallets, now) {
   const list = (wallets || []).map(String).filter(valid).slice(0, 36);
   const at = now || Date.now();
   const prev = readSnaps(store)[mint];
-  if (prev && prev.line && at - (prev.at || 0) < SELL_GAP) {
+  if (prev && prev.v === 2 && prev.line && at - (prev.at || 0) < SELL_GAP) {
     return {
       mint: mint,
       score: prev.score || list.length,
