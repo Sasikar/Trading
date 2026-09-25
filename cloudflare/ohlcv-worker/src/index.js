@@ -12,7 +12,7 @@ import { pumpfunFeed } from './pumpfun.js';
 import { scanTiers } from './tiers.js';
 import { scanBundle } from './bundle.js';
 import { scanFlows } from './flows.js';
-import { scanWallet, readWallets, writeWallets, scanSells, tickSells } from './coinstats.js';
+import { scanWallet, readWallets, writeWallets, scanSells, tickSells, readChart, writeChartPoint } from './coinstats.js';
 import { applySnapshot, tierDailyTick } from './tier-history.js';
 import { readNote, writeNote } from './tier-notes.js';
 
@@ -325,6 +325,20 @@ export class OhlcvEngine {
           return new Response(JSON.stringify({ ok: true, wallets: wallets }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
         }
         return new Response(JSON.stringify({ ok: true, wallets: readWallets(this.store) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+      if (path === '/coinstats-chart' || path === '/api/coinstats-chart') {
+        const url = new URL(request.url);
+        const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+        const mint = String(body.mint || url.searchParams.get('mint') || '').trim();
+        try {
+          if (request.method === 'POST') {
+            const series = writeChartPoint(this.store, mint, body || {});
+            return new Response(JSON.stringify({ ok: true, series: series }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+          }
+          return new Response(JSON.stringify({ ok: true, series: readChart(this.store, mint) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
       }
       if (path === '/coinstats-sells' || path === '/api/coinstats-sells') {
         const url = new URL(request.url);

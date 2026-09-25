@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { holdingsFromDas, historyRows, labelHistory, writeWallets, readWallets, judgeSells, sellLine } from './coinstats.js';
+import { holdingsFromDas, historyRows, labelHistory, writeWallets, readWallets, judgeSells, sellLine, writeChartPoint, readChart } from './coinstats.js';
 
 test('holdings keep priced tokens and native sol', () => {
   const out = holdingsFromDas({
@@ -70,4 +70,19 @@ test('a smaller balance is a sell, and the line names the score', () => {
   assert.equal(row.sold, 2);
   assert.equal(row.holding, 2);
   assert.equal(sellLine(Object.assign({ hadBaseline: true, name: 'JEANPHIL' }, row)), 'JEANPHIL. 2 of 3 still holding.');
+});
+
+test('a chart keeps one point per day for seven days', () => {
+  const bag = {};
+  const store = { getMeta() { return bag.v || '{}'; }, setMeta(_k, v) { bag.v = v; } };
+  const mint = 'GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump';
+  writeChartPoint(store, mint, { day: '2026-09-20', total: 100, coin: 80 });
+  writeChartPoint(store, mint, { day: '2026-09-20', total: 140, coin: 90 });
+  for (let n = 1; n <= 8; n++) writeChartPoint(store, mint, { day: '2026-09-2' + n, total: n, coin: n });
+  const series = readChart(store, mint);
+  assert.equal(series.length, 7);
+  assert.equal(series[0].day, '2026-09-22');
+  assert.equal(series.filter((row) => row.day === '2026-09-20').length, 0);
+  const again = writeChartPoint(store, mint, { day: '2026-09-28', total: 9, coin: 4 });
+  assert.equal(again.filter((row) => row.day === '2026-09-28').length, 1);
 });

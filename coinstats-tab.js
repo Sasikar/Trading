@@ -13,6 +13,7 @@
   var query = "";
   var notes = {};
   var noteBusy = {};
+  var chartSeries = {};
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -140,7 +141,8 @@
     Object.keys(by).forEach(function (mint) {
       html += "<div style=\"margin-top:16px;padding-top:12px;border-top:1px solid #243041\"><div data-cs-title=\"" + esc(mint) + "\" style=\"font-size:18px;font-weight:900;color:#f4f7fb\">" + esc(coinTitle(mint)) + "</div>" +
         "<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:8px\">" + by[mint].map(chip).join("") + "</div>" +
-        "<div data-cs-note=\"" + esc(mint) + "\" style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">" + esc(notes[mint] || "Reading who still holds, and who bought or sold…") + "</div></div>";
+        "<div data-cs-note=\"" + esc(mint) + "\" style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">" + esc(notes[mint] || "Reading who still holds, and who bought or sold…") + "</div>" +
+        "<div data-cs-chart=\"" + esc(mint) + "\">" + chartHtml(chartSeries[mint]) + "</div></div>";
     });
     if (loose.length) {
       html += "<div style=\"margin-top:14px\"><div style=\"font-size:12px;color:#8491a1\">Added by hand</div>" +
@@ -166,19 +168,85 @@
           var hist = (body && body.history) || [];
           out.push({
             holds: !!held,
+            coin: held ? Number(held.value) || 0 : 0,
+            total: Number(body && body.total) || 0,
             bought: hist.some(function (row) { return row.side === "in" && movedCoin(row, mint, name); }),
             sold: hist.some(function (row) { return row.side === "out" && movedCoin(row, mint, name); })
           });
         })
-        .catch(function () { out.push({ holds: false, bought: false, sold: false }); })
+        .catch(function () { out.push({ holds: false, bought: false, sold: false, coin: 0, total: 0 }); })
         .then(next);
     }
     return Promise.all([next(), next(), next()]).then(function () {
       var hold = out.filter(function (row) { return row.holds; }).length;
       var buy = out.filter(function (row) { return row.bought; }).length;
       var sell = out.filter(function (row) { return row.sold; }).length;
+      var coin = out.reduce(function (sum, row) { return sum + (row.coin || 0); }, 0);
+      var total = out.reduce(function (sum, row) { return sum + (row.total || 0); }, 0);
       var extra = list.length > capped.length ? " Showing the first " + capped.length + " wallets." : "";
-      return hold + " of " + capped.length + " still holding. Last 7 days: " + buy + " bought, " + sell + " sold." + extra;
+      return {
+        line: hold + " of " + capped.length + " still holding. Last 7 days: " + buy + " bought, " + sell + " sold." + extra,
+        coin: coin,
+        total: total
+      };
+    });
+  }
+  function localDay() {
+    var d = new Date();
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+  }
+  function chartHtml(series) {
+    var pts = (series || []).slice(-7);
+    if (!pts.length) return "<div style=\"margin-top:8px;font-size:12px;color:#8491a1\">Total holdings chart starts today. One point a day, kept for 7 days.</div>";
+    var last = pts[pts.length - 1];
+    var vals = pts.map(function (p) { return Number(p.total) || 0; });
+    var min = Math.min.apply(null, vals);
+    var max = Math.max.apply(null, vals);
+    if (max === min) max = min + 1;
+    var w = 320, h = 96, pad = 12;
+    var dots = pts.map(function (p, i) {
+      var x = pts.length === 1 ? w / 2 : pad + i * (w - pad * 2) / (pts.length - 1);
+      var y = h - pad - ((Number(p.total) || 0) - min) / (max - min) * (h - pad * 2);
+      return { x: x, y: y };
+    });
+    var color = vals[vals.length - 1] >= vals[0] ? "#3dbe7a" : "#ff8a7a";
+    var poly = dots.map(function (p) { return p.x.toFixed(1) + "," + p.y.toFixed(1); }).join(" ");
+    var circles = dots.map(function (p) { return "<circle cx=\"" + p.x.toFixed(1) + "\" cy=\"" + p.y.toFixed(1) + "\" r=\"3.5\" fill=\"" + color + "\"/>"; }).join("");
+    return "<div style=\"margin-top:10px;font-weight:800;color:#f4f7fb\">Together " + money(last.total) + "</div>" +
+      "<div style=\"margin-top:2px;font-size:12px;color:#8491a1\">This coin " + money(last.coin) + " · total holdings of these wallets</div>" +
+      "<svg viewBox=\"0 0 320 96\" width=\"100%\" height=\"96\" style=\"margin-top:6px;display:block\"><polyline fill=\"none\" stroke=\"" + color + "\" stroke-width=\"2.5\" points=\"" + poly + "\"/>" + circles + "</svg>" +
+      "<div style=\"font-size:11px;color:#8491a1\">" + pts.map(function (p) { return String(p.day).slice(5); }).join(" · ") + " · 1 point a day · 7 days</div>";
+  }
+  function paintChart(mint) {
+    document.querySelectorAll("[data-cs-chart]").forEach(function (el) {
+      if (el.getAttribute("data-cs-chart") === mint) el.innerHTML = chartHtml(chartSeries[mint]);
+    });
+  }
+  function saveChart(mint, row) {
+    fetch(API + "/coinstats-chart", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ mint: mint, day: localDay(), total: row.total, coin: row.coin })
+    }).then(function (res) { return res.json(); }).then(function (body) {
+      chartSeries[mint] = (body && body.series) || chartSeries[mint] || [];
+      paintChart(mint);
+    }).catch(function () {});
+  }
+  function loadCharts() {
+    var seen = {};
+    wallets.forEach(function (row) {
+      (row.mints || []).forEach(function (mint) {
+        if (seen[mint]) return;
+        seen[mint] = 1;
+        if (chartSeries[mint]) { paintChart(mint); return; }
+        fetch(API + "/coinstats-chart?mint=" + encodeURIComponent(mint), { cache: "no-store" })
+          .then(function (res) { return res.json(); })
+          .then(function (body) {
+            chartSeries[mint] = (body && body.series) || [];
+            paintChart(mint);
+          }).catch(function () {});
+      });
     });
   }
   function loadNotes() {
@@ -190,12 +258,13 @@
         noteBusy[mint] = 1;
         var name = coinTitle(mint);
         var list = wallets.filter(function (item) { return (item.mints || []).indexOf(mint) >= 0; }).map(function (item) { return item.address; });
-        readGroup(mint, list, name).then(function (line) {
-          notes[mint] = line;
+        readGroup(mint, list, name).then(function (row) {
+          notes[mint] = row.line;
           noteBusy[mint] = 0;
           document.querySelectorAll("[data-cs-note]").forEach(function (el) {
-            if (el.getAttribute("data-cs-note") === mint) el.textContent = line;
+            if (el.getAttribute("data-cs-note") === mint) el.textContent = row.line;
           });
+          saveChart(mint, row);
         }).catch(function () { noteBusy[mint] = 0; });
       });
     });
@@ -347,6 +416,7 @@
     });
     loadNotes();
     resolveNames();
+    loadCharts();
   }
 
   function onAdd(ev) {
@@ -490,6 +560,14 @@
   setInterval(function () {
     var panel = $("coinstats-panel");
     if (!panel || panel.style.display === "none") return;
+    var day = localDay();
+    wallets.forEach(function (row) {
+      (row.mints || []).forEach(function (mint) {
+        var series = chartSeries[mint] || [];
+        var last = series[series.length - 1];
+        if (!last || last.day !== day) delete notes[mint];
+      });
+    });
     loadNotes();
   }, 10 * 60 * 1000);
 })();

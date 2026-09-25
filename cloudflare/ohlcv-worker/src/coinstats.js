@@ -33,6 +33,39 @@ export function writeWallets(store, list) {
   return kept;
 }
 
+const CHART_KEY = 'cs_daily_chart';
+
+export function readChart(store, mint) {
+  try {
+    const all = JSON.parse(store.getMeta(CHART_KEY) || '{}');
+    const series = all && all[mint];
+    return Array.isArray(series) ? series : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function writeChartPoint(store, mint, point) {
+  if (!valid(mint)) throw new Error('That coin is missing.');
+  const day = String((point && point.day) || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('Bad day.');
+  let all = {};
+  try { all = JSON.parse(store.getMeta(CHART_KEY) || '{}') || {}; } catch (e) { all = {}; }
+  const series = (Array.isArray(all[mint]) ? all[mint] : []).filter((row) => row && row.day !== day);
+  series.push({
+    day: day,
+    total: Number(point.total) || 0,
+    coin: Number(point.coin) || 0,
+    at: Date.now()
+  });
+  series.sort((a, b) => (a.day < b.day ? -1 : 1));
+  all[mint] = series.slice(-7);
+  const keys = Object.keys(all);
+  if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((key) => { delete all[key]; });
+  store.setMeta(CHART_KEY, JSON.stringify(all));
+  return all[mint];
+}
+
 export function holdingsFromDas(json) {
   const result = (json && json.result) || {};
   const rows = [];
