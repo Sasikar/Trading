@@ -6,13 +6,41 @@ const LABELS = [
   ['mm', 'MM']
 ];
 
+function uiAmount(raw) {
+  if (raw == null) return 0;
+  if (typeof raw === 'number') return Math.abs(raw);
+  const src = raw.tokenAmount != null ? raw : { tokenAmount: raw, decimals: 0 };
+  const text = String(src.tokenAmount);
+  const n = Number(text);
+  if (!isFinite(n) || n === 0) return 0;
+  const d = Number(src.decimals);
+  if (text.indexOf('.') >= 0 || !(d > 0)) return Math.abs(n);
+  return Math.abs(n) / Math.pow(10, d);
+}
+
 export function tradesFromTx(tx, mint, price) {
-  const user = tx && tx.feePayer;
-  if (!user || !(price > 0)) return [];
+  if (!(price > 0) || !tx) return [];
+  const swap = tx.events && tx.events.swap;
+  if (swap) {
+    const out = [];
+    (swap.tokenOutputs || []).forEach((t) => {
+      if (!t || t.mint !== mint || !t.userAccount) return;
+      const amt = uiAmount(t.rawTokenAmount);
+      if (amt > 0) out.push({ wallet: t.userAccount, side: 'buy', usd: amt * price });
+    });
+    (swap.tokenInputs || []).forEach((t) => {
+      if (!t || t.mint !== mint || !t.userAccount) return;
+      const amt = uiAmount(t.rawTokenAmount);
+      if (amt > 0) out.push({ wallet: t.userAccount, side: 'sell', usd: amt * price });
+    });
+    if (out.length) return out;
+  }
+  const user = tx.feePayer;
+  if (!user) return [];
   let net = 0;
   (tx.tokenTransfers || []).forEach((t) => {
     if (!t || t.mint !== mint) return;
-    const amt = Number(t.tokenAmount) || 0;
+    const amt = uiAmount(t.tokenAmount);
     if (t.toUserAccount === user) net += amt;
     if (t.fromUserAccount === user) net -= amt;
   });
@@ -108,7 +136,7 @@ async function swapsOf(key, address, mint, price, since) {
   const trades = [];
   let before = '';
   let truncated = false;
-  for (let page = 0; page < 6; page++) {
+  for (let page = 0; page < 10; page++) {
     let url = 'https://api.helius.xyz/v0/addresses/' + encodeURIComponent(address) + '/transactions?api-key=' + encodeURIComponent(key) + '&limit=100';
     if (before) url += '&before=' + encodeURIComponent(before);
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
@@ -123,7 +151,7 @@ async function swapsOf(key, address, mint, price, since) {
     });
     before = rows[rows.length - 1] && rows[rows.length - 1].signature;
     if (old || !before) break;
-    if (page === 5) truncated = true;
+    if (page === 9) truncated = true;
   }
   return { trades: trades, truncated: truncated };
 }

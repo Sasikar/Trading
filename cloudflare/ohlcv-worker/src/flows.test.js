@@ -2,6 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { netFlows, tradesFromTx } from './flows.js';
 
+test('a swap event buy uses the raw token amount', () => {
+  const rows = tradesFromTx({
+    events: {
+      swap: {
+        tokenOutputs: [{ userAccount: 'USER', mint: 'M', rawTokenAmount: { tokenAmount: '2500000', decimals: 6 } }],
+        tokenInputs: []
+      }
+    }
+  }, 'M', 2);
+  assert.equal(rows[0].side, 'buy');
+  assert.equal(rows[0].usd, 5);
+});
+
 test('a buy is tokens arriving at the fee payer', () => {
   const rows = tradesFromTx({
     feePayer: 'USER',
