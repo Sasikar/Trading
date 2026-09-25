@@ -99,6 +99,22 @@
       runLookup();
       return;
     }
+    const coinBtn = ev.target && ev.target.closest && ev.target.closest('[data-cs-mint]');
+    if (coinBtn) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const mint = coinBtn.getAttribute('data-cs-mint') || '';
+      const list = (coinBtn.getAttribute('data-cs-wallets') || '').split(',').filter(Boolean);
+      const on = coinBtn.getAttribute('data-cs-on') !== '1';
+      if (window.coinstatsSetCoin) window.coinstatsSetCoin(mint, list, on);
+      document.querySelectorAll('#wallets-panel [data-cs-mint="' + mint + '"]').forEach(function (el) {
+        el.setAttribute('data-cs-on', on ? '1' : '0');
+        el.style.background = on ? '#2a1c0e' : 'transparent';
+        el.style.color = on ? '#f5a14a' : '#e8eef6';
+        el.style.borderColor = on ? '#f5a14a' : 'transparent';
+      });
+      return;
+    }
     const b = ev.target && ev.target.closest && ev.target.closest('.wt-tab');
     if (!b) return;
     const wt = b.getAttribute('data-wt');
@@ -447,15 +463,36 @@
       });
     });
   }
+  function coinPicked(mint) {
+    try {
+      return !!JSON.parse(localStorage.getItem('cs_coin_picks_v1') || '{}')[mint];
+    } catch (e) {
+      return false;
+    }
+  }
   function rowHtml(c) {
     const n = scoreOf(c);
     const apeTot = coinApeTotal(c);
+    const wallets = (c.wallets || []).filter(Boolean);
+    const on = coinPicked(c.mint);
     return (
       '<tr>' +
       '<td style="padding:10px 8px;border-bottom:1px solid #243041;font-weight:800;color:#e8eef6;white-space:nowrap">' +
-      '<span>' +
+      '<button type="button" data-cs-mint="' +
+      esc(c.mint || '') +
+      '" data-cs-wallets="' +
+      esc(wallets.join(',')) +
+      '" data-cs-on="' +
+      (on ? '1' : '0') +
+      '" style="border:1px solid ' +
+      (on ? '#f5a14a' : 'transparent') +
+      ';background:' +
+      (on ? '#2a1c0e' : 'transparent') +
+      ';color:' +
+      (on ? '#f5a14a' : '#e8eef6') +
+      ';border-radius:8px;padding:4px 8px;font-weight:800;font-size:13px;cursor:pointer">' +
       esc(coinLabel(c)) +
-      '</span>' +
+      '</button>' +
       (fmtMc(c.mcap) ? '<span style="margin-left:8px;color:#62e3a0;font-size:12px">' + esc(fmtMc(c.mcap)) + '</span>' : '') +
       (c.mint
         ? '<a href="' +

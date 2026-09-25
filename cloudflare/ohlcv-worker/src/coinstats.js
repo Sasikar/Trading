@@ -23,7 +23,9 @@ export function writeWallets(store, list) {
     clean.push({
       address: address,
       label: String((row && row.label) || '').slice(0, 32),
-      at: (row && row.at) || Date.now()
+      at: (row && row.at) || Date.now(),
+      manual: !!(row && row.manual),
+      mints: Array.isArray(row && row.mints) ? row.mints.map(String).filter(valid).slice(0, 20) : []
     });
   });
   const kept = clean.slice(0, MAX);

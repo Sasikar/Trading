@@ -2,6 +2,7 @@
   if (window.__coinstatsTab) return;
   window.__coinstatsTab = 1;
 
+  var PICKS = "cs_coin_picks_v1";
   var KEY = "coinstats_wallets_v1";
   var API = "https://trading-ohlcv.sasipudi.workers.dev";
   var wallets = [];
@@ -39,6 +40,18 @@
     return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
+  function loadPicks() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(PICKS) || "{}");
+      return raw && typeof raw === "object" ? raw : {};
+    } catch (e) { return {}; }
+  }
+  function savePicks(picks) {
+    try { localStorage.setItem(PICKS, JSON.stringify(picks)); } catch (e) {}
+  }
+  function trashIcon() {
+    return "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13\"/></svg>";
+  }
   function loadLocal() {
     try {
       var raw = JSON.parse(localStorage.getItem(KEY) || "[]");
@@ -53,7 +66,15 @@
     var by = {};
     loadLocal().concat(remote || []).forEach(function (row) {
       if (!row || !valid(row.address)) return;
-      by[row.address] = { address: row.address, label: row.label || "", at: row.at || Date.now() };
+      var prev = by[row.address];
+      var mints = Array.isArray(row.mints) ? row.mints.filter(valid) : [];
+      if (!prev) {
+        by[row.address] = { address: row.address, label: row.label || "", at: row.at || Date.now(), manual: !!row.manual, mints: mints };
+        return;
+      }
+      prev.manual = prev.manual || !!row.manual;
+      prev.label = prev.label || row.label || "";
+      mints.forEach(function (mint) { if (prev.mints.indexOf(mint) < 0) prev.mints.push(mint); });
     });
     var list = Object.keys(by).map(function (k) { return by[k]; });
     list.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
@@ -103,7 +124,9 @@
     if (!box) return;
     var chips = wallets.map(function (row) {
       var on = row.address === selected;
-      return "<button type=\"button\" data-wallet=\"" + esc(row.address) + "\" style=\"padding:8px 12px;border-radius:999px;border:1px solid " + (on ? "#f5a14a" : "#243041") + ";background:" + (on ? "#2a1c0e" : "#121a24") + ";color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer\">" + esc(row.label || short(row.address)) + "</button>";
+      return "<span style=\"display:inline-flex;align-items:center;gap:2px;padding:4px 4px 4px 12px;border-radius:999px;border:1px solid " + (on ? "#f5a14a" : "#243041") + ";background:" + (on ? "#2a1c0e" : "#121a24") + "\">" +
+        "<button type=\"button\" data-wallet=\"" + esc(row.address) + "\" style=\"padding:6px 4px;border:0;background:transparent;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer\">" + esc(row.label || short(row.address)) + "</button>" +
+        "<button type=\"button\" data-remove=\"" + esc(row.address) + "\" aria-label=\"Delete wallet\" style=\"width:28px;height:28px;border:0;border-radius:999px;background:transparent;color:#8491a1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center\">" + trashIcon() + "</button></span>";
     }).join("");
     var total = bag && isFinite(bag.total) ? money(bag.total) : "—";
     var held = "";
@@ -148,8 +171,7 @@
       "<div style=\"display:flex;gap:18px;margin-top:18px;border-bottom:1px solid #243041\">" +
       "<button type=\"button\" data-view=\"assets\" style=\"padding:10px 0;border:0;background:transparent;color:" + (view === "assets" ? "#f5a14a" : "#8491a1") + ";font-weight:900;border-bottom:2px solid " + (view === "assets" ? "#f5a14a" : "transparent") + ";cursor:pointer\">Assets</button>" +
       "<button type=\"button\" data-view=\"history\" style=\"padding:10px 0;border:0;background:transparent;color:" + (view === "history" ? "#f5a14a" : "#8491a1") + ";font-weight:900;border-bottom:2px solid " + (view === "history" ? "#f5a14a" : "transparent") + ";cursor:pointer\">History</button></div>" +
-      "<div style=\"margin-top:8px\">" + (view === "history" ? hist : held) + "</div>" +
-      (selected ? "<button type=\"button\" id=\"cs-remove\" style=\"margin-top:14px;padding:8px 12px;border-radius:8px;border:1px solid #243041;background:transparent;color:#8491a1;font-size:12px;cursor:pointer\">Remove this wallet</button>" : "");
+      "<div style=\"margin-top:8px\">" + (view === "history" ? hist : held) + "</div>";
     var form = $("cs-add");
     if (form) form.addEventListener("submit", onAdd);
     box.querySelectorAll("[data-wallet]").forEach(function (btn) {
@@ -173,15 +195,12 @@
       var again = $("cs-search");
       if (again) { again.focus(); again.setSelectionRange(query.length, query.length); }
     });
-    var remove = $("cs-remove");
-    if (remove) remove.addEventListener("click", function () {
-      wallets = wallets.filter(function (row) { return row.address !== selected; });
-      saveLocal(wallets);
-      persist();
-      selected = wallets.length ? wallets[wallets.length - 1].address : "";
-      bag = null;
-      paint();
-      if (selected) loadWallet(selected);
+    box.querySelectorAll("[data-remove]").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        removeWallet(btn.getAttribute("data-remove"));
+      });
     });
   }
 
@@ -195,7 +214,7 @@
       return;
     }
     if (!wallets.some(function (row) { return row.address === address; })) {
-      wallets.push({ address: address, label: "", at: Date.now() });
+      wallets.push({ address: address, label: "", at: Date.now(), manual: true, mints: [] });
       saveLocal(wallets);
       persist();
     }
@@ -223,6 +242,54 @@
         paint();
       });
   }
+
+  function removeWallet(address) {
+    wallets = wallets.filter(function (item) { return item.address !== address; });
+    saveLocal(wallets);
+    persist();
+    if (selected === address) {
+      selected = wallets.length ? wallets[wallets.length - 1].address : "";
+      bag = null;
+      if (selected) loadWallet(selected);
+    }
+    paint();
+  }
+
+  window.coinstatsSetCoin = function (mint, addresses, on) {
+    if (!valid(mint)) return;
+    var list = (addresses || []).filter(valid);
+    var picks = loadPicks();
+    if (on) picks[mint] = 1;
+    else delete picks[mint];
+    savePicks(picks);
+    if (on) {
+      list.forEach(function (address) {
+        var row = wallets.filter(function (item) { return item.address === address; })[0];
+        if (!row) wallets.push({ address: address, label: "", at: Date.now(), manual: false, mints: [mint] });
+        else if ((row.mints || []).indexOf(mint) < 0) {
+          row.mints = (row.mints || []).concat([mint]);
+        }
+      });
+      if (!selected && list.length) selected = list[0];
+    } else {
+      wallets.forEach(function (row) {
+        row.mints = (row.mints || []).filter(function (item) { return item !== mint; });
+      });
+      wallets = wallets.filter(function (row) {
+        if (list.indexOf(row.address) < 0) return true;
+        if (row.manual) return true;
+        return (row.mints || []).length > 0;
+      });
+      if (list.indexOf(selected) >= 0 && !wallets.some(function (row) { return row.address === selected; })) {
+        selected = wallets.length ? wallets[0].address : "";
+        bag = null;
+        if (selected) loadWallet(selected);
+      }
+    }
+    saveLocal(wallets);
+    persist();
+    if ($("coinstats-panel") && $("coinstats-panel").style.display !== "none") paint();
+  };
 
   function boot() {
     wallets = loadLocal();
