@@ -99,6 +99,32 @@ export function historyRows(txs, wallet, since) {
   return rows.slice(0, 400);
 }
 
+const NAMES = {
+  EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v: 'USDC',
+  Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB: 'USDT',
+  So11111111111111111111111111111111111111112: 'SOL'
+};
+
+export function labelHistory(rows, holdings) {
+  const name = Object.assign({}, NAMES);
+  const price = { SOL: 0 };
+  (holdings || []).forEach((row) => {
+    if (row.mint && row.symbol) name[row.mint] = row.symbol;
+    if (row.mint && row.price) price[row.mint] = row.price;
+    if (row.symbol === 'SOL' && row.price) price.SOL = row.price;
+  });
+  return (rows || []).map((row) => {
+    const mint = row.token || '';
+    const symbol = name[mint] || mint;
+    const px = price[mint] || (symbol === 'SOL' ? price.SOL : 0) || 0;
+    return Object.assign({}, row, {
+      token: symbol,
+      mint: name[mint] ? mint : '',
+      usd: px ? Math.abs(row.amount) * px : 0
+    });
+  });
+}
+
 async function rpc(key, method, params) {
   const res = await fetch('https://mainnet.helius-rpc.com/?api-key=' + encodeURIComponent(key), {
     method: 'POST',
@@ -154,7 +180,7 @@ export async function scanWallet(env, wallet) {
     wallet: wallet,
     total: held.total,
     holdings: held.rows,
-    history: historyRows(book.txs, wallet, since),
+    history: labelHistory(historyRows(book.txs, wallet, since), held.rows),
     truncated: book.truncated
   };
 }

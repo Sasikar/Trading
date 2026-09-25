@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { holdingsFromDas, historyRows, writeWallets, readWallets } from './coinstats.js';
+import { holdingsFromDas, historyRows, labelHistory, writeWallets, readWallets } from './coinstats.js';
 
 test('holdings keep priced tokens and native sol', () => {
   const out = holdingsFromDas({
@@ -36,6 +36,15 @@ test('history keeps the last week and knows in from out', () => {
   assert.equal(rows.length, 1);
   assert.equal(rows[0].side, 'in');
   assert.equal(rows[0].token, 'JEAN');
+});
+
+test('history uses the holding name so a search can find it', () => {
+  const rows = labelHistory(
+    [{ token: 'GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump', amount: 10, side: 'in' }],
+    [{ mint: 'GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump', symbol: 'JEANPHIL', price: 0.004 }]
+  );
+  assert.equal(rows[0].token, 'JEANPHIL');
+  assert.equal(rows[0].usd, 0.04);
 });
 
 test('wallets add without duplicates', () => {

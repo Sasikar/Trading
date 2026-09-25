@@ -134,7 +134,8 @@
         return "<div style=\"display:flex;justify-content:space-between;gap:10px;padding:12px 0;border-bottom:1px solid #243041\">" +
           "<div><div style=\"font-weight:800;color:#e8eef6\">" + esc(row.token) + " · " + (inn ? "in" : "out") + "</div>" +
           "<div style=\"margin-top:4px;font-size:12px;color:#8491a1\">" + esc(when(row.at)) + " · " + esc(row.type || row.source || "") + "</div></div>" +
-          "<div style=\"font-weight:800;color:" + (inn ? "#3dbe7a" : "#ff8a7a") + "\">" + (inn ? "+" : "−") + qty(row.amount) + "</div></div>";
+          "<div style=\"text-align:right\"><div style=\"font-weight:800;color:" + (inn ? "#3dbe7a" : "#ff8a7a") + "\">" + (inn ? "+" : "−") + qty(row.amount) + " " + esc(row.token) + "</div>" +
+          (row.usd ? "<div style=\"margin-top:4px;font-size:12px;color:#8491a1\">" + money(row.usd) + "</div>" : "") + "</div></div>";
       }).join("") : "<div style=\"margin-top:10px;font-size:13px;color:#8491a1\">Nothing in the last 7 days matches.</div>";
       if (bag.truncated) hist += "<div style=\"margin-top:8px;font-size:12px;color:#8491a1\">This wallet moved more than the read covered.</div>";
     }
