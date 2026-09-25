@@ -11,6 +11,7 @@ import { lookupBuy } from './helius-lookup.js';
 import { pumpfunFeed } from './pumpfun.js';
 import { scanTiers } from './tiers.js';
 import { scanBundle } from './bundle.js';
+import { scanFlows } from './flows.js';
 import { applySnapshot, tierDailyTick } from './tier-history.js';
 import { readNote, writeNote } from './tier-notes.js';
 
@@ -436,6 +437,21 @@ export default {
       const mint = (new URL(request.url).searchParams.get('mint') || '').trim();
       try {
         const data = await scanBundle(env, mint, new URL(request.url).searchParams.get('launch'));
+        return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
+    if (path === '/flows' || path === '/api/flows') {
+      const url = new URL(request.url);
+      const mint = (url.searchParams.get('mint') || '').trim();
+      try {
+        const data = await scanFlows(env, mint, {
+          price: url.searchParams.get('price'),
+          pair: url.searchParams.get('pair') || '',
+          symbol: url.searchParams.get('symbol') || '',
+          change: url.searchParams.get('change')
+        });
         return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });

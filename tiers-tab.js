@@ -338,7 +338,7 @@ function stat(label, value, note) {
   var NOTES = "https://trading-ohlcv.sasipudi.workers.dev/tier-notes";
 
   function setTierView(next) {
-    var views = ["bands", "bundle", "bubble", "dex"];
+    var views = ["bands", "bundle", "bubble", "dex", "flows"];
     tierView = views.indexOf(next) === -1 ? "bands" : next;
     views.forEach(function (name) {
       var panel = $("tier-view-" + name + "-panel");
@@ -483,6 +483,81 @@ function stat(label, value, note) {
       });
   }
 
+  var flowsFor = "";
+
+  function moneySigned(n) {
+    var sign = n < 0 ? "-" : "";
+    var v = Math.abs(n);
+    var body = v >= 1000 ? "$" + Math.round(v).toLocaleString("en-US") : "$" + Math.round(v);
+    return sign + body;
+  }
+
+  function paintFlows(result, loading) {
+    var box = $("tier-view-flows-panel");
+    if (!box) return;
+    if (loading) {
+      box.innerHTML = "<div style=\"font-size:12px;color:#8491a1\">Reading daily flows…</div>";
+      return;
+    }
+    if (!result) {
+      box.innerHTML = "<div style=\"font-size:12px;color:#8491a1\">Check a token. Daily net flows load with that address.</div>";
+      return;
+    }
+    if (result.ok === false) {
+      box.innerHTML = "<div style=\"font-size:12px;color:#e07a7a\">" + esc(result.error || "Flow read failed") + "</div>";
+      return;
+    }
+    var ch = result.change;
+    var chTxt = ch == null || !isFinite(+ch) ? "" : "<span style=\"color:" + (ch >= 0 ? "#3dbe7a" : "#ff8a7a") + ";font-weight:800\">" + (ch >= 0 ? "+" : "") + Number(ch).toFixed(1) + "%</span>";
+    var max = 1;
+    (result.rows || []).forEach(function (r) { if (Math.abs(r.usd) > max) max = Math.abs(r.usd); });
+    var html = "<div style=\"padding:14px;border-radius:16px;border:1px solid #243041;background:#0b121a\">";
+    html += "<div style=\"font-size:16px;font-weight:900;color:#e8eef6\">" + esc(result.symbol || "Coin") + "</div>";
+    html += "<div style=\"margin-top:4px;font-size:14px;color:#e8eef6\">$" + (Number(result.price) < 1 ? Number(result.price).toFixed(6) : Number(result.price).toFixed(4)) + " " + chTxt + "</div>";
+    html += "<div style=\"margin-top:14px;font-size:13px;font-weight:800;color:#e8eef6\">Daily net USD flows</div>";
+    (result.rows || []).forEach(function (r) {
+      var pos = r.usd >= 0;
+      var col = pos ? "#3dbe7a" : "#ff5d6c";
+      var width = Math.max(4, Math.round(Math.abs(r.usd) / max * 100));
+      html += "<div style=\"display:grid;grid-template-columns:72px 1fr auto;gap:8px;align-items:center;margin-top:10px\">" +
+        "<div style=\"font-size:13px;color:#c5d0dc\">" + esc(r.label) + "</div>" +
+        "<div style=\"height:8px;border-radius:99px;background:" + col + ";width:" + width + "%;box-shadow:0 0 10px " + col + "\"></div>" +
+        "<div style=\"font-size:13px;font-weight:800;color:" + col + "\">" + moneySigned(r.usd) + "</div></div>";
+    });
+    html += "<div style=\"margin-top:12px;font-size:11px;color:#8491a1;line-height:1.45\">Last 24 hours. Green is net buying, red is net selling. A whale holds at least $10k of this coin, a shark $2k–$10k, a dolphin $500–$2k, and a fish is smaller. MM traded both ways. The pool is left out. Sun Flow does not publish its cutoff, so these bars will not match theirs one for one." + (result.truncated ? " This coin traded more than the read covered." : "") + "</div>";
+    html += "</div>";
+    box.innerHTML = html;
+  }
+
+  function loadFlows(mint) {
+    flowsFor = mint;
+    paintFlows(null, true);
+    fetch("https://api.dexscreener.com/latest/dex/tokens/" + encodeURIComponent(mint), { cache: "no-store" })
+      .then(function (res) { return res.ok ? res.json() : {}; })
+      .then(function (body) {
+        var pairs = ((body && body.pairs) || []).filter(function (p) {
+          return p.chainId === "solana" && p.baseToken && p.baseToken.address === mint;
+        });
+        pairs.sort(function (a, b) { return ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0); });
+        var top = pairs[0] || {};
+        var q = "mint=" + encodeURIComponent(mint);
+        if (top.priceUsd) q += "&price=" + encodeURIComponent(top.priceUsd);
+        if (top.pairAddress) q += "&pair=" + encodeURIComponent(top.pairAddress);
+        if (top.baseToken && top.baseToken.symbol) q += "&symbol=" + encodeURIComponent(top.baseToken.symbol);
+        if (top.priceChange && top.priceChange.h24 != null) q += "&change=" + encodeURIComponent(top.priceChange.h24);
+        return fetch("https://trading-ohlcv.sasipudi.workers.dev/flows?" + q, { cache: "no-store" });
+      })
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        if (flowsFor !== mint) return;
+        paintFlows(body || { ok: false, error: "Flow read failed" }, false);
+      })
+      .catch(function (err) {
+        if (flowsFor !== mint) return;
+        paintFlows({ ok: false, error: err.message || "Flow read failed" }, false);
+      });
+  }
+
   function boot() {
     var tabs = $("tf-tabs");
     if (tabs) tabs.addEventListener("click", onTabClick);
@@ -507,6 +582,7 @@ function stat(label, value, note) {
         var hist = $("tier-history");
         if (hist) hist.innerHTML = "";
         loadBundle(mint);
+        loadFlows(mint);
         loadNotes(mint);
         scan(mint).then(paint).catch(function (err) {
           if (st) st.textContent = "FAILED";
@@ -516,7 +592,7 @@ function stat(label, value, note) {
         }).then(function () { busy = false; });
       });
     }
-    ["bands", "bundle", "bubble", "dex"].forEach(function (name) {
+    ["bands", "bundle", "bubble", "dex", "flows"].forEach(function (name) {
       var btn = $("tier-view-" + name);
       if (btn) btn.addEventListener("click", function () { setTierView(name); });
     });
