@@ -58,14 +58,63 @@
       return raw && typeof raw === "object" ? raw : {};
     } catch (e) { return {}; }
   }
+  function goodName(symbol, mint) {
+    var s = String(symbol || "").trim();
+    if (!s || s === "—" || s.indexOf("…") >= 0 || s.indexOf("...") >= 0) return "";
+    if (/^[1-9A-HJ-NP-Za-km-z]{20,}$/.test(s)) return "";
+    if (mint && (s === short(mint) || s === String(mint).slice(0, 4))) return "";
+    return s;
+  }
+  function rememberName(mint, symbol) {
+    var name = goodName(symbol, mint);
+    if (!name || loadNames()[mint] === name) return name;
+    var names = loadNames();
+    names[mint] = name;
+    try { localStorage.setItem(NAMES, JSON.stringify(names)); } catch (e) {}
+    document.querySelectorAll("[data-cs-title]").forEach(function (el) {
+      if (el.getAttribute("data-cs-title") === mint) el.textContent = name;
+    });
+    return name;
+  }
   function coinTitle(mint) {
-    var saved = loadNames()[mint];
-    if (saved && saved !== "—" && saved.indexOf("…") < 0) return saved;
+    var saved = goodName(loadNames()[mint], mint);
+    if (saved) return saved;
     var rows = (bag && bag.holdings) || [];
     for (var i = 0; i < rows.length; i++) {
-      if (rows[i].mint === mint && rows[i].symbol) return rows[i].symbol;
+      var row = rows[i];
+      if (!row || !goodName(row.symbol, mint)) continue;
+      if (row.mint === mint || short(row.mint || "") === short(mint)) return row.symbol;
     }
-    return saved || short(mint);
+    return short(mint);
+  }
+  function resolveNames() {
+    var seen = {};
+    wallets.forEach(function (row) {
+      (row.mints || []).forEach(function (mint) {
+        if (seen[mint] || goodName(loadNames()[mint], mint)) return;
+        seen[mint] = 1;
+        var fromBag = coinTitle(mint);
+        if (fromBag !== short(mint)) {
+          rememberName(mint, fromBag);
+          return;
+        }
+        fetch("https://api.dexscreener.com/tokens/v1/solana/" + encodeURIComponent(mint), { cache: "no-store" })
+          .then(function (res) { return res.json(); })
+          .then(function (arr) {
+            var best = "";
+            var bestLiq = -1;
+            (Array.isArray(arr) ? arr : []).forEach(function (pair) {
+              var symbol = pair && pair.baseToken && pair.baseToken.symbol;
+              var liq = pair && pair.liquidity && Number(pair.liquidity.usd) || 0;
+              if (!goodName(symbol, mint) || liq < bestLiq) return;
+              best = symbol;
+              bestLiq = liq;
+            });
+            if (best) rememberName(mint, best);
+          })
+          .catch(function () {});
+      });
+    });
   }
   function trashIcon() {
     return "<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13\"/></svg>";
@@ -113,14 +162,7 @@
         .then(function (res) { return res.json(); })
         .then(function (body) {
           var held = ((body && body.holdings) || []).filter(function (row) { return row.mint === mint; })[0];
-          if (held && held.symbol) {
-            var names = loadNames();
-            names[mint] = held.symbol;
-            try { localStorage.setItem(NAMES, JSON.stringify(names)); } catch (e) {}
-            document.querySelectorAll("[data-cs-title]").forEach(function (el) {
-              if (el.getAttribute("data-cs-title") === mint) el.textContent = held.symbol;
-            });
-          }
+          if (held && goodName(held.symbol, mint)) rememberName(mint, held.symbol);
           var hist = (body && body.history) || [];
           out.push({
             holds: !!held,
@@ -304,6 +346,7 @@
       });
     });
     loadNotes();
+    resolveNames();
   }
 
   function onAdd(ev) {
