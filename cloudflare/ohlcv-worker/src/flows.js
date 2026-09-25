@@ -234,7 +234,7 @@ async function swapsOf(key, address, mint, price, since, startBefore) {
   let before = startBefore || '';
   let done = false;
   let scanned = 0;
-  for (let page = 0; page < 2 && !done; page++) {
+  for (let page = 0; page < 4 && !done; page++) {
     let url = 'https://api.helius.xyz/v0/addresses/' + encodeURIComponent(address) + '/transactions?api-key=' + encodeURIComponent(key) + '&limit=100';
     if (before) url += '&before=' + encodeURIComponent(before);
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
@@ -261,19 +261,8 @@ async function swapsOf(key, address, mint, price, since, startBefore) {
     before = rows[rows.length - 1] && rows[rows.length - 1].signature;
     if (!before) done = true;
   }
-  let cut = window.length;
-  let pending = 0;
-  for (let i = 0; i < window.length; i++) {
-    if (!window[i].pending) continue;
-    pending += 1;
-    if (pending === 30) {
-      cut = i + 1;
-      done = false;
-      break;
-    }
-  }
-  const slice = window.slice(0, cut);
-  const sigs = slice.filter((row) => row.pending && row.sig).map((row) => row.sig);
+  const slice = window;
+  const sigs = slice.filter((row) => row.pending && row.sig).slice(0, 8).map((row) => row.sig);
   const chain = sigs.length ? await chainTrades(key, sigs, mint, price, address) : { trades: [], read: 0 };
   const trades = [];
   slice.forEach((row) => {
