@@ -12,6 +12,7 @@ import { pumpfunFeed } from './pumpfun.js';
 import { scanTiers } from './tiers.js';
 import { scanBundle } from './bundle.js';
 import { scanFlows } from './flows.js';
+import { scanWallet, readWallets, writeWallets } from './coinstats.js';
 import { applySnapshot, tierDailyTick } from './tier-history.js';
 import { readNote, writeNote } from './tier-notes.js';
 
@@ -317,6 +318,14 @@ export class OhlcvEngine {
         }
         return new Response(JSON.stringify({ ok: true, ...readNote(this.store, mint) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
+      if (path === '/coinstats-wallets' || path === '/api/coinstats-wallets') {
+        if (request.method === 'POST') {
+          const body = await request.json().catch(() => ({}));
+          const wallets = writeWallets(this.store, body.wallets || []);
+          return new Response(JSON.stringify({ ok: true, wallets: wallets }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ ok: true, wallets: readWallets(this.store) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
       if (path === '/oldcoins' || path === '/api/oldcoins') {
         const want = new URL(request.url).searchParams.get('scan') === '1';
         if (want) {
@@ -454,6 +463,15 @@ export default {
           before: url.searchParams.get('before') || '',
           debug: url.searchParams.get('debug') === '1'
         });
+        return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
+    if (path === '/coinstats' || path === '/api/coinstats') {
+      const wallet = (new URL(request.url).searchParams.get('wallet') || '').trim();
+      try {
+        const data = await scanWallet(env, wallet);
         return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
