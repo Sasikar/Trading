@@ -167,7 +167,7 @@
       "<button type=\"submit\" style=\"padding:12px 16px;border-radius:12px;border:0;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></form>" +
       "<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:12px\">" + chips + "</div>" +
       "<div style=\"margin-top:22px;font-size:40px;font-weight:900;letter-spacing:-.04em;color:#f4f7fb\">" + total + "</div>" +
-      "<div style=\"margin-top:4px;font-size:12px;color:#8491a1\">Current holdings · prices from the chain read · not all-time profit</div>" +
+      "<div style=\"margin-top:4px;font-size:12px;color:#8491a1\">Current holdings · Jupiter price · not all-time profit</div>" +
       "<div style=\"display:flex;gap:18px;margin-top:18px;border-bottom:1px solid #243041\">" +
       "<button type=\"button\" data-view=\"assets\" style=\"padding:10px 0;border:0;background:transparent;color:" + (view === "assets" ? "#f5a14a" : "#8491a1") + ";font-weight:900;border-bottom:2px solid " + (view === "assets" ? "#f5a14a" : "transparent") + ";cursor:pointer\">Assets</button>" +
       "<button type=\"button\" data-view=\"history\" style=\"padding:10px 0;border:0;background:transparent;color:" + (view === "history" ? "#f5a14a" : "#8491a1") + ";font-weight:900;border-bottom:2px solid " + (view === "history" ? "#f5a14a" : "transparent") + ";cursor:pointer\">History</button></div>" +
@@ -224,11 +224,35 @@
     loadWallet(address);
   }
 
+  function withLivePrices(body) {
+    var rows = (body && body.holdings) || [];
+    var ids = rows.map(function (row) {
+      return row.mint === "SOL" ? "So11111111111111111111111111111111111111112" : row.mint;
+    }).filter(Boolean);
+    if (!body || !ids.length) return Promise.resolve(body);
+    var q = ids.slice(0, 50).map(encodeURIComponent).join(",");
+    return fetch("https://lite-api.jup.ag/price/v3?ids=" + q, { cache: "no-store" })
+      .then(function (res) { return res.ok ? res.json() : {}; })
+      .then(function (prices) {
+        rows.forEach(function (row) {
+          var key = row.mint === "SOL" ? "So11111111111111111111111111111111111111112" : row.mint;
+          var px = prices && prices[key] && Number(prices[key].usdPrice);
+          if (!(px > 0)) return;
+          row.price = px;
+          row.value = row.amount * px;
+        });
+        body.total = rows.reduce(function (sum, row) { return sum + (Number(row.value) || 0); }, 0);
+        return body;
+      })
+      .catch(function () { return body; });
+  }
+
   function loadWallet(address) {
     var st = $("cs-status");
     if (st) st.textContent = "READING";
     fetch(API + "/coinstats?wallet=" + encodeURIComponent(address), { cache: "no-store" })
       .then(function (res) { return res.json(); })
+      .then(function (body) { return withLivePrices(body || { ok: false, error: "Could not read that wallet" }); })
       .then(function (body) {
         if (selected !== address) return;
         bag = body || { ok: false, error: "Could not read that wallet" };
