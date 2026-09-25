@@ -183,19 +183,20 @@ async function swapsOf(key, address, mint, price, since) {
     if (!Array.isArray(rows) || !rows.length) break;
     let old = false;
     rows.forEach((tx) => {
-      if (!sample) {
+      if (!sample || ((tx.accountData || []).length && !sample.acc)) {
         const t0 = (tx.tokenTransfers || [])[0] || {};
         const swap = tx.events && tx.events.swap;
+        const acc0 = (tx.accountData || [])[0] || {};
+        const ch0 = (acc0.tokenBalanceChanges || [])[0] || {};
         sample = {
+          keys: Object.keys(tx).slice(0, 20),
+          acc: (tx.accountData || []).length,
+          changes: (acc0.tokenBalanceChanges || []).length,
+          chMint: ch0.mint || '',
+          chKeys: Object.keys(ch0).slice(0, 8),
           type: tx.type || '',
-          source: tx.source || '',
-          fee: tx.feePayer ? tx.feePayer.slice(0, 4) : '',
           transfers: (tx.tokenTransfers || []).length,
-          transferKeys: Object.keys(t0),
-          mint0: t0.mint || '',
-          swap: !!swap,
-          swapKeys: swap ? Object.keys(swap) : [],
-          out0: swap && swap.tokenOutputs && swap.tokenOutputs[0] ? Object.keys(swap.tokenOutputs[0]) : []
+          swap: !!swap
         };
       }
       const at = (tx.timestamp || 0) * 1000;
