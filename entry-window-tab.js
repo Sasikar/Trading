@@ -27,6 +27,9 @@
     selCa = (localStorage.getItem('ew_ca') || '').toLowerCase();
   } catch (e) {}
   let lastCards = [];
+  let lastSignals = [];
+  let sigTf = '15m';
+  const SIG_TFS = ['5m', '15m', '1h', '2h', '4h', '1d', '1w'];
   const EW_BANDS = [
     { id: 'ACTIVE', lab: 'ACTIVE' },
     { id: 'RECLAIM', lab: 'RECLAIM' },
@@ -363,9 +366,66 @@
         (selCa ? 'No card for this coin on ' : 'No coins in this state on ') +
         (ewTf === 'all' ? 'ALL TF' : tfLab(ewTf)) +
         '.</div>';
+      paintSignals();
       return;
     }
     list.innerHTML = rows.map(renderCard).join('');
+    paintSignals();
+  }
+  function paintSignals() {
+    const box = $('ew-signals');
+    if (!box) return;
+    if (!selCa) {
+      box.innerHTML = '<div style="font-size:12px;color:#8491a1">Select a coin to see the signals it fired.</div>';
+      return;
+    }
+    const now = Date.now();
+    const hour = now - 3600e3;
+    const rows = lastSignals.filter(function (r) {
+      return String(r.ca || '').toLowerCase() === selCa;
+    });
+    const by = {};
+    SIG_TFS.forEach(function (tf) {
+      by[tf] = { n: 0, hour: 0 };
+    });
+    rows.forEach(function (r) {
+      const tf = String(r.tf || '').toLowerCase();
+      if (!by[tf]) return;
+      by[tf].n += 1;
+      if (+r.at >= hour) by[tf].hour += 1;
+    });
+    let hourN = 0;
+    SIG_TFS.forEach(function (tf) {
+      hourN += by[tf].hour;
+    });
+    if (!by[sigTf]) sigTf = '15m';
+    const list = rows
+      .filter(function (r) {
+        return String(r.tf || '').toLowerCase() === sigTf;
+      })
+      .slice()
+      .reverse();
+    let html = '<div style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">SIGNAL HISTORY · 3 DAYS</div>';
+    html += '<div style="margin-top:6px;font-size:18px;font-weight:900;color:#e8eef6">Last hour · ' + hourN + ' signal' + (hourN === 1 ? '' : 's') + '</div>';
+    html += '<div style="margin-top:4px;font-size:11px;color:#8491a1">From now back 60 minutes, every timeframe on this coin. A timeframe is recorded while that setup is on screen, or while All is on.</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">';
+    SIG_TFS.forEach(function (tf) {
+      html += '<div style="padding:6px 8px;border-radius:8px;background:#121a24;font-size:11px;color:#c5d0dc"><b style="color:#e8eef6">' + tfLab(tf) + '</b> ' + by[tf].n + '</div>';
+    });
+    html += '</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">';
+    SIG_TFS.forEach(function (tf) {
+      const on = tf === sigTf;
+      html += '<button type="button" data-sig-tf="' + tf + '" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:' + (on ? '#1a9b6c' : '#121a24') + ';color:' + (on ? '#fff' : '#c5d0dc') + ';font-weight:800;font-size:11px;cursor:pointer">' + tfLab(tf) + '</button>';
+    });
+    html += '</div>';
+    html += '<div style="margin-top:10px;font-size:12px;color:#8491a1">' + tfLab(sigTf) + ' · ' + list.length + ' in 3 days · ' + by[sigTf].hour + ' in the last hour</div>';
+    if (!list.length) {
+      html += '<div style="margin-top:8px;font-size:12px;color:#8491a1">No fired signal on this timeframe yet.</div>';
+    }
+    list.forEach(function (r) {
+      html += '<div style="padding:10px 0;border-bottom:1px solid #243041"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-size:12px;color:#8491a1">' + esc(new Date(r.at).toLocaleString()) + '</span><span style="font-weight:900;color:#e8eef6">' + esc(r.label || r.state) + '</span></div>' + (r.why ? '<div style="margin-top:4px;font-size:12px;color:#c5d0dc">' + esc(r.why) + '</div>' : '') + '</div>';
+    });
+    box.innerHTML = html;
   }
   function pickState(id) {
     selCa = '';
@@ -450,6 +510,7 @@
         if (wantTf === 'all') return true;
         return String(c.tf || '').toLowerCase() === wantTf;
       });
+      if (Array.isArray(j.signals)) lastSignals = j.signals;
       paintCoinSel(lastCards);
       paintStateTabs(lastCards);
       paintLooking();
@@ -528,6 +589,15 @@
   if (coinSel) {
     coinSel.addEventListener('change', function () {
       pickCoin(coinSel.value);
+    });
+  }
+  const sigBox = document.getElementById('ew-signals');
+  if (sigBox) {
+    sigBox.addEventListener('click', function (ev) {
+      const b = ev.target && ev.target.closest && ev.target.closest('[data-sig-tf]');
+      if (!b) return;
+      sigTf = b.getAttribute('data-sig-tf') || '15m';
+      paintSignals();
     });
   }
   const tabs = document.getElementById('tf-tabs');

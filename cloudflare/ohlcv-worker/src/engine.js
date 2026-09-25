@@ -3,6 +3,7 @@
  * DexScreener is the quote tape. We own the candles.
  */
 import { decisionCheck, pickDecisionHit } from './decision-check.js';
+import { applySignals } from './ew-signals.js';
 import { GMGN_EVERY_MS, GMGN_MIN_GAP_MS, fetchGmgnHot, fetchGmgnTrending } from './gmgn.js';
 import {
   FOMO_HOLD_MS,
@@ -4037,7 +4038,37 @@ export class Engine {
       paper = [];
     }
     if (tfn !== 'all') paper = paper.filter((p) => String(p.tf || '').toLowerCase() === tfn);
-    return { tf: tfn, saved: watch.length, cards, paper: paper.slice(-40).reverse(), updated: new Date().toISOString() };
+    let signals = [];
+    try {
+      signals = this.recordEwSignals(
+        hits.map((h) => ({ ca: h.ca, name: h.name, tf: h.tf, ew: h.ew || {} }))
+      );
+    } catch (e) {}
+    return { tf: tfn, saved: watch.length, cards, paper: paper.slice(-40).reverse(), signals: signals, updated: new Date().toISOString() };
+  }
+
+  recordEwSignals(cards) {
+    const now = Date.now();
+    let book = {};
+    try {
+      book = JSON.parse(this.store.getMeta('ew_signals') || '{}') || {};
+    } catch (e) {
+      book = {};
+    }
+    const events = (cards || []).map((c) => {
+      const e = c.ew || {};
+      return {
+        ca: c.ca,
+        name: c.name,
+        tf: c.tf,
+        state: e.state || '',
+        label: e.label || '',
+        why: e.why || ''
+      };
+    });
+    const next = applySignals(book, events, now);
+    this.store.setMeta('ew_signals', JSON.stringify(next));
+    return next.log;
   }
   persistEntry(hit) {
     const e = hit && hit.entry;
@@ -5349,6 +5380,14 @@ export async function handleApi(engine, request) {
       }
     }
     return json({ ok: true, tabs: engine.strategyState() });
+  }
+  if (path === '/ew-signals' || path === '/api/ew-signals') {
+    try {
+      const log = engine.recordEwSignals([]);
+      return json({ ok: true, n: log.length });
+    } catch (e) {
+      return json({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 160) });
+    }
   }
   if (path === '/entry-window' || path === '/api/entry-window') {
     const tf = (url.searchParams.get('tf') || '4h').toLowerCase();
