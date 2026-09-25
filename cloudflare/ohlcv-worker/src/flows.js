@@ -6,19 +6,23 @@ const LABELS = [
   ['mm', 'MM']
 ];
 
-function uiAmount(raw) {
+function signedUi(raw) {
   if (raw == null) return 0;
-  if (typeof raw === 'number') return Math.abs(raw);
+  if (typeof raw === 'number') return raw;
   const src = raw.tokenAmount != null ? raw : { tokenAmount: raw, decimals: 0 };
   const text = String(src.tokenAmount);
   const n = Number(text);
   if (!isFinite(n) || n === 0) return 0;
   const d = Number(src.decimals);
-  if (text.indexOf('.') >= 0 || !(d > 0)) return Math.abs(n);
-  return Math.abs(n) / Math.pow(10, d);
+  if (text.replace('-', '').indexOf('.') >= 0 || !(d > 0)) return n;
+  return n / Math.pow(10, d);
 }
 
-export function tradesFromTx(tx, mint, price) {
+function uiAmount(raw) {
+  return Math.abs(signedUi(raw));
+}
+
+function tradesFromParsed(tx, mint, price) {
   if (!(price > 0) || !tx) return [];
   const swap = tx.events && tx.events.swap;
   if (swap) {
@@ -46,6 +50,39 @@ export function tradesFromTx(tx, mint, price) {
   });
   if (!net) return [];
   return [{ wallet: user, side: net > 0 ? 'buy' : 'sell', usd: Math.abs(net) * price }];
+}
+
+function tradesFromBalances(tx, mint, price, pair) {
+  const by = new Map();
+  (tx.accountData || []).forEach((acc) => {
+    (acc.tokenBalanceChanges || []).forEach((c) => {
+      if (!c || c.mint !== mint) return;
+      const delta = signedUi(c.rawTokenAmount);
+      const wallet = c.userAccount || acc.account;
+      if (!wallet || !delta) return;
+      by.set(wallet, (by.get(wallet) || 0) + delta);
+    });
+  });
+  if (pair) by.delete(pair);
+  const fee = tx.feePayer;
+  if (fee && by.get(fee)) {
+    const net = by.get(fee);
+    return [{ wallet: fee, side: net > 0 ? 'buy' : 'sell', usd: Math.abs(net) * price }];
+  }
+  const rows = Array.from(by.entries()).filter((row) => row[1]);
+  if (rows.length >= 2) {
+    rows.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    const rest = rows.slice(1).reduce((sum, row) => sum + row[1], 0);
+    if (Math.abs(rows[0][1] + rest) <= Math.abs(rest) * 0.02) rows.shift();
+  }
+  return rows.map((row) => ({ wallet: row[0], side: row[1] > 0 ? 'buy' : 'sell', usd: Math.abs(row[1]) * price }));
+}
+
+export function tradesFromTx(tx, mint, price, pair) {
+  const parsed = tradesFromParsed(tx, mint, price);
+  if (parsed.length) return parsed;
+  if (!(price > 0) || !tx) return [];
+  return tradesFromBalances(tx, mint, price, pair);
 }
 
 function tierOf(usd) {
@@ -163,7 +200,7 @@ async function swapsOf(key, address, mint, price, since) {
       }
       const at = (tx.timestamp || 0) * 1000;
       if (at && at < since) old = true;
-      else trades.push.apply(trades, tradesFromTx(tx, mint, price));
+      else trades.push.apply(trades, tradesFromTx(tx, mint, price, address));
     });
     before = rows[rows.length - 1] && rows[rows.length - 1].signature;
     if (old || !before) break;

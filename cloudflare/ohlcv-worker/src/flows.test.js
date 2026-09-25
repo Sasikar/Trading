@@ -15,6 +15,20 @@ test('a swap event buy uses the raw token amount', () => {
   assert.equal(rows[0].usd, 5);
 });
 
+test('a meteora balance change on the fee payer is the trade', () => {
+  const rows = tradesFromTx({
+    feePayer: 'USER',
+    accountData: [
+      { tokenBalanceChanges: [{ userAccount: 'USER', mint: 'M', rawTokenAmount: { tokenAmount: '2500000', decimals: 6 } }] },
+      { tokenBalanceChanges: [{ userAccount: 'POOL', mint: 'M', rawTokenAmount: { tokenAmount: '-2500000', decimals: 6 } }] }
+    ]
+  }, 'M', 2, 'POOL');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].wallet, 'USER');
+  assert.equal(rows[0].side, 'buy');
+  assert.equal(rows[0].usd, 5);
+});
+
 test('a buy is tokens arriving at the fee payer', () => {
   const rows = tradesFromTx({
     feePayer: 'USER',
