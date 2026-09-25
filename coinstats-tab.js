@@ -12,6 +12,7 @@
   var bag = null;
   var query = "";
   var notes = {};
+  var noteBusy = {};
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -82,9 +83,9 @@
     });
     var html = "";
     Object.keys(by).forEach(function (mint) {
-      html += "<div style=\"margin-top:14px\"><div style=\"font-weight:900;color:#e8eef6\">" + esc(coinTitle(mint)) + "</div>" +
+      html += "<div style=\"margin-top:16px;padding-top:12px;border-top:1px solid #243041\"><div style=\"font-size:18px;font-weight:900;color:#f4f7fb\">" + esc(coinTitle(mint)) + "</div>" +
         "<div style=\"display:flex;gap:8px;flex-wrap:wrap;margin-top:8px\">" + by[mint].map(chip).join("") + "</div>" +
-        "<div data-cs-note=\"" + esc(mint) + "\" style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">" + esc(notes[mint] || "Checking sells…") + "</div></div>";
+        "<div data-cs-note=\"" + esc(mint) + "\" style=\"margin-top:8px;font-size:13px;line-height:1.45;color:#c5d0dc\">" + esc(notes[mint] || "Reading who still holds, and who bought or sold…") + "</div></div>";
     });
     if (loose.length) {
       html += "<div style=\"margin-top:14px\"><div style=\"font-size:12px;color:#8491a1\">Added by hand</div>" +
@@ -92,24 +93,54 @@
     }
     return html;
   }
+  function movedCoin(row, mint, name) {
+    return row.mint === mint || row.token === mint || (name && name !== "—" && row.token === name);
+  }
+  function readGroup(mint, list, name) {
+    var capped = list.slice(0, 24);
+    var out = [];
+    var i = 0;
+    function next() {
+      if (i >= capped.length) return Promise.resolve();
+      var address = capped[i++];
+      return fetch(API + "/coinstats?wallet=" + encodeURIComponent(address), { cache: "no-store" })
+        .then(function (res) { return res.json(); })
+        .then(function (body) {
+          var holds = ((body && body.holdings) || []).some(function (row) { return row.mint === mint; });
+          var hist = (body && body.history) || [];
+          out.push({
+            holds: holds,
+            bought: hist.some(function (row) { return row.side === "in" && movedCoin(row, mint, name); }),
+            sold: hist.some(function (row) { return row.side === "out" && movedCoin(row, mint, name); })
+          });
+        })
+        .catch(function () { out.push({ holds: false, bought: false, sold: false }); })
+        .then(next);
+    }
+    return Promise.all([next(), next(), next()]).then(function () {
+      var hold = out.filter(function (row) { return row.holds; }).length;
+      var buy = out.filter(function (row) { return row.bought; }).length;
+      var sell = out.filter(function (row) { return row.sold; }).length;
+      var extra = list.length > capped.length ? " Showing the first " + capped.length + " wallets." : "";
+      return hold + " of " + capped.length + " still holding. Last 7 days: " + buy + " bought, " + sell + " sold." + extra;
+    });
+  }
   function loadNotes() {
     var seen = {};
     wallets.forEach(function (row) {
       (row.mints || []).forEach(function (mint) {
-        if (seen[mint]) return;
+        if (seen[mint] || noteBusy[mint] || notes[mint]) return;
         seen[mint] = 1;
+        noteBusy[mint] = 1;
+        var name = coinTitle(mint);
         var list = wallets.filter(function (item) { return (item.mints || []).indexOf(mint) >= 0; }).map(function (item) { return item.address; });
-        fetch(API + "/coinstats-sells", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ mint: mint, wallets: list })
-        }).then(function (res) { return res.json(); }).then(function (body) {
-          var line = (body && body.line) || (body && body.error) || "Sell check failed.";
+        readGroup(mint, list, name).then(function (line) {
           notes[mint] = line;
+          noteBusy[mint] = 0;
           document.querySelectorAll("[data-cs-note]").forEach(function (el) {
             if (el.getAttribute("data-cs-note") === mint) el.textContent = line;
           });
-        }).catch(function () {});
+        }).catch(function () { noteBusy[mint] = 0; });
       });
     });
   }
