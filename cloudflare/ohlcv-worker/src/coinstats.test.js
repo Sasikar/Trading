@@ -72,17 +72,21 @@ test('a smaller balance is a sell, and the line names the score', () => {
   assert.equal(sellLine(Object.assign({ hadBaseline: true, name: 'JEANPHIL' }, row)), 'JEANPHIL. 2 of 3 still holding.');
 });
 
-test('a chart keeps one point per day for seven days', () => {
+test('a chart keeps one point per hour for one day', () => {
   const bag = {};
   const store = { getMeta() { return bag.v || '{}'; }, setMeta(_k, v) { bag.v = v; } };
   const mint = 'GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump';
-  writeChartPoint(store, mint, { day: '2026-09-20', total: 100, coin: 80 });
-  writeChartPoint(store, mint, { day: '2026-09-20', total: 140, coin: 90 });
-  for (let n = 1; n <= 8; n++) writeChartPoint(store, mint, { day: '2026-09-2' + n, total: n, coin: n });
-  const series = readChart(store, mint);
-  assert.equal(series.length, 7);
-  assert.equal(series[0].day, '2026-09-22');
-  assert.equal(series.filter((row) => row.day === '2026-09-20').length, 0);
-  const again = writeChartPoint(store, mint, { day: '2026-09-28', total: 9, coin: 4 });
-  assert.equal(again.filter((row) => row.day === '2026-09-28').length, 1);
+  writeChartPoint(store, mint, { hour: '2026-09-25T10', total: 100, coin: 80 });
+  writeChartPoint(store, mint, { hour: '2026-09-25T10', total: 140, coin: 90 });
+  for (let n = 0; n < 24; n++) {
+    const hh = n < 10 ? '0' + n : String(n);
+    writeChartPoint(store, mint, { hour: '2026-09-25T' + hh, total: n, coin: n });
+  }
+  let series = readChart(store, mint);
+  assert.equal(series.length, 24);
+  assert.equal(series[0].hour, '2026-09-25T00');
+  assert.equal(series.filter((row) => row.hour === '2026-09-25T10')[0].total, 10);
+  series = writeChartPoint(store, mint, { hour: '2026-09-26T00', total: 30, coin: 3 });
+  assert.equal(series.length, 24);
+  assert.equal(series[0].hour, '2026-09-25T01');
 });

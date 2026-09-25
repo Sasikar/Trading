@@ -14,6 +14,7 @@
   var notes = {};
   var noteBusy = {};
   var chartSeries = {};
+  var chartTf = "4h";
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -191,14 +192,23 @@
       };
     });
   }
-  function localDay() {
+  function localHour() {
     var d = new Date();
     var p = function (n) { return (n < 10 ? "0" : "") + n; };
-    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours());
+  }
+  function chartWindow(series) {
+    var n = chartTf === "1h" ? 2 : chartTf === "1d" ? 24 : 4;
+    return (series || []).slice(-n);
   }
   function chartHtml(series) {
-    var pts = (series || []).slice(-7);
-    if (!pts.length) return "<div style=\"margin-top:8px;font-size:12px;color:#8491a1\">Total holdings chart starts today. One point a day, kept for 7 days.</div>";
+    var pts = chartWindow(series);
+    var buttons = ["1h", "4h", "1d"].map(function (tf) {
+      var on = chartTf === tf;
+      return "<button type=\"button\" data-cs-tf=\"" + tf + "\" style=\"padding:6px 10px;border-radius:8px;border:1px solid " + (on ? "#f5a14a" : "#243041") + ";background:" + (on ? "#2a1c0e" : "transparent") + ";color:" + (on ? "#f5a14a" : "#8491a1") + ";font-weight:800;font-size:11px;cursor:pointer\">" + tf.toUpperCase() + "</button>";
+    }).join("");
+    var head = "<div style=\"display:flex;gap:6px;margin-top:10px\">" + buttons + "</div>";
+    if (!pts.length) return head + "<div style=\"margin-top:8px;font-size:12px;color:#8491a1\">Whale total starts this hour. A new point is saved every hour. 1H, 4H and 1D.</div>";
     var last = pts[pts.length - 1];
     var vals = pts.map(function (p) { return Number(p.total) || 0; });
     var min = Math.min.apply(null, vals);
@@ -213,10 +223,14 @@
     var color = vals[vals.length - 1] >= vals[0] ? "#3dbe7a" : "#ff8a7a";
     var poly = dots.map(function (p) { return p.x.toFixed(1) + "," + p.y.toFixed(1); }).join(" ");
     var circles = dots.map(function (p) { return "<circle cx=\"" + p.x.toFixed(1) + "\" cy=\"" + p.y.toFixed(1) + "\" r=\"3.5\" fill=\"" + color + "\"/>"; }).join("");
-    return "<div style=\"margin-top:10px;font-weight:800;color:#f4f7fb\">Together " + money(last.total) + "</div>" +
-      "<div style=\"margin-top:2px;font-size:12px;color:#8491a1\">This coin " + money(last.coin) + " · total holdings of these wallets</div>" +
+    var span = pts.length <= 4
+      ? pts.map(function (p) { return String(p.hour || "").slice(11) + ":00"; }).join(" · ")
+      : String(pts[0].hour || "").slice(11) + ":00 → " + String(pts[pts.length - 1].hour || "").slice(11) + ":00";
+    return head +
+      "<div style=\"margin-top:8px;font-weight:800;color:#f4f7fb\">Together " + money(last.total) + "</div>" +
+      "<div style=\"margin-top:2px;font-size:12px;color:#8491a1\">This coin " + money(last.coin) + " · whale holdings</div>" +
       "<svg viewBox=\"0 0 320 96\" width=\"100%\" height=\"96\" style=\"margin-top:6px;display:block\"><polyline fill=\"none\" stroke=\"" + color + "\" stroke-width=\"2.5\" points=\"" + poly + "\"/>" + circles + "</svg>" +
-      "<div style=\"font-size:11px;color:#8491a1\">" + pts.map(function (p) { return String(p.day).slice(5); }).join(" · ") + " · 1 point a day · 7 days</div>";
+      "<div style=\"font-size:11px;color:#8491a1\">" + span + " · one point every hour</div>";
   }
   function paintChart(mint) {
     document.querySelectorAll("[data-cs-chart]").forEach(function (el) {
@@ -227,7 +241,7 @@
     fetch(API + "/coinstats-chart", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ mint: mint, day: localDay(), total: row.total, coin: row.coin })
+      body: JSON.stringify({ mint: mint, hour: localHour(), total: row.total, coin: row.coin })
     }).then(function (res) { return res.json(); }).then(function (body) {
       chartSeries[mint] = (body && body.series) || chartSeries[mint] || [];
       paintChart(mint);
@@ -417,6 +431,16 @@
     loadNotes();
     resolveNames();
     loadCharts();
+    var panel = $("coinstats-panel");
+    if (panel && !panel.getAttribute("data-cs-tf-bound")) {
+      panel.setAttribute("data-cs-tf-bound", "1");
+      panel.addEventListener("click", function (ev) {
+        var b = ev.target && ev.target.closest && ev.target.closest("[data-cs-tf]");
+        if (!b) return;
+        chartTf = b.getAttribute("data-cs-tf") || "4h";
+        Object.keys(chartSeries).forEach(paintChart);
+      });
+    }
   }
 
   function onAdd(ev) {
@@ -560,12 +584,12 @@
   setInterval(function () {
     var panel = $("coinstats-panel");
     if (!panel || panel.style.display === "none") return;
-    var day = localDay();
+    var hour = localHour();
     wallets.forEach(function (row) {
       (row.mints || []).forEach(function (mint) {
         var series = chartSeries[mint] || [];
         var last = series[series.length - 1];
-        if (!last || last.day !== day) delete notes[mint];
+        if (!last || last.hour !== hour) delete notes[mint];
       });
     });
     loadNotes();
