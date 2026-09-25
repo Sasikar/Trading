@@ -451,6 +451,7 @@ export default {
           pair: url.searchParams.get('pair') || '',
           symbol: url.searchParams.get('symbol') || '',
           change: url.searchParams.get('change'),
+          before: url.searchParams.get('before') || '',
           debug: url.searchParams.get('debug') === '1'
         });
         return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });

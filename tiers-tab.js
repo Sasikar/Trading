@@ -533,6 +533,7 @@ function stat(label, value, note) {
   function loadFlows(mint) {
     flowsFor = mint;
     paintFlows(null, true);
+    var base = "";
     fetch("https://api.dexscreener.com/latest/dex/tokens/" + encodeURIComponent(mint), { cache: "no-store" })
       .then(function (res) { return res.ok ? res.json() : {}; })
       .then(function (body) {
@@ -541,21 +542,51 @@ function stat(label, value, note) {
         });
         pairs.sort(function (a, b) { return ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0); });
         var top = pairs[0] || {};
-        var q = "mint=" + encodeURIComponent(mint);
-        if (top.priceUsd) q += "&price=" + encodeURIComponent(top.priceUsd);
-        if (top.pairAddress) q += "&pair=" + encodeURIComponent(top.pairAddress);
-        if (top.baseToken && top.baseToken.symbol) q += "&symbol=" + encodeURIComponent(top.baseToken.symbol);
-        if (top.priceChange && top.priceChange.h24 != null) q += "&change=" + encodeURIComponent(top.priceChange.h24);
-        return fetch("https://trading-ohlcv.sasipudi.workers.dev/flows?" + q, { cache: "no-store" });
-      })
-      .then(function (res) { return res.json(); })
-      .then(function (body) {
-        if (flowsFor !== mint) return;
-        paintFlows(body || { ok: false, error: "Flow read failed" }, false);
+        base = "mint=" + encodeURIComponent(mint);
+        if (top.priceUsd) base += "&price=" + encodeURIComponent(top.priceUsd);
+        if (top.pairAddress) base += "&pair=" + encodeURIComponent(top.pairAddress);
+        if (top.baseToken && top.baseToken.symbol) base += "&symbol=" + encodeURIComponent(top.baseToken.symbol);
+        if (top.priceChange && top.priceChange.h24 != null) base += "&change=" + encodeURIComponent(top.priceChange.h24);
+        return walkFlows(mint, base, "", null, 0);
       })
       .catch(function (err) {
         if (flowsFor !== mint) return;
         paintFlows({ ok: false, error: err.message || "Flow read failed" }, false);
+      });
+  }
+
+  function addRows(into, rows) {
+    var next = (into || []).map(function (r) { return { id: r.id, label: r.label, usd: r.usd }; });
+    (rows || []).forEach(function (r) {
+      var hit = next.filter(function (x) { return x.id === r.id; })[0];
+      if (hit) hit.usd += r.usd || 0;
+    });
+    return next;
+  }
+
+  function walkFlows(mint, base, before, acc, step) {
+    if (flowsFor !== mint) return;
+    var q = base + (before ? "&before=" + encodeURIComponent(before) : "");
+    return fetch("https://trading-ohlcv.sasipudi.workers.dev/flows?" + q, { cache: "no-store" })
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        if (flowsFor !== mint) return;
+        if (!body || body.ok === false) {
+          paintFlows(body || { ok: false, error: "Flow read failed" }, false);
+          return;
+        }
+        var rows = addRows(acc || body.rows, acc ? body.rows : null);
+        var view = Object.assign({}, body, { rows: rows, truncated: !body.done && step >= 11 });
+        paintFlows(view, false);
+        if (body.done || !body.next || step >= 11) return;
+        var box = $("tier-view-flows-panel");
+        if (box) {
+          var note = document.createElement("div");
+          note.style.cssText = "margin-top:8px;font-size:12px;color:#8491a1";
+          note.textContent = "Still reading the last 24 hours…";
+          box.appendChild(note);
+        }
+        return walkFlows(mint, base, body.next, rows, step + 1);
       });
   }
 

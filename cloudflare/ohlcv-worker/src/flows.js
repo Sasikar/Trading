@@ -229,39 +229,59 @@ async function chainTrades(key, sigs, mint, price, pair) {
   return { trades: trades, read: read };
 }
 
-async function swapsOf(key, address, mint, price, since) {
-  const trades = [];
-  const pending = [];
-  let before = '';
-  let truncated = false;
+async function swapsOf(key, address, mint, price, since, startBefore) {
+  const window = [];
+  let before = startBefore || '';
+  let done = false;
   let scanned = 0;
-  for (let page = 0; page < 15; page++) {
+  for (let page = 0; page < 2 && !done; page++) {
     let url = 'https://api.helius.xyz/v0/addresses/' + encodeURIComponent(address) + '/transactions?api-key=' + encodeURIComponent(key) + '&limit=100';
     if (before) url += '&before=' + encodeURIComponent(before);
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) break;
     const rows = await res.json().catch(() => []);
-    if (!Array.isArray(rows) || !rows.length) break;
-    let old = false;
+    if (!Array.isArray(rows) || !rows.length) {
+      done = true;
+      break;
+    }
     rows.forEach((tx) => {
       scanned += 1;
       const at = (tx.timestamp || 0) * 1000;
       if (at && at < since) {
-        old = true;
+        done = true;
         return;
       }
       const parsed = tradesFromTx(tx, mint, price, address);
-      if (parsed.length) trades.push.apply(trades, parsed);
-      else if (tx.signature && worthChainRead(tx) && pending.length < 120) pending.push(tx.signature);
+      window.push({
+        sig: tx.signature || '',
+        trades: parsed,
+        pending: !parsed.length && !!(tx.signature) && worthChainRead(tx)
+      });
     });
     before = rows[rows.length - 1] && rows[rows.length - 1].signature;
-    if (old || !before) break;
-    if (page === 14) truncated = true;
+    if (!before) done = true;
   }
-  const chain = pending.length ? await chainTrades(key, pending, mint, price, address) : { trades: [], read: 0 };
+  let cut = window.length;
+  let pending = 0;
+  for (let i = 0; i < window.length; i++) {
+    if (!window[i].pending) continue;
+    pending += 1;
+    if (pending === 30) {
+      cut = i + 1;
+      done = false;
+      break;
+    }
+  }
+  const slice = window.slice(0, cut);
+  const sigs = slice.filter((row) => row.pending && row.sig).map((row) => row.sig);
+  const chain = sigs.length ? await chainTrades(key, sigs, mint, price, address) : { trades: [], read: 0 };
+  const trades = [];
+  slice.forEach((row) => {
+    if (row.trades && row.trades.length) trades.push.apply(trades, row.trades);
+  });
   trades.push.apply(trades, chain.trades);
-  if (pending.length >= 120) truncated = true;
-  return { trades: trades, truncated: truncated, scanned: scanned, chain: chain.read };
+  const next = !done && slice.length ? slice[slice.length - 1].sig : '';
+  return { trades: trades, done: done || !next, next: next, scanned: scanned, chain: chain.read };
 }
 
 export async function scanFlows(env, mint, hints) {
@@ -269,20 +289,22 @@ export async function scanFlows(env, mint, hints) {
   const key = env && env.HELIUS_API_KEY;
   if (!key) throw new Error('Helius key is missing on the worker.');
   hints = hints || {};
-  const live = await market(mint);
+  const live = hints.price && hints.pair ? null : await market(mint);
   const price = (live && live.price) || Number(hints.price) || 0;
   const pair = (live && live.pair) || hints.pair || '';
   if (!(price > 0)) throw new Error('No price for that coin.');
   const holders = await holdersOf(key, mint);
   const since = Date.now() - 24 * 60 * 60 * 1000;
-  const book = await swapsOf(key, pair || mint, mint, price, since);
+  const book = await swapsOf(key, pair || mint, mint, price, since, hints.before || '');
   const out = {
     mint: mint,
     symbol: (live && live.symbol) || hints.symbol || '',
     price: price,
     change: live && live.change != null ? live.change : (hints.change != null ? Number(hints.change) : null),
     rows: netFlows(book.trades, holders, price),
-    truncated: book.truncated,
+    truncated: !book.done,
+    next: book.next || '',
+    done: !!book.done,
     trades: book.trades.length,
     scanned: book.scanned,
     chain: book.chain
