@@ -184,19 +184,32 @@ async function swapsOf(key, address, mint, price, since) {
     let old = false;
     rows.forEach((tx) => {
       if (!sample || ((tx.accountData || []).length && !sample.acc)) {
-        const t0 = (tx.tokenTransfers || [])[0] || {};
         const swap = tx.events && tx.events.swap;
-        const acc0 = (tx.accountData || [])[0] || {};
-        const ch0 = (acc0.tokenBalanceChanges || [])[0] || {};
+        let changes = 0;
+        let chMint = '';
+        let chKeys = [];
+        const keySet = {};
+        (tx.accountData || []).forEach((acc) => {
+          Object.keys(acc || {}).forEach((k) => { keySet[k] = 1; });
+          const list = (acc && acc.tokenBalanceChanges) || [];
+          changes += list.length;
+          if (list.length && !chKeys.length) {
+            chKeys = Object.keys(list[0]).slice(0, 8);
+            chMint = list[0].mint || '';
+          }
+        });
         sample = {
           keys: Object.keys(tx).slice(0, 20),
           acc: (tx.accountData || []).length,
-          changes: (acc0.tokenBalanceChanges || []).length,
-          chMint: ch0.mint || '',
-          chKeys: Object.keys(ch0).slice(0, 8),
+          accKeys: Object.keys(keySet),
+          changes: changes,
+          chMint: chMint,
+          chKeys: chKeys,
+          native: (tx.nativeTransfers || []).length,
           type: tx.type || '',
           transfers: (tx.tokenTransfers || []).length,
-          swap: !!swap
+          swap: !!swap,
+          desc: String(tx.description || '').slice(0, 100)
         };
       }
       const at = (tx.timestamp || 0) * 1000;
