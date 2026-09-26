@@ -409,6 +409,21 @@ test('CATE 2H example: LIVE break, freshness expired → BREAKOUT MISSED not NO 
   assert.match(ew.why, /not opened in time/i);
 });
 
+test('invalidated 2H names the next close, not a reclaim of the old high', () => {
+  const bars = [];
+  for (let i = 0; i < 8; i++) bars.push({ t: i * 7200000, o: 0.004, h: 0.005 + i * 0.0001, l: 0.003, c: 0.0045 });
+  bars.push({ t: 8 * 7200000, o: 0.0045, h: 0.0062, l: 0.004, c: 0.0048 });
+  const ew = entryWindow({
+    hit: { tf: '2h', level: 0.009441, spot: 0.004874, event: 'FAILED', section: 'live' },
+    episode: { level: 0.009441, invalidated: true },
+    barsTf: bars
+  });
+  assert.equal(ew.state, 'INVALIDATED');
+  assert.ok(ew.nextClose > 0.005);
+  assert.match(ew.why, /CLOSE above/);
+  assert.match(ew.why, /does not bring this setup back/);
+});
+
 test('alert line shows current price and compact MC', () => {
   assert.equal(fmtUsdCompact(1.081e9), '$1.08B');
   assert.equal(fmtUsdCompact(12.4e6), '$12.4M');

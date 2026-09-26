@@ -189,6 +189,7 @@
       '</div>' +
       '<div style="margin-top:10px;font-size:12px">' +
       row('Breakout', px(e.level)) +
+      (e.nextClose > 0 ? row('Wait close', px(e.nextClose)) : '') +
       row('Current', px(e.spot)) +
       row('Extension', e.extPct == null ? '—' : (e.extPct >= 0 ? '+' : '') + Number(e.extPct).toFixed(1) + '%') +
       row('Pullback ideal', px(e.ideal)) +

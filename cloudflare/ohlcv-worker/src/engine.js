@@ -1035,6 +1035,16 @@ export function rangeHighFromBars(bars) {
   return Math.max(...prior.map((b) => b.h));
 }
 
+function nextBreakWait(tf, bars) {
+  const nextClose = rangeHighFromBars(bars);
+  const tfu = String(tf || '').toUpperCase();
+  const line =
+    nextClose > 0
+      ? ' Next confirmation is a ' + tfu + ' CLOSE above ' + fmtPx(nextClose) + '. Touching the old high does not bring this setup back.'
+      : ' Next confirmation is a new ' + tfu + ' CLOSE above the current range high. The old setup does not come back.';
+  return { nextClose, line };
+}
+
 /** Plain-language reasons. Pages only display this; they do not compute it. */
 export function describeWhy(tf, det, tick) {
   const mom = momentumFromTick(tick || {});
@@ -1445,13 +1455,16 @@ export function entryWindow(args) {
     empty.trigger = lv;
     empty.inval = lv > 0 ? lv * 0.97 : 0;
     empty.extPct = ext != null ? +ext.toFixed(2) : null;
+    const wait = nextBreakWait(tf, barsTf);
+    empty.nextClose = wait.nextClose;
     empty.why =
       'Structure lost — setup cancelled. Current ' +
       fmtPx(spot) +
       (ext != null ? ' is ' + (ext >= 0 ? '+' : '') + ext.toFixed(1) + '% vs level ' + fmtPx(lv) : '') +
       '. Being above the old high is not a reclaim. Do not chase. Wait for a NEW ' +
       String(tf).toUpperCase() +
-      ' breakout.';
+      ' breakout.' +
+      wait.line;
     empty.entryPaint = 'FAILED';
     return empty;
   }
@@ -1525,11 +1538,14 @@ export function entryWindow(args) {
   let state = 'WAIT_RETEST';
   let label = 'WAIT FOR RETEST';
   let color = '#e6c878';
+  let nextClose = 0;
   let why = 'Break confirmed. Do not buy the break candle. Wait for price to leave, pull back to ' + fmtPx(level0) + ', then reclaim.';
   if (entry.paint === 'FAILED') {
     state = 'INVALIDATED';
     label = 'INVALIDATED';
     color = '#ff6f7c';
+    const wait = nextBreakWait(tf, barsTf);
+    nextClose = wait.nextClose;
     why =
       'Structure lost — setup cancelled. Two 5m closes under ' +
       (fmtPx(level0) || 'level') +
@@ -1538,11 +1554,14 @@ export function entryWindow(args) {
       (extPct != null ? ' is ' + (extPct >= 0 ? '+' : '') + extPct.toFixed(1) + '% vs level' : '') +
       '. Being above the old high is not a reclaim. Do not chase. Wait for a NEW ' +
       String(tf).toUpperCase() +
-      ' breakout.';
+      ' breakout.' +
+      wait.line;
   } else if (inval > 0 && spot > 0 && spot < inval) {
     state = 'INVALIDATED';
     label = 'INVALIDATED';
     color = '#ff6f7c';
+    const wait = nextBreakWait(tf, barsTf);
+    nextClose = wait.nextClose;
     why =
       'Structure lost — setup cancelled. Price under invalidation ' +
       fmtPx(inval) +
@@ -1550,7 +1569,8 @@ export function entryWindow(args) {
       fmtPx(spot) +
       '. Do not chase. Wait for a NEW ' +
       String(tf).toUpperCase() +
-      ' breakout.';
+      ' breakout.' +
+      wait.line;
   } else if (stretched && !inZone && !reclaim) {
     state = 'NO_CHASE';
     label = 'NO CHASE';
@@ -1619,6 +1639,7 @@ export function entryWindow(args) {
     sup1d,
     inval,
     trigger: level0,
+    nextClose,
     execTf: '5m',
     volPass,
     momPass,
@@ -3058,18 +3079,28 @@ export class Engine {
     if (prev && !this.sameEwEpisode(hit, prev)) return;
     const ext =
       ew.extPct != null ? (ew.extPct >= 0 ? '+' : '') + Number(ew.extPct).toFixed(1) + '%' : '';
+    const extra =
+      +ew.nextClose > 0
+        ? ' Next confirmation is a ' +
+          String(hit.tf || '').toUpperCase() +
+          ' CLOSE above ' +
+          fmtPx(ew.nextClose) +
+          '. Touching the old high does not bring this setup back.'
+        : '';
     hit.ew = Object.assign({}, ew, {
       state: 'INVALIDATED',
       label: 'INVALIDATED',
       color: '#ff6f7c',
       latched: true,
+      nextClose: +ew.nextClose || 0,
       why:
         'Structure lost — setup cancelled. Current ' +
         fmtPx(ew.spot) +
         (ext ? ' is ' + ext + ' vs level ' + fmtPx(ew.level) : '') +
         '. Being above the old high is not a reclaim. Do not chase. Wait for a NEW ' +
         String(hit.tf || '').toUpperCase() +
-        ' breakout.'
+        ' breakout.' +
+        extra
     });
   }
   touchEwPaper(hit) {
