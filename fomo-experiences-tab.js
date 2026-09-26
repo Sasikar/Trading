@@ -92,14 +92,15 @@
   }
   function readDraft() {
     var box = $("fx-board");
+    var entered = [];
+    var current = [];
+    if (box) {
+      box.querySelectorAll("[data-entered]").forEach(function (el) { entered.push(el.value || ""); });
+      box.querySelectorAll("[data-current]").forEach(function (el) { current.push(el.value || ""); });
+    }
+    var count = Math.max(entered.length, current.length, 1);
     var prices = [];
-    if (box) box.querySelectorAll("[data-price]").forEach(function (row) {
-      prices.push({
-        entered: (row.querySelector("[data-entered]") || {}).value || "",
-        current: (row.querySelector("[data-current]") || {}).value || ""
-      });
-    });
-    if (!prices.length) prices = [{ entered: "", current: "" }];
+    for (var i = 0; i < count; i++) prices.push({ entered: entered[i] || "", current: current[i] || "" });
     return {
       id: (draft && draft.id) || String(Date.now()),
       name: (($("fx-name") || {}).value || "").trim(),
@@ -108,57 +109,76 @@
       at: (draft && draft.at) || Date.now()
     };
   }
-  function pager() {
-    var n = items.length;
-    var dis = "opacity:.35;pointer-events:none";
-    return "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px\">" +
-      "<button type=\"button\" data-prev style=\"padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#e8eef6;font-weight:800;" + (page <= 0 ? dis : "") + "\">Prev</button>" +
-      "<span style=\"font-size:13px;font-weight:800;color:#c5d0dc\">" + (n ? (page + 1) + " / " + n : "0 / 0") + "</span>" +
-      "<button type=\"button\" data-next style=\"padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#e8eef6;font-weight:800;" + (page >= n - 1 ? dis : "") + "\">Next</button></div>";
+  var PAGE = 5;
+  function field() {
+    return "width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-size:13px";
   }
-  function priceTable(rows, edit) {
-    var html = "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800\"><span>PRICE ENTERED</span><span>CURRENT PRICE</span></div>";
-    (rows || []).forEach(function (row, i) {
-      if (edit) {
-        html += "<div data-price style=\"display:grid;grid-template-columns:1fr 1fr 28px;gap:8px;margin-top:8px\">" +
-          "<input data-entered value=\"" + esc(row.entered) + "\" placeholder=\"Entered\" style=\"" + field() + "\">" +
-          "<input data-current value=\"" + esc(row.current) + "\" placeholder=\"Current\" style=\"" + field() + "\">" +
-          "<button type=\"button\" data-rm-price=\"" + i + "\" aria-label=\"Remove price\" style=\"border:0;background:transparent;color:#8491a1;font-size:18px;cursor:pointer\">×</button></div>";
-      } else {
-        html += "<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;padding:10px 12px;border-radius:12px;background:#121a24;border:1px solid #243041;color:#e8eef6;font-weight:800\">" +
-          "<span>" + esc(row.entered || "—") + "</span><span>" + esc(row.current || "—") + "</span></div>";
-      }
+  function head() {
+    var th = "padding:10px 8px;text-align:left;border-bottom:1px solid #3d4d63;color:#8491a1;font-size:11px;letter-spacing:.04em;font-weight:800";
+    return "<th style=\"" + th + "\">Ticket name</th><th style=\"" + th + "\">Price entered</th><th style=\"" + th + "\">Current price</th><th style=\"" + th + "\">Final note</th><th style=\"" + th + "\"></th>";
+  }
+  function cell() { return "padding:10px 8px;border-bottom:1px solid #243041;vertical-align:top;color:#e8eef6"; }
+  function lines(rows, key) {
+    return (rows || []).map(function (row) { return esc(row[key] || "—"); }).join("<br>") || "—";
+  }
+  function editCells(row) {
+    var entered = "";
+    var current = "";
+    (row.prices || []).forEach(function (price, i) {
+      entered += "<input data-entered value=\"" + esc(price.entered) + "\" placeholder=\"Entered\" style=\"" + field() + ";margin-top:" + (i ? "6px" : "0") + "\">";
+      current += "<div data-price style=\"display:flex;gap:4px;margin-top:" + (i ? "6px" : "0") + "\">" +
+        "<input data-current value=\"" + esc(price.current) + "\" placeholder=\"Current\" style=\"" + field() + "\">" +
+        "<button type=\"button\" data-rm-price=\"" + i + "\" style=\"border:0;background:transparent;color:#8491a1;font-size:16px;cursor:pointer\">×</button></div>";
     });
-    return html;
+    return "<td style=\"" + cell() + "\"><input id=\"fx-name\" value=\"" + esc(row.name) + "\" placeholder=\"Ticket name\" style=\"" + field() + "\"></td>" +
+      "<td style=\"" + cell() + "\">" + entered + "<button type=\"button\" data-add-price style=\"margin-top:6px;padding:4px 8px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-size:11px;font-weight:800;cursor:pointer\">+</button></td>" +
+      "<td style=\"" + cell() + "\">" + current + "</td>" +
+      "<td style=\"" + cell() + "\"><textarea id=\"fx-note\" rows=\"2\" placeholder=\"Final note\" style=\"" + field() + ";resize:vertical\">" + esc(row.note) + "</textarea></td>" +
+      "<td style=\"" + cell() + ";white-space:nowrap\"><button type=\"button\" data-save style=\"padding:6px 8px;border:0;border-radius:8px;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer\">Save</button> <button type=\"button\" data-cancel style=\"padding:6px 8px;border:0;background:transparent;color:#8491a1;font-weight:800;cursor:pointer\">Cancel</button></td>";
+  }
+  function viewCells(row, index) {
+    return "<td style=\"" + cell() + ";font-weight:800\">" + esc(row.name) + "</td>" +
+      "<td style=\"" + cell() + "\">" + lines(row.prices, "entered") + "</td>" +
+      "<td style=\"" + cell() + "\">" + lines(row.prices, "current") + "</td>" +
+      "<td style=\"" + cell() + "\">" + esc(row.note || "—") + "</td>" +
+      "<td style=\"" + cell() + ";white-space:nowrap\"><button type=\"button\" data-edit=\"" + index + "\" style=\"border:0;background:transparent;color:#6eb6ff;font-weight:800;cursor:pointer\">Edit</button> <button type=\"button\" data-drop=\"" + index + "\" style=\"border:0;background:transparent;color:#ff8a7a;font-weight:800;cursor:pointer\">×</button></td>";
+  }
+  function pager(start) {
+    var n = items.length;
+    var pages = Math.max(1, Math.ceil(n / PAGE));
+    var from = n ? start + 1 : 0;
+    var to = Math.min(n, start + PAGE);
+    var nums = "";
+    for (var i = 0; i < pages; i++) {
+      var on = i === page;
+      nums += "<button type=\"button\" data-go=\"" + i + "\" style=\"min-width:32px;padding:6px 8px;border-radius:8px;border:1px solid " + (on ? "#f5a14a" : "#243041") + ";background:" + (on ? "#2a1c0e" : "#121a24") + ";color:" + (on ? "#f5a14a" : "#c5d0dc") + ";font-weight:800;cursor:pointer\">" + (i + 1) + "</button>";
+    }
+    var dis = "opacity:.35;pointer-events:none";
+    return "<div style=\"display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:12px\">" +
+      "<span style=\"font-size:12px;color:#8491a1\">Showing " + from + " to " + to + " of " + n + "</span>" +
+      "<span style=\"display:flex;gap:6px;flex-wrap:wrap\">" +
+      "<button type=\"button\" data-prev style=\"padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e8eef6;font-weight:800;" + (page <= 0 ? dis : "") + "\">Prev</button>" +
+      nums +
+      "<button type=\"button\" data-next style=\"padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e8eef6;font-weight:800;" + (page >= pages - 1 ? dis : "") + "\">Next</button></span></div>";
   }
   function paint() {
     var box = $("fx-board");
     if (!box) return;
-    var html = pager();
-    html += "<div style=\"display:flex;gap:8px;margin-bottom:12px\"><button type=\"button\" data-new style=\"padding:10px 14px;border:0;border-radius:12px;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">New</button></div>";
-    if (mode === "edit" && draft) {
-      html += "<label style=\"display:block;font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800\">TICKET NAME</label>" +
-        "<input id=\"fx-name\" value=\"" + esc(draft.name) + "\" placeholder=\"Ticket name\" style=\"" + field() + ";margin-top:6px\">" +
-        priceTable(draft.prices, true) +
-        "<button type=\"button\" data-add-price style=\"margin-top:8px;padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#e8eef6;font-weight:800;cursor:pointer\">+ price</button>" +
-        "<label style=\"display:block;margin-top:14px;font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800\">FINAL NOTE</label>" +
-        "<textarea id=\"fx-note\" rows=\"3\" placeholder=\"Final note\" style=\"" + field() + ";margin-top:6px;resize:vertical\">" + esc(draft.note) + "</textarea>" +
-        "<div style=\"display:flex;gap:8px;margin-top:12px\">" +
-        "<button type=\"button\" data-save style=\"padding:10px 14px;border:0;border-radius:12px;background:#1a9b6c;color:#fff;font-weight:900;cursor:pointer\">Save</button>" +
-        "<button type=\"button\" data-cancel style=\"padding:10px 14px;border-radius:12px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer\">Cancel</button></div>";
-    } else if (!items.length) {
-      html += "<div style=\"padding:18px 4px;color:#8491a1;font-size:14px\">No experiences yet. Add one ticket at a time.</div>";
-    } else {
-      var row = items[page] || items[0];
-      html += "<div style=\"font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800\">TICKET NAME</div>" +
-        "<div style=\"margin-top:4px;font-size:20px;font-weight:900;color:#f4f7fb\">" + esc(row.name) + "</div>" +
-        priceTable(row.prices, false) +
-        "<div style=\"margin-top:14px;font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800\">FINAL NOTE</div>" +
-        "<div style=\"margin-top:6px;padding:12px;border-radius:12px;background:#121a24;border:1px solid #243041;color:#e8eef6;line-height:1.45;white-space:pre-wrap\">" + esc(row.note || "—") + "</div>" +
-        "<div style=\"display:flex;gap:8px;margin-top:12px\">" +
-        "<button type=\"button\" data-edit style=\"padding:10px 14px;border-radius:12px;border:1px solid #243041;background:#121a24;color:#e8eef6;font-weight:800;cursor:pointer\">Edit</button>" +
-        "<button type=\"button\" data-drop style=\"padding:10px 14px;border:0;border-radius:12px;background:transparent;color:#ff8a7a;font-weight:800;cursor:pointer\">Delete</button></div>";
-    }
+    var pages = Math.max(1, Math.ceil(items.length / PAGE));
+    if (page > pages - 1) page = pages - 1;
+    if (page < 0) page = 0;
+    var start = page * PAGE;
+    var slice = items.slice(start, start + PAGE);
+    var html = "<div style=\"display:flex;justify-content:flex-end;margin-bottom:10px\"><button type=\"button\" data-new style=\"padding:8px 14px;border:0;border-radius:10px;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></div>";
+    html += "<div style=\"overflow-x:auto\"><table style=\"width:100%;border-collapse:collapse;font-size:13px\"><thead><tr>" + head() + "</tr></thead><tbody>";
+    if (mode === "edit" && draft && !items.some(function (row) { return row.id === draft.id; })) html += "<tr>" + editCells(draft) + "</tr>";
+    if (!slice.length && mode !== "edit") html += "<tr><td colspan=\"5\" style=\"" + cell() + ";color:#8491a1\">No rows yet.</td></tr>";
+    slice.forEach(function (row, i) {
+      var index = start + i;
+      html += "<tr style=\"background:" + (i % 2 ? "#101820" : "transparent") + "\">" +
+        (mode === "edit" && draft && draft.id === row.id ? editCells(draft) : viewCells(row, index)) + "</tr>";
+    });
+    html += "</tbody></table></div>" + pager(start);
     box.innerHTML = html;
     var st = $("fx-status");
     if (st && st.textContent !== "SAVED") st.textContent = items.length ? "SAVED" : "READY";
@@ -166,14 +186,15 @@
   }
   function bind(box) {
     function go(sel, fn) {
-      var el = box.querySelector(sel);
-      if (el) el.addEventListener("click", fn);
+      box.querySelectorAll(sel).forEach(function (el) { el.addEventListener("click", fn); });
     }
     go("[data-prev]", function () { if (page > 0) { page -= 1; mode = "view"; paint(); } });
-    go("[data-next]", function () { if (page < items.length - 1) { page += 1; mode = "view"; paint(); } });
-    go("[data-new]", function () { draft = blank(); mode = "edit"; paint(); });
-    go("[data-edit]", function () {
-      draft = JSON.parse(JSON.stringify(items[page]));
+    go("[data-next]", function () { if (page < Math.ceil(items.length / PAGE) - 1) { page += 1; mode = "view"; paint(); } });
+    go("[data-go]", function (ev) { page = Number(ev.currentTarget.getAttribute("data-go")) || 0; mode = "view"; paint(); });
+    go("[data-new]", function () { draft = blank(); mode = "edit"; page = 0; paint(); });
+    go("[data-edit]", function (ev) {
+      var index = Number(ev.currentTarget.getAttribute("data-edit"));
+      draft = JSON.parse(JSON.stringify(items[index]));
       mode = "edit";
       paint();
     });
@@ -190,15 +211,16 @@
       var at = items.findIndex(function (row) { return row.id === draft.id; });
       if (at >= 0) items[at] = draft;
       else { items.unshift(draft); page = 0; }
-      if (at >= 0) page = at;
+      if (at >= 0) page = Math.floor(at / PAGE);
       mode = "view";
       draft = null;
       paint();
       pushRemote();
     });
-    go("[data-drop]", function () {
-      items.splice(page, 1);
-      if (page >= items.length) page = Math.max(0, items.length - 1);
+    go("[data-drop]", function (ev) {
+      items.splice(Number(ev.currentTarget.getAttribute("data-drop")), 1);
+      var pages = Math.max(1, Math.ceil(items.length / PAGE));
+      if (page > pages - 1) page = pages - 1;
       mode = "view";
       paint();
       pushRemote();
