@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-26T03:47:20.569Z",
+  "updated": "2026-09-26T03:47:21.717Z",
   "items": [
     {
       "text": "DCA entry please",
@@ -13,17 +13,17 @@
     },
     {
       "text": "WOW DIP Triggered???",
-      "on": true,
+      "on": false,
       "custom": true
     },
     {
       "text": "Wait for DIPs",
-      "on": true,
+      "on": false,
       "custom": true
     },
     {
       "text": "Is clean floor established",
-      "on": true,
+      "on": false,
       "custom": true
     },
     {
