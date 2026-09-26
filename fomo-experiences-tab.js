@@ -111,7 +111,7 @@
   }
   var PAGE = 5;
   function field() {
-    return "width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-size:13px";
+    return "width:100%;min-height:44px;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #3d4d63;background:#0b121a;color:#f4f7fb;font-size:16px";
   }
   function head() {
     var th = "padding:10px 8px;text-align:left;border-bottom:1px solid #3d4d63;color:#8491a1;font-size:11px;letter-spacing:.04em;font-weight:800";
@@ -121,20 +121,25 @@
   function lines(rows, key) {
     return (rows || []).map(function (row) { return esc(row[key] || "—"); }).join("<br>") || "—";
   }
-  function editCells(row) {
-    var entered = "";
-    var current = "";
-    (row.prices || []).forEach(function (price, i) {
-      entered += "<input data-entered value=\"" + esc(price.entered) + "\" placeholder=\"Entered\" style=\"" + field() + ";margin-top:" + (i ? "6px" : "0") + "\">";
-      current += "<div data-price style=\"display:flex;gap:4px;margin-top:" + (i ? "6px" : "0") + "\">" +
-        "<input data-current value=\"" + esc(price.current) + "\" placeholder=\"Current\" style=\"" + field() + "\">" +
-        "<button type=\"button\" data-rm-price=\"" + i + "\" style=\"border:0;background:transparent;color:#8491a1;font-size:16px;cursor:pointer\">×</button></div>";
+  function editor(row) {
+    var pairs = "";
+    (row.prices || [{ entered: "", current: "" }]).forEach(function (price, i) {
+      pairs += "<div style=\"display:grid;grid-template-columns:1fr 1fr 44px;gap:8px;margin-top:8px\">" +
+        "<input data-entered value=\"" + esc(price.entered) + "\" placeholder=\"Price entered\" style=\"" + field() + "\">" +
+        "<input data-current value=\"" + esc(price.current) + "\" placeholder=\"Current price\" style=\"" + field() + "\">" +
+        "<button type=\"button\" data-rm-price=\"" + i + "\" aria-label=\"Remove price\" style=\"height:44px;border:1px solid #3d4d63;border-radius:12px;background:#121a24;color:#c5d0dc;font-size:20px;cursor:pointer\">×</button></div>";
     });
-    return "<td style=\"" + cell() + "\"><input id=\"fx-name\" value=\"" + esc(row.name) + "\" placeholder=\"Ticket name\" style=\"" + field() + "\"></td>" +
-      "<td style=\"" + cell() + "\">" + entered + "<button type=\"button\" data-add-price style=\"margin-top:6px;padding:4px 8px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-size:11px;font-weight:800;cursor:pointer\">+</button></td>" +
-      "<td style=\"" + cell() + "\">" + current + "</td>" +
-      "<td style=\"" + cell() + "\"><textarea id=\"fx-note\" rows=\"2\" placeholder=\"Final note\" style=\"" + field() + ";resize:vertical\">" + esc(row.note) + "</textarea></td>" +
-      "<td style=\"" + cell() + ";white-space:nowrap\"><button type=\"button\" data-save style=\"padding:6px 8px;border:0;border-radius:8px;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer\">Save</button> <button type=\"button\" data-cancel style=\"padding:6px 8px;border:0;background:transparent;color:#8491a1;font-weight:800;cursor:pointer\">Cancel</button></td>";
+    return "<div style=\"margin-bottom:14px;padding:12px;border-radius:14px;border:1px solid #243041;background:#101820\">" +
+      "<div style=\"font-size:12px;font-weight:800;color:#8491a1;margin-bottom:6px\">Ticket name</div>" +
+      "<input id=\"fx-name\" value=\"" + esc(row.name) + "\" placeholder=\"Ticket name\" style=\"" + field() + "\">" +
+      "<div style=\"display:grid;grid-template-columns:1fr 1fr 44px;gap:8px;margin-top:14px;font-size:12px;font-weight:800;color:#8491a1\"><span>Price entered</span><span>Current price</span><span></span></div>" +
+      pairs +
+      "<button type=\"button\" data-add-price style=\"margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid #3d4d63;background:#121a24;color:#e8eef6;font-weight:800;cursor:pointer\">+ another price</button>" +
+      "<div style=\"margin-top:14px;font-size:12px;font-weight:800;color:#8491a1;margin-bottom:6px\">Final note</div>" +
+      "<textarea id=\"fx-note\" rows=\"3\" placeholder=\"Final note\" style=\"" + field() + ";min-height:88px;resize:vertical\">" + esc(row.note) + "</textarea>" +
+      "<div style=\"display:flex;gap:8px;margin-top:12px\">" +
+      "<button type=\"button\" data-save style=\"flex:1;padding:12px;border:0;border-radius:12px;background:#1a9b6c;color:#fff;font-weight:900;cursor:pointer\">Save</button>" +
+      "<button type=\"button\" data-cancel style=\"padding:12px 16px;border-radius:12px;border:1px solid #3d4d63;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer\">Cancel</button></div></div>";
   }
   function viewCells(row, index) {
     return "<td style=\"" + cell() + ";font-weight:800\">" + esc(row.name) + "</td>" +
@@ -169,14 +174,14 @@
     if (page < 0) page = 0;
     var start = page * PAGE;
     var slice = items.slice(start, start + PAGE);
-    var html = "<div style=\"display:flex;justify-content:flex-end;margin-bottom:10px\"><button type=\"button\" data-new style=\"padding:8px 14px;border:0;border-radius:10px;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></div>";
+    var html = "";
+    if (mode === "edit" && draft) html += editor(draft);
+    else html += "<div style=\"display:flex;justify-content:flex-end;margin-bottom:10px\"><button type=\"button\" data-new style=\"padding:8px 14px;border:0;border-radius:10px;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></div>";
     html += "<div style=\"overflow-x:auto\"><table style=\"width:100%;border-collapse:collapse;font-size:13px\"><thead><tr>" + head() + "</tr></thead><tbody>";
-    if (mode === "edit" && draft && !items.some(function (row) { return row.id === draft.id; })) html += "<tr>" + editCells(draft) + "</tr>";
-    if (!slice.length && mode !== "edit") html += "<tr><td colspan=\"5\" style=\"" + cell() + ";color:#8491a1\">No rows yet.</td></tr>";
+    if (!slice.length) html += "<tr><td colspan=\"5\" style=\"" + cell() + ";color:#8491a1\">No rows yet.</td></tr>";
     slice.forEach(function (row, i) {
-      var index = start + i;
-      html += "<tr style=\"background:" + (i % 2 ? "#101820" : "transparent") + "\">" +
-        (mode === "edit" && draft && draft.id === row.id ? editCells(draft) : viewCells(row, index)) + "</tr>";
+      if (mode === "edit" && draft && draft.id === row.id) return;
+      html += "<tr style=\"background:" + (i % 2 ? "#101820" : "transparent") + "\">" + viewCells(row, start + i) + "</tr>";
     });
     html += "</tbody></table></div>" + pager(start);
     box.innerHTML = html;
