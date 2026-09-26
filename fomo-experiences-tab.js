@@ -110,12 +110,12 @@
     };
   }
   var PAGE = 5;
-  function field() {
-    return "width:100%;min-height:44px;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #3d4d63;background:#0b121a;color:#f4f7fb;font-size:16px";
+  function box(extra) {
+    return "display:block;width:100%;min-height:48px;box-sizing:border-box;padding:12px 14px;border-radius:12px;font-size:16px;font-weight:700;color:#f4f7fb;" + extra;
   }
   function head() {
-    var th = "padding:10px 8px;text-align:left;border-bottom:1px solid #3d4d63;color:#8491a1;font-size:11px;letter-spacing:.04em;font-weight:800";
-    return "<th style=\"" + th + "\">Ticket name</th><th style=\"" + th + "\">Price entered</th><th style=\"" + th + "\">Current price</th><th style=\"" + th + "\">Final note</th><th style=\"" + th + "\"></th>";
+    var th = "padding:10px 8px;text-align:left;border-bottom:1px solid #3d4d63;font-size:11px;letter-spacing:.04em;font-weight:800";
+    return "<th style=\"" + th + ";color:#f5a14a\">Ticket name</th><th style=\"" + th + ";color:#3dbe7a\">Price entered</th><th style=\"" + th + ";color:#6eb6ff\">Current price</th><th style=\"" + th + ";color:#d2a8ff\">Final note</th><th style=\"" + th + "\"></th>";
   }
   function cell() { return "padding:10px 8px;border-bottom:1px solid #243041;vertical-align:top;color:#e8eef6"; }
   function lines(rows, key) {
@@ -124,22 +124,22 @@
   function editor(row) {
     var pairs = "";
     (row.prices || [{ entered: "", current: "" }]).forEach(function (price, i) {
-      pairs += "<div style=\"display:grid;grid-template-columns:1fr 1fr 44px;gap:8px;margin-top:8px\">" +
-        "<input data-entered value=\"" + esc(price.entered) + "\" placeholder=\"Price entered\" style=\"" + field() + "\">" +
-        "<input data-current value=\"" + esc(price.current) + "\" placeholder=\"Current price\" style=\"" + field() + "\">" +
-        "<button type=\"button\" data-rm-price=\"" + i + "\" aria-label=\"Remove price\" style=\"height:44px;border:1px solid #3d4d63;border-radius:12px;background:#121a24;color:#c5d0dc;font-size:20px;cursor:pointer\">×</button></div>";
+      pairs += "<div style=\"display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 48px;gap:8px;margin-top:8px\">" +
+        "<input data-entered value=\"" + esc(price.entered) + "\" placeholder=\"0.00\" style=\"" + box("border:1px solid #1f6b45;background:#102218") + "\">" +
+        "<input data-current value=\"" + esc(price.current) + "\" placeholder=\"0.00\" style=\"" + box("border:1px solid #2a5f8a;background:#101c2a") + "\">" +
+        "<button type=\"button\" data-rm-price=\"" + i + "\" aria-label=\"Remove price\" style=\"height:48px;border:1px solid #5a3030;border-radius:12px;background:#2a1616;color:#ff8a7a;font-size:22px;cursor:pointer\">×</button></div>";
     });
-    return "<div style=\"margin-bottom:14px;padding:12px;border-radius:14px;border:1px solid #243041;background:#101820\">" +
-      "<div style=\"font-size:12px;font-weight:800;color:#8491a1;margin-bottom:6px\">Ticket name</div>" +
-      "<input id=\"fx-name\" value=\"" + esc(row.name) + "\" placeholder=\"Ticket name\" style=\"" + field() + "\">" +
-      "<div style=\"display:grid;grid-template-columns:1fr 1fr 44px;gap:8px;margin-top:14px;font-size:12px;font-weight:800;color:#8491a1\"><span>Price entered</span><span>Current price</span><span></span></div>" +
+    return "<div style=\"margin-bottom:14px;padding:14px;border-radius:16px;border:1px solid #3d4d63;background:#121a24\">" +
+      "<div style=\"font-size:13px;font-weight:800;color:#f5a14a;margin-bottom:6px\">Ticket name</div>" +
+      "<input id=\"fx-name\" value=\"" + esc(row.name) + "\" placeholder=\"Ticket name\" style=\"" + box("border:1px solid #8a5a22;background:#24180e") + "\">" +
+      "<div style=\"display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 48px;gap:8px;margin-top:14px;font-size:13px;font-weight:800\"><span style=\"color:#3dbe7a\">Price entered</span><span style=\"color:#6eb6ff\">Current price</span><span></span></div>" +
       pairs +
-      "<button type=\"button\" data-add-price style=\"margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid #3d4d63;background:#121a24;color:#e8eef6;font-weight:800;cursor:pointer\">+ another price</button>" +
-      "<div style=\"margin-top:14px;font-size:12px;font-weight:800;color:#8491a1;margin-bottom:6px\">Final note</div>" +
-      "<textarea id=\"fx-note\" rows=\"3\" placeholder=\"Final note\" style=\"" + field() + ";min-height:88px;resize:vertical\">" + esc(row.note) + "</textarea>" +
-      "<div style=\"display:flex;gap:8px;margin-top:12px\">" +
-      "<button type=\"button\" data-save style=\"flex:1;padding:12px;border:0;border-radius:12px;background:#1a9b6c;color:#fff;font-weight:900;cursor:pointer\">Save</button>" +
-      "<button type=\"button\" data-cancel style=\"padding:12px 16px;border-radius:12px;border:1px solid #3d4d63;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer\">Cancel</button></div></div>";
+      "<button type=\"button\" data-add-price style=\"margin-top:10px;width:100%;padding:12px;border-radius:12px;border:1px solid #3d4d63;background:#1a2633;color:#f4f7fb;font-size:15px;font-weight:800;cursor:pointer\">+ another price</button>" +
+      "<div style=\"margin-top:14px;font-size:13px;font-weight:800;color:#d2a8ff;margin-bottom:6px\">Final note</div>" +
+      "<textarea id=\"fx-note\" rows=\"4\" placeholder=\"Final note\" style=\"" + box("border:1px solid #5a3d78;background:#1a1424;min-height:110px;resize:vertical") + "\">" + esc(row.note) + "</textarea>" +
+      "<div style=\"display:flex;gap:8px;margin-top:14px\">" +
+      "<button type=\"button\" data-save style=\"flex:1;padding:14px;border:0;border-radius:12px;background:#1a9b6c;color:#fff;font-size:16px;font-weight:900;cursor:pointer\">Save</button>" +
+      "<button type=\"button\" data-cancel style=\"padding:14px 16px;border-radius:12px;border:1px solid #3d4d63;background:#1a2633;color:#f4f7fb;font-size:16px;font-weight:800;cursor:pointer\">Cancel</button></div></div>";
   }
   function viewCells(row, index) {
     return "<td style=\"" + cell() + ";font-weight:800\">" + esc(row.name) + "</td>" +
@@ -177,7 +177,7 @@
     var html = "";
     if (mode === "edit" && draft) html += editor(draft);
     else html += "<div style=\"display:flex;justify-content:flex-end;margin-bottom:10px\"><button type=\"button\" data-new style=\"padding:8px 14px;border:0;border-radius:10px;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></div>";
-    html += "<div style=\"overflow-x:auto\"><table style=\"width:100%;border-collapse:collapse;font-size:13px\"><thead><tr>" + head() + "</tr></thead><tbody>";
+    html += "<div style=\"overflow-x:auto\"><table style=\"width:100%;min-width:560px;border-collapse:collapse;font-size:13px\"><thead><tr>" + head() + "</tr></thead><tbody>";
     if (!slice.length) html += "<tr><td colspan=\"5\" style=\"" + cell() + ";color:#8491a1\">No rows yet.</td></tr>";
     slice.forEach(function (row, i) {
       if (mode === "edit" && draft && draft.id === row.id) return;
