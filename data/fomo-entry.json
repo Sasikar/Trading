@@ -1,14 +1,14 @@
 {
-  "updated": "2026-09-26T03:47:21.717Z",
+  "updated": "2026-09-26T04:14:28.959Z",
   "items": [
     {
       "text": "DCA entry please",
-      "on": true,
+      "on": false,
       "custom": false
     },
     {
       "text": "Always chunk entries. No big entry at once please",
-      "on": true,
+      "on": false,
       "custom": false
     },
     {
@@ -28,6 +28,11 @@
     },
     {
       "text": "Why the fuck you want to miss Pull Back Entry",
+      "on": false,
+      "custom": true
+    },
+    {
+      "text": "May be better entry in Cool off what do you say",
       "on": false,
       "custom": true
     }
