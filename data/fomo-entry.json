@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-26T03:19:32.289Z",
+  "updated": "2026-09-26T03:43:00.836Z",
   "items": [
     {
       "text": "DCA entry please",
@@ -18,6 +18,11 @@
     },
     {
       "text": "Wait for DIPs",
+      "on": false,
+      "custom": true
+    },
+    {
+      "text": "Is clean floor established",
       "on": false,
       "custom": true
     }
