@@ -125,6 +125,7 @@
     var on = row.address === selected;
     return "<span style=\"display:inline-flex;align-items:center;gap:2px;padding:4px 4px 4px 12px;border-radius:999px;border:1px solid " + (on ? "#f5a14a" : "#243041") + ";background:" + (on ? "#2a1c0e" : "#121a24") + "\">" +
       "<button type=\"button\" data-wallet=\"" + esc(row.address) + "\" style=\"padding:6px 4px;border:0;background:transparent;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer\">" + esc(row.label || short(row.address)) + "</button>" +
+      "<button type=\"button\" data-copy=\"" + esc(row.address) + "\" aria-label=\"Copy wallet\" style=\"padding:4px 6px;border:0;border-radius:999px;background:#1a2430;color:#6eb6ff;font-size:10px;font-weight:800;cursor:pointer\">copy</button>" +
       "<button type=\"button\" data-remove=\"" + esc(row.address) + "\" aria-label=\"Delete wallet\" style=\"width:28px;height:28px;border:0;border-radius:999px;background:transparent;color:#8491a1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center\">" + trashIcon() + "</button></span>";
   }
   function groupHtml() {
@@ -420,6 +421,16 @@
       paint();
       var again = $("cs-search");
       if (again) { again.focus(); again.setSelectionRange(query.length, query.length); }
+    });
+    box.querySelectorAll("[data-copy]").forEach(function (btn) {
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var text = btn.getAttribute("data-copy") || "";
+        var done = function () { btn.textContent = "copied"; setTimeout(function () { btn.textContent = "copy"; }, 900); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(function () { window.prompt("Copy", text); });
+        else window.prompt("Copy", text);
+      });
     });
     box.querySelectorAll("[data-remove]").forEach(function (btn) {
       btn.addEventListener("click", function (ev) {
