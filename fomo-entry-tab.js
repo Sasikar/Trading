@@ -56,8 +56,8 @@
       .then(function (res) { return res.json(); })
       .then(function (body) {
         if (pushing) return;
-        if (body && Array.isArray(body.items) && body.items.length) {
-          saveLocal(body.items);
+        if (body && body.saved) {
+          saveLocal(body.items || []);
           paint();
           return;
         }
@@ -82,7 +82,7 @@
   function load() {
     try {
       var raw = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (raw && Array.isArray(raw.items) && raw.items.length) {
+      if (raw && Array.isArray(raw.items)) {
         return raw.items.map(function (row) {
           return { text: String(row.text || "").slice(0, 160), on: !!row.on, custom: !!row.custom };
         }).filter(function (row) { return row.text; });
@@ -136,10 +136,14 @@
     var ready = items.length && items.every(function (row) { return row.on; });
     var html = "<div style=\"display:flex;flex-direction:column;gap:10px\">";
     items.forEach(function (row, i) {
-      html += "<label style=\"display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:14px;background:#121a24;border:1px solid #243041;color:#e8eef6;font-size:15px;line-height:1.45;font-weight:700\">" +
-        "<input data-fomo=\"" + i + "\" type=\"checkbox\"" + (row.on ? " checked" : "") + " style=\"width:20px;height:20px;margin-top:1px;flex:none;accent-color:#f5a14a\">" +
+      var tick = row.on
+        ? "<span aria-hidden=\"true\" style=\"flex:none;width:18px;height:18px;margin-top:1px;border-radius:999px;background:#143d2a;color:#3dbe7a;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900\">✓</span>"
+        : "";
+      html += "<label style=\"display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:14px;background:" + (row.on ? "#102218" : "#121a24") + ";border:1px solid " + (row.on ? "#1f6b45" : "#243041") + ";color:#e8eef6;font-size:15px;line-height:1.45;font-weight:700\">" +
+        "<input data-fomo=\"" + i + "\" type=\"checkbox\"" + (row.on ? " checked" : "") + " style=\"width:20px;height:20px;margin-top:1px;flex:none;accent-color:#3dbe7a\">" +
+        tick +
         "<span style=\"flex:1\">" + esc(row.text) + "</span>" +
-        (row.custom ? "<button type=\"button\" data-drop=\"" + i + "\" aria-label=\"Remove check\" style=\"border:0;background:transparent;color:#8491a1;font-weight:800;cursor:pointer;padding:0 2px\">×</button>" : "") +
+        "<button type=\"button\" data-drop=\"" + i + "\" aria-label=\"Remove check\" style=\"border:0;background:transparent;color:#8491a1;font-size:18px;font-weight:800;cursor:pointer;padding:0 2px;line-height:1\">×</button>" +
         "</label>";
     });
     html += "</div>";

@@ -1,18 +1,22 @@
 const KEY = 'fomo_entry_checks';
 const PATH = 'data/fomo-entry.json';
 
-export function readFomoEntry(store) {
+export function readFomoState(store) {
   try {
-    const parsed = JSON.parse(store.getMeta(KEY) || '[]');
-    return Array.isArray(parsed) ? cleanItems(parsed) : [];
-  } catch (e) {
-    return [];
-  }
+    const parsed = JSON.parse(store.getMeta(KEY) || 'null');
+    if (Array.isArray(parsed)) return { items: cleanItems(parsed), saved: true };
+    if (parsed && parsed.saved && Array.isArray(parsed.items)) return { items: cleanItems(parsed.items), saved: true };
+  } catch (e) {}
+  return { items: [], saved: false };
+}
+
+export function readFomoEntry(store) {
+  return readFomoState(store).items;
 }
 
 export function writeFomoEntry(store, items) {
   const clean = cleanItems(items);
-  store.setMeta(KEY, JSON.stringify(clean));
+  store.setMeta(KEY, JSON.stringify({ saved: true, items: clean }));
   return clean;
 }
 

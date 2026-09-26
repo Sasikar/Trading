@@ -14,4 +14,6 @@ test('fomo checks stay on the worker', () => {
   assert.equal(items[0].on, true);
   assert.equal(items[1].text.length, 160);
   assert.deepEqual(readFomoEntry(store), items);
+  writeFomoEntry(store, []);
+  assert.deepEqual(readFomoEntry(store), []);
 });
