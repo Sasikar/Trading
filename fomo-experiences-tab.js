@@ -114,10 +114,10 @@
     return "display:block;width:100%;min-height:48px;box-sizing:border-box;padding:12px 14px;border-radius:12px;font-size:16px;font-weight:700;color:#f4f7fb;" + extra;
   }
   function head() {
-    var th = "padding:10px 8px;text-align:left;border-bottom:1px solid #3d4d63;font-size:11px;letter-spacing:.04em;font-weight:800";
-    return "<th style=\"" + th + ";color:#f5a14a\">Ticket name</th><th style=\"" + th + ";color:#3dbe7a\">Price entered</th><th style=\"" + th + ";color:#6eb6ff\">Current price</th><th style=\"" + th + ";color:#d2a8ff\">Final note</th><th style=\"" + th + "\"></th>";
+    var th = "padding:8px 4px;text-align:left;border-bottom:1px solid #3d4d63;font-size:11px;letter-spacing:0;font-weight:800;white-space:normal";
+    return "<th style=\"" + th + ";color:#f5a14a;width:18%\">Ticket</th><th style=\"" + th + ";color:#3dbe7a;width:16%\">Entered</th><th style=\"" + th + ";color:#6eb6ff;width:16%\">Now</th><th style=\"" + th + ";color:#d2a8ff\">Note</th><th style=\"" + th + ";width:36px\"></th>";
   }
-  function cell() { return "padding:10px 8px;border-bottom:1px solid #243041;vertical-align:top;color:#e8eef6"; }
+  function cell() { return "padding:8px 4px;border-bottom:1px solid #243041;vertical-align:top;color:#e8eef6"; }
   function lines(rows, key) {
     return (rows || []).map(function (row) { return esc(row[key] || "—"); }).join("<br>") || "—";
   }
@@ -142,11 +142,12 @@
       "<button type=\"button\" data-cancel style=\"padding:14px 16px;border-radius:12px;border:1px solid #3d4d63;background:#1a2633;color:#f4f7fb;font-size:16px;font-weight:800;cursor:pointer\">Cancel</button></div></div>";
   }
   function viewCells(row, index) {
-    return "<td style=\"" + cell() + ";font-weight:800\">" + esc(row.name) + "</td>" +
-      "<td style=\"" + cell() + "\">" + lines(row.prices, "entered") + "</td>" +
-      "<td style=\"" + cell() + "\">" + lines(row.prices, "current") + "</td>" +
-      "<td style=\"" + cell() + "\">" + esc(row.note || "—") + "</td>" +
-      "<td style=\"" + cell() + ";white-space:nowrap\"><button type=\"button\" data-edit=\"" + index + "\" style=\"border:0;background:transparent;color:#6eb6ff;font-weight:800;cursor:pointer\">Edit</button> <button type=\"button\" data-drop=\"" + index + "\" style=\"border:0;background:transparent;color:#ff8a7a;font-weight:800;cursor:pointer\">×</button></td>";
+    var slim = cell() + ";width:16%;font-size:12px;line-height:1.3;word-break:break-word";
+    return "<td style=\"" + slim + ";font-weight:800;color:#f5a14a\">" + esc(row.name) + "</td>" +
+      "<td style=\"" + slim + "\">" + lines(row.prices, "entered") + "</td>" +
+      "<td style=\"" + slim + "\">" + lines(row.prices, "current") + "</td>" +
+      "<td style=\"" + cell() + ";font-size:14px;line-height:1.45;font-weight:650;color:#f4f7fb;white-space:pre-wrap;word-break:break-word\">" + esc(row.note || "—") + "</td>" +
+      "<td style=\"" + cell() + ";width:36px;text-align:right\"><button type=\"button\" data-edit=\"" + index + "\" style=\"display:block;border:0;background:transparent;color:#6eb6ff;font-weight:800;cursor:pointer;padding:0\">Edit</button><button type=\"button\" data-drop=\"" + index + "\" style=\"border:0;background:transparent;color:#ff8a7a;font-weight:800;cursor:pointer;padding:0\">×</button></td>";
   }
   function pager(start) {
     var n = items.length;
@@ -177,13 +178,13 @@
     var html = "";
     if (mode === "edit" && draft) html += editor(draft);
     else html += "<div style=\"display:flex;justify-content:flex-end;margin-bottom:10px\"><button type=\"button\" data-new style=\"padding:8px 14px;border:0;border-radius:10px;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></div>";
-    html += "<div style=\"overflow-x:auto\"><table style=\"width:100%;min-width:560px;border-collapse:collapse;font-size:13px\"><thead><tr>" + head() + "</tr></thead><tbody>";
+    html += "<table style=\"width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px\"><thead><tr>" + head() + "</tr></thead><tbody>";
     if (!slice.length) html += "<tr><td colspan=\"5\" style=\"" + cell() + ";color:#8491a1\">No rows yet.</td></tr>";
     slice.forEach(function (row, i) {
       if (mode === "edit" && draft && draft.id === row.id) return;
       html += "<tr style=\"background:" + (i % 2 ? "#101820" : "transparent") + "\">" + viewCells(row, start + i) + "</tr>";
     });
-    html += "</tbody></table></div>" + pager(start);
+    html += "</tbody></table>" + pager(start);
     box.innerHTML = html;
     var st = $("fx-status");
     if (st && st.textContent !== "SAVED") st.textContent = items.length ? "SAVED" : "READY";
