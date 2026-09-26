@@ -1,0 +1,25 @@
+{
+  "updated": "2026-09-26T03:18:55.663Z",
+  "items": [
+    {
+      "text": "DCA entry please",
+      "on": true,
+      "custom": false
+    },
+    {
+      "text": "Always chunk entries. No big entry at once please",
+      "on": true,
+      "custom": false
+    },
+    {
+      "text": "Wait for DIPs",
+      "on": false,
+      "custom": true
+    },
+    {
+      "text": "WOW DIP Triggered???",
+      "on": false,
+      "custom": true
+    }
+  ]
+}
