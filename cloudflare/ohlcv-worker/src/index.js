@@ -14,7 +14,7 @@ import { scanBundle } from './bundle.js';
 import { scanFlows } from './flows.js';
 import { scanWallet, readWallets, writeWallets, scanSells, tickSells, readChart, writeChartPoint } from './coinstats.js';
 import { applySnapshot, tierDailyTick } from './tier-history.js';
-import { readNote, writeNote } from './tier-notes.js';
+import { readFomoEntry, writeFomoEntry, pushFomoGithub } from './fomo-entry.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -317,6 +317,16 @@ export class OhlcvEngine {
           return new Response(JSON.stringify({ ok: true, ...note }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
         }
         return new Response(JSON.stringify({ ok: true, ...readNote(this.store, mint) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+      if (path === '/fomo-entry' || path === '/api/fomo-entry') {
+        if (request.method === 'POST') {
+          const body = await request.json().catch(() => ({}));
+          const items = writeFomoEntry(this.store, body.items || []);
+          let github = false;
+          try { github = await pushFomoGithub(this.env, items); } catch (e) { github = false; }
+          return new Response(JSON.stringify({ ok: true, items: items, github: github }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ ok: true, items: readFomoEntry(this.store) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/coinstats-wallets' || path === '/api/coinstats-wallets') {
         if (request.method === 'POST') {

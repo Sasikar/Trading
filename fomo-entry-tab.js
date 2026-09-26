@@ -9,6 +9,61 @@
     "Always chunk entries. No big entry at once please"
   ];
 
+  var API = "https://trading-ohlcv.sasipudi.workers.dev";
+  var pushing = 0;
+  function gitToken() {
+    try { return localStorage.getItem("trading_github_token") || localStorage.getItem("trading_tax_github_token") || ""; }
+    catch (e) { return ""; }
+  }
+  function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function pushGit(items) {
+    var token = gitToken();
+    if (!token) return Promise.resolve(false);
+    var url = "https://api.github.com/repos/Sasikar/Trading/contents/data/fomo-entry.json";
+    var headers = { Authorization: "Bearer " + token, Accept: "application/vnd.github+json" };
+    return fetch(url + "?ref=master", { headers: headers, cache: "no-store" })
+      .then(function (res) { return res.status === 404 ? {} : res.json(); })
+      .then(function (file) {
+        var body = {
+          message: "Save Fomo Entry checks",
+          content: b64(JSON.stringify({ updated: new Date().toISOString(), items: items }, null, 2)),
+          branch: "master"
+        };
+        if (file && file.sha) body.sha = file.sha;
+        return fetch(url, {
+          method: "PUT",
+          headers: { Authorization: "Bearer " + token, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+      })
+      .then(function (res) { return !!(res && res.ok); })
+      .catch(function () { return false; });
+  }
+  function pushRemote(items) {
+    pushing += 1;
+    return fetch(API + "/fomo-entry", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ items: items })
+    }).then(function (res) { return res.json(); }).then(function () {
+      var st = $("fomo-status");
+      if (st) st.textContent = "SAVED";
+      return pushGit(items);
+    }).catch(function () {}).then(function () { pushing = Math.max(0, pushing - 1); });
+  }
+  function pull() {
+    fetch(API + "/fomo-entry", { cache: "no-store" })
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        if (pushing) return;
+        if (body && Array.isArray(body.items) && body.items.length) {
+          saveLocal(body.items);
+          paint();
+          return;
+        }
+        pushRemote(load());
+      }).catch(function () {});
+  }
   function $(id) { return document.getElementById(id); }
   function esc(s) {
     return String(s == null ? "" : s)
@@ -34,11 +89,15 @@
       }
     } catch (e) {}
     var items = seed();
-    save(items);
+    saveLocal(items);
     return items;
   }
-  function save(items) {
+  function saveLocal(items) {
     try { localStorage.setItem(KEY, JSON.stringify({ items: items })); } catch (e) {}
+  }
+  function save(items) {
+    saveLocal(items);
+    pushRemote(items);
   }
   function hideOthers() {
     document.querySelectorAll(".trend-panel").forEach(function (p) {
@@ -62,6 +121,7 @@
       p.style.display = "block";
       p.classList.add("on");
       paint();
+      pull();
     } else {
       p.style.display = "none";
       p.classList.remove("on");
