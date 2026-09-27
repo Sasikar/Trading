@@ -541,8 +541,11 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   .tab{font-size:11px;height:34px;padding:0 8px}
   .shell{width:min(960px,calc(100% - 20px))}
 }
+@keyframes dip-marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+#dip-alert-track { display:inline-block; white-space:nowrap; padding-left:100%; animation: dip-marquee 16s linear infinite; }
 </style></head><body>
 <div class="shell"><main>
+<div id="dip-alert" style="display:none;position:sticky;top:0;z-index:30;overflow:hidden;margin:0 0 12px;padding:10px 0;border-radius:12px;border:1px solid #f5a14a;background:#3a2410;color:#f5a14a;font-weight:900;font-size:15px"><div id="dip-alert-track"></div></div>
 <section class="section">
   <div class="head"><div><h2>Live market</h2><p>BTC · ETH · NASDAQ · Fear &amp; Greed</p></div><span class="source" id="market-source">…</span></div>
   <div class="card"><div class="market-row">
@@ -1556,7 +1559,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="emotion-tab.js?v=20260924-em1"></script>
 <script src="fomo-entry-tab.js?v=20260926-fe4"></script>
 <script src="fomo-experiences-tab.js?v=20260927-fx8"></script>
-<script src="fav-dips-tab.js?v=20260927-fd4"></script>
+<script src="fav-dips-tab.js?v=20260927-fd5"></script>
 <script src="coinstats-tab.js?v=20260926-cs13"></script>
 <script src="gmgn-tab.js?v=20260923-pf1"></script>
 <script src="wallets-tab.js?v=20260923-pf1"></script>

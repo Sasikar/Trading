@@ -63,6 +63,7 @@
     }).then(function (res) { return res.json(); }).then(function () {
       var st = $("fd-status");
       if (st) st.textContent = "SAVED";
+      checkDipAlerts();
     }).catch(function () {}).then(function () { pushing = Math.max(0, pushing - 1); });
   }
   function pull() {
@@ -233,6 +234,49 @@
       });
     });
   }
+
+  function dipNum(value) {
+    var n = parseFloat(String(value || "").replace(/[^0-9.]/g, ""));
+    return n > 0 ? n : 0;
+  }
+  function paintAlert(names) {
+    var bar = $("dip-alert");
+    var track = $("dip-alert-track");
+    if (!bar || !track) return;
+    if (!names.length) {
+      bar.style.display = "none";
+      track.textContent = "";
+      return;
+    }
+    var line = names.map(function (name) { return name + " wonderful dip"; }).join("      ");
+    track.textContent = (line + "      " + line + "      ");
+    bar.style.display = "block";
+    track.style.animation = "none";
+    void track.offsetWidth;
+    track.style.animation = "";
+  }
+  function checkDipAlerts() {
+    Promise.all([
+      fetch(API + "/fav-supports", { cache: "no-store" }).then(function (res) { return res.json(); }),
+      fetch(API + "/fav-dips", { cache: "no-store" }).then(function (res) { return res.json(); })
+    ]).then(function (both) {
+      var live = (both[0] && both[0].rows) || [];
+      var saved = (both[1] && both[1].saved ? both[1].items : mine) || [];
+      var names = [];
+      saved.forEach(function (item) {
+        if (!item.watch) return;
+        var dip = dipNum(item.dip);
+        if (!dip) return;
+        var ca = String(item.ca || "").toLowerCase();
+        var row = live.filter(function (hit) { return hit.ca === ca; })[0];
+        var spot = row ? +row.spot : 0;
+        if (spot > 0 && spot < dip) names.push((row && row.name) || item.name || ca);
+      });
+      paintAlert(names);
+    }).catch(function () {});
+  }
+  checkDipAlerts();
+  setInterval(checkDipAlerts, 5 * 60 * 1000);
 
   var search = $("fd-search");
   if (search && !search.dataset.bound) {
