@@ -113,9 +113,17 @@
   function box(extra) {
     return "display:block;width:100%;min-height:48px;box-sizing:border-box;padding:12px 14px;border-radius:12px;font-size:16px;font-weight:700;color:#f4f7fb;" + extra;
   }
+  function daysAgo(at) {
+    var then = new Date(+at || Date.now());
+    var now = new Date();
+    var startThen = Date.UTC(then.getFullYear(), then.getMonth(), then.getDate());
+    var startNow = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    var days = Math.max(0, Math.round((startNow - startThen) / 86400000));
+    return days === 1 ? "1 day ago" : days + " days ago";
+  }
   function head() {
     var th = "padding:8px 4px;text-align:left;border-bottom:1px solid #3d4d63;font-size:11px;letter-spacing:0;font-weight:800;white-space:normal";
-    return "<th style=\"" + th + ";color:#f5a14a;width:18%\">Ticket</th><th style=\"" + th + ";color:#3dbe7a;width:16%\">Entered</th><th style=\"" + th + ";color:#6eb6ff;width:16%\">Now</th><th style=\"" + th + ";color:#d2a8ff\">Note</th><th style=\"" + th + ";width:36px\"></th>";
+    return "<th style=\"" + th + ";color:#e6c878;width:18%\">Since</th><th style=\"" + th + ";color:#f5a14a;width:16%\">Ticket</th><th style=\"" + th + ";color:#3dbe7a;width:14%\">Entered</th><th style=\"" + th + ";color:#6eb6ff;width:14%\">Now</th><th style=\"" + th + ";color:#d2a8ff\">Note</th><th style=\"" + th + ";width:36px\"></th>";
   }
   function cell() { return "padding:8px 4px;border-bottom:1px solid #243041;vertical-align:top;color:#e8eef6"; }
   function lines(rows, key) {
@@ -143,7 +151,8 @@
   }
   function viewCells(row, index) {
     var slim = cell() + ";width:16%;font-size:12px;line-height:1.3;word-break:break-word";
-    return "<td style=\"" + slim + ";font-weight:800;color:#f5a14a\">" + esc(row.name) + "</td>" +
+    return "<td style=\"" + slim + ";color:#e6c878;font-weight:800\">" + esc(daysAgo(row.at)) + "</td>" +
+      "<td style=\"" + slim + ";font-weight:800;color:#f5a14a\">" + esc(row.name) + "</td>" +
       "<td style=\"" + slim + "\">" + lines(row.prices, "entered") + "</td>" +
       "<td style=\"" + slim + "\">" + lines(row.prices, "current") + "</td>" +
       "<td style=\"" + cell() + ";font-size:14px;line-height:1.45;font-weight:650;color:#f4f7fb;white-space:pre-wrap;word-break:break-word\">" + esc(row.note || "—") + "</td>" +
