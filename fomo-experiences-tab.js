@@ -147,7 +147,7 @@
       "<td style=\"" + slim + "\">" + lines(row.prices, "entered") + "</td>" +
       "<td style=\"" + slim + "\">" + lines(row.prices, "current") + "</td>" +
       "<td style=\"" + cell() + ";font-size:14px;line-height:1.45;font-weight:650;color:#f4f7fb;white-space:pre-wrap;word-break:break-word\">" + esc(row.note || "—") + "</td>" +
-      "<td style=\"" + cell() + ";width:36px;text-align:right\"><button type=\"button\" data-edit=\"" + index + "\" style=\"display:block;border:0;background:transparent;color:#6eb6ff;font-weight:800;cursor:pointer;padding:0\">Edit</button><button type=\"button\" data-drop=\"" + index + "\" style=\"border:0;background:transparent;color:#ff8a7a;font-weight:800;cursor:pointer;padding:0\">×</button></td>";
+      "<td style=\"" + cell() + ";width:36px;text-align:right\"><button type=\"button\" data-edit=\"" + index + "\" style=\"display:block;border:0;background:transparent;color:#6eb6ff;font-weight:800;cursor:pointer;padding:0\">Edit</button></td>";
   }
   function pager(start) {
     var n = items.length;
@@ -220,14 +220,6 @@
       if (at >= 0) page = Math.floor(at / PAGE);
       mode = "view";
       draft = null;
-      paint();
-      pushRemote();
-    });
-    go("[data-drop]", function (ev) {
-      items.splice(Number(ev.currentTarget.getAttribute("data-drop")), 1);
-      var pages = Math.max(1, Math.ceil(items.length / PAGE));
-      if (page > pages - 1) page = pages - 1;
-      mode = "view";
       paint();
       pushRemote();
     });

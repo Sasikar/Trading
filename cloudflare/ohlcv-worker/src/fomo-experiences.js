@@ -26,7 +26,9 @@ export function readFomoExperiences(store) {
 }
 
 export function writeFomoExperiences(store, items) {
+  const prev = readFomoExperiences(store);
   const clean = cleanItems(items);
+  if (prev.saved && prev.items.length && !clean.length) return prev.items;
   store.setMeta(KEY, JSON.stringify({ saved: true, items: clean }));
   return clean;
 }

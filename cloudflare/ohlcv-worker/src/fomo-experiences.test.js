@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFomoExperiences, writeFomoExperiences } from './fomo-experiences.js';
 
-test('fomo experiences keep every price row and a deleted list stays empty', () => {
+test('fomo experiences keep every price row and an empty save cannot wipe them', () => {
   const bag = {};
   const store = { getMeta() { return bag.v || 'null'; }, setMeta(_k, v) { bag.v = v; } };
   const items = writeFomoExperiences(store, [{
@@ -18,5 +18,6 @@ test('fomo experiences keep every price row and a deleted list stays empty', () 
   writeFomoExperiences(store, []);
   const again = readFomoExperiences(store);
   assert.equal(again.saved, true);
-  assert.equal(again.items.length, 0);
+  assert.equal(again.items.length, 1);
+  assert.equal(again.items[0].note, 'chunked');
 });
