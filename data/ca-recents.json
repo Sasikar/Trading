@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-27T16:42:27.655Z",
+  "updated": "2026-09-27T16:57:08.411Z",
   "count": 32,
   "items": [
     {
@@ -7,11 +7,11 @@
       "ca": "HcRLc9VDgjLeK154xDawfb1dmVJ98DoSqcwTHGqiDeJR",
       "name": "ZCAT",
       "base": "ZCAT",
-      "t": 1790527314243,
+      "t": 1790527367109,
       "poolAddress": "BTccxxTFi7a9xJTE1exKn38Jgie35s6gNeRxd8DM61Rc",
       "poolNetwork": "solana",
-      "poolLiq": 1432386.9,
-      "poolCachedAt": 1790527314242
+      "poolLiq": 1437000.96,
+      "poolCachedAt": 1790527367109
     },
     {
       "chain": "solana",
