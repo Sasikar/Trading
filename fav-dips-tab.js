@@ -94,6 +94,8 @@
       hideOthers();
       p.style.display = "block";
       p.classList.add("on");
+      var panels = $("tf-panels");
+      if (panels) { panels.classList.add("hidden"); panels.style.display = "none"; }
       if (!mine.length) mine = loadLocal();
       paint();
       pull();
@@ -103,21 +105,30 @@
     }
   }
   window.showFavDips = show;
+  var query = "";
+  function filtered() {
+    var q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(function (row) {
+      return String(row.name || "").toLowerCase().indexOf(q) >= 0 || String(row.ca || "").toLowerCase().indexOf(q) >= 0;
+    });
+  }
 
   function paint() {
     var board = $("fd-board");
     if (!board) return;
-    var pages = Math.max(1, Math.ceil(rows.length / PAGE));
+    var list = filtered();
+    var pages = Math.max(1, Math.ceil(list.length / PAGE));
     if (page > pages - 1) page = Math.max(0, pages - 1);
     var start = page * PAGE;
-    var slice = rows.slice(start, start + PAGE);
+    var slice = list.slice(start, start + PAGE);
     var th = "position:sticky;top:0;padding:8px 6px;text-align:right;background:#121a24;border-bottom:1px solid #3d4d63;font-size:11px;font-weight:800;white-space:nowrap";
     var td = "padding:8px 6px;border-bottom:1px solid #243041;text-align:right;font-size:12px;font-weight:800;white-space:nowrap;color:#c5d0dc";
     var html = "<div style=\"overflow-x:auto\"><table style=\"border-collapse:collapse;min-width:760px\"><thead><tr>" +
       "<th style=\"" + th + ";left:0;z-index:1;text-align:left;color:#f4f7fb\">Coin</th>";
     TFS.forEach(function (tf) { html += "<th style=\"" + th + ";color:#8491a1\">" + tf + "</th>"; });
     html += "<th style=\"" + th + ";color:#3dbe7a\">Engine</th><th style=\"" + th + ";text-align:left;color:#f5a14a\">My dip</th></tr></thead><tbody>";
-    if (!slice.length) html += "<tr><td colspan=\"10\" style=\"padding:12px;color:#8491a1\">No saved coins yet.</td></tr>";
+    if (!slice.length) html += "<tr><td colspan=\"10\" style=\"padding:12px;color:#8491a1\">" + (query ? "No coin matches." : "No saved coins yet.") + "</td></tr>";
     slice.forEach(function (row, i) {
       html += "<tr style=\"background:" + (i % 2 ? "#101820" : "transparent") + "\">" +
         "<td style=\"" + td + ";position:sticky;left:0;background:#0e151d;text-align:left;color:#f4f7fb\">" + esc(row.name) +
@@ -128,7 +139,7 @@
         "<td style=\"" + td + ";text-align:left\"><input data-dip=\"" + esc(row.ca) + "\" value=\"" + esc(myDip(row.ca)) + "\" inputmode=\"decimal\" placeholder=\"yours\" style=\"width:88px;padding:8px;border-radius:8px;border:1px solid #8a5a22;background:#24180e;color:#f4f7fb;font-weight:800\"></td></tr>";
     });
     html += "</tbody></table></div>";
-    var n = rows.length;
+    var n = list.length;
     var from = n ? start + 1 : 0;
     var to = Math.min(n, start + PAGE);
     var nums = "";
@@ -151,7 +162,7 @@
       el.addEventListener("click", function () { if (page > 0) { page -= 1; paint(); } });
     });
     board.querySelectorAll("[data-next]").forEach(function (el) {
-      el.addEventListener("click", function () { if (page < Math.ceil(rows.length / PAGE) - 1) { page += 1; paint(); } });
+      el.addEventListener("click", function () { if (page < Math.ceil(filtered().length / PAGE) - 1) { page += 1; paint(); } });
     });
     board.querySelectorAll("[data-go]").forEach(function (el) {
       el.addEventListener("click", function () { page = Number(el.getAttribute("data-go")) || 0; paint(); });
@@ -168,6 +179,15 @@
     });
   }
 
+  var search = $("fd-search");
+  if (search && !search.dataset.bound) {
+    search.dataset.bound = "1";
+    search.addEventListener("input", function () {
+      query = search.value || "";
+      page = 0;
+      paint();
+    });
+  }
   var tabs = document.getElementById("tf-tabs");
   if (tabs) {
     tabs.addEventListener("click", function (ev) {
