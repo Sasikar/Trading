@@ -188,7 +188,7 @@
     if (mode === "edit" && draft) html += editor(draft);
     else html += "<div style=\"display:flex;justify-content:flex-end;margin-bottom:10px\"><button type=\"button\" data-new style=\"padding:8px 14px;border:0;border-radius:10px;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></div>";
     html += "<table style=\"width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px\"><thead><tr>" + head() + "</tr></thead><tbody>";
-    if (!slice.length) html += "<tr><td colspan=\"5\" style=\"" + cell() + ";color:#8491a1\">No rows yet.</td></tr>";
+    if (!slice.length) html += "<tr><td colspan=\"6\" style=\"" + cell() + ";color:#8491a1\">No rows yet.</td></tr>";
     slice.forEach(function (row, i) {
       if (mode === "edit" && draft && draft.id === row.id) return;
       html += "<tr style=\"background:" + (i % 2 ? "#101820" : "transparent") + "\">" + viewCells(row, start + i) + "</tr>";
