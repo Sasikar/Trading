@@ -4,11 +4,11 @@
 
   var API = "https://trading-ohlcv.sasipudi.workers.dev";
   var KEY = "fav_dips_v1";
-  var PAGE = 5;
-  var items = [];
+  var PAGE = 8;
+  var TFS = ["5m", "15m", "1h", "2h", "4h", "1d", "1w"];
+  var rows = [];
+  var mine = [];
   var page = 0;
-  var mode = "view";
-  var draft = null;
   var pushing = 0;
 
   function $(id) { return document.getElementById(id); }
@@ -19,26 +19,39 @@
       .replace(/>/g, "&" + "gt;")
       .replace(/"/g, "&" + "quot;");
   }
-  function today() {
-    var d = new Date();
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  function px(n) {
+    var x = +n || 0;
+    if (!(x > 0)) return "—";
+    if (x >= 1) return x.toFixed(4);
+    if (x >= 0.01) return x.toFixed(5);
+    return x.toPrecision(4);
+  }
+  function level(row, tf) {
+    var hit = (row.levels || []).filter(function (item) { return item.tf === tf; })[0];
+    return hit && hit.px > 0 ? px(hit.px) : "—";
+  }
+  function myDip(ca) {
+    var hit = mine.filter(function (item) { return String(item.ca || "").toLowerCase() === ca; })[0];
+    return hit ? hit.dip || "" : "";
   }
   function saveLocal() {
-    try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify({ items: mine })); } catch (e) {}
   }
   function loadLocal() {
     try {
-      var raw = JSON.parse(localStorage.getItem(KEY) || "[]");
-      return Array.isArray(raw) ? raw : [];
-    } catch (e) { return []; }
+      var raw = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (raw && Array.isArray(raw.items)) return raw.items;
+      if (Array.isArray(raw)) return raw;
+    } catch (e) {}
+    return [];
   }
-  function pushRemote() {
+  function pushMine() {
     pushing += 1;
     saveLocal();
     return fetch(API + "/fav-dips", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ items: items })
+      body: JSON.stringify({ items: mine })
     }).then(function (res) { return res.json(); }).then(function () {
       var st = $("fd-status");
       if (st) st.textContent = "SAVED";
@@ -46,17 +59,19 @@
   }
   function pull() {
     var seen = pushing;
-    fetch(API + "/fav-dips", { cache: "no-store" })
-      .then(function (res) { return res.json(); })
-      .then(function (body) {
-        if (pushing !== seen || mode === "edit") return;
-        if (body && body.saved) {
-          items = body.items || [];
-          saveLocal();
-          if (page >= Math.ceil(items.length / PAGE)) page = Math.max(0, Math.ceil(items.length / PAGE) - 1);
-          paint();
-        }
-      }).catch(function () {});
+    Promise.all([
+      fetch(API + "/fav-supports", { cache: "no-store" }).then(function (res) { return res.json(); }),
+      fetch(API + "/fav-dips", { cache: "no-store" }).then(function (res) { return res.json(); })
+    ]).then(function (both) {
+      if (pushing !== seen) return;
+      rows = (both[0] && both[0].rows) || [];
+      if (both[1] && both[1].saved) mine = both[1].items || [];
+      else if (!mine.length) mine = loadLocal();
+      saveLocal();
+      paint();
+      var st = $("fd-status");
+      if (st) st.textContent = rows.length ? "LIVE" : "EMPTY";
+    }).catch(function () { paint(); });
   }
   function hideOthers() {
     document.querySelectorAll(".trend-panel").forEach(function (p) {
@@ -79,7 +94,7 @@
       hideOthers();
       p.style.display = "block";
       p.classList.add("on");
-      if (!items.length) items = loadLocal();
+      if (!mine.length) mine = loadLocal();
       paint();
       pull();
     } else {
@@ -89,68 +104,31 @@
   }
   window.showFavDips = show;
 
-  function blank() {
-    return { id: String(Date.now()), date: today(), name: "", dip: "", support: "", at: Date.now() };
-  }
-  function box(extra) {
-    return "display:block;width:100%;min-height:48px;box-sizing:border-box;padding:12px 14px;border-radius:12px;font-size:16px;font-weight:700;color:#f4f7fb;" + extra;
-  }
-  function readDraft() {
-    return {
-      id: (draft && draft.id) || String(Date.now()),
-      date: (($("fd-date") || {}).value || "").trim(),
-      name: (($("fd-name") || {}).value || "").trim(),
-      dip: (($("fd-dip") || {}).value || "").trim(),
-      support: (($("fd-sup") || {}).value || "").trim(),
-      at: (draft && draft.at) || Date.now()
-    };
-  }
-  function editor(row) {
-    return "<div style=\"margin-bottom:14px;padding:14px;border-radius:16px;border:1px solid #3d4d63;background:#121a24\">" +
-      "<div style=\"font-size:13px;font-weight:800;color:#f5a14a;margin-bottom:6px\">Date</div>" +
-      "<input id=\"fd-date\" type=\"date\" value=\"" + esc(row.date) + "\" style=\"" + box("border:1px solid #8a5a22;background:#24180e") + "\">" +
-      "<div style=\"margin-top:14px;font-size:13px;font-weight:800;color:#e8eef6;margin-bottom:6px\">Coin name</div>" +
-      "<input id=\"fd-name\" value=\"" + esc(row.name) + "\" placeholder=\"Coin name\" style=\"" + box("border:1px solid #3d4d63;background:#0b121a") + "\">" +
-      "<div style=\"margin-top:14px;font-size:13px;font-weight:800;color:#3dbe7a;margin-bottom:6px\">My fav dip price</div>" +
-      "<input id=\"fd-dip\" value=\"" + esc(row.dip) + "\" placeholder=\"0.00\" inputmode=\"decimal\" style=\"" + box("border:1px solid #1f6b45;background:#102218") + "\">" +
-      "<div style=\"margin-top:14px;font-size:13px;font-weight:800;color:#6eb6ff;margin-bottom:6px\">Coin actual support</div>" +
-      "<input id=\"fd-sup\" value=\"" + esc(row.support) + "\" placeholder=\"0.00\" inputmode=\"decimal\" style=\"" + box("border:1px solid #2a5f8a;background:#101c2a") + "\">" +
-      "<div style=\"display:flex;gap:8px;margin-top:14px\">" +
-      "<button type=\"button\" data-save style=\"flex:1;padding:14px;border:0;border-radius:12px;background:#1a9b6c;color:#fff;font-size:16px;font-weight:900;cursor:pointer\">Save</button>" +
-      "<button type=\"button\" data-cancel style=\"padding:14px 16px;border-radius:12px;border:1px solid #3d4d63;background:#1a2633;color:#f4f7fb;font-size:16px;font-weight:800;cursor:pointer\">Cancel</button></div></div>";
-  }
-  function cell() { return "padding:8px 4px;border-bottom:1px solid #243041;vertical-align:top;font-size:13px;line-height:1.35;word-break:break-word;color:#e8eef6"; }
   function paint() {
     var board = $("fd-board");
     if (!board) return;
-    var pages = Math.max(1, Math.ceil(items.length / PAGE));
-    if (page > pages - 1) page = pages - 1;
-    if (page < 0) page = 0;
+    var pages = Math.max(1, Math.ceil(rows.length / PAGE));
+    if (page > pages - 1) page = Math.max(0, pages - 1);
     var start = page * PAGE;
-    var slice = items.slice(start, start + PAGE);
-    var th = "padding:8px 4px;text-align:left;border-bottom:1px solid #3d4d63;font-size:11px;font-weight:800;white-space:normal";
-    var html = "";
-    if (mode === "edit" && draft) html += editor(draft);
-    else html += "<div style=\"display:flex;justify-content:flex-end;margin-bottom:10px\"><button type=\"button\" data-new style=\"padding:8px 14px;border:0;border-radius:10px;background:#f5a14a;color:#1a1006;font-weight:900;cursor:pointer\">Add</button></div>";
-    html += "<table style=\"width:100%;table-layout:fixed;border-collapse:collapse\"><thead><tr>" +
-      "<th style=\"" + th + ";color:#f5a14a;width:22%\">Date</th>" +
-      "<th style=\"" + th + ";color:#e8eef6;width:24%\">Coin</th>" +
-      "<th style=\"" + th + ";color:#3dbe7a;width:22%\">Fav dip</th>" +
-      "<th style=\"" + th + ";color:#6eb6ff\">Support</th>" +
-      "<th style=\"" + th + ";width:36px\"></th></tr></thead><tbody>";
-    if (!slice.length) html += "<tr><td colspan=\"5\" style=\"" + cell() + ";color:#8491a1\">No dips yet.</td></tr>";
+    var slice = rows.slice(start, start + PAGE);
+    var th = "position:sticky;top:0;padding:8px 6px;text-align:right;background:#121a24;border-bottom:1px solid #3d4d63;font-size:11px;font-weight:800;white-space:nowrap";
+    var td = "padding:8px 6px;border-bottom:1px solid #243041;text-align:right;font-size:12px;font-weight:800;white-space:nowrap;color:#c5d0dc";
+    var html = "<div style=\"overflow-x:auto\"><table style=\"border-collapse:collapse;min-width:760px\"><thead><tr>" +
+      "<th style=\"" + th + ";left:0;z-index:1;text-align:left;color:#f4f7fb\">Coin</th>";
+    TFS.forEach(function (tf) { html += "<th style=\"" + th + ";color:#8491a1\">" + tf + "</th>"; });
+    html += "<th style=\"" + th + ";color:#3dbe7a\">Engine</th><th style=\"" + th + ";text-align:left;color:#f5a14a\">My dip</th></tr></thead><tbody>";
+    if (!slice.length) html += "<tr><td colspan=\"10\" style=\"padding:12px;color:#8491a1\">No saved coins yet.</td></tr>";
     slice.forEach(function (row, i) {
-      if (mode === "edit" && draft && draft.id === row.id) return;
-      var index = start + i;
       html += "<tr style=\"background:" + (i % 2 ? "#101820" : "transparent") + "\">" +
-        "<td style=\"" + cell() + "\">" + esc(row.date || "—") + "</td>" +
-        "<td style=\"" + cell() + ";font-weight:800\">" + esc(row.name) + "</td>" +
-        "<td style=\"" + cell() + ";color:#3dbe7a;font-weight:800\">" + esc(row.dip || "—") + "</td>" +
-        "<td style=\"" + cell() + ";color:#6eb6ff;font-weight:800\">" + esc(row.support || "—") + "</td>" +
-        "<td style=\"" + cell() + ";text-align:right\"><button type=\"button\" data-edit=\"" + index + "\" style=\"display:block;border:0;background:transparent;color:#6eb6ff;font-weight:800;cursor:pointer;padding:0\">Edit</button><button type=\"button\" data-drop=\"" + index + "\" style=\"border:0;background:transparent;color:#ff8a7a;font-weight:800;cursor:pointer;padding:0\">×</button></td></tr>";
+        "<td style=\"" + td + ";position:sticky;left:0;background:#0e151d;text-align:left;color:#f4f7fb\">" + esc(row.name) +
+        "<div style=\"font-size:10px;font-weight:700;color:#8491a1\">" + px(row.spot) + "</div></td>";
+      TFS.forEach(function (tf) { html += "<td style=\"" + td + "\">" + level(row, tf) + "</td>"; });
+      html += "<td style=\"" + td + ";color:#3dbe7a\">" + px(row.price) +
+        "<div style=\"font-size:10px;font-weight:700;color:#8491a1;max-width:120px;white-space:normal\">" + esc(row.why || "") + "</div></td>" +
+        "<td style=\"" + td + ";text-align:left\"><input data-dip=\"" + esc(row.ca) + "\" value=\"" + esc(myDip(row.ca)) + "\" inputmode=\"decimal\" placeholder=\"yours\" style=\"width:88px;padding:8px;border-radius:8px;border:1px solid #8a5a22;background:#24180e;color:#f4f7fb;font-weight:800\"></td></tr>";
     });
-    html += "</tbody></table>";
-    var n = items.length;
+    html += "</tbody></table></div>";
+    var n = rows.length;
     var from = n ? start + 1 : 0;
     var to = Math.min(n, start + PAGE);
     var nums = "";
@@ -166,42 +144,27 @@
       nums +
       "<button type=\"button\" data-next style=\"padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e8eef6;font-weight:800;" + (page >= pages - 1 ? dis : "") + "\">Next</button></span></div>";
     board.innerHTML = html;
-    var st = $("fd-status");
-    if (st && st.textContent !== "SAVED") st.textContent = items.length ? "SAVED" : "READY";
     bind(board);
   }
   function bind(board) {
-    function go(sel, fn) {
-      board.querySelectorAll(sel).forEach(function (el) { el.addEventListener("click", fn); });
-    }
-    go("[data-prev]", function () { if (page > 0) { page -= 1; mode = "view"; paint(); } });
-    go("[data-next]", function () { if (page < Math.ceil(items.length / PAGE) - 1) { page += 1; mode = "view"; paint(); } });
-    go("[data-go]", function (ev) { page = Number(ev.currentTarget.getAttribute("data-go")) || 0; mode = "view"; paint(); });
-    go("[data-new]", function () { draft = blank(); mode = "edit"; page = 0; paint(); });
-    go("[data-edit]", function (ev) {
-      draft = JSON.parse(JSON.stringify(items[Number(ev.currentTarget.getAttribute("data-edit"))]));
-      mode = "edit";
-      paint();
+    board.querySelectorAll("[data-prev]").forEach(function (el) {
+      el.addEventListener("click", function () { if (page > 0) { page -= 1; paint(); } });
     });
-    go("[data-cancel]", function () { mode = "view"; draft = null; paint(); });
-    go("[data-save]", function () {
-      draft = readDraft();
-      if (!draft.name) return;
-      var at = items.findIndex(function (row) { return row.id === draft.id; });
-      if (at >= 0) { items[at] = draft; page = Math.floor(at / PAGE); }
-      else { items.unshift(draft); page = 0; }
-      mode = "view";
-      draft = null;
-      paint();
-      pushRemote();
+    board.querySelectorAll("[data-next]").forEach(function (el) {
+      el.addEventListener("click", function () { if (page < Math.ceil(rows.length / PAGE) - 1) { page += 1; paint(); } });
     });
-    go("[data-drop]", function (ev) {
-      items.splice(Number(ev.currentTarget.getAttribute("data-drop")), 1);
-      var pages = Math.max(1, Math.ceil(items.length / PAGE));
-      if (page > pages - 1) page = pages - 1;
-      mode = "view";
-      paint();
-      pushRemote();
+    board.querySelectorAll("[data-go]").forEach(function (el) {
+      el.addEventListener("click", function () { page = Number(el.getAttribute("data-go")) || 0; paint(); });
+    });
+    board.querySelectorAll("[data-dip]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var ca = input.getAttribute("data-dip");
+        var row = rows.filter(function (item) { return item.ca === ca; })[0] || {};
+        var next = mine.filter(function (item) { return String(item.ca || "").toLowerCase() !== ca; });
+        next.push({ id: ca, ca: ca, name: row.name || ca, date: "", dip: input.value.trim(), support: row.price ? String(row.price) : "", at: Date.now() });
+        mine = next;
+        pushMine();
+      });
     });
   }
 

@@ -10,10 +10,11 @@ function cleanItems(items) {
     id: String((row && row.id) || '').slice(0, 24) || String(Date.now()),
     date: cleanDate(row && row.date),
     name: String((row && row.name) || '').trim().slice(0, 48),
+    ca: String((row && row.ca) || '').trim().toLowerCase().slice(0, 64),
     dip: String((row && row.dip) || '').trim().slice(0, 32),
     support: String((row && row.support) || '').trim().slice(0, 32),
     at: Number(row && row.at) || Date.now()
-  })).filter((row) => row.name).slice(0, 200);
+  })).filter((row) => row.name || row.ca).slice(0, 200);
 }
 
 export function readFavDips(store) {

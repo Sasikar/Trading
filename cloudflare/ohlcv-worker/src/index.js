@@ -17,6 +17,7 @@ import { applySnapshot, tierDailyTick } from './tier-history.js';
 import { readFomoEntry, writeFomoEntry, pushFomoGithub, readFomoState } from './fomo-entry.js';
 import { readFomoExperiences, writeFomoExperiences } from './fomo-experiences.js';
 import { readFavDips, writeFavDips } from './fav-dips.js';
+import { readFavSupports } from './fav-support.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -348,6 +349,10 @@ export class OhlcvEngine {
         }
         const dips = readFavDips(this.store);
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+      if (path === '/fav-supports' || path === '/api/fav-supports') {
+        const board = readFavSupports(this.store);
+        return new Response(JSON.stringify({ ok: true, ...board }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       }
       if (path === '/coinstats-wallets' || path === '/api/coinstats-wallets') {
         if (request.method === 'POST') {
