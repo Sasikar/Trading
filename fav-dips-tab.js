@@ -9,6 +9,7 @@
   var rows = [];
   var mine = [];
   var page = 0;
+  var tab = "all";
   var pushing = 0;
 
   function $(id) { return document.getElementById(id); }
@@ -30,8 +31,15 @@
     var hit = (row.levels || []).filter(function (item) { return item.tf === tf; })[0];
     return hit && hit.px > 0 ? px(hit.px) : "—";
   }
+  function mineOf(ca) {
+    return mine.filter(function (item) { return String(item.ca || "").toLowerCase() === ca; })[0] || null;
+  }
+  function watched(ca) {
+    var hit = mineOf(ca);
+    return !!(hit && hit.watch);
+  }
   function myDip(ca) {
-    var hit = mine.filter(function (item) { return String(item.ca || "").toLowerCase() === ca; })[0];
+    var hit = mineOf(ca);
     return hit ? hit.dip || "" : "";
   }
   function saveLocal() {
@@ -113,25 +121,41 @@
       return String(row.name || "").toLowerCase().indexOf(q) >= 0 || String(row.ca || "").toLowerCase().indexOf(q) >= 0;
     });
   }
+  function listed() {
+    var list = filtered();
+    if (tab !== "mom") return list;
+    return list.filter(function (row) { return watched(row.ca); });
+  }
+  function eye(on) {
+    return "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"" + (on ? "#f5a14a" : "none") + "\" stroke=\"" + (on ? "#f5a14a" : "#8491a1") + "\" stroke-width=\"2\"><path d=\"M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\" fill=\"" + (on ? "#1a1006" : "none") + "\"/></svg>";
+  }
 
   function paint() {
     var board = $("fd-board");
     if (!board) return;
-    var list = filtered();
+    var list = listed();
     var pages = Math.max(1, Math.ceil(list.length / PAGE));
     if (page > pages - 1) page = Math.max(0, pages - 1);
     var start = page * PAGE;
     var slice = list.slice(start, start + PAGE);
     var th = "position:sticky;top:0;padding:8px 6px;text-align:right;background:#121a24;border-bottom:1px solid #3d4d63;font-size:11px;font-weight:800;white-space:nowrap";
     var td = "padding:8px 6px;border-bottom:1px solid #243041;text-align:right;font-size:12px;font-weight:800;white-space:nowrap;color:#c5d0dc";
-    var html = "<div style=\"overflow-x:auto\"><table style=\"border-collapse:collapse;min-width:760px\"><thead><tr>" +
+    var momN = rows.filter(function (row) { return watched(row.ca); }).length;
+    function chip(id, label) {
+      var on = tab === id;
+      return "<button type=\"button\" data-tab=\"" + id + "\" style=\"padding:8px 12px;border-radius:10px;border:1px solid " + (on ? "#3dbe7a" : "#243041") + ";background:" + (on ? "#102218" : "#121a24") + ";color:" + (on ? "#3dbe7a" : "#c5d0dc") + ";font-weight:800;cursor:pointer\">" + label + "</button>";
+    }
+    var html = "<div style=\"display:flex;gap:8px;margin-bottom:10px\">" + chip("all", "All") + chip("mom", "Momentum" + (momN ? " " + momN : "")) + "</div>";
+    html += "<div style=\"overflow-x:auto\"><table style=\"border-collapse:collapse;min-width:760px\"><thead><tr>" +
       "<th style=\"" + th + ";left:0;z-index:1;text-align:left;color:#f4f7fb\">Coin</th>";
     TFS.forEach(function (tf) { html += "<th style=\"" + th + ";color:#8491a1\">" + tf + "</th>"; });
     html += "<th style=\"" + th + ";color:#3dbe7a\">Engine</th><th style=\"" + th + ";text-align:left;color:#f5a14a\">My dip</th></tr></thead><tbody>";
-    if (!slice.length) html += "<tr><td colspan=\"10\" style=\"padding:12px;color:#8491a1\">" + (query ? "No coin matches." : "No saved coins yet.") + "</td></tr>";
+    if (!slice.length) html += "<tr><td colspan=\"10\" style=\"padding:12px;color:#8491a1\">" + (tab === "mom" ? "No momentum coins. Tap the eye on All." : query ? "No coin matches." : "No saved coins yet.") + "</td></tr>";
     slice.forEach(function (row, i) {
       html += "<tr style=\"background:" + (i % 2 ? "#101820" : "transparent") + "\">" +
-        "<td style=\"" + td + ";position:sticky;left:0;background:#0e151d;text-align:left;color:#f4f7fb\">" + esc(row.name) +
+        "<td style=\"" + td + ";position:sticky;left:0;background:#0e151d;text-align:left;color:#f4f7fb\">" +
+        (tab === "all" ? "<button type=\"button\" data-watch=\"" + esc(row.ca) + "\" aria-label=\"Watch\" style=\"border:0;background:transparent;padding:0 6px 0 0;vertical-align:middle;cursor:pointer\">" + eye(watched(row.ca)) + "</button>" : "") +
+        esc(row.name) +
         "<div style=\"font-size:10px;font-weight:700;color:#8491a1\">" + px(row.spot) + "</div></td>";
       TFS.forEach(function (tf) { html += "<td style=\"" + td + "\">" + level(row, tf) + "</td>"; });
       html += "<td style=\"" + td + ";color:#3dbe7a\">" + px(row.price) +
@@ -162,7 +186,37 @@
       el.addEventListener("click", function () { if (page > 0) { page -= 1; paint(); } });
     });
     board.querySelectorAll("[data-next]").forEach(function (el) {
-      el.addEventListener("click", function () { if (page < Math.ceil(filtered().length / PAGE) - 1) { page += 1; paint(); } });
+      el.addEventListener("click", function () { if (page < Math.ceil(listed().length / PAGE) - 1) { page += 1; paint(); } });
+    });
+    board.querySelectorAll("[data-tab]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        tab = el.getAttribute("data-tab") || "all";
+        page = 0;
+        paint();
+      });
+    });
+    board.querySelectorAll("[data-watch]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var ca = el.getAttribute("data-watch");
+        var row = rows.filter(function (item) { return item.ca === ca; })[0] || {};
+        var prev = mineOf(ca) || {};
+        var on = !prev.watch;
+        var next = mine.filter(function (item) { return String(item.ca || "").toLowerCase() !== ca; });
+        next.push({
+          id: prev.id || ca,
+          ca: ca,
+          name: row.name || prev.name || ca,
+          date: prev.date || "",
+          dip: prev.dip || "",
+          support: row.price ? String(row.price) : (prev.support || ""),
+          watch: on,
+          at: prev.at || Date.now()
+        });
+        mine = next;
+        if (on) { tab = "mom"; page = 0; }
+        paint();
+        pushMine();
+      });
     });
     board.querySelectorAll("[data-go]").forEach(function (el) {
       el.addEventListener("click", function () { page = Number(el.getAttribute("data-go")) || 0; paint(); });
@@ -171,8 +225,9 @@
       input.addEventListener("change", function () {
         var ca = input.getAttribute("data-dip");
         var row = rows.filter(function (item) { return item.ca === ca; })[0] || {};
+        var prev = mineOf(ca) || {};
         var next = mine.filter(function (item) { return String(item.ca || "").toLowerCase() !== ca; });
-        next.push({ id: ca, ca: ca, name: row.name || ca, date: "", dip: input.value.trim(), support: row.price ? String(row.price) : "", at: Date.now() });
+        next.push({ id: prev.id || ca, ca: ca, name: row.name || prev.name || ca, date: prev.date || "", dip: input.value.trim(), support: row.price ? String(row.price) : (prev.support || ""), watch: !!prev.watch, at: prev.at || Date.now() });
         mine = next;
         pushMine();
       });

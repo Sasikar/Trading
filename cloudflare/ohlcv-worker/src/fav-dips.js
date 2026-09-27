@@ -13,6 +13,7 @@ function cleanItems(items) {
     ca: String((row && row.ca) || '').trim().toLowerCase().slice(0, 64),
     dip: String((row && row.dip) || '').trim().slice(0, 32),
     support: String((row && row.support) || '').trim().slice(0, 32),
+    watch: !!(row && row.watch),
     at: Number(row && row.at) || Date.now()
   })).filter((row) => row.name || row.ca).slice(0, 200);
 }
