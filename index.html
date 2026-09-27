@@ -310,7 +310,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 #coin-fib-tv{min-height:280px}
 
 .card-pad{padding:14px}
-#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card,#wowdip-panel .card,#omg-panel .card,#pitfalls-panel .card,#strategy-panel .card,#decision-panel .card,#gmgn-panel .card,#wallets-panel .card,#pumpfun-panel .card,#coinstats-panel .card,#fomo-panel .card,#fx-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card,#wowdip-panel .card,#omg-panel .card,#pitfalls-panel .card,#strategy-panel .card,#decision-panel .card,#gmgn-panel .card,#wallets-panel .card,#pumpfun-panel .card,#coinstats-panel .card,#fomo-panel .card,#fx-panel .card,#fd-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 .hu-band-now{position:fixed;top:52px;left:0;right:0;z-index:80;display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:rgba(8,13,19,.96);border-bottom:1px solid #2a3644;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px #0006}
 .hu-band-now[hidden]{display:none!important}
 .hu-band-now b{font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
@@ -576,6 +576,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="coinstats" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showCoinstats&&window.showCoinstats(true);}catch(e){}">Coinstats</button>
   <button type="button" class="tab" data-tf="fomo" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntry&&window.showFomoEntry(true);}catch(e){}">Fomo Entry</button>
   <button type="button" class="tab" data-tf="fx" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoExperiences&&window.showFomoExperiences(true);}catch(e){}">Fomo Experiences</button>
+  <button type="button" class="tab" data-tf="fd" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFavDips&&window.showFavDips(true);}catch(e){}">Fav Dip</button>
   <button type="button" class="tab" data-tf="gmgn">GMGN</button>
   <button type="button" class="tab" data-tf="pumpfun" onclick="try{window.showPumpfun&&window.showPumpfun(true)}catch(e){}">Pumpfun</button>
   <button type="button" class="tab" data-tf="wallets">Wallets</button>
@@ -1227,6 +1228,17 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="fd-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Fav Dip / Support</h2><p>Date, coin, your dip, and the real support. Saved on the server.</p></div>
+    <span class="source" id="fd-status">READY</span>
+  </div>
+  <div class="card">
+    <div id="fd-board"></div>
+  </div>
+</section>
+</div>
 <div id="coinstats-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
@@ -1543,6 +1555,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="emotion-tab.js?v=20260924-em1"></script>
 <script src="fomo-entry-tab.js?v=20260926-fe4"></script>
 <script src="fomo-experiences-tab.js?v=20260926-fx5"></script>
+<script src="fav-dips-tab.js?v=20260927-fd1"></script>
 <script src="coinstats-tab.js?v=20260926-cs13"></script>
 <script src="gmgn-tab.js?v=20260923-pf1"></script>
 <script src="wallets-tab.js?v=20260923-pf1"></script>

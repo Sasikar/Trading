@@ -16,6 +16,7 @@ import { scanWallet, readWallets, writeWallets, scanSells, tickSells, readChart,
 import { applySnapshot, tierDailyTick } from './tier-history.js';
 import { readFomoEntry, writeFomoEntry, pushFomoGithub, readFomoState } from './fomo-entry.js';
 import { readFomoExperiences, writeFomoExperiences } from './fomo-experiences.js';
+import { readFavDips, writeFavDips } from './fav-dips.js';
 
 const _snapshotWallets = Engine.prototype.snapshotWallets;
 Engine.prototype.snapshotWallets = function snapshotWalletsWithCommon() {
@@ -338,6 +339,15 @@ export class OhlcvEngine {
         }
         const exp = readFomoExperiences(this.store);
         return new Response(JSON.stringify({ ok: true, items: exp.items, saved: exp.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+      if (path === '/fav-dips' || path === '/api/fav-dips') {
+        if (request.method === 'POST') {
+          const body = await request.json().catch(() => ({}));
+          const items = writeFavDips(this.store, body.items || []);
+          return new Response(JSON.stringify({ ok: true, items: items, saved: true }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        const dips = readFavDips(this.store);
+        return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/coinstats-wallets' || path === '/api/coinstats-wallets') {
         if (request.method === 'POST') {
