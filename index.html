@@ -538,6 +538,21 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 .recents-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .recents-head .lab{font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800}
 .recents-head button{height:32px;padding:0 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.ca-switch{display:flex;gap:6px}
+.ca-switch button.on{background:#e6c878;color:#1a1406;border-color:#e6c878}
+.ca-del-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #243041;border-radius:14px;background:#0b121a;margin-bottom:8px}
+.ca-del-row b{display:block;font-size:14px}
+.ca-del-row span{color:#8491a1;font-size:11px;font-weight:700}
+.ca-del-row button{margin-left:auto;height:34px;padding:0 12px;border:0;border-radius:10px;background:#6b2a34;color:#ffd0d4;font-weight:900;font-size:12px;cursor:pointer}
+#coin-delete-list{max-height:320px;overflow-y:auto}
+#ca-del-modal{position:fixed;inset:0;z-index:10050;background:#000a;display:none;align-items:flex-end;justify-content:center;padding:16px}
+#ca-del-modal.on{display:flex}
+#ca-del-sheet{width:min(420px,100%);background:#12161d;border:1px solid #2a3140;border-radius:22px;padding:18px;margin-bottom:12px}
+#ca-del-sheet p{color:#c5cad6;font-size:14px;line-height:1.45;margin:8px 0 16px}
+#ca-del-sheet .row{display:flex;gap:8px}
+#ca-del-sheet .row button{flex:1;height:44px;border-radius:12px;font-weight:900;font-size:14px;cursor:pointer}
+#ca-del-no{border:1px solid #2a3140;background:transparent;color:#f4f7fb}
+#ca-del-yes{border:0;background:#ff6f7c;color:#1a0a0c}
 @media(max-width:720px){
   .tf-grid,.coin-tf,#bo-tf{grid-template-columns:repeat(5,minmax(0,1fr))}
   .tab{font-size:11px;height:34px;padding:0 8px}
@@ -1493,11 +1508,15 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
     <div id="coin-recents-wrap">
       <div class="recents-head">
-        <div class="lab">RECENT CAs</div>
+        <div class="ca-switch">
+          <button type="button" id="ca-tab-coins" class="on">Coins</button>
+          <button type="button" id="ca-tab-del">Delete</button>
+        </div>
         <button type="button" onclick="try{window.coinRecentsSync&&window.coinRecentsSync()}catch(e){}">Sync GitHub</button>
       </div>
       <div id="coin-recents-status" class="coin-meta"></div>
       <div id="coin-recents"></div>
+      <div id="coin-delete-list" style="display:none"></div>
     </div>
     <div class="coin-tf" id="coin-tf">
       <button type="button" data-ctf="1m" onclick="try{window.setCoinTF&&window.setCoinTF('1m')}catch(e){}">1m</button>
@@ -1573,7 +1592,17 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 </div>
 </main></div>
 <script src="alerts-tab.js?v=20260928-al2"></script>
-<script src="overview-app.js?v=20260928-al1"></script>
+<div id="ca-del-modal" aria-hidden="true">
+  <div id="ca-del-sheet">
+    <b>Delete this coin?</b>
+    <p id="ca-del-copy">Are you sure? It will leave your saved list and GitHub.</p>
+    <div class="row">
+      <button type="button" id="ca-del-no">Cancel</button>
+      <button type="button" id="ca-del-yes">Delete</button>
+    </div>
+  </div>
+</div>
+<script src="overview-app.js?v=20260929-del"></script>
 <script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>

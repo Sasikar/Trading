@@ -4115,9 +4115,12 @@ window.runMultiCA = runMultiCA;
 
 /* ===== CA RECENT LIST (persistent browser + data/ca-recents.json) ===== */
 const COIN_RECENTS_KEY='ca_recents_v1';
+const COIN_RECENTS_TOMB='ca_recents_tomb_v1';
 const COIN_RECENTS_PATH='data/ca-recents.json';
 const COIN_RECENTS_MAX=0; // 0 = unlimited until user deletes
 let coinRecentsSha=null;
+let caDelView='coins';
+let caDelPending=null;
 
 function coinRecentsLoadLocal(){
   try{
@@ -4140,11 +4143,25 @@ function coinRecentsSaveLocal(arr){
 function coinRecentKey(e){
   return String(e.chain||'')+'|'+String(e.ca||'').toLowerCase();
 }
+function coinRecentsTombstones(){
+  try{
+    const o=JSON.parse(localStorage.getItem(COIN_RECENTS_TOMB)||'{}');
+    return o&&typeof o==='object'?o:{};
+  }catch(e){ return {}; }
+}
+function coinRecentsTomb(chain, ca, on){
+  const map=coinRecentsTombstones();
+  const k=coinRecentKey({chain,ca});
+  if(on) map[k]=Date.now();
+  else delete map[k];
+  try{ localStorage.setItem(COIN_RECENTS_TOMB, JSON.stringify(map)); }catch(e){}
+}
 function coinRecentsUpsert(entry){
   if(!entry||!entry.ca) return;
   const ca=String(entry.ca).trim();
   const chain=String(entry.chain||'solana');
   const name=String(entry.name||entry.base||ca.slice(0,6)+'…').slice(0,24);
+  coinRecentsTomb(chain, ca, false);
   // Keep prior pool fields if this upsert doesn't include them
   const prev=(coinRecentsLoadLocal().find(x=>coinRecentKey(x)===coinRecentKey({chain,ca})))||{};
   const item={
@@ -4162,45 +4179,75 @@ function coinRecentsUpsert(entry){
   coinRecentsRender();
 }
 function coinRecentsRemove(chain, ca){
+  coinRecentsTomb(chain, ca, true);
   const k=coinRecentKey({chain,ca});
   coinRecentsSaveLocal(coinRecentsLoadLocal().filter(x=>coinRecentKey(x)!==k));
   coinRecentsRender();
 }
+function coinRecentsAskDelete(e){
+  if(!e) return;
+  caDelPending=e;
+  const modal=$('ca-del-modal');
+  const copy=$('ca-del-copy');
+  if(copy) copy.textContent='Are you sure you want to delete '+(e.name||'this coin')+'? It leaves the saved list and GitHub.';
+  if(modal){ modal.classList.add('on'); modal.setAttribute('aria-hidden','false'); }
+}
+function coinRecentsCloseAsk(){
+  caDelPending=null;
+  const modal=$('ca-del-modal');
+  if(modal){ modal.classList.remove('on'); modal.setAttribute('aria-hidden','true'); }
+}
 function coinRecentsRender(){
   const box=$('coin-recents'); if(!box) return;
+  const delBox=$('coin-delete-list');
   const arr=coinRecentsLoadLocal();
+  const coinsBtn=$('ca-tab-coins');
+  const delBtn=$('ca-tab-del');
+  if(coinsBtn) coinsBtn.classList.toggle('on', caDelView!=='del');
+  if(delBtn) delBtn.classList.toggle('on', caDelView==='del');
+  box.style.display=caDelView==='del'?'none':'';
+  if(delBox) delBox.style.display=caDelView==='del'?'block':'none';
   if(!arr.length){
     box.innerHTML='<div style="font-size:11px;color:#8491a1">No saved CAs yet — Load one and it stays here</div>';
+    if(delBox) delBox.innerHTML='<div style="font-size:12px;color:#8491a1;font-weight:700">Nothing to delete.</div>';
     return;
   }
   const st0=$('coin-recents-status'); if(st0&&!st0.textContent) st0.textContent=arr.length+' saved';
   box.innerHTML=arr.map(function(e,i){
-    const short=e.ca.length>10?(e.ca.slice(0,4)+'…'+e.ca.slice(-4)):e.ca;
     const chainLab=(e.chain==='solana'||e.chain==='sol')?'SOL':'ETH';
     const active=(coinCA&&e.ca.toLowerCase()===String(coinCA).toLowerCase());
     return '<div class="coin-recent-chip'+(active?' on':'')+'" data-i="'+i+'" style="border:1px solid '+(active?'rgba(98,227,160,.45)':'#243041')+';background:'+(active?'rgba(98,227,160,.12)':'#0b121a')+'">'
       +'<button type="button" data-act="load" data-i="'+i+'" style="border:0;background:transparent;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+e.ca+'">'
       +e.name+' <span style="color:#8491a1;font-weight:650;font-size:10px">'+chainLab+'</span></button>'
-      +'<button type="button" data-act="del" data-i="'+i+'" title="Remove" style="border:0;background:transparent;color:#8491a1;font-size:14px;cursor:pointer;padding:0 2px;line-height:1;flex-shrink:0">×</button>'
       +'</div>';
   }).join('');
-  box.querySelectorAll('button[data-act]').forEach(function(btn){
-    btn.addEventListener('click', function(ev){
-      ev.preventDefault();
-      const i=+btn.getAttribute('data-i');
-      const list=coinRecentsLoadLocal();
-      const e=list[i]; if(!e) return;
-      if(btn.getAttribute('data-act')==='del'){
-        coinRecentsRemove(e.chain, e.ca);
-        try{ window.coinRecentsSync && window.coinRecentsSync(true); }catch(err){}
-        return;
-      }
-      // load
-      if($('coin-chain')) $('coin-chain').value = (e.chain==='sol'||e.chain==='solana')?'solana':'eth';
-      if($('coin-ca')) $('coin-ca').value = e.ca;
-      try{ window.loadCoin && window.loadCoin(); }catch(err){ alert(err); }
+  if(delBox){
+    delBox.innerHTML=arr.map(function(e,i){
+      const chainLab=(e.chain==='solana'||e.chain==='sol')?'SOL':'ETH';
+      return '<div class="ca-del-row"><div style="min-width:0"><b>'+e.name+'</b><span>'+chainLab+'</span></div>'
+        +'<button type="button" data-act="ask" data-i="'+i+'">Delete</button></div>';
+    }).join('');
+  }
+  function bind(root){
+    if(!root) return;
+    root.querySelectorAll('button[data-act]').forEach(function(btn){
+      btn.addEventListener('click', function(ev){
+        ev.preventDefault();
+        const i=+btn.getAttribute('data-i');
+        const list=coinRecentsLoadLocal();
+        const e=list[i]; if(!e) return;
+        if(btn.getAttribute('data-act')==='ask'){
+          coinRecentsAskDelete(e);
+          return;
+        }
+        if($('coin-chain')) $('coin-chain').value = (e.chain==='sol'||e.chain==='solana')?'solana':'eth';
+        if($('coin-ca')) $('coin-ca').value = e.ca;
+        try{ window.loadCoin && window.loadCoin(); }catch(err){ alert(err); }
+      });
     });
-  });
+  }
+  bind(box);
+  bind(delBox);
 }
 window.coinRecentsRender=coinRecentsRender;
 window.coinRecentsLoadLocal=coinRecentsLoadLocal;
@@ -4211,10 +4258,12 @@ async function coinRecentsSync(silent){
   const url='https://api.github.com/repos/Sasikar/Trading/contents/'+COIN_RECENTS_PATH;
 
   function mergeLists(a,b){
+    const tombs=coinRecentsTombstones();
     const map=new Map();
     (a||[]).concat(b||[]).forEach(function(e){
       if(!e||!e.ca) return;
       const k=coinRecentKey(e);
+      if(tombs[k]) return;
       const prev=map.get(k);
       if(!prev || (e.t||0)>=(prev.t||0)) map.set(k,e);
     });
@@ -4333,6 +4382,26 @@ async function coinRecentsSync(silent){
   }
 }
 window.coinRecentsSync=coinRecentsSync;
+(function wireCaDelete(){
+  const coins=$('ca-tab-coins');
+  const del=$('ca-tab-del');
+  if(coins) coins.addEventListener('click', function(){ caDelView='coins'; coinRecentsRender(); });
+  if(del) del.addEventListener('click', function(){ caDelView='del'; coinRecentsRender(); });
+  const no=$('ca-del-no');
+  const yes=$('ca-del-yes');
+  const modal=$('ca-del-modal');
+  if(no) no.addEventListener('click', coinRecentsCloseAsk);
+  if(modal) modal.addEventListener('click', function(ev){ if(ev.target===modal) coinRecentsCloseAsk(); });
+  if(yes) yes.addEventListener('click', function(){
+    const e=caDelPending;
+    coinRecentsCloseAsk();
+    if(!e) return;
+    coinRecentsRemove(e.chain, e.ca);
+    const st=$('coin-recents-status');
+    if(st) st.textContent='Deleting '+(e.name||'coin')+'…';
+    try{ coinRecentsSync(true); }catch(err){}
+  });
+})();
 
 async function loadCoin(){
   const chain=(($('coin-chain')||{}).value)||'eth';
