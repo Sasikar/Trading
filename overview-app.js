@@ -2814,7 +2814,7 @@ document.addEventListener('click', function(ev){
   }catch(e){ console.warn(e); }
 });
 
-function showCoin(on){
+function showCoin(on, opts){
   const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel'),af=$('antifomo-panel'),bo=$('breakouts-panel');
   if(panels){panels.classList.add('hidden');panels.style.display='none';}
   if(trend){trend.classList.remove('on');trend.style.display='none';}
@@ -2825,7 +2825,7 @@ function showCoin(on){
   if(af){af.style.display='none';af.classList.remove('on');}
   if(on && bo){bo.style.display='none';bo.classList.remove('on');}
   if(cp){
-    if(on){ cp.classList.add('on'); cp.style.display='block'; try{wireCoinUI();}catch(e){} }
+    if(on){ cp.classList.add('on'); cp.style.display='block'; if(!(opts&&opts.del)) caDelView='coins'; try{wireCoinUI();}catch(e){} try{coinRecentsRender();}catch(e){} }
     else { cp.classList.remove('on'); cp.style.display='none'; }
   }
 }
@@ -4382,6 +4382,15 @@ async function coinRecentsSync(silent){
   }
 }
 window.coinRecentsSync=coinRecentsSync;
+function showCoinDelete(on){
+  if(!on){ showCoin(false); return; }
+  ['fe-panel','alerts-panel','pumpfun-panel','fomo-panel','fx-panel','fd-panel','coinstats-panel','emotion-panel','wallets-panel','gmgn-panel','hunter-panel','breakouts-panel'].forEach(function(id){
+    var el=$(id); if(!el) return; el.style.display='none'; el.classList.remove('on');
+  });
+  caDelView='del';
+  showCoin(true, {del:true});
+}
+window.showCoinDelete=showCoinDelete;
 (function wireCaDelete(){
   const coins=$('ca-tab-coins');
   const del=$('ca-tab-del');
