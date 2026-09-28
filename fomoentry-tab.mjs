@@ -151,6 +151,27 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
           "<span style=\"font-size:12px;font-weight:800;color:#8b93a7\">" + (cur ? esc(cur.name) + " · " : "") + (pos + 1) + " / " + list.length + "</span></div>" + riskLine
         : "<div style=\"border:1px solid #2a3140;border-radius:16px;padding:12px;margin-bottom:12px;color:#8b93a7;font-weight:800\">No TAKE coin clears this tab. The setup below stays hidden so it is not mistaken for a match.</div>");
   }
+  function missTable() {
+    var missed = [];
+    takes.forEach(function (t) {
+      var m = metrics(t);
+      if (m.up >= 15 && m.rr >= 1.5) return;
+      var later = ((t.setup && t.setup.targets) || []).filter(function (x) { return +x.percent > m.up + 0.05; });
+      var why = m.up < 15
+        ? "First target under +15%" + (later[0] ? ". +" + (+later[0].percent).toFixed(1) + "% is a later target" : "")
+        : m.rr.toFixed(2) + "× is under 1.5× the stop";
+      missed.push({ name: t.name || "Coin", up: m.up, rr: m.rr, why: why });
+    });
+    missed.sort(function (a, b) { return b.up - a.up || b.rr - a.rr; });
+    if (!missed.length) {
+      return "<section style=\"margin-top:14px;border:1px solid #2a3140;border-radius:22px;padding:14px;color:#8b93a7;font-weight:800\">Every TAKE coin cleared Best Upside.</section>";
+    }
+    var head = "<div style=\"display:grid;grid-template-columns:1.05fr .7fr .62fr 1.5fr;gap:6px;font-size:10px;letter-spacing:.06em;font-weight:900;color:#8b93a7;padding:0 2px 8px\"><span>COIN</span><span>TARGET 1</span><span>× STOP</span><span>WHY MISSED</span></div>";
+    var body = missed.map(function (r) {
+      return "<div style=\"display:grid;grid-template-columns:1.05fr .7fr .62fr 1.5fr;gap:6px;align-items:start;padding:8px 2px;border-top:1px solid #2a3140;font-size:12px;line-height:1.35\"><b>" + esc(r.name) + "</b><span style=\"font-weight:800;color:#f4f7fb\">" + (r.up > 0 ? "+" + r.up.toFixed(1) + "%" : "—") + "</span><span style=\"font-weight:800;color:#f4f7fb\">" + (r.rr > 0 ? r.rr.toFixed(2) + "×" : "—") + "</span><span style=\"color:#e6b84d;font-weight:700\">" + esc(r.why) + "</span></div>";
+    }).join("");
+    return "<section style=\"margin-top:14px;border:1px solid #2a3140;border-radius:22px;padding:14px\"><div style=\"font-size:11px;letter-spacing:.14em;font-weight:900;color:#8b93a7;margin-bottom:10px\">WHY THE OTHER TAKE COINS MISSED</div>" + head + body + "</section>";
+  }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";
     if (id === "7D") return "ACTIVE SWING · HOURS TO DAYS";
@@ -302,7 +323,8 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       "<span style=\"flex:1;border-top:1px dashed #2a3140\"></span></div>" +
       "<div style=\"font-size:11px;letter-spacing:.16em;font-weight:900;color:#8b93a7;margin:2px 2px 8px\">SUPPORT ZONES</div>" +
       (sup.length ? sup.map(function (l) { return zoneCard(l, false); }).join("<div style=\"height:8px\"></div>") : "<div style=\"color:#8b93a7;font-size:13px\">No support with enough evidence.</div>") +
-      "</section>");
+      "</section>") +
+      (lane === "up" ? missTable() : "");
     var qEl = $("fe-q");
     if (qEl) {
       qEl.addEventListener("input", function () {
