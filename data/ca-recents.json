@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-28T23:58:07.914Z",
+  "updated": "2026-09-28T23:58:13.261Z",
   "count": 33,
   "items": [
     {
@@ -7,11 +7,11 @@
       "ca": "0xD533a949740bb3306d119CC777fa900bA034cd52",
       "name": "cvxCRV",
       "base": "cvxCRV",
-      "t": 1790639316502,
+      "t": 1790639892464,
       "poolAddress": "0x971add32Ea87f10bD192671630be3BE8A11b8623",
       "poolNetwork": "eth",
-      "poolLiq": 11165708.03,
-      "poolCachedAt": 1790639316501
+      "poolLiq": 11035051.44,
+      "poolCachedAt": 1790639892462
     },
     {
       "chain": "solana",
