@@ -714,7 +714,7 @@ function lastZoneAt(barsByTf, zone, lookback, now) {
       if (t > bestOpen || (t === bestOpen && r < bestRank)) {
         bestOpen = t;
         bestRank = r;
-        bestAt = Math.min(tnow, t + ms);
+        bestAt = t;
       }
     }
   }

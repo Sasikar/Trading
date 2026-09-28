@@ -1,4 +1,4 @@
-import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-near";
+import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-open";
 
 (function () {
   if (window.__fomoEntryDesk) return;
@@ -700,7 +700,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
         if (hi < zone.low || lo > zone.high) continue;
         if (t >= bestOpen) {
           bestOpen = t;
-          bestAt = Math.min(Date.now(), t + ms);
+          bestAt = t;
         }
       }
     }
