@@ -1,4 +1,4 @@
-import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-ist";
+import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-touch";
 
 (function () {
   if (window.__fomoEntryDesk) return;
@@ -262,7 +262,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   }
 
   async function barsOf(mint) {
-    var tfs = [["5m", 400], ["1h", 220], ["4h", 120], ["1d", 90], ["1w", 40]];
+    var tfs = [["5m", 400], ["15m", 400], ["30m", 400], ["1h", 240], ["4h", 160], ["1d", 90], ["1w", 40]];
     var out = {};
     await Promise.all(tfs.map(async function (pair) {
       var res = await fetch(API + "/candles?ca=" + encodeURIComponent(mint) + "&tf=" + pair[0] + "&n=" + pair[1], { cache: "no-store" });
@@ -275,6 +275,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   }
 
   var mcAt = 0;
+  var trigToken = 0;
   async function dexJson(cas) {
     var path = "/latest/dex/tokens/" + cas.map(encodeURIComponent).join(",");
     try {
@@ -293,7 +294,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       var price = +p.priceUsd || 0;
       var liq = +((p.liquidity && p.liquidity.usd) || 0);
       if (!mint || !(mc > 0 || price > 0)) return;
-      if (!best[mint] || liq > best[mint].liq) best[mint] = { mc: mc, price: price, liq: liq };
+      if (!best[mint] || liq > best[mint].liq) best[mint] = { mc: mc, price: price, liq: liq, pair: p.pairAddress || "", chain: p.chainId || "" };
     });
     Object.keys(best).forEach(function (k) { quotes[k] = best[k]; });
   }
@@ -314,6 +315,61 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       }
     } catch (e) {
       mcAt = 0;
+    }
+  }
+
+  async function gtBars(chain, pool, frame) {
+    var net = String(chain || "").toLowerCase();
+    if (net === "sol" || net === "solana") net = "solana";
+    else if (net === "eth" || net === "ethereum") net = "eth";
+    var path = "/networks/" + net + "/pools/" + pool + "/ohlcv/" + frame;
+    var urls = [
+      "https://api.geckoterminal.com/api/v2" + path,
+      "https://trading-proxy.sasipudi.workers.dev/gt?path=" + encodeURIComponent(path)
+    ];
+    for (var i = 0; i < urls.length; i++) {
+      try {
+        var r = await fetch(urls[i], { cache: "no-store" });
+        if (!r.ok) continue;
+        var j = await r.json();
+        var list = j && j.data && j.data.attributes && j.data.attributes.ohlcv_list;
+        if (list && list.length) return list;
+      } catch (e) {}
+    }
+    return [];
+  }
+  async function refineTrigger(setup, token) {
+    var zone = setup && setup.entryZone;
+    var q = quotes[String(ca || "").toLowerCase()];
+    if (!zone || !q || !q.pair) return;
+    var frames = [
+      ["hour?aggregate=1&limit=240&currency=usd", 60 * 60 * 1000],
+      ["minute?aggregate=15&limit=200&currency=usd", 15 * 60 * 1000]
+    ];
+    var bestOpen = 0;
+    var bestAt = 0;
+    for (var f = 0; f < frames.length; f++) {
+      var list = await gtBars(q.chain, q.pair, frames[f][0]);
+      if (token !== trigToken) return;
+      var ms = frames[f][1];
+      for (var i = 0; i < list.length; i++) {
+        var row = list[i];
+        var t = +row[0];
+        if (t > 0 && t < 1e12) t *= 1000;
+        var hi = +row[2];
+        var lo = +row[3];
+        if (!(t > 0) || !(hi > 0) || !(lo > 0)) continue;
+        if (hi < zone.low || lo > zone.high) continue;
+        if (t >= bestOpen) {
+          bestOpen = t;
+          bestAt = Math.min(Date.now(), t + ms);
+        }
+      }
+    }
+    if (token !== trigToken || !(bestAt > 0)) return;
+    if (bestAt > (+zone.triggeredAt || 0)) {
+      zone.triggeredAt = bestAt;
+      if (last === setup) paint(setup);
     }
   }
 
@@ -343,6 +399,8 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       var bucket = Math.floor(Date.now() / 300000);
       (next.events || []).forEach(function (ev) { seen[alertKey(ca, next.setupId || "none", ev, bucket)] = 1; });
       paint(next);
+      trigToken += 1;
+      refineTrigger(next, trigToken);
     } catch (e) {
       var box = $("fe-board");
       if (box) box.innerHTML = "<div style=\"color:#ff5d6c;font-weight:800\">" + esc(e && e.message ? e.message : e) + "</div>";

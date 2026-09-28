@@ -6,7 +6,10 @@
 
 const TF_MS = {
   "5m": 5 * 60 * 1000,
+  "15m": 15 * 60 * 1000,
+  "30m": 30 * 60 * 1000,
   "1h": 60 * 60 * 1000,
+  "2h": 2 * 60 * 60 * 1000,
   "4h": 4 * 60 * 60 * 1000,
   "1d": 24 * 60 * 60 * 1000,
   "1w": 7 * 24 * 60 * 60 * 1000,
@@ -681,22 +684,34 @@ function lastZoneAt(barsByTf, zone, lookback, now) {
   if (!zone || !(zone.low > 0) || !(zone.high > 0)) return null;
   const tnow = +now || Date.now();
   const sliced = sliceLookback(barsByTf || {}, lookback || "ALL", tnow);
-  let best = 0;
-  for (const tf of sliced.order) {
+  const tfs = sliced.order.slice();
+  Object.keys(barsByTf || {}).forEach(function (tf) {
+    if (tfs.indexOf(tf) < 0) tfs.push(tf);
+  });
+  const rank = { "5m": 1, "15m": 2, "30m": 3, "1h": 4, "2h": 5, "4h": 6, "1d": 7, "1w": 8 };
+  let bestOpen = 0;
+  let bestAt = 0;
+  let bestRank = 99;
+  for (const tf of tfs) {
     const ms = tfMs(tf);
-    for (const b of cleanPrints(sliced.bars[tf] || [])) {
+    const r = rank[tf] || 9;
+    for (const b of sliced.bars[tf] || barsByTf[tf] || []) {
       const t = +b.t;
       if (!(t > 0) || t > tnow + ms) continue;
+      const windowMs = lookback === "24H" ? 864e5 : lookback === "7D" ? 7 * 864e5 : lookback === "30D" ? 30 * 864e5 : 0;
+      if (windowMs && t < tnow - windowMs) continue;
       const c = +b.c;
       const lo = Math.min(+b.l > 0 ? +b.l : c, c);
       const hi = Math.max(+b.h > 0 ? +b.h : c, c);
-      if (hi >= zone.low && lo <= zone.high) {
-        const at = Math.min(tnow, t + ms);
-        if (at > best) best = at;
+      if (!(hi >= zone.low && lo <= zone.high)) continue;
+      if (t > bestOpen || (t === bestOpen && r < bestRank)) {
+        bestOpen = t;
+        bestRank = r;
+        bestAt = Math.min(tnow, t + ms);
       }
     }
   }
-  return best || null;
+  return bestAt || null;
 }
 
 function withTrigger(setup, input) {
