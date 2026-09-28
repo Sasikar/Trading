@@ -1,7 +1,18 @@
 {
-  "updated": "2026-09-28T14:07:23.296Z",
-  "count": 32,
+  "updated": "2026-09-28T14:22:38.560Z",
+  "count": 33,
   "items": [
+    {
+      "chain": "eth",
+      "ca": "0xDDB3422497E61e13543BeA06989C0789117555c5",
+      "name": "COTI",
+      "base": "COTI",
+      "t": 1790605351425,
+      "poolAddress": "0xA2b04F8133fC25887A436812eaE384e32A8A84F2",
+      "poolNetwork": "eth",
+      "poolLiq": 184976.41,
+      "poolCachedAt": 1790605351424
+    },
     {
       "chain": "eth",
       "ca": "0x68BbEd6A47194EFf1CF514B50Ea91895597fc91E",
