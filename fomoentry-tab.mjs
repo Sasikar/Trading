@@ -14,7 +14,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   var cards = [];
   var last = null;
   var query = "";
-  var menuOpen = false;
+  var mcaps = {};
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -40,6 +40,18 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   }
   function badgeOf(s) {
     return takeState(s);
+  }
+  function fmtMc(n) {
+    n = +n;
+    if (!(n > 0)) return "";
+    if (n >= 1e9) return "$" + trim((n / 1e9).toFixed(n >= 10e9 ? 1 : 2)) + "B";
+    if (n >= 1e6) return "$" + trim((n / 1e6).toFixed(n >= 10e6 ? 1 : 2)) + "M";
+    if (n >= 1e3) return "$" + trim((n / 1e3).toFixed(n >= 1e5 ? 0 : 1)) + "k";
+    return "$" + Math.round(n);
+  }
+  function mcOf(c) {
+    var id = String(c.ca || "").toLowerCase();
+    return +c.mcap || +mcaps[id] || 0;
   }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";
@@ -126,12 +138,11 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     var rows = shown.slice(0, 12).map(function (c) {
       var id = String(c.ca).toLowerCase();
       var on = id === ca;
-      var short = id.slice(0, 4) + "…" + id.slice(-4);
+      var mc = fmtMc(mcOf(c));
       return "<button type=\"button\" class=\"fe-row" + (on ? " on" : "") + "\" data-ca=\"" + esc(id) + "\">" +
         "<span class=\"fe-ava\">" + esc((c.name || "?").slice(0, 1).toUpperCase()) + "</span>" +
-        "<span style=\"flex:1;min-width:0\"><span style=\"display:block;font-weight:800\">" + esc(c.name || id.slice(0, 6)) + "</span>" +
-        "<span style=\"display:block;color:#6d7688;font-size:11px;font-family:ui-monospace,monospace\">" + esc(short) + "</span></span>" +
-        (on ? "<span style=\"color:#e6b84d;font-weight:900;font-size:12px\">Selected</span>" : "") +
+        "<span style=\"flex:1;min-width:0;font-weight:800\">" + esc(c.name || id.slice(0, 6)) + "</span>" +
+        "<span style=\"font-weight:800;font-size:13px;color:" + (mc ? "#3dbe7a" : "#6d7688") + "\">" + esc(mc || "MC —") + "</span>" +
         "</button>";
     }).join("");
     if (!rows && mintish) {
@@ -153,7 +164,8 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       "<div class=\"fe-lab\" style=\"margin-top:12px\">COIN</div>" +
       "<button type=\"button\" class=\"fe-drop\" id=\"fe-drop\" aria-expanded=\"" + (menuOpen ? "true" : "false") + "\">" +
       "<span class=\"fe-ava\">" + esc(name.slice(0, 1).toUpperCase()) + "</span>" +
-      "<span style=\"flex:1;min-width:0;font-weight:900;font-size:16px\">" + esc(name) + "</span>" +
+      "<span style=\"flex:1;min-width:0\"><span style=\"display:block;font-weight:900;font-size:16px\">" + esc(name) + "</span>" +
+      "<span style=\"display:block;color:#3dbe7a;font-size:12px;font-weight:800\">" + esc(fmtMc(mcOf(card || { ca: ca })) || "MC —") + "</span></span>" +
       "<span style=\"border-radius:99px;padding:4px 10px;font-size:11px;font-weight:900;background:" + (badge === "TAKE" ? "#143d2a" : "#3a2e14") + ";color:" + (badge === "TAKE" ? "#3dbe7a" : "#e6b84d") + "\">" + badge + "</span>" +
       "<span style=\"color:#8b93a7;font-size:12px\">" + (menuOpen ? "▴" : "▾") + "</span></button>" +
       (menuOpen ? "<div class=\"fe-menu\" id=\"fe-menu\">" + rows + "</div>" : "") +
@@ -241,10 +253,39 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     return out;
   }
 
+  async function fillMc() {
+    var need = cards.map(function (c) { return String(c.ca || ""); }).filter(function (id) {
+      return id && !(mcaps[id.toLowerCase()] > 0) && !(cards.find(function (c) { return String(c.ca).toLowerCase() === id.toLowerCase() && +c.mcap > 0; }));
+    });
+    if (!need.length) return;
+    try {
+      for (var i = 0; i < need.length; i += 30) {
+        var chunk = need.slice(i, i + 30);
+        var res = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + chunk.join(","));
+        var body = await res.json();
+        var best = {};
+        (body.pairs || []).forEach(function (p) {
+          var mint = String((p.baseToken && p.baseToken.address) || "").toLowerCase();
+          var mc = +p.marketCap || +p.fdv || 0;
+          var liq = +((p.liquidity && p.liquidity.usd) || 0);
+          if (!mint || !(mc > 0)) return;
+          if (!best[mint] || liq > best[mint].liq) best[mint] = { mc: mc, liq: liq };
+        });
+        Object.keys(best).forEach(function (k) { mcaps[k] = best[k].mc; });
+        chunk.forEach(function (id) {
+          var k = id.toLowerCase();
+          if (!(mcaps[k] > 0)) mcaps[k] = -1;
+        });
+      }
+      if (last) paint(last);
+    } catch (e) {}
+  }
+
   async function load() {
     try {
       var ew = await fetch(API + "/entry-window?tf=1h", { cache: "no-store" }).then(function (r) { return r.json(); });
       cards = ew.cards || [];
+      fillMc();
       if (!ca) {
         var saved = "";
         try { saved = localStorage.getItem("fomoentry_ca") || ""; } catch (e) {}

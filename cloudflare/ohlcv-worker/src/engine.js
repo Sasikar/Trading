@@ -4128,6 +4128,7 @@ export class Engine {
       state: h.state,
       bars: h.bars,
       need: h.need,
+      mcap: +h.mcap || 0,
       ew: h.ew || { state: 'NO_SETUP', label: 'NO BREAKOUT', color: '#8491a1', why: 'No entry window yet.' }
     });
     const hits = [];
