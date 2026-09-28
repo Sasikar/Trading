@@ -422,8 +422,12 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     (items || []).forEach(function (e) {
       var id = String(e.ca || "").toLowerCase();
       if (!id) return;
-      if (!by[id]) by[id] = { ca: e.ca, name: e.name || e.base || id.slice(0, 6), chain: e.chain || "", mcap: 0, ew: null };
-      else if (!by[id].name && (e.name || e.base)) by[id].name = e.name || e.base;
+      if (!by[id]) by[id] = { ca: e.ca, name: e.name || e.base || id.slice(0, 6), chain: e.chain || "", poolAddress: e.poolAddress || "", mcap: 0, ew: null };
+      else {
+        if (!by[id].name && (e.name || e.base)) by[id].name = e.name || e.base;
+        if (!by[id].poolAddress && e.poolAddress) by[id].poolAddress = e.poolAddress;
+        if (!by[id].chain && e.chain) by[id].chain = e.chain;
+      }
     });
     return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) {
       return String(a.name || "").localeCompare(String(b.name || ""));
@@ -443,6 +447,13 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
         out[pair[0]] = [];
       }
     }));
+    var have = ((out["1h"] || []).length) + ((out["4h"] || []).length) + ((out["1d"] || []).length);
+    if (have < 12) {
+      var extra = await geckoPack(mint);
+      ["5m", "1h", "4h", "1d", "1w"].forEach(function (tf) {
+        if ((out[tf] || []).length < 12 && extra[tf] && extra[tf].length) out[tf] = extra[tf];
+      });
+    }
     return out;
   }
 
@@ -509,6 +520,53 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       } catch (e) {}
     }
     return [];
+  }
+  function rowsFromList(list) {
+    var rows = [];
+    (list || []).forEach(function (row) {
+      var t = +row[0];
+      if (t > 0 && t < 1e12) t *= 1000;
+      var o = +row[1], h = +row[2], l = +row[3], c = +row[4];
+      if (!(t > 0) || !(h > 0) || !(l > 0)) return;
+      rows.push({ t: t, o: o || c, h: h, l: l, c: c || o, vol: +row[5] || 0 });
+    });
+    rows.sort(function (a, b) { return a.t - b.t; });
+    return rows;
+  }
+  function rollWeeks(days) {
+    var buckets = {};
+    (days || []).forEach(function (b) {
+      var week = Math.floor(b.t / (7 * 86400000)) * 7 * 86400000;
+      var g = buckets[week];
+      if (!g) buckets[week] = { t: week, o: b.o, h: b.h, l: b.l, c: b.c, vol: b.vol || 0 };
+      else {
+        g.h = Math.max(g.h, b.h);
+        g.l = Math.min(g.l, b.l);
+        g.c = b.c;
+        g.vol += b.vol || 0;
+      }
+    });
+    return Object.keys(buckets).map(function (k) { return buckets[k]; }).sort(function (a, b) { return a.t - b.t; });
+  }
+  async function geckoPack(mint) {
+    var id = String(mint || "").toLowerCase();
+    var card = cards.find(function (c) { return String(c.ca || "").toLowerCase() === id; });
+    var q = quotes[id];
+    var pool = (card && card.poolAddress) || (q && q.pair) || "";
+    var chain = (card && card.chain) || (q && q.chain) || "";
+    if (!pool) return {};
+    var frames = [
+      ["5m", "minute?aggregate=5&limit=300&currency=usd"],
+      ["1h", "hour?aggregate=1&limit=240&currency=usd"],
+      ["4h", "hour?aggregate=4&limit=180&currency=usd"],
+      ["1d", "day?aggregate=1&limit=180&currency=usd"]
+    ];
+    var out = {};
+    await Promise.all(frames.map(async function (pair) {
+      out[pair[0]] = rowsFromList(await gtBars(chain, pool, pair[1]));
+    }));
+    out["1w"] = rollWeeks(out["1d"]);
+    return out;
   }
   async function refineTrigger(setup, token) {
     var zone = setup && setup.entryZone;
