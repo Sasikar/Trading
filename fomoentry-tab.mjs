@@ -131,7 +131,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   function pagerHtml() {
     if (!takes.length) return "";
     var list = laneList();
-    var note = lane === "up" ? "First target at least +15% and 1.5R." : lane === "down" ? "Stop within 8%, and price is in the zone or 3% under it." : "Every coin currently in TAKE.";
+    var note = lane === "up" ? "First target at least +15%, and it must pay at least 1.5 times the stop." : lane === "down" ? "Stop within 8%, and price is in the zone or 3% under it." : "Every coin currently in TAKE.";
     var nums = list.map(function (t, i) {
       var on = String(t.ca) === ca;
       return "<button type=\"button\" data-page=\"" + i + "\" title=\"" + esc(t.name || "") + "\" style=\"width:34px;height:34px;border-radius:12px;border:1px solid " + (on ? "#e6b84d" : "#2a3140") + ";background:" + (on ? "#e6b84d" : "#12161d") + ";color:" + (on ? "#1a1406" : "#c5cad6") + ";font-weight:900;font-size:13px\">" + (i + 1) + "</button>";
@@ -139,11 +139,16 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     var cur = list.filter(function (t) { return String(t.ca) === ca; })[0];
     var pos = 0;
     list.forEach(function (t, i) { if (String(t.ca) === ca) pos = i; });
+    var riskLine = "";
+    if (lane === "up" && cur) {
+      var m = metrics(cur);
+      riskLine = "<div style=\"border:1px solid #1d6b45;background:#102218;border-radius:16px;padding:10px 12px;margin:-4px 0 12px;font-size:13px;line-height:1.45;color:#d7deea\"><b style=\"color:#3dbe7a\">" + (m.rr > 0 ? m.rr.toFixed(1) + "× the stop." : "Stop multiple.") + "</b> R means the stop-loss risk, not the reward. The stop is " + (m.risk < 99 ? m.risk.toFixed(1) + "% under the entry middle." : "not set.") + (m.up > 0 && m.risk > 0 && m.risk < 99 ? " The first target is +" + m.up.toFixed(1) + "%, so " + m.up.toFixed(1) + " ÷ " + m.risk.toFixed(1) + " = " + m.rr.toFixed(1) + "." : "") + "</div>";
+    }
     return laneBar() +
       "<div style=\"font-size:12px;color:#8b93a7;font-weight:700;margin:-2px 2px 8px\">" + note + "</div>" +
       (list.length
         ? "<div style=\"display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px\">" + nums +
-          "<span style=\"font-size:12px;font-weight:800;color:#8b93a7\">" + (cur ? esc(cur.name) + " · " : "") + (pos + 1) + " / " + list.length + "</span></div>"
+          "<span style=\"font-size:12px;font-weight:800;color:#8b93a7\">" + (cur ? esc(cur.name) + " · " : "") + (pos + 1) + " / " + list.length + "</span></div>" + riskLine
         : "<div style=\"border:1px solid #2a3140;border-radius:16px;padding:12px;margin-bottom:12px;color:#8b93a7;font-weight:800\">No TAKE coin clears this tab. The setup below stays hidden so it is not mistaken for a match.</div>");
   }
   function horizon(id) {
@@ -274,7 +279,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       "<div style=\"display:flex;border:1px solid #2a3140;border-radius:16px;padding:4px;margin-bottom:14px\">" + chips + "</div>" +
       "<section style=\"border:1px solid #2a3140;border-radius:22px;padding:14px\">" +
       "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px\"><b style=\"letter-spacing:.04em\">TRADE SETUP</b>" +
-      "<span style=\"border:1px solid #2a3140;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900\">R:R " + (rr != null ? Number(rr).toFixed(1) : "—") + " : 1</span></div>" +
+      "<span style=\"border:1px solid #2a3140;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900\">" + (rr != null ? (lane === "up" ? Number(rr).toFixed(1) + "× THE STOP" : "R:R " + Number(rr).toFixed(1) + " : 1") : "—") + "</span></div>" +
       "<div style=\"display:inline-block;background:#132033;color:#7eb6ff;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900;margin-bottom:8px\">" + horizon(look) + "</div>" +
       "<div><span style=\"display:inline-block;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900;background:" + (weak ? "#3a2e14" : "#143d2a") + ";color:" + (weak ? "#e6b84d" : "#3dbe7a") + "\">" + esc(setup.quality || "WAIT") + "</span></div>" +
       takeChips(takeWhere(setup)) +
