@@ -121,20 +121,20 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   }
   function laneBar() {
     var items = [["all", "ALL TAKE"], ["up", "BEST UPSIDE"], ["down", "PROTECT"]];
-    return "<div style=\"display:flex;gap:6px;margin-bottom:10px\">" + items.map(function (it) {
+    return "<div style=\"display:flex;gap:6px;margin-bottom:6px\">" + items.map(function (it) {
       var on = lane === it[0];
       var bg = !on ? "transparent" : it[0] === "down" ? "#6b2a34" : it[0] === "up" ? "#1d6b45" : "#e6b84d";
       var fg = !on ? "#8b93a7" : it[0] === "all" ? "#1a1406" : "#f4f7fb";
-      return "<button type=\"button\" data-lane=\"" + it[0] + "\" style=\"flex:1;border:1px solid #2a3140;border-radius:14px;padding:9px 4px;font-size:11px;font-weight:900;letter-spacing:.03em;background:" + bg + ";color:" + fg + "\">" + it[1] + "</button>";
+      return "<button type=\"button\" data-lane=\"" + it[0] + "\" style=\"flex:1;border:1px solid #2a3140;border-radius:12px;padding:7px 4px;font-size:11px;font-weight:900;letter-spacing:.03em;background:" + bg + ";color:" + fg + "\">" + it[1] + "</button>";
     }).join("") + "</div>";
   }
   function pagerHtml() {
     if (!takes.length) return "";
     var list = laneList();
-    var note = lane === "up" ? "First target at least +15%, and it must pay at least 1.5 times the stop." : lane === "down" ? "Stop within 8%, and price is in the zone or 3% under it." : "Every coin currently in TAKE.";
+    var note = lane === "up" ? "First target at least +15%, and at least 1.5× the stop." : lane === "down" ? "Stop within 8%, price in the zone or 3% under." : "";
     var nums = list.map(function (t, i) {
       var on = String(t.ca) === ca;
-      return "<button type=\"button\" data-page=\"" + i + "\" title=\"" + esc(t.name || "") + "\" style=\"width:34px;height:34px;border-radius:12px;border:1px solid " + (on ? "#e6b84d" : "#2a3140") + ";background:" + (on ? "#e6b84d" : "#12161d") + ";color:" + (on ? "#1a1406" : "#c5cad6") + ";font-weight:900;font-size:13px\">" + (i + 1) + "</button>";
+      return "<button type=\"button\" data-page=\"" + i + "\" title=\"" + esc(t.name || "") + "\" style=\"width:28px;height:28px;border-radius:9px;border:1px solid " + (on ? "#e6b84d" : "#2a3140") + ";background:" + (on ? "#e6b84d" : "#12161d") + ";color:" + (on ? "#1a1406" : "#c5cad6") + ";font-weight:900;font-size:12px\">" + (i + 1) + "</button>";
     }).join("");
     var cur = list.filter(function (t) { return String(t.ca) === ca; })[0];
     var pos = 0;
@@ -145,9 +145,9 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       riskLine = "<div style=\"border:1px solid #1d6b45;background:#102218;border-radius:16px;padding:10px 12px;margin:-4px 0 12px;font-size:13px;line-height:1.45;color:#d7deea\"><b style=\"color:#3dbe7a\">" + (m.rr > 0 ? m.rr.toFixed(1) + "× the stop." : "Stop multiple.") + "</b> R means the stop-loss risk, not the reward. The stop is " + (m.risk < 99 ? m.risk.toFixed(1) + "% under the entry middle." : "not set.") + (m.up > 0 && m.risk > 0 && m.risk < 99 ? " The first target is +" + m.up.toFixed(1) + "%, so " + m.up.toFixed(1) + " ÷ " + m.risk.toFixed(1) + " = " + m.rr.toFixed(1) + "." : "") + "</div>";
     }
     return laneBar() +
-      "<div style=\"font-size:12px;color:#8b93a7;font-weight:700;margin:-2px 2px 8px\">" + note + "</div>" +
+      (note ? "<div style=\"font-size:11px;color:#8b93a7;font-weight:700;margin:0 2px 6px\">" + note + "</div>" : "") +
       (list.length
-        ? "<div style=\"display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px\">" + nums +
+        ? "<div style=\"display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:8px\">" + nums +
           "<span style=\"font-size:12px;font-weight:800;color:#8b93a7\">" + (cur ? esc(cur.name) + " · " : "") + (pos + 1) + " / " + list.length + "</span></div>" + riskLine
         : "<div style=\"border:1px solid #2a3140;border-radius:16px;padding:12px;margin-bottom:12px;color:#8b93a7;font-weight:800\">No TAKE coin clears this tab. The setup below stays hidden so it is not mistaken for a match.</div>");
   }
@@ -230,23 +230,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       (note ? "<div style=\"margin-top:4px;font-size:12px;color:#8b93a7\">" + esc(note) + "</div>" : "") + "</div>";
   }
 
-  function paint(setup, keepFocus) {
-    var box = $("fe-board");
-    if (!box || !setup) return;
-    var wasTyping = !!keepFocus || (document.activeElement && document.activeElement.id === "fe-q");
-    last = setup;
-    var name = "Coin";
-    var card = cards.find(function (c) { return String(c.ca).toLowerCase() === ca; });
-    if (card && card.name) name = card.name;
-    var badge = badgeOf(setup);
-    var spot = setup.currentPrice || 0;
-    var res = (setup.keyLevels.resistance || []).filter(function (l) { return l.price > spot; }).sort(function (a, b) { return b.price - a.price; }).slice(0, 4);
-    var sup = (setup.keyLevels.support || []).filter(function (l) { return l.price < spot; }).sort(function (a, b) { return b.price - a.price; }).slice(0, 4);
-    var targets = (setup.targets || []).slice().sort(function (a, b) { return b.price - a.price; });
-    var above = (setup.keyLevels.resistance || []).filter(function (l) { return l.price > spot * 1.002; }).sort(function (a, b) { return a.price - b.price; });
-    var trigger = (above[0] && above[0].price) || (setup.breakoutTrigger && setup.breakoutTrigger.price) || null;
-    var rr = setup.rr && setup.rr.target1;
-    var weak = (setup.quality || "").indexOf("WEAK") >= 0 || setup.dataQuality === "LIMITED HISTORY";
+  function coinRows() {
     var q = query.trim().toLowerCase();
     var shown = cards.filter(function (c) {
       if (!q) return true;
@@ -268,6 +252,84 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       rows = "<button type=\"button\" class=\"fe-row\" data-ca=\"" + esc(query.trim()) + "\"><span class=\"fe-ava\">+</span><span style=\"font-weight:800\">Load this CA</span></button>";
     }
     if (!rows) rows = "<div style=\"padding:14px;color:#6d7688;font-size:13px\">No coin matches.</div>";
+    return rows;
+  }
+  function pickCoin(id) {
+    ca = String(id || ca).toLowerCase();
+    query = "";
+    menuOpen = false;
+    prev = null;
+    try { localStorage.setItem("fomoentry_ca", ca); } catch (e) {}
+    var hit = null;
+    for (var i = 0; i < takes.length; i++) if (takes[i].ca === ca) hit = takes[i];
+    if (hit && hit.setup) paint(hit.setup);
+    else if (last) paint(last);
+    load();
+  }
+  function fillRows() {
+    var holder = $("fe-rows");
+    if (!holder) return;
+    holder.innerHTML = coinRows();
+    holder.querySelectorAll("[data-ca]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        pickCoin(btn.getAttribute("data-ca") || ca);
+      });
+    });
+  }
+  function closeMenu() {
+    menuOpen = false;
+    var menu = $("fe-menu");
+    if (menu) menu.remove();
+    var chev = $("fe-chev");
+    if (chev) chev.textContent = "▾";
+    var drop = $("fe-drop");
+    if (drop) drop.setAttribute("aria-expanded", "false");
+  }
+  function openMenu() {
+    if ($("fe-menu")) return;
+    var drop = $("fe-drop");
+    if (!drop) {
+      menuOpen = true;
+      if (last) paint(last);
+      return;
+    }
+    menuOpen = true;
+    var menu = document.createElement("div");
+    menu.id = "fe-menu";
+    menu.className = "fe-menu";
+    menu.innerHTML = "<label class=\"fe-search\" style=\"margin:8px\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6d7688\" stroke-width=\"2.4\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><path d=\"M20 20l-3.5-3.5\"></path></svg><input id=\"fe-q\" type=\"search\" placeholder=\"Search name or contract\" value=\"" + esc(query) + "\" autocomplete=\"off\"></label><div id=\"fe-rows\"></div>";
+    drop.insertAdjacentElement("afterend", menu);
+    var chev = $("fe-chev");
+    if (chev) chev.textContent = "▴";
+    drop.setAttribute("aria-expanded", "true");
+    fillRows();
+    var qEl = $("fe-q");
+    if (qEl) {
+      qEl.addEventListener("input", function () {
+        query = qEl.value;
+        fillRows();
+      });
+      qEl.focus();
+    }
+  }
+  function paint(setup, keepFocus) {
+    var box = $("fe-board");
+    if (!box || !setup) return;
+    var wasTyping = !!keepFocus || (document.activeElement && document.activeElement.id === "fe-q");
+    last = setup;
+    var name = "Coin";
+    var card = cards.find(function (c) { return String(c.ca).toLowerCase() === ca; });
+    if (card && card.name) name = card.name;
+    var badge = badgeOf(setup);
+    var spot = setup.currentPrice || 0;
+    var res = (setup.keyLevels.resistance || []).filter(function (l) { return l.price > spot; }).sort(function (a, b) { return b.price - a.price; }).slice(0, 4);
+    var sup = (setup.keyLevels.support || []).filter(function (l) { return l.price < spot; }).sort(function (a, b) { return b.price - a.price; }).slice(0, 4);
+    var targets = (setup.targets || []).slice().sort(function (a, b) { return b.price - a.price; });
+    var above = (setup.keyLevels.resistance || []).filter(function (l) { return l.price > spot * 1.002; }).sort(function (a, b) { return a.price - b.price; });
+    var trigger = (above[0] && above[0].price) || (setup.breakoutTrigger && setup.breakoutTrigger.price) || null;
+    var rr = setup.rr && setup.rr.target1;
+    var weak = (setup.quality || "").indexOf("WEAK") >= 0 || setup.dataQuality === "LIMITED HISTORY";
+    var rows = coinRows();
     var chips = LOOKS.map(function (id) {
       var on = id === look;
       return "<button type=\"button\" data-look=\"" + id + "\" style=\"flex:1;border:0;border-radius:12px;padding:8px 0;font-weight:900;background:" + (on ? "#e6b84d" : "transparent") + ";color:" + (on ? "#1a1406" : "#8b93a7") + "\">" + id + "</button>";
@@ -282,22 +344,18 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       zoneNote += touched ? " · Triggered " + touched : " · No trigger in this lookback";
     }
     box.innerHTML =
-      "<div style=\"margin-bottom:14px\">" +
-      "<div class=\"fe-lab\">SEARCH</div>" +
-      "<label class=\"fe-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6d7688\" stroke-width=\"2.4\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><path d=\"M20 20l-3.5-3.5\"></path></svg>" +
-      "<input id=\"fe-q\" type=\"search\" placeholder=\"Name or contract\" value=\"" + esc(query) + "\" autocomplete=\"off\"></label>" +
-      "<div class=\"fe-lab\" style=\"margin-top:12px\">COIN</div>" +
+      "<div style=\"margin-bottom:8px\">" +
       "<button type=\"button\" class=\"fe-drop\" id=\"fe-drop\" aria-expanded=\"" + (menuOpen ? "true" : "false") + "\">" +
       "<span class=\"fe-ava\">" + esc(name.slice(0, 1).toUpperCase()) + "</span>" +
       "<span style=\"flex:1;min-width:0\"><span style=\"display:block;font-weight:900;font-size:16px\">" + esc(name) + "</span>" +
       "<span style=\"display:block;color:#3dbe7a;font-size:12px;font-weight:800\">" + esc(fmtMc(mcOf(card || { ca: ca })) || "MC —") + "</span></span>" +
       "<span style=\"border-radius:99px;padding:4px 10px;font-size:11px;font-weight:900;background:" + (badge === "TAKE" ? "#143d2a" : "#3a2e14") + ";color:" + (badge === "TAKE" ? "#3dbe7a" : "#e6b84d") + "\">" + badge + "</span>" +
-      "<span style=\"color:#8b93a7;font-size:12px\">" + (menuOpen ? "▴" : "▾") + "</span></button>" +
-      (menuOpen ? "<div class=\"fe-menu\" id=\"fe-menu\">" + rows + "</div>" : "") +
+      "<span id=\"fe-chev\" style=\"color:#8b93a7;font-size:12px\">" + (menuOpen ? "▴" : "▾") + "</span></button>" +
+      (menuOpen ? "<div class=\"fe-menu\" id=\"fe-menu\"><label class=\"fe-search\" style=\"margin:8px\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6d7688\" stroke-width=\"2.4\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><path d=\"M20 20l-3.5-3.5\"></path></svg><input id=\"fe-q\" type=\"search\" placeholder=\"Search name or contract\" value=\"" + esc(query) + "\" autocomplete=\"off\"></label><div id=\"fe-rows\">" + rows + "</div></div>" : "") +
       "</div>" +
       pagerHtml() +
       (lane !== "all" && !laneList().length ? "" :
-      "<div style=\"display:flex;border:1px solid #2a3140;border-radius:16px;padding:4px;margin-bottom:14px\">" + chips + "</div>" +
+      "<div style=\"display:flex;border:1px solid #2a3140;border-radius:14px;padding:3px;margin-bottom:8px\">" + chips + "</div>" +
       "<section style=\"border:1px solid #2a3140;border-radius:22px;padding:14px\">" +
       "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px\"><b style=\"letter-spacing:.04em\">TRADE SETUP</b>" +
       "<span style=\"border:1px solid #2a3140;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900\">" + (rr != null ? (lane === "up" ? Number(rr).toFixed(1) + "× THE STOP" : "R:R " + Number(rr).toFixed(1) + " : 1") : "—") + "</span></div>" +
@@ -329,8 +387,8 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     if (qEl) {
       qEl.addEventListener("input", function () {
         query = qEl.value;
-        menuOpen = true;
-        paint(last, true);
+        if ($("fe-rows")) fillRows();
+        else { menuOpen = true; paint(last, true); }
       });
       if (wasTyping) {
         qEl.focus();
@@ -340,8 +398,8 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     }
     var drop = $("fe-drop");
     if (drop) drop.addEventListener("click", function () {
-      menuOpen = !menuOpen;
-      paint(last);
+      if ($("fe-menu")) closeMenu();
+      else openMenu();
     });
     box.querySelectorAll("[data-lane]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -376,12 +434,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     });
     box.querySelectorAll("[data-ca]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        ca = btn.getAttribute("data-ca") || ca;
-        query = "";
-        menuOpen = false;
-        prev = null;
-        try { localStorage.setItem("fomoentry_ca", ca); } catch (e) {}
-        load();
+        pickCoin(btn.getAttribute("data-ca") || ca);
       });
     });
     box.querySelectorAll("[data-look]").forEach(function (btn) {
