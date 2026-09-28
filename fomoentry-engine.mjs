@@ -677,12 +677,41 @@ function closeEnough(a, b) {
   return Math.abs(a - b) / a <= 0.012;
 }
 
+function lastZoneAt(barsByTf, zone, lookback, now) {
+  if (!zone || !(zone.low > 0) || !(zone.high > 0)) return null;
+  const tnow = +now || Date.now();
+  const sliced = sliceLookback(barsByTf || {}, lookback || "ALL", tnow);
+  let best = 0;
+  for (const tf of sliced.order) {
+    const ms = tfMs(tf);
+    for (const b of cleanPrints(sliced.bars[tf] || [])) {
+      const t = +b.t;
+      if (!(t > 0) || t > tnow + ms) continue;
+      const c = +b.c;
+      const lo = Math.min(+b.l > 0 ? +b.l : c, c);
+      const hi = Math.max(+b.h > 0 ? +b.h : c, c);
+      if (hi >= zone.low && lo <= zone.high) {
+        const at = Math.min(tnow, t + ms);
+        if (at > best) best = at;
+      }
+    }
+  }
+  return best || null;
+}
+
+function withTrigger(setup, input) {
+  if (!setup || !setup.entryZone) return setup;
+  const at = lastZoneAt((input && input.bars) || {}, setup.entryZone, setup.lookback, setup.updatedAt);
+  setup.entryZone = { ...setup.entryZone, triggeredAt: at };
+  return setup;
+}
+
 function freezeOrFresh(input, fresh) {
   const prev = input && input.prev;
   const now = fresh.updatedAt;
   if (!prev || !prev.setupId || prev.ca !== fresh.ca) {
     if (fresh.entryZone) fresh.events = ["TRADE_SETUP_CREATED"];
-    return fresh;
+    return withTrigger(fresh, input);
   }
   const dead = prev.status === "INVALIDATED" || prev.status === "EXPIRED";
   if (!dead && prev.entryZone && fresh.entryZone && prev.setupType === fresh.setupType && closeEnough(prev.entryZone.midpoint, fresh.entryZone.midpoint)) {
@@ -727,7 +756,7 @@ function freezeOrFresh(input, fresh) {
         return again;
       }
     }
-    return kept;
+    return withTrigger(kept, input);
   }
   if (prev.invalidation && fresh.currentPrice > 0 && fresh.currentPrice < prev.invalidation.price && prev.entryZone) {
     const invalidated = {
@@ -743,12 +772,12 @@ function freezeOrFresh(input, fresh) {
     if (fresh.entryZone && fresh.setupId !== prev.setupId) {
       fresh.replacedId = prev.setupId;
       fresh.events = ["INVALIDATION_REACHED", "TRADE_SETUP_CREATED"];
-      return fresh;
+      return withTrigger(fresh, input);
     }
-    return invalidated;
+    return withTrigger(invalidated, input);
   }
   if (fresh.entryZone && fresh.setupId !== prev.setupId) fresh.events = ["TRADE_SETUP_CREATED"];
-  return fresh;
+  return withTrigger(fresh, input);
 }
 
 function diffEvents(prev, next) {

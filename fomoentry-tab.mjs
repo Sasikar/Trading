@@ -1,4 +1,4 @@
-import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-t3";
+import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-ist";
 
 (function () {
   if (window.__fomoEntryDesk) return;
@@ -55,6 +55,18 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     var q = quotes[id];
     if (q && q.mc > 0) return q.mc;
     return +c.mcap || 0;
+  }
+  function fmtIst(ms) {
+    ms = +ms;
+    if (!(ms > 0)) return "";
+    var d = new Date(ms + 330 * 60 * 1000);
+    var mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
+    var h = d.getUTCHours();
+    var m = d.getUTCMinutes();
+    var ap = h >= 12 ? "PM" : "AM";
+    h = h % 12 || 12;
+    var mm = (m < 10 ? "0" : "") + m;
+    return d.getUTCDate() + " " + mon + ", " + h + ":" + mm + " " + ap + " IST";
   }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";
@@ -159,6 +171,12 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     var targetHtml = targets.map(function (t, i) {
       return ladder("TARGET " + (targets.length - i), money(t.price), pct(t.percent) + " · " + (t.reason || ""), "target");
     }).join("");
+    var zoneNote = "No zone yet";
+    if (setup.entryZone) {
+      zoneNote = money(setup.entryZone.low) + " – " + money(setup.entryZone.high);
+      var touched = fmtIst(setup.entryZone.triggeredAt);
+      zoneNote += touched ? " · Triggered " + touched : " · No trigger in this lookback";
+    }
     box.innerHTML =
       "<div style=\"margin-bottom:14px\">" +
       "<div class=\"fe-lab\">SEARCH</div>" +
@@ -187,7 +205,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       "<div style=\"display:flex;flex-direction:column;gap:8px\">" + targetHtml +
       ladder("BREAKOUT TRIGGER", money(trigger), "momentum entry above this", "trigger") +
       ladder("CURRENT PRICE", money(spot), "", "spot") +
-      ladder("ENTRY ZONE", money(setup.entryZone && setup.entryZone.midpoint), setup.entryZone ? money(setup.entryZone.low) + " – " + money(setup.entryZone.high) : "No zone yet", "entry") +
+      ladder("ENTRY ZONE", money(setup.entryZone && setup.entryZone.midpoint), zoneNote, "entry") +
       ladder("STOP / INVALIDATION", money(setup.invalidation && setup.invalidation.price), setup.invalidation ? setup.invalidation.percentRisk + "% below the entry midpoint · setup is wrong below this" : "No stop until a zone exists", "stop") +
       "</div></section>" +
       "<section style=\"margin-top:14px;border:1px solid #2a3140;border-radius:22px;padding:14px;background:#12161dcc\">" +
