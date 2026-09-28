@@ -144,7 +144,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       (list.length
         ? "<div style=\"display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px\">" + nums +
           "<span style=\"font-size:12px;font-weight:800;color:#8b93a7\">" + (cur ? esc(cur.name) + " · " : "") + (pos + 1) + " / " + list.length + "</span></div>"
-        : "<div style=\"border:1px solid #2a3140;border-radius:16px;padding:12px;margin-bottom:12px;color:#8b93a7;font-weight:800\">No TAKE coin clears this tab.</div>");
+        : "<div style=\"border:1px solid #2a3140;border-radius:16px;padding:12px;margin-bottom:12px;color:#8b93a7;font-weight:800\">No TAKE coin clears this tab. The setup below stays hidden so it is not mistaken for a match.</div>");
   }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";
@@ -270,6 +270,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       (menuOpen ? "<div class=\"fe-menu\" id=\"fe-menu\">" + rows + "</div>" : "") +
       "</div>" +
       pagerHtml() +
+      (lane !== "all" && !laneList().length ? "" :
       "<div style=\"display:flex;border:1px solid #2a3140;border-radius:16px;padding:4px;margin-bottom:14px\">" + chips + "</div>" +
       "<section style=\"border:1px solid #2a3140;border-radius:22px;padding:14px\">" +
       "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px\"><b style=\"letter-spacing:.04em\">TRADE SETUP</b>" +
@@ -296,7 +297,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       "<span style=\"flex:1;border-top:1px dashed #2a3140\"></span></div>" +
       "<div style=\"font-size:11px;letter-spacing:.16em;font-weight:900;color:#8b93a7;margin:2px 2px 8px\">SUPPORT ZONES</div>" +
       (sup.length ? sup.map(function (l) { return zoneCard(l, false); }).join("<div style=\"height:8px\"></div>") : "<div style=\"color:#8b93a7;font-size:13px\">No support with enough evidence.</div>") +
-      "</section>";
+      "</section>");
     var qEl = $("fe-q");
     if (qEl) {
       qEl.addEventListener("input", function () {
