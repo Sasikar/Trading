@@ -248,12 +248,15 @@
       track.textContent = "";
       return;
     }
-    var line = names.map(function (item) {
+    var bit = names.map(function (item) {
       var name = item.name || item;
       var spot = item.spot;
       return name + " wonderful dip · live " + (spot > 0 ? px(spot) : "—");
-    }).join("      ");
-    track.textContent = (line + "      " + line + "      ");
+    }).join("   ·   ");
+    var copies = [];
+    for (var i = 0; i < 8; i++) copies.push("<span>" + esc(bit) + "</span>");
+    var half = copies.join("");
+    track.innerHTML = half + half;
     bar.style.display = "block";
     track.style.animation = "none";
     void track.offsetWidth;
