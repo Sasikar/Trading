@@ -17,6 +17,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   var menuOpen = false;
   var takes = [];
   var page = 0;
+  var lane = "all";
   var scanned = false;
   var scanning = false;
 
@@ -92,18 +93,58 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       return "<span style=\"border-radius:99px;padding:5px 10px;font-size:11px;font-weight:900;border:1px solid " + (on ? "#1d6b45" : "#2a3140") + ";background:" + (on ? "#143d2a" : "transparent") + ";color:" + (on ? "#3dbe7a" : "#6d7688") + "\">" + item[1] + "</span>";
     }).join("") + "</div>";
   }
+  function metrics(item) {
+    var s = item && item.setup;
+    if (!s) return { risk: 99, up: 0, rr: 0, where: "" };
+    var risk = s.invalidation ? +s.invalidation.percentRisk : 0;
+    var t1 = s.targets && s.targets[0];
+    var up = t1 ? +t1.percent : 0;
+    var rr = s.rr && +s.rr.target1 > 0 ? +s.rr.target1 : risk > 0 && up > 0 ? up / risk : 0;
+    return { risk: risk > 0 ? risk : 99, up: up, rr: rr, where: takeWhere(s) };
+  }
+  function laneList() {
+    var rows = takes.slice();
+    if (lane === "up") {
+      rows = rows.filter(function (t) {
+        var m = metrics(t);
+        return m.up >= 15 && m.rr >= 1.5;
+      });
+      rows.sort(function (a, b) { return metrics(b).rr - metrics(a).rr || metrics(b).up - metrics(a).up; });
+    } else if (lane === "down") {
+      rows = rows.filter(function (t) {
+        var m = metrics(t);
+        return m.risk <= 8 && (m.where === "in" || m.where === "under");
+      });
+      rows.sort(function (a, b) { return metrics(a).risk - metrics(b).risk; });
+    }
+    return rows;
+  }
+  function laneBar() {
+    var items = [["all", "ALL TAKE"], ["up", "BEST UPSIDE"], ["down", "PROTECT"]];
+    return "<div style=\"display:flex;gap:6px;margin-bottom:10px\">" + items.map(function (it) {
+      var on = lane === it[0];
+      var bg = !on ? "transparent" : it[0] === "down" ? "#6b2a34" : it[0] === "up" ? "#1d6b45" : "#e6b84d";
+      var fg = !on ? "#8b93a7" : it[0] === "all" ? "#1a1406" : "#f4f7fb";
+      return "<button type=\"button\" data-lane=\"" + it[0] + "\" style=\"flex:1;border:1px solid #2a3140;border-radius:14px;padding:9px 4px;font-size:11px;font-weight:900;letter-spacing:.03em;background:" + bg + ";color:" + fg + "\">" + it[1] + "</button>";
+    }).join("") + "</div>";
+  }
   function pagerHtml() {
     if (!takes.length) return "";
-    var nums = takes.map(function (t, i) {
-      var on = i === page && String(t.ca) === ca;
+    var list = laneList();
+    var note = lane === "up" ? "First target at least +15% and 1.5R." : lane === "down" ? "Stop within 8%, and price is in the zone or 3% under it." : "Every coin currently in TAKE.";
+    var nums = list.map(function (t, i) {
+      var on = String(t.ca) === ca;
       return "<button type=\"button\" data-page=\"" + i + "\" title=\"" + esc(t.name || "") + "\" style=\"width:34px;height:34px;border-radius:12px;border:1px solid " + (on ? "#e6b84d" : "#2a3140") + ";background:" + (on ? "#e6b84d" : "#12161d") + ";color:" + (on ? "#1a1406" : "#c5cad6") + ";font-weight:900;font-size:13px\">" + (i + 1) + "</button>";
     }).join("");
-    var cur = takes[page];
-    var whoName = cur && String(cur.ca) === ca ? cur.name : "";
-    return "<div style=\"display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px\">" +
-      "<span style=\"font-size:11px;letter-spacing:.14em;font-weight:900;color:#3dbe7a\">TAKE</span>" +
-      nums +
-      "<span style=\"font-size:12px;font-weight:800;color:#8b93a7\">" + (whoName ? esc(whoName) + " · " : "") + (page + 1) + " / " + takes.length + "</span></div>";
+    var cur = list.filter(function (t) { return String(t.ca) === ca; })[0];
+    var pos = 0;
+    list.forEach(function (t, i) { if (String(t.ca) === ca) pos = i; });
+    return laneBar() +
+      "<div style=\"font-size:12px;color:#8b93a7;font-weight:700;margin:-2px 2px 8px\">" + note + "</div>" +
+      (list.length
+        ? "<div style=\"display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px\">" + nums +
+          "<span style=\"font-size:12px;font-weight:800;color:#8b93a7\">" + (cur ? esc(cur.name) + " · " : "") + (pos + 1) + " / " + list.length + "</span></div>"
+        : "<div style=\"border:1px solid #2a3140;border-radius:16px;padding:12px;margin-bottom:12px;color:#8b93a7;font-weight:800\">No TAKE coin clears this tab.</div>");
   }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";
@@ -274,16 +315,34 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       menuOpen = !menuOpen;
       paint(last);
     });
-    box.querySelectorAll("[data-page]").forEach(function (btn) {
+    box.querySelectorAll("[data-lane]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var n = +btn.getAttribute("data-page");
-        if (!takes[n]) return;
-        page = n;
-        ca = takes[n].ca;
+        lane = btn.getAttribute("data-lane") || "all";
+        var list = laneList();
+        page = 0;
+        if (!list.length) {
+          if (last) paint(last);
+          return;
+        }
+        ca = list[0].ca;
         query = "";
         menuOpen = false;
         prev = null;
-        if (takes[n].setup) paint(takes[n].setup);
+        if (list[0].setup) paint(list[0].setup);
+        load();
+      });
+    });
+    box.querySelectorAll("[data-page]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var n = +btn.getAttribute("data-page");
+        var list = laneList();
+        if (!list[n]) return;
+        page = n;
+        ca = list[n].ca;
+        query = "";
+        menuOpen = false;
+        prev = null;
+        if (list[n].setup) paint(list[n].setup);
         load();
       });
     });
@@ -529,10 +588,12 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       var ix = -1;
       for (var ti = 0; ti < takes.length; ti++) if (takes[ti].ca === ca) ix = ti;
       if (ix >= 0) {
-        page = ix;
         takes[ix].setup = next;
         takes[ix].name = (card && card.name) || takes[ix].name;
       }
+      var shown = laneList();
+      page = 0;
+      for (var pi = 0; pi < shown.length; pi++) if (shown[pi].ca === ca) page = pi;
       paint(next);
       trigToken += 1;
       refineTrigger(next, trigToken);
