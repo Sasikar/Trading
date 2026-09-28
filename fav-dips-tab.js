@@ -248,7 +248,11 @@
       track.textContent = "";
       return;
     }
-    var line = names.map(function (name) { return name + " wonderful dip"; }).join("      ");
+    var line = names.map(function (item) {
+      var name = item.name || item;
+      var spot = item.spot;
+      return name + " wonderful dip · live " + (spot > 0 ? px(spot) : "—");
+    }).join("      ");
     track.textContent = (line + "      " + line + "      ");
     bar.style.display = "block";
     track.style.animation = "none";
@@ -270,7 +274,7 @@
         var ca = String(item.ca || "").toLowerCase();
         var row = live.filter(function (hit) { return hit.ca === ca; })[0];
         var spot = row ? +row.spot : 0;
-        if (spot > 0 && spot < dip) names.push((row && row.name) || item.name || ca);
+        if (spot > 0 && spot < dip) names.push({ name: (row && row.name) || item.name || ca, spot: spot });
       });
       paintAlert(names);
     }).catch(function () {});
