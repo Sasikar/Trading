@@ -68,6 +68,26 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     var mm = (m < 10 ? "0" : "") + m;
     return d.getUTCDate() + " " + mon + ", " + h + ":" + mm + " " + ap + " IST";
   }
+  function takeWhere(setup) {
+    var zone = setup && setup.entryZone;
+    var spot = setup && +setup.currentPrice;
+    if (!zone || !(spot > 0) || !(zone.high > 0) || !(zone.low > 0)) return "";
+    if (spot >= zone.low && spot <= zone.high) return "in";
+    if (spot > zone.high && (spot - zone.high) / zone.high <= 0.03) return "above";
+    if (spot < zone.low && (zone.low - spot) / zone.low <= 0.03) return "under";
+    return "";
+  }
+  function takeChips(active) {
+    var items = [
+      ["in", "IN THE ZONE"],
+      ["under", "WITHIN 3% UNDER"],
+      ["above", "WITHIN 3% ABOVE"]
+    ];
+    return "<div style=\"display:flex;flex-wrap:wrap;gap:6px;margin-top:8px\">" + items.map(function (item) {
+      var on = item[0] === active;
+      return "<span style=\"border-radius:99px;padding:5px 10px;font-size:11px;font-weight:900;border:1px solid " + (on ? "#1d6b45" : "#2a3140") + ";background:" + (on ? "#143d2a" : "transparent") + ";color:" + (on ? "#3dbe7a" : "#6d7688") + "\">" + item[1] + "</span>";
+    }).join("") + "</div>";
+  }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";
     if (id === "7D") return "ACTIVE SWING · HOURS TO DAYS";
@@ -197,6 +217,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       "<span style=\"border:1px solid #2a3140;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900\">R:R " + (rr != null ? Number(rr).toFixed(1) : "—") + " : 1</span></div>" +
       "<div style=\"display:inline-block;background:#132033;color:#7eb6ff;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900;margin-bottom:8px\">" + horizon(look) + "</div>" +
       "<div><span style=\"display:inline-block;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900;background:" + (weak ? "#3a2e14" : "#143d2a") + ";color:" + (weak ? "#e6b84d" : "#3dbe7a") + "\">" + esc(setup.quality || "WAIT") + "</span></div>" +
+      takeChips(takeWhere(setup)) +
       "<div style=\"text-align:center;font-size:11px;letter-spacing:.14em;font-weight:900;color:#8b93a7;margin:10px 0\">" + (weak ? "PROJECTED FROM LIMITED MARKET HISTORY" : "FROM CLOSED MARKET STRUCTURE") + "</div>" +
       "<button type=\"button\" id=\"fe-who\" style=\"width:100%;text-align:left;border:1px solid #2a3140;background:transparent;color:#f4f7fb;border-radius:16px;padding:12px;font-weight:900;margin-bottom:10px\">" + (who ? "▾" : "▸") + " Who this setup is designed for</button>" +
       (who ? "<p style=\"color:#8b93a7;font-size:14px;line-height:1.45;margin:0 0 10px\">Someone who will wait for the entry zone and accept being wrong at the stop. Not a chase of the current price. " + esc(setup.reason || "") + "</p>" : "") +
