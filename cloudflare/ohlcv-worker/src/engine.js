@@ -2207,6 +2207,21 @@ export class Engine {
     if (m === 'off' || m === 'picked') return m;
     return 'all';
   }
+  alertTypes() {
+    const ids = ['breakout', 'breakout1m', 'entry', 'entrywindow', 'parabolic', 'wowdip', 'position', 'decision', 'wallets'];
+    let saved = {};
+    try {
+      saved = JSON.parse(this.store.getMeta('alert_types') || '{}') || {};
+    } catch (e) {
+      saved = {};
+    }
+    const out = {};
+    for (const id of ids) out[id] = saved[id] !== false;
+    return out;
+  }
+  typeOn(id) {
+    return this.alertTypes()[id] !== false;
+  }
   alertCas() {
     try {
       const a = JSON.parse(this.store.getMeta('alert_cas') || '[]');
@@ -2248,19 +2263,34 @@ export class Engine {
       else set.add(k);
       this.store.setMeta('alert_cas', JSON.stringify(Array.from(set)));
     }
+    if (body.types && typeof body.types === 'object') {
+      const cur = this.alertTypes();
+      for (const id of Object.keys(cur)) {
+        if (typeof body.types[id] === 'boolean') cur[id] = body.types[id];
+      }
+      this.store.setMeta('alert_types', JSON.stringify(cur));
+    }
+    if (body.typesAll === true || body.typesAll === false) {
+      const cur = this.alertTypes();
+      for (const id of Object.keys(cur)) cur[id] = body.typesAll === true;
+      this.store.setMeta('alert_types', JSON.stringify(cur));
+    }
     return {
       alertMode: this.alertMode(),
-      alertCas: this.alertCas()
+      alertCas: this.alertCas(),
+      alertTypes: this.alertTypes()
     };
   }
   shouldAlert(hit, tf) {
     if (!this.alertsAllowed(hit && hit.ca)) return false;
     const tfn = String(tf || '').toLowerCase();
     if (tfn === '1m') {
+      if (!this.typeOn('breakout1m')) return false;
       if (!hit.focus) return false;
       if (this.store.getMeta('focus_1m_alerts') !== 'on') return false;
       return hit.section === 'live' || (hit.fresh && hit.event === 'NEW BREAKOUT');
     }
+    if (!this.typeOn('breakout')) return false;
     // Closed TF candle only. Do not ping LIVE if 5m already failed the level.
     if (hit.entry && hit.entry.paint === 'FAILED') return false;
     const live =
@@ -2285,6 +2315,7 @@ export class Engine {
     return closed.concat([open]);
   }
   async maybeParabolicAlert(row, tick) {
+    if (!this.typeOn('parabolic')) return false;
     if (this.alertMode() === 'off') return false;
     const p = parabolicFromTick(tick || {});
     if (!p.on) return false;
@@ -2397,6 +2428,7 @@ export class Engine {
   }
 
   async maybeEntryAlert(hit) {
+    if (!this.typeOn('entry')) return false;
     const e = hit && hit.entry;
     if (!this.alertsAllowed(hit && hit.ca)) return false;
     if (!e || (e.paint !== 'WINDOW' && e.paint !== 'EXTENDED' && e.paint !== 'FAILED')) return false;
@@ -3162,6 +3194,7 @@ export class Engine {
     this.store.setMeta('ew_paper', JSON.stringify(list.slice(-40)));
   }
   async maybeEwAlert(hit) {
+    if (!this.typeOn('entrywindow')) return false;
     const ew = hit && hit.ew;
     if (!ew || !ew.state) return false;
     if (!this.alertsAllowed(hit.ca)) return false;
@@ -3679,6 +3712,7 @@ export class Engine {
     }
   }
   async maybeWalletAlert(clustered) {
+    if (!this.typeOn('wallets')) return false;
     if (this.alertMode() === 'off') return false;
     const hits = (clustered || []).filter((c) => signalOf(c) === 'WATCHLIST' || signalOf(c) === 'CLUSTER');
     if (!hits.length) return false;
@@ -3755,6 +3789,7 @@ export class Engine {
     return { nCheck, nWait, nClear, byKind, after, n: list.length };
   }
   async maybeDecisionAlert(row, card) {
+    if (!this.typeOn('decision')) return false;
     if (this.alertMode() === 'off') return false;
     if (!this.alertsAllowed(row && row.ca)) return false;
     if (!card || !card.overall) return false;
@@ -3856,6 +3891,7 @@ export class Engine {
     return all;
   }
   async maybeCrashAlert(row, card) {
+    if (!this.typeOn('wowdip')) return false;
     if (this.alertMode() === 'off') return false;
     if (!this.alertsAllowed(row && row.ca)) return false;
     const c = card || {};
@@ -3904,6 +3940,7 @@ export class Engine {
     return true;
   }
   async maybePositionAlert(row, tick) {
+    if (!this.typeOn('position')) return false;
     if (this.alertMode() === 'off') return false;
     const card = this.observePosition(row);
     const p = card.primary || {};
@@ -4404,6 +4441,7 @@ export class Engine {
       focusName: this.store.getMeta('focus_name') || '',
       focus1mAlerts: this.store.getMeta('focus_1m_alerts') === 'on',
       alertMode: this.alertMode(),
+      alertTypes: this.alertTypes(),
       alertCas: this.alertCas(),
       alertWatch: (watch || []).map((r) => ({
         ca: r.ca,
