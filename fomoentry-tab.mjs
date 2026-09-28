@@ -14,6 +14,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   var cards = [];
   var last = null;
   var query = "";
+  var menuOpen = false;
   var mcaps = {};
 
   function $(id) { return document.getElementById(id); }
