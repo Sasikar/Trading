@@ -504,7 +504,14 @@ export function buildFomoEntry(input) {
   let anchor = null;
   let setupType = null;
   let reason = "";
-  if (flips.length) {
+  const nearFlips = flips.filter((l) => l.price < spot && (spot - l.price) / spot <= 0.12);
+  const nearerShelf = nearSupport[0] && (!nearFlips[0] || nearSupport[0].price > nearFlips[0].price);
+  if (nearFlips.length && !nearerShelf) {
+    anchor = nearFlips[0];
+    setupType = "BREAKOUT RETEST";
+    const tfNote = anchor.tfs.length > 1 ? anchor.tfs.join("+") + " confluence" : anchor.tf + " structure";
+    reason = "Prior breakout held as support · " + anchor.touchCount + " touches · " + tfNote;
+  } else if (flips.length && !nearSupport.length) {
     anchor = flips[0];
     setupType = "BREAKOUT RETEST";
     const tfNote = anchor.tfs.length > 1 ? anchor.tfs.join("+") + " confluence" : anchor.tf + " structure";
@@ -729,7 +736,19 @@ function freezeOrFresh(input, fresh) {
     return withTrigger(fresh, input);
   }
   const dead = prev.status === "INVALIDATED" || prev.status === "EXPIRED";
-  if (!dead && prev.entryZone && fresh.entryZone && prev.setupType === fresh.setupType && closeEnough(prev.entryZone.midpoint, fresh.entryZone.midpoint)) {
+  const backInPrev =
+    !dead &&
+    prev.entryZone &&
+    fresh.currentPrice >= prev.entryZone.low &&
+    fresh.currentPrice <= prev.entryZone.high;
+  if (
+    backInPrev ||
+    (!dead &&
+      prev.entryZone &&
+      fresh.entryZone &&
+      prev.setupType === fresh.setupType &&
+      closeEnough(prev.entryZone.midpoint, fresh.entryZone.midpoint))
+  ) {
     const kept = {
       ...fresh,
       setupId: prev.setupId,
