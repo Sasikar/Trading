@@ -454,6 +454,13 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
         if ((out[tf] || []).length < 12 && extra[tf] && extra[tf].length) out[tf] = extra[tf];
       });
     }
+    have = ((out["1h"] || []).length) + ((out["4h"] || []).length) + ((out["1d"] || []).length);
+    if (have < 12) {
+      var cg = await cgPack(mint);
+      ["5m", "1h", "4h", "1d", "1w"].forEach(function (tf) {
+        if ((out[tf] || []).length < 12 && cg[tf] && cg[tf].length) out[tf] = cg[tf];
+      });
+    }
     return out;
   }
 
@@ -567,6 +574,54 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     }));
     out["1w"] = rollWeeks(out["1d"]);
     return out;
+  }
+  function cgPlatform(chain) {
+    var n = String(chain || "").toLowerCase();
+    if (n === "eth" || n === "ethereum") return "ethereum";
+    if (n === "sol" || n === "solana") return "solana";
+    if (n === "base") return "base";
+    if (n === "bsc" || n === "bnb") return "binance-smart-chain";
+    return n;
+  }
+  function barsFromPrices(prices, ms) {
+    var buckets = {};
+    (prices || []).forEach(function (p) {
+      var t = +p[0];
+      var px = +p[1];
+      if (!(t > 0) || !(px > 0)) return;
+      var bucket = Math.floor(t / ms) * ms;
+      var g = buckets[bucket];
+      if (!g) buckets[bucket] = { t: bucket, o: px, h: px, l: px, c: px, vol: 0 };
+      else {
+        g.h = Math.max(g.h, px);
+        g.l = Math.min(g.l, px);
+        g.c = px;
+      }
+    });
+    return Object.keys(buckets).map(function (k) { return buckets[k]; }).sort(function (a, b) { return a.t - b.t; });
+  }
+  async function cgPack(mint) {
+    var id = String(mint || "").toLowerCase();
+    var card = cards.find(function (c) { return String(c.ca || "").toLowerCase() === id; });
+    var q = quotes[id];
+    var platform = cgPlatform((card && card.chain) || (q && q.chain) || "");
+    if (!platform) return {};
+    try {
+      var r = await fetch("https://api.coingecko.com/api/v3/coins/" + platform + "/contract/" + encodeURIComponent(mint) + "/market_chart?vs_currency=usd&days=30", { cache: "no-store" });
+      if (!r.ok) return {};
+      var j = await r.json();
+      var prices = j.prices || [];
+      if (prices.length < 12) return {};
+      var day = barsFromPrices(prices, 86400000);
+      return {
+        "1h": barsFromPrices(prices, 3600000),
+        "4h": barsFromPrices(prices, 4 * 3600000),
+        "1d": day,
+        "1w": rollWeeks(day)
+      };
+    } catch (e) {
+      return {};
+    }
   }
   async function refineTrigger(setup, token) {
     var zone = setup && setup.entryZone;
