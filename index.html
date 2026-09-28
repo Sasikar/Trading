@@ -543,6 +543,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 }
 @keyframes dip-marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 #dip-alert-track { display:inline-block; white-space:nowrap; padding-left:100%; animation: dip-marquee 16s linear infinite; }
+#fe-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
 </style></head><body>
 <div class="shell"><main>
 <div id="dip-alert" style="display:none;position:sticky;top:0;z-index:30;overflow:hidden;margin:0 0 12px;padding:10px 0;border-radius:12px;border:1px solid #f5a14a;background:#3a2410;color:#f5a14a;font-weight:900;font-size:15px"><div id="dip-alert-track"></div></div>
@@ -578,6 +579,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="emotion">Emotional<span class="tab-sub">Checks</span></button>
   <button type="button" class="tab" data-tf="coinstats" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showCoinstats&&window.showCoinstats(true);}catch(e){}">Coinstats</button>
   <button type="button" class="tab" data-tf="fomo" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntry&&window.showFomoEntry(true);}catch(e){}">Fomo Entry</button>
+  <button type="button" class="tab" data-tf="fe" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntryDesk&&window.showFomoEntryDesk(true);}catch(e){}">FomoEntry</button>
   <button type="button" class="tab" data-tf="fx" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoExperiences&&window.showFomoExperiences(true);}catch(e){}">Fomo Experiences</button>
   <button type="button" class="tab" data-tf="fd" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFavDips&&window.showFavDips(true);}catch(e){}">Fav Dip</button>
   <button type="button" class="tab" data-tf="gmgn">GMGN</button>
@@ -1209,6 +1211,17 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
 </section>
 </div>
+<div id="fe-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>FomoEntry</h2><p>Where the next setup is. Entry Window still says when. Nothing here buys.</p></div>
+    <span class="source" id="fe-status">WAIT</span>
+  </div>
+  <div class="card">
+    <div id="fe-board"></div>
+  </div>
+</section>
+</div>
 <div id="fomo-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
@@ -1558,6 +1571,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="decision-tab.js?v=20260919-dc1"></script>
 <script src="emotion-tab.js?v=20260924-em1"></script>
 <script src="fomo-entry-tab.js?v=20260926-fe4"></script>
+<script type="module" src="fomoentry-tab.mjs?v=20260928-fe1"></script>
 <script src="fomo-experiences-tab.js?v=20260927-fx8"></script>
 <script src="fav-dips-tab.js?v=20260927-fd5"></script>
 <script src="coinstats-tab.js?v=20260926-cs13"></script>
