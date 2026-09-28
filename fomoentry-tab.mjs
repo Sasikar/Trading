@@ -13,6 +13,8 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   var timer = null;
   var cards = [];
   var last = null;
+  var query = "";
+  var menuOpen = false;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -97,9 +99,10 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       (note ? "<div style=\"margin-top:4px;font-size:12px;color:#8b93a7\">" + esc(note) + "</div>" : "") + "</div>";
   }
 
-  function paint(setup) {
+  function paint(setup, keepFocus) {
     var box = $("fe-board");
     if (!box || !setup) return;
+    var wasTyping = !!keepFocus || (document.activeElement && document.activeElement.id === "fe-q");
     last = setup;
     var name = "Coin";
     var card = cards.find(function (c) { return String(c.ca).toLowerCase() === ca; });
@@ -113,10 +116,28 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     var trigger = (above[0] && above[0].price) || (setup.breakoutTrigger && setup.breakoutTrigger.price) || null;
     var rr = setup.rr && setup.rr.target1;
     var weak = (setup.quality || "").indexOf("WEAK") >= 0 || setup.dataQuality === "LIMITED HISTORY";
-    var opts = cards.map(function (c) {
+    var q = query.trim().toLowerCase();
+    var shown = cards.filter(function (c) {
+      if (!q) return true;
       var id = String(c.ca).toLowerCase();
-      return "<option value=\"" + esc(id) + "\"" + (id === ca ? " selected" : "") + ">" + esc(c.name || id.slice(0, 6)) + "</option>";
+      return (c.name || "").toLowerCase().indexOf(q) >= 0 || id.indexOf(q) >= 0;
+    });
+    var mintish = /^[1-9A-HJ-NP-Za-km-z]{32,48}$/.test(query.trim());
+    var rows = shown.slice(0, 12).map(function (c) {
+      var id = String(c.ca).toLowerCase();
+      var on = id === ca;
+      var short = id.slice(0, 4) + "…" + id.slice(-4);
+      return "<button type=\"button\" class=\"fe-row" + (on ? " on" : "") + "\" data-ca=\"" + esc(id) + "\">" +
+        "<span class=\"fe-ava\">" + esc((c.name || "?").slice(0, 1).toUpperCase()) + "</span>" +
+        "<span style=\"flex:1;min-width:0\"><span style=\"display:block;font-weight:800\">" + esc(c.name || id.slice(0, 6)) + "</span>" +
+        "<span style=\"display:block;color:#6d7688;font-size:11px;font-family:ui-monospace,monospace\">" + esc(short) + "</span></span>" +
+        (on ? "<span style=\"color:#e6b84d;font-weight:900;font-size:12px\">Selected</span>" : "") +
+        "</button>";
     }).join("");
+    if (!rows && mintish) {
+      rows = "<button type=\"button\" class=\"fe-row\" data-ca=\"" + esc(query.trim()) + "\"><span class=\"fe-ava\">+</span><span style=\"font-weight:800\">Load this CA</span></button>";
+    }
+    if (!rows) rows = "<div style=\"padding:14px;color:#6d7688;font-size:13px\">No coin matches.</div>";
     var chips = LOOKS.map(function (id) {
       var on = id === look;
       return "<button type=\"button\" data-look=\"" + id + "\" style=\"flex:1;border:0;border-radius:12px;padding:8px 0;font-weight:900;background:" + (on ? "#e6b84d" : "transparent") + ";color:" + (on ? "#1a1406" : "#8b93a7") + "\">" + id + "</button>";
@@ -125,10 +146,18 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       return ladder("TARGET " + (targets.length - i), money(t.price), pct(t.percent) + " · " + (t.reason || ""), "target");
     }).join("");
     box.innerHTML =
-      "<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:12px\">" +
-      "<div style=\"width:32px;height:32px;border-radius:99px;background:#171c24;color:#e6b84d;display:grid;place-items:center;font-weight:900\">" + esc(name.slice(0, 1).toUpperCase()) + "</div>" +
-      "<select id=\"fe-ca\" style=\"flex:1;min-width:0;background:transparent;border:0;color:#f4f7fb;font-weight:900;font-size:16px\">" + opts + "</select>" +
-      "<span style=\"border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900;background:" + (badge === "TAKE" ? "#143d2a" : "#3a2e14") + ";color:" + (badge === "TAKE" ? "#3dbe7a" : "#e6b84d") + "\">" + badge + "</span></div>" +
+      "<div style=\"margin-bottom:14px\">" +
+      "<div class=\"fe-lab\">SEARCH</div>" +
+      "<label class=\"fe-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#6d7688\" stroke-width=\"2.4\"><circle cx=\"11\" cy=\"11\" r=\"7\"></circle><path d=\"M20 20l-3.5-3.5\"></path></svg>" +
+      "<input id=\"fe-q\" type=\"search\" placeholder=\"Name or contract\" value=\"" + esc(query) + "\" autocomplete=\"off\"></label>" +
+      "<div class=\"fe-lab\" style=\"margin-top:12px\">COIN</div>" +
+      "<button type=\"button\" class=\"fe-drop\" id=\"fe-drop\" aria-expanded=\"" + (menuOpen ? "true" : "false") + "\">" +
+      "<span class=\"fe-ava\">" + esc(name.slice(0, 1).toUpperCase()) + "</span>" +
+      "<span style=\"flex:1;min-width:0;font-weight:900;font-size:16px\">" + esc(name) + "</span>" +
+      "<span style=\"border-radius:99px;padding:4px 10px;font-size:11px;font-weight:900;background:" + (badge === "TAKE" ? "#143d2a" : "#3a2e14") + ";color:" + (badge === "TAKE" ? "#3dbe7a" : "#e6b84d") + "\">" + badge + "</span>" +
+      "<span style=\"color:#8b93a7;font-size:12px\">" + (menuOpen ? "▴" : "▾") + "</span></button>" +
+      (menuOpen ? "<div class=\"fe-menu\" id=\"fe-menu\">" + rows + "</div>" : "") +
+      "</div>" +
       "<div style=\"display:flex;border:1px solid #2a3140;border-radius:16px;padding:4px;margin-bottom:14px\">" + chips + "</div>" +
       "<section style=\"border:1px solid #2a3140;border-radius:22px;padding:14px\">" +
       "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px\"><b style=\"letter-spacing:.04em\">TRADE SETUP</b>" +
@@ -155,12 +184,33 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       "<div style=\"font-size:11px;letter-spacing:.16em;font-weight:900;color:#8b93a7;margin:2px 2px 8px\">SUPPORT ZONES</div>" +
       (sup.length ? sup.map(function (l) { return zoneCard(l, false); }).join("<div style=\"height:8px\"></div>") : "<div style=\"color:#8b93a7;font-size:13px\">No support with enough evidence.</div>") +
       "</section>";
-    var sel = $("fe-ca");
-    if (sel) sel.addEventListener("change", function () {
-      ca = sel.value;
-      prev = null;
-      try { localStorage.setItem("fomoentry_ca", ca); } catch (e) {}
-      load();
+    var qEl = $("fe-q");
+    if (qEl) {
+      qEl.addEventListener("input", function () {
+        query = qEl.value;
+        menuOpen = true;
+        paint(last, true);
+      });
+      if (wasTyping) {
+        qEl.focus();
+        var n = qEl.value.length;
+        try { qEl.setSelectionRange(n, n); } catch (e) {}
+      }
+    }
+    var drop = $("fe-drop");
+    if (drop) drop.addEventListener("click", function () {
+      menuOpen = !menuOpen;
+      paint(last);
+    });
+    box.querySelectorAll("[data-ca]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        ca = btn.getAttribute("data-ca") || ca;
+        query = "";
+        menuOpen = false;
+        prev = null;
+        try { localStorage.setItem("fomoentry_ca", ca); } catch (e) {}
+        load();
+      });
     });
     box.querySelectorAll("[data-look]").forEach(function (btn) {
       btn.addEventListener("click", function () {
