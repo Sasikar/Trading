@@ -46,13 +46,15 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     n = +n;
     if (!(n > 0)) return "";
     if (n >= 1e9) return "$" + trim((n / 1e9).toFixed(n >= 10e9 ? 1 : 2)) + "B";
-    if (n >= 1e6) return "$" + trim((n / 1e6).toFixed(n >= 10e6 ? 1 : 2)) + "M";
+    if (n >= 1e6) return "$" + trim((n / 1e6).toFixed(n >= 100e6 ? 1 : 2)) + "M";
     if (n >= 1e3) return "$" + trim((n / 1e3).toFixed(n >= 1e5 ? 0 : 1)) + "k";
     return "$" + Math.round(n);
   }
   function mcOf(c) {
     var id = String(c.ca || "").toLowerCase();
-    return +c.mcap || +mcaps[id] || 0;
+    var live = +mcaps[id];
+    if (live > 0) return live;
+    return +c.mcap || 0;
   }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";
@@ -254,11 +256,13 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     return out;
   }
 
+  var mcAt = 0;
   async function fillMc() {
-    var need = cards.map(function (c) { return String(c.ca || ""); }).filter(function (id) {
-      return id && !(mcaps[id.toLowerCase()] > 0) && !(cards.find(function (c) { return String(c.ca).toLowerCase() === id.toLowerCase() && +c.mcap > 0; }));
-    });
+    var now = Date.now();
+    if (mcAt && now - mcAt < 60000) return;
+    var need = cards.map(function (c) { return String(c.ca || ""); }).filter(Boolean);
     if (!need.length) return;
+    mcAt = now;
     try {
       for (var i = 0; i < need.length; i += 30) {
         var chunk = need.slice(i, i + 30);
@@ -273,13 +277,11 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
           if (!best[mint] || liq > best[mint].liq) best[mint] = { mc: mc, liq: liq };
         });
         Object.keys(best).forEach(function (k) { mcaps[k] = best[k].mc; });
-        chunk.forEach(function (id) {
-          var k = id.toLowerCase();
-          if (!(mcaps[k] > 0)) mcaps[k] = -1;
-        });
       }
       if (last) paint(last);
-    } catch (e) {}
+    } catch (e) {
+      mcAt = 0;
+    }
   }
 
   async function load() {
