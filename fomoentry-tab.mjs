@@ -400,15 +400,48 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     if (st) st.textContent = badge;
   }
 
+  async function savedItems() {
+    var urls = [
+      "https://raw.githubusercontent.com/Sasikar/Trading/master/data/ca-recents.json",
+      "https://sasikar.github.io/Trading/data/ca-recents.json?fresh=" + Date.now()
+    ];
+    for (var i = 0; i < urls.length; i++) {
+      try {
+        var j = await fetch(urls[i], { cache: "no-store" }).then(function (r) { return r.json(); });
+        if (j && j.items && j.items.length) return j.items;
+      } catch (e) {}
+    }
+    return [];
+  }
+  function mergeCards(base, items) {
+    var by = {};
+    (base || []).forEach(function (c) {
+      var id = String(c.ca || "").toLowerCase();
+      if (id) by[id] = c;
+    });
+    (items || []).forEach(function (e) {
+      var id = String(e.ca || "").toLowerCase();
+      if (!id) return;
+      if (!by[id]) by[id] = { ca: e.ca, name: e.name || e.base || id.slice(0, 6), chain: e.chain || "", mcap: 0, ew: null };
+      else if (!by[id].name && (e.name || e.base)) by[id].name = e.name || e.base;
+    });
+    return Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) {
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }
   async function barsOf(mint) {
     var tfs = [["5m", 400], ["15m", 400], ["30m", 400], ["1h", 240], ["4h", 160], ["1d", 90], ["1w", 40]];
     var out = {};
     await Promise.all(tfs.map(async function (pair) {
-      var res = await fetch(API + "/candles?ca=" + encodeURIComponent(mint) + "&tf=" + pair[0] + "&n=" + pair[1], { cache: "no-store" });
-      var body = await res.json();
-      out[pair[0]] = (body.bars || []).map(function (b) {
-        return { t: +b.t, o: +b.o, h: +b.h, l: +b.l, c: +b.c, vol: +b.vol || 0 };
-      });
+      try {
+        var res = await fetch(API + "/candles?ca=" + encodeURIComponent(mint) + "&tf=" + pair[0] + "&n=" + pair[1], { cache: "no-store" });
+        var body = await res.json();
+        out[pair[0]] = (body.bars || []).map(function (b) {
+          return { t: +b.t, o: +b.o, h: +b.h, l: +b.l, c: +b.c, vol: +b.vol || 0 };
+        });
+      } catch (e) {
+        out[pair[0]] = [];
+      }
     }));
     return out;
   }
@@ -516,11 +549,15 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     var tfs = [["5m", 160], ["1h", 140], ["4h", 80], ["1d", 50]];
     var out = {};
     await Promise.all(tfs.map(async function (pair) {
-      var res = await fetch(API + "/candles?ca=" + encodeURIComponent(mint) + "&tf=" + pair[0] + "&n=" + pair[1], { cache: "no-store" });
-      var body = await res.json();
-      out[pair[0]] = (body.bars || []).map(function (b) {
-        return { t: +b.t, o: +b.o, h: +b.h, l: +b.l, c: +b.c, vol: +b.vol || 0 };
-      });
+      try {
+        var res = await fetch(API + "/candles?ca=" + encodeURIComponent(mint) + "&tf=" + pair[0] + "&n=" + pair[1], { cache: "no-store" });
+        var body = await res.json();
+        out[pair[0]] = (body.bars || []).map(function (b) {
+          return { t: +b.t, o: +b.o, h: +b.h, l: +b.l, c: +b.c, vol: +b.vol || 0 };
+        });
+      } catch (e) {
+        out[pair[0]] = [];
+      }
     }));
     return out;
   }
@@ -547,7 +584,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     try {
       scanNote("Loading TAKE setups…");
       var ew = await fetch(API + "/entry-window?tf=1h", { cache: "no-store" }).then(function (r) { return r.json(); });
-      cards = ew.cards || [];
+      cards = mergeCards(ew.cards || [], await savedItems());
       try { await fillMc(); } catch (e) {}
       var found = [];
       var cursor = 0;
@@ -591,7 +628,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   async function load() {
     try {
       var ew = await fetch(API + "/entry-window?tf=1h", { cache: "no-store" }).then(function (r) { return r.json(); });
-      cards = ew.cards || [];
+      cards = mergeCards(ew.cards || [], await savedItems());
       fillMc();
       if (!ca) {
         var saved = "";
