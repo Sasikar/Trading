@@ -3,6 +3,7 @@
  * DexScreener is the quote tape. We own the candles.
  */
 import { buildFomoEntry, takeState } from '../../../fomoentry-engine.mjs';
+import { decisionCheck, pickDecisionHit } from './decision-check.js';
 import { applySignals } from './ew-signals.js';
 import { GMGN_EVERY_MS, GMGN_MIN_GAP_MS, fetchGmgnHot, fetchGmgnTrending } from './gmgn.js';
 import {
@@ -5141,8 +5142,13 @@ export class Engine {
         if (await this.maybeParabolicAlert(row, tick)) nAlert++;
         if (await this.maybePositionAlert(row, tick)) nAlert++;
         if (await this.maybeCrashAlert(row, crash)) nAlert++;
-        const dc = this.observeDecision(row, { hitsByTf, tick, crash, parabolic: p });
-        if (await this.maybeDecisionAlert(row, dc)) nAlert++;
+        let dc = null;
+        try {
+          dc = this.observeDecision(row, { hitsByTf, tick, crash, parabolic: p });
+        } catch (e) {
+          this.lastErr = String(e && e.message ? e.message : e).slice(0, 180);
+        }
+        if (dc && (await this.maybeDecisionAlert(row, dc))) nAlert++;
       }
       if (scanned > 0) {
         this.rateLimitedUntil = 0;
