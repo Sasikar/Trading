@@ -15,6 +15,10 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   var last = null;
   var query = "";
   var menuOpen = false;
+  var takes = [];
+  var page = 0;
+  var scanned = false;
+  var scanning = false;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -87,6 +91,19 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       var on = item[0] === active;
       return "<span style=\"border-radius:99px;padding:5px 10px;font-size:11px;font-weight:900;border:1px solid " + (on ? "#1d6b45" : "#2a3140") + ";background:" + (on ? "#143d2a" : "transparent") + ";color:" + (on ? "#3dbe7a" : "#6d7688") + "\">" + item[1] + "</span>";
     }).join("") + "</div>";
+  }
+  function pagerHtml() {
+    if (!takes.length) return "";
+    var nums = takes.map(function (t, i) {
+      var on = i === page && String(t.ca) === ca;
+      return "<button type=\"button\" data-page=\"" + i + "\" title=\"" + esc(t.name || "") + "\" style=\"width:34px;height:34px;border-radius:12px;border:1px solid " + (on ? "#e6b84d" : "#2a3140") + ";background:" + (on ? "#e6b84d" : "#12161d") + ";color:" + (on ? "#1a1406" : "#c5cad6") + ";font-weight:900;font-size:13px\">" + (i + 1) + "</button>";
+    }).join("");
+    var cur = takes[page];
+    var whoName = cur && String(cur.ca) === ca ? cur.name : "";
+    return "<div style=\"display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px\">" +
+      "<span style=\"font-size:11px;letter-spacing:.14em;font-weight:900;color:#3dbe7a\">TAKE</span>" +
+      nums +
+      "<span style=\"font-size:12px;font-weight:800;color:#8b93a7\">" + (whoName ? esc(whoName) + " · " : "") + (page + 1) + " / " + takes.length + "</span></div>";
   }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";
@@ -211,6 +228,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       "<span style=\"color:#8b93a7;font-size:12px\">" + (menuOpen ? "▴" : "▾") + "</span></button>" +
       (menuOpen ? "<div class=\"fe-menu\" id=\"fe-menu\">" + rows + "</div>" : "") +
       "</div>" +
+      pagerHtml() +
       "<div style=\"display:flex;border:1px solid #2a3140;border-radius:16px;padding:4px;margin-bottom:14px\">" + chips + "</div>" +
       "<section style=\"border:1px solid #2a3140;border-radius:22px;padding:14px\">" +
       "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px\"><b style=\"letter-spacing:.04em\">TRADE SETUP</b>" +
@@ -255,6 +273,19 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     if (drop) drop.addEventListener("click", function () {
       menuOpen = !menuOpen;
       paint(last);
+    });
+    box.querySelectorAll("[data-page]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var n = +btn.getAttribute("data-page");
+        if (!takes[n]) return;
+        page = n;
+        ca = takes[n].ca;
+        query = "";
+        menuOpen = false;
+        prev = null;
+        if (takes[n].setup) paint(takes[n].setup);
+        load();
+      });
     });
     box.querySelectorAll("[data-ca]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -394,6 +425,82 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     }
   }
 
+  async function barsLight(mint) {
+    var tfs = [["5m", 160], ["1h", 140], ["4h", 80], ["1d", 50]];
+    var out = {};
+    await Promise.all(tfs.map(async function (pair) {
+      var res = await fetch(API + "/candles?ca=" + encodeURIComponent(mint) + "&tf=" + pair[0] + "&n=" + pair[1], { cache: "no-store" });
+      var body = await res.json();
+      out[pair[0]] = (body.bars || []).map(function (b) {
+        return { t: +b.t, o: +b.o, h: +b.h, l: +b.l, c: +b.c, vol: +b.vol || 0 };
+      });
+    }));
+    return out;
+  }
+  async function setupFor(mint, card, heavy) {
+    var bars = heavy ? await barsOf(mint) : await barsLight(mint);
+    var live = quotes[String(mint).toLowerCase()];
+    var spot = (live && live.price > 0 && live.price) || (card && card.ew && +card.ew.spot) || (bars["5m"] && bars["5m"].length && +bars["5m"][bars["5m"].length - 1].c) || 0;
+    return buildFomoEntry({
+      ca: mint, lookback: "ALL", bars: bars, spot: spot, now: Date.now(), prev: null,
+      entryWindow: card && card.ew, confirm: false
+    });
+  }
+  function scanNote(msg) {
+    var box = $("fe-board");
+    if (box && !last) box.innerHTML = "<div style=\"padding:18px;color:#8b93a7;font-weight:800\">" + esc(msg) + "</div>";
+  }
+  async function preload() {
+    if (scanned) {
+      if (ca) load();
+      return;
+    }
+    if (scanning) return;
+    scanning = true;
+    try {
+      scanNote("Loading TAKE setups…");
+      var ew = await fetch(API + "/entry-window?tf=1h", { cache: "no-store" }).then(function (r) { return r.json(); });
+      cards = ew.cards || [];
+      try { await fillMc(); } catch (e) {}
+      var found = [];
+      var cursor = 0;
+      var done = 0;
+      async function worker() {
+        while (cursor < cards.length) {
+          var c = cards[cursor++];
+          var id = String((c && c.ca) || "").toLowerCase();
+          if (id) {
+            try {
+              var setup = await setupFor(id, c, false);
+              if (takeState(setup) === "TAKE") found.push({ ca: id, name: c.name || id.slice(0, 6), setup: setup });
+            } catch (e) {}
+          }
+          done++;
+          scanNote("TAKE scan " + done + " / " + cards.length);
+        }
+      }
+      var jobs = [];
+      var n = Math.min(3, Math.max(1, cards.length));
+      for (var k = 0; k < n; k++) jobs.push(worker());
+      await Promise.all(jobs);
+      found.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+      takes = found;
+      scanned = true;
+      if (takes.length) {
+        page = 0;
+        ca = takes[0].ca;
+        prev = null;
+        paint(takes[0].setup);
+      }
+      await load();
+    } catch (e) {
+      scanned = true;
+      await load();
+    } finally {
+      scanning = false;
+    }
+  }
+
   async function load() {
     try {
       var ew = await fetch(API + "/entry-window?tf=1h", { cache: "no-store" }).then(function (r) { return r.json(); });
@@ -419,6 +526,13 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       advancePaper(null, next, Date.now());
       var bucket = Math.floor(Date.now() / 300000);
       (next.events || []).forEach(function (ev) { seen[alertKey(ca, next.setupId || "none", ev, bucket)] = 1; });
+      var ix = -1;
+      for (var ti = 0; ti < takes.length; ti++) if (takes[ti].ca === ca) ix = ti;
+      if (ix >= 0) {
+        page = ix;
+        takes[ix].setup = next;
+        takes[ix].name = (card && card.name) || takes[ix].name;
+      }
       paint(next);
       trigToken += 1;
       refineTrigger(next, trigToken);
@@ -429,9 +543,11 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   }
 
   function boot() {
-    load();
+    preload();
     if (timer) clearInterval(timer);
-    timer = setInterval(load, 45000);
+    timer = setInterval(function () {
+      if (!scanning && ca) load();
+    }, 45000);
   }
 
   var tabs = $("tf-tabs");
