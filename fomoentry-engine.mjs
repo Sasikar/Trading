@@ -27,6 +27,37 @@ export function closedBars(bars, tf, now) {
   return list;
 }
 
+/** Drop decimal-bug and one-tick prints that sit far off the rest of the tape. */
+export function cleanPrints(bars) {
+  const list = (bars || []).filter((b) => b && +b.c > 0 && +b.h > 0 && +b.t > 0);
+  if (list.length < 8) return list;
+  const closes = list.map((b) => +b.c).sort((a, b) => a - b);
+  const lo = closes[Math.floor(closes.length * 0.4)];
+  const hi = closes[Math.floor((closes.length - 1) * 0.8)];
+  const ref = (lo + hi) / 2;
+  if (!(ref > 0)) return list;
+  const wickCap = ref * 12;
+  const island = ref * 20;
+  const dust = ref / 30;
+  const out = [];
+  for (const b of list) {
+    let o = +b.o > 0 ? +b.o : +b.c;
+    let h = +b.h;
+    let l = +b.l > 0 ? +b.l : Math.min(o, +b.c);
+    const c = +b.c;
+    if (Math.min(o, h, l, c) > island || Math.max(o, h, l, c) < dust) continue;
+    if (h > wickCap && c <= ref * 4) {
+      o = Math.min(o, Math.max(c, l));
+      h = Math.max(o, c);
+    }
+    if (o > island) o = c;
+    if (h < Math.max(o, c)) h = Math.max(o, c);
+    if (l > Math.min(o, c)) l = Math.min(o, c);
+    out.push({ ...b, o, h, l, c });
+  }
+  return out.length >= 8 ? out : list;
+}
+
 export function confirmedSwings(bars, k) {
   const highs = [];
   const lows = [];
@@ -168,7 +199,7 @@ export function scoreCluster(group, bars, tf, tol, lastIndex) {
 }
 
 export function levelsForTimeframe(bars, tf, tol, now) {
-  const closed = closedBars(bars, tf, now);
+  const closed = closedBars(cleanPrints(bars), tf, now);
   if (closed.length < 8) return [];
   const k = pivotK(tf, closed.length);
   const swings = confirmedSwings(closed, k);
@@ -390,6 +421,7 @@ export function buildFomoEntry(input) {
   const ca = (input && input.ca) || "";
   const barsByTf = (input && input.bars) || {};
   const sliced = sliceLookback(barsByTf, lookback, now);
+  for (const tf of sliced.order) sliced.bars[tf] = cleanPrints(sliced.bars[tf]);
   const primaryTf = sliced.order.find((tf) => closedBars(sliced.bars[tf], tf, now).length >= 8) || sliced.order[0];
   const primary = closedBars(sliced.bars[primaryTf] || [], primaryTf, now);
   const allClosed = [];
@@ -422,8 +454,8 @@ export function buildFomoEntry(input) {
   const dataQuality = primary.length >= 30 ? "NORMAL HISTORY" : "LIMITED HISTORY";
   const when = mapEntryWindow(input && input.entryWindow) || { state: "WAIT", label: "WAIT", source: "price" };
   const keyLevels = {
-    support: support.filter((l) => l.price <= spot * 1.002 || l.flipped),
-    resistance: resistance.filter((l) => l.price >= spot * 0.998),
+    support: support.filter((l) => (l.price <= spot * 1.002 || l.flipped) && (!spot || l.price >= spot / 20)),
+    resistance: resistance.filter((l) => l.price >= spot * 0.998 && (!spot || l.price <= spot * 20)),
   };
 
   if (primary.length < 12) {

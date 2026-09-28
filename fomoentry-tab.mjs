@@ -1,4 +1,4 @@
-import { advancePaper, alertKey, buildFomoEntry } from "./fomoentry-engine.mjs";
+import { advancePaper, alertKey, buildFomoEntry } from "./fomoentry-engine.mjs?v=20260928-clean";
 
 (function () {
   if (window.__fomoEntryDesk) return;
