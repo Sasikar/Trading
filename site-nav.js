@@ -23,11 +23,29 @@ style.textContent=`html{scroll-padding-top:56px}body{padding-top:56px!important}
 #site-nav .site-links::-webkit-scrollbar{display:none}
 #site-nav .site-link{color:#9aa6b5;text-decoration:none;font-size:13px;font-weight:650;padding:8px 10px;border-radius:9px;white-space:nowrap;flex-shrink:0}
 #site-nav .site-link.pri{font-size:15px;font-weight:800;color:#d5dde8;padding:8px 12px}
-#site-nav .site-link.active{color:#f4f7fb!important;background:rgba(98,227,160,.14)!important}`;
+#site-nav .site-link.active{color:#f4f7fb!important;background:rgba(98,227,160,.14)!important}
+#site-nav .site-fresh{flex-shrink:0;border:0;background:#e6c878;color:#1a1406;font:900 11px Inter,system-ui,sans-serif;letter-spacing:.04em;border-radius:9px;padding:8px 10px;cursor:pointer}`;
 document.head.appendChild(style);
 const nav=document.createElement('nav');nav.id='site-nav';
-nav.innerHTML=`<a class="site-brand" href="index.html">TRADING<i>.</i></a><div class="site-links">${primary.map(([l,h,pri])=>`<a class="site-link${pri?' pri':''}${isActive(h)?' active':''}" href="${h}">${l}</a>`).join('')}</div>`;
+nav.innerHTML=`<a class="site-brand" href="index.html">TRADING<i>.</i></a><div class="site-links">${primary.map(([l,h,pri])=>`<a class="site-link${pri?' pri':''}${isActive(h)?' active':''}" href="${h}">${l}</a>`).join('')}</div><button type="button" class="site-fresh" id="site-fresh">Refresh</button>`;
 document.body.insertBefore(nav,document.body.firstChild);
+const fresh=document.getElementById('site-fresh');
+if(fresh) fresh.addEventListener('click',async function(){
+  fresh.textContent='Refreshing…';
+  try{
+    if(navigator.serviceWorker){
+      const rs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(rs.map(r=>r.unregister()));
+    }
+    if(window.caches){
+      const ks=await caches.keys();
+      await Promise.all(ks.map(k=>caches.delete(k)));
+    }
+  }catch(e){}
+  const u=new URL(location.href);
+  u.searchParams.set('fresh',Date.now());
+  location.replace(u.href);
+});
 if(!document.querySelector('script[src*="wallets-observe"]')){
   const s=document.createElement('script');
   s.src='wallets-observe.js?v=20260925-cs7';
