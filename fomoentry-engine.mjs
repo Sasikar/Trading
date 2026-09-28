@@ -498,7 +498,13 @@ export function buildFomoEntry(input) {
     .filter((l) => l.flipped && l.low <= spot * 1.02 && (l.touchCount >= 2 || l.tfs.length >= 2 || l.strength >= 48))
     .sort((a, b) => Math.abs(a.price - spot) - Math.abs(b.price - spot) || b.price - a.price);
   const nearSupport = support
-    .filter((l) => !l.flipped && l.price < spot && (spot - l.price) / spot <= 0.12 && (l.touchCount >= 2 || l.strength >= 50))
+    .filter((l) => {
+      if (l.flipped || !(l.touchCount >= 2 || l.strength >= 50)) return false;
+      if (!(l.price > 0) || !(spot > 0)) return false;
+      const under = l.price < spot && (spot - l.price) / spot <= 0.12;
+      const inShelf = l.low <= spot && spot <= Math.max(l.high, l.price) * 1.005;
+      return under || inShelf;
+    })
     .sort((a, b) => b.price - a.price);
 
   let anchor = null;
