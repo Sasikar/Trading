@@ -238,7 +238,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       return (c.name || "").toLowerCase().indexOf(q) >= 0 || id.indexOf(q) >= 0;
     });
     var mintish = /^[1-9A-HJ-NP-Za-km-z]{32,48}$/.test(query.trim());
-    var rows = shown.slice(0, 12).map(function (c) {
+    var rows = shown.slice(0, 80).map(function (c) {
       var id = String(c.ca).toLowerCase();
       var on = id === ca;
       var mc = fmtMc(mcOf(c));
@@ -465,6 +465,18 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       } catch (e) {}
     }
     return [];
+  }
+  function localItems() {
+    var tombs = {};
+    try { tombs = JSON.parse(localStorage.getItem("ca_recents_tomb_v1") || "{}") || {}; } catch (e) {}
+    var arr = [];
+    try { arr = JSON.parse(localStorage.getItem("ca_recents_v1") || "[]") || []; } catch (e) {}
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(function (e) {
+      if (!e || !e.ca) return false;
+      var k = String(e.chain || "") + "|" + String(e.ca).toLowerCase();
+      return !tombs[k];
+    });
   }
   function mergeCards(base, items) {
     var by = {};
@@ -750,7 +762,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     try {
       scanNote("Loading TAKE setups…");
       var ew = await fetch(API + "/entry-window?tf=1h", { cache: "no-store" }).then(function (r) { return r.json(); });
-      cards = mergeCards(ew.cards || [], await savedItems());
+      cards = mergeCards(mergeCards(ew.cards || [], await savedItems()), localItems());
       try { await fillMc(); } catch (e) {}
       var found = [];
       var cursor = 0;
@@ -794,7 +806,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   async function load() {
     try {
       var ew = await fetch(API + "/entry-window?tf=1h", { cache: "no-store" }).then(function (r) { return r.json(); });
-      cards = mergeCards(ew.cards || [], await savedItems());
+      cards = mergeCards(mergeCards(ew.cards || [], await savedItems()), localItems());
       fillMc();
       if (!ca) {
         var saved = "";
