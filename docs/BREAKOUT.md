@@ -270,7 +270,7 @@ Message includes: event, TF, why, reasons, Dex 5m/1h/vol, **level in brackets**,
 
 Alerts are Telegram only. ntfy.sh is not used.
 
-The **Alerts** tab lists every ping type with its own switch, stored as `alert_types` on the worker (`POST /alerts` `{ types: { breakout: false } }` or `{ typesAll: false }`). Missing key stays on. Types: `breakout`, `breakout1m`, `entry`, `entrywindow`, `parabolic`, `wowdip`, `position`, `decision`, `wallets`. Coin mode (`all` / `picked` / `off`) still applies on top.
+The **Alerts** tab lists every ping type with its own switch, stored as `alert_types` on the worker (`POST /alerts` `{ types: { breakout: false } }` or `{ typesAll: false }`). Missing key stays on. Types: `breakout`, `breakout1m`, `entry`, `entrywindow`, `fomoentry`, `parabolic`, `wowdip`, `position`, `decision`, `wallets`. Coin mode (`all` / `picked` / `off`) still applies on top. `fomoentry` pings once per setup when that coin's FomoEntry badge first becomes TAKE.
 
 
 ---

@@ -1,4 +1,4 @@
-import { advancePaper, alertKey, buildFomoEntry } from "./fomoentry-engine.mjs?v=20260928-clean";
+import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-take";
 
 (function () {
   if (window.__fomoEntryDesk) return;
@@ -37,13 +37,7 @@ import { advancePaper, alertKey, buildFomoEntry } from "./fomoentry-engine.mjs?v
     return (n > 0 ? "+" : "") + n.toFixed(2) + "%";
   }
   function badgeOf(s) {
-    if (!s || !s.entryZone) return "WAIT";
-    var q = s.quality || "";
-    if (q.indexOf("INSUFFICIENT") >= 0 || q.indexOf("WEAK") >= 0) return "WAIT";
-    var w = s.window && s.window.state;
-    if (w === "IN_ZONE" || w === "ENTRY_WINDOW_ACTIVE" || w === "APPROACHING") return "TAKE";
-    if (s.currentPrice >= s.entryZone.low && s.currentPrice <= s.entryZone.high * 1.03) return "TAKE";
-    return "WAIT";
+    return takeState(s);
   }
   function horizon(id) {
     if (id === "24H") return "ACTIVE SWING · MINUTES TO HOURS";

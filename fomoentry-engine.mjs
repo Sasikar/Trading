@@ -372,6 +372,19 @@ export function mapEntryWindow(ew) {
   return { ...hit, source: "entry-window", raw: ew.state, why: ew.why || "" };
 }
 
+/** Same rule as the FomoEntry badge. WEAK stays WAIT. */
+export function takeState(setup) {
+  if (!setup || !setup.entryZone) return "WAIT";
+  const q = setup.quality || "";
+  if (q.indexOf("INSUFFICIENT") >= 0 || q.indexOf("WEAK") >= 0) return "WAIT";
+  const w = setup.window && setup.window.state;
+  if (w === "IN_ZONE" || w === "ENTRY_WINDOW_ACTIVE" || w === "APPROACHING") return "TAKE";
+  const spot = +setup.currentPrice;
+  const zone = setup.entryZone;
+  if (spot >= zone.low && spot <= zone.high * 1.03) return "TAKE";
+  return "WAIT";
+}
+
 function emptySetup(partial) {
   return {
     status: "WAITING FOR STRUCTURE",

@@ -2,7 +2,7 @@
  * Candle + breakout engine. Works in Cloudflare Workers and Node.
  * DexScreener is the quote tape. We own the candles.
  */
-import { decisionCheck, pickDecisionHit } from './decision-check.js';
+import { buildFomoEntry, takeState } from '../../../fomoentry-engine.mjs';
 import { applySignals } from './ew-signals.js';
 import { GMGN_EVERY_MS, GMGN_MIN_GAP_MS, fetchGmgnHot, fetchGmgnTrending } from './gmgn.js';
 import {
@@ -2208,7 +2208,7 @@ export class Engine {
     return 'all';
   }
   alertTypes() {
-    const ids = ['breakout', 'breakout1m', 'entry', 'entrywindow', 'parabolic', 'wowdip', 'position', 'decision', 'wallets'];
+    const ids = ['breakout', 'breakout1m', 'entry', 'entrywindow', 'fomoentry', 'parabolic', 'wowdip', 'position', 'decision', 'wallets'];
     let saved = {};
     try {
       saved = JSON.parse(this.store.getMeta('alert_types') || '{}') || {};
@@ -3981,6 +3981,77 @@ export class Engine {
     );
     return true;
   }
+  async maybeFomoEntryAlert(row, tick, hitsByTf) {
+    if (!this.typeOn('fomoentry')) return false;
+    if (this.alertMode() === 'off') return false;
+    if (!this.alertsAllowed(row && row.ca)) return false;
+    const ca = String((row && row.ca) || '').toLowerCase();
+    if (!ca) return false;
+    const now = Date.now();
+    const bars = {
+      '5m': this.store.bars(ca, '5m', 400),
+      '1h': this.store.bars(ca, '1h', 220),
+      '4h': this.store.bars(ca, '4h', 120),
+      '1d': this.store.bars(ca, '1d', 90),
+      '1w': this.store.bars(ca, '1w', 40)
+    };
+    const spot = +((tick && tick.price) || 0);
+    const ew = (hitsByTf && (hitsByTf['1h'] || hitsByTf['4h'] || hitsByTf['5m']) || {}).ew || null;
+    let setup;
+    try {
+      setup = buildFomoEntry({
+        ca,
+        lookback: 'ALL',
+        bars,
+        spot,
+        now,
+        entryWindow: ew,
+        confirm: false
+      });
+    } catch (e) {
+      return false;
+    }
+    if (takeState(setup) !== 'TAKE' || !setup.entryZone) return false;
+    const zone = setup.entryZone;
+    const key = ca + '|fomoentry|' + (setup.setupId || zone.low + '-' + zone.high);
+    if (this.store.getAlert(key)) return false;
+    const name = (tick && tick.name) || row.name || 'coin';
+    const chain = (tick && tick.chain) || row.chain || '';
+    const targets = (setup.targets || []).slice(0, 2).map((t) => fmtPx(t.price) + ' (' + (t.percent > 0 ? '+' : '') + t.percent + '%)');
+    const title = 'TAKE · FomoEntry · ' + name;
+    const msg = [
+      name + ' (' + (chainIdOf(chain) === 'solana' ? 'SOL' : chainIdOf(chain) === 'ethereum' ? 'ETH' : String(chain || '').toUpperCase()) + ')',
+      'Setup entered TAKE. Not a buy.',
+      alertPxMcLine({ spot: setup.currentPrice || spot, mcap: tick && tick.mcap }),
+      'Entry ' + fmtPx(zone.low) + ' – ' + fmtPx(zone.high),
+      setup.invalidation ? 'Stop ' + fmtPx(setup.invalidation.price) + ' · ' + setup.invalidation.percentRisk + '% under the midpoint' : '',
+      targets.length ? 'Targets ' + targets.join(' · ') : '',
+      setup.reason || '',
+      'CA: ' + (row.ca || ca),
+      dexHref(row.ca || ca, chain, tick && tick.dexUrl)
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const token = this.telegramToken();
+    if (!token) return false;
+    try {
+      let chat = this.telegramChatId();
+      if (!chat) chat = await this.resolveTelegramChat();
+      if (!chat) return false;
+      await sendTelegram(token, chat, title + '\n' + msg);
+      this.telegramErr = '';
+      this.store.setMeta('telegram_err', '');
+    } catch (e) {
+      this.markTelegramFail(e);
+      return false;
+    }
+    this.store.setAlert(key, now);
+    this.store.setMeta(
+      'last_fomoentry_alert',
+      JSON.stringify({ name, ca, setupId: setup.setupId || '', via: 'telegram', at: new Date(now).toISOString() })
+    );
+    return true;
+  }
   async refreshSpotIfStale(maxAgeMs) {
     const now = Date.now();
     const last = +this.store.getMeta('spot_refresh') || 0;
@@ -5024,6 +5095,7 @@ export class Engine {
           if (!avoid && (await this.maybeEntryAlert(hit))) nAlert++;
           if (!avoid && (await this.maybeEwAlert(hit))) nAlert++;
         }
+        if (!avoid && (await this.maybeFomoEntryAlert(row, tick, hitsByTf))) nAlert++;
         const p = parabolicFromTick(tick);
         if (p.on) {
           this.touchOmg({
