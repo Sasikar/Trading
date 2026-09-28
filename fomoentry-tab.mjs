@@ -1,4 +1,4 @@
-import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-take";
+import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-t3";
 
 (function () {
   if (window.__fomoEntryDesk) return;

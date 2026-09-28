@@ -588,7 +588,7 @@ export function buildFomoEntry(input) {
     if (!(r.price > Math.max(spot, zone.high) * 1.004)) return false;
     if (r.strength < 28 || (r.touchCount < 2 && r.tfs.length < 2)) return false;
     const pct = (r.price - midpoint) / midpoint;
-    return pct >= 0.025 && pct <= 0.55;
+    return pct >= 0.025 && pct <= 3;
   });
   const targets = above.slice(0, 3).map((r) => ({
     price: +r.price.toPrecision(6),
