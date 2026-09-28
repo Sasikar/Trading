@@ -4203,6 +4203,10 @@ function coinRecentsRender(){
   const arr=coinRecentsLoadLocal();
   const coinsBtn=$('ca-tab-coins');
   const delBtn=$('ca-tab-del');
+  const panel=$('coin-panel');
+  if(panel) panel.classList.toggle('ca-del-mode', caDelView==='del');
+  const title=panel&&panel.querySelector('.section > .head h2');
+  if(title) title.textContent=caDelView==='del'?'Delete a coin':'Meme CA · Indicators';
   if(coinsBtn) coinsBtn.classList.toggle('on', caDelView!=='del');
   if(delBtn) delBtn.classList.toggle('on', caDelView==='del');
   box.style.display=caDelView==='del'?'none':'';

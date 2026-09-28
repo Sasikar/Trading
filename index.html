@@ -545,6 +545,9 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 .ca-del-row span{color:#8491a1;font-size:11px;font-weight:700}
 .ca-del-row button{margin-left:auto;height:34px;padding:0 12px;border:0;border-radius:10px;background:#6b2a34;color:#ffd0d4;font-weight:900;font-size:12px;cursor:pointer}
 #coin-delete-list{max-height:320px;overflow-y:auto}
+#coin-panel.ca-del-mode .card > *:not(#coin-recents-wrap){display:none!important}
+#coin-panel.ca-del-mode .ca-switch,#coin-panel.ca-del-mode .head p,#coin-panel.ca-del-mode #coin-source{display:none!important}
+#coin-panel.ca-del-mode #coin-delete-list{max-height:none}
 #ca-del-modal{position:fixed;inset:0;z-index:10050;background:#000a;display:none;align-items:flex-end;justify-content:center;padding:16px}
 #ca-del-modal.on{display:flex}
 #ca-del-sheet{width:min(420px,100%);background:#12161d;border:1px solid #2a3140;border-radius:22px;padding:18px;margin-bottom:12px}
@@ -1603,7 +1606,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20260929-deltab2"></script>
+<script src="overview-app.js?v=20260929-delonly"></script>
 <script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260915-h12"></script>
