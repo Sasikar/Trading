@@ -229,8 +229,16 @@ export function mergeLevels(levels, tol) {
 
 function sliceLookback(barsByTf, lookback, now) {
   const tnow = +now || Date.now();
-  const ms = lookback === "24H" ? 24 * 3600e3 : lookback === "7D" ? 7 * 24 * 3600e3 : null;
-  const order = lookback === "24H" ? ["5m", "1h"] : lookback === "7D" ? ["1h", "4h", "5m"] : ["4h", "1h", "1d", "5m", "1w"];
+  const ms =
+    lookback === "24H" ? 24 * 3600e3 : lookback === "7D" ? 7 * 24 * 3600e3 : lookback === "30D" ? 30 * 24 * 3600e3 : null;
+  const order =
+    lookback === "24H"
+      ? ["5m", "1h"]
+      : lookback === "7D"
+        ? ["1h", "4h", "5m"]
+        : lookback === "30D"
+          ? ["4h", "1h", "1d"]
+          : ["4h", "1h", "1d", "5m", "1w"];
   const out = {};
   for (const tf of order) {
     const raw = barsByTf[tf] || [];
@@ -655,7 +663,14 @@ function freezeOrFresh(input, fresh) {
     kept.window = windowFromPrice(fresh.currentPrice, zone, inval, confirm);
     kept.status = kept.window.state === "INVALIDATED" ? "INVALIDATED" : kept.window.label;
     kept.events = diffEvents(prev, kept);
-    const staleMs = fresh.lookback === "24H" ? 36 * 3600e3 : fresh.lookback === "7D" ? 5 * 24 * 3600e3 : 14 * 24 * 3600e3;
+    const staleMs =
+      fresh.lookback === "24H"
+        ? 36 * 3600e3
+        : fresh.lookback === "7D"
+          ? 5 * 24 * 3600e3
+          : fresh.lookback === "30D"
+            ? 20 * 24 * 3600e3
+            : 14 * 24 * 3600e3;
     if (kept.createdAt && now - kept.createdAt > staleMs && kept.window.state === "NO_CHASE" && !(prev.paper && prev.paper.zoneReached)) {
       kept.status = "EXPIRED";
       kept.window = { state: "EXPIRED", label: "EXPIRED" };
@@ -757,6 +772,7 @@ export function advancePaper(prev, setup, now) {
 export function lookbackMs(lookback) {
   if (lookback === "24H") return 24 * 3600e3;
   if (lookback === "7D") return 7 * 24 * 3600e3;
+  if (lookback === "30D") return 30 * 24 * 3600e3;
   return null;
 }
 
