@@ -136,16 +136,7 @@ import { advancePaper, alertKey, buildFomoEntry } from "./fomoentry-engine.mjs";
       "<select id=\"fe-ca\" style=\"flex:1;min-width:0;background:transparent;border:0;color:#f4f7fb;font-weight:900;font-size:16px\">" + opts + "</select>" +
       "<span style=\"border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900;background:" + (badge === "TAKE" ? "#143d2a" : "#3a2e14") + ";color:" + (badge === "TAKE" ? "#3dbe7a" : "#e6b84d") + "\">" + badge + "</span></div>" +
       "<div style=\"display:flex;border:1px solid #2a3140;border-radius:16px;padding:4px;margin-bottom:14px\">" + chips + "</div>" +
-      "<section style=\"border:1px solid #2a3140;border-radius:22px;padding:14px;background:#12161dcc\">" +
-      "<div style=\"font-size:11px;letter-spacing:.16em;font-weight:900;color:#8b93a7;margin:2px 2px 8px\">RESISTANCE ZONES</div>" +
-      (res.length ? res.map(function (l) { return zoneCard(l, true); }).join("<div style=\"height:8px\"></div>") : "<div style=\"color:#8b93a7;font-size:13px\">No resistance with enough evidence.</div>") +
-      "<div style=\"display:flex;align-items:center;gap:8px;margin:14px 0\"><span style=\"flex:1;border-top:1px dashed #2a3140\"></span>" +
-      "<div style=\"border:1px solid #e6b84d;color:#e6b84d;border-radius:99px;padding:8px 14px;font-weight:900;font-size:14px;white-space:nowrap\">Current Price " + money(spot) + "</div>" +
-      "<span style=\"flex:1;border-top:1px dashed #2a3140\"></span></div>" +
-      "<div style=\"font-size:11px;letter-spacing:.16em;font-weight:900;color:#8b93a7;margin:2px 2px 8px\">SUPPORT ZONES</div>" +
-      (sup.length ? sup.map(function (l) { return zoneCard(l, false); }).join("<div style=\"height:8px\"></div>") : "<div style=\"color:#8b93a7;font-size:13px\">No support with enough evidence.</div>") +
-      "</section>" +
-      "<section style=\"margin-top:14px;border:1px solid #2a3140;border-radius:22px;padding:14px\">" +
+      "<section style=\"border:1px solid #2a3140;border-radius:22px;padding:14px\">" +
       "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:10px\"><b style=\"letter-spacing:.04em\">TRADE SETUP</b>" +
       "<span style=\"border:1px solid #2a3140;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900\">R:R " + (rr != null ? Number(rr).toFixed(1) : "—") + " : 1</span></div>" +
       "<div style=\"display:inline-block;background:#132033;color:#7eb6ff;border-radius:99px;padding:4px 10px;font-size:12px;font-weight:900;margin-bottom:8px\">" + horizon(look) + "</div>" +
@@ -160,7 +151,16 @@ import { advancePaper, alertKey, buildFomoEntry } from "./fomoentry-engine.mjs";
       ladder("CURRENT PRICE", money(spot), "", "spot") +
       ladder("ENTRY ZONE", money(setup.entryZone && setup.entryZone.midpoint), setup.entryZone ? money(setup.entryZone.low) + " – " + money(setup.entryZone.high) : "No zone yet", "entry") +
       ladder("STOP / INVALIDATION", money(setup.invalidation && setup.invalidation.price), setup.invalidation ? setup.invalidation.percentRisk + "% below the entry midpoint · setup is wrong below this" : "No stop until a zone exists", "stop") +
-      "</div></section>";
+      "</div></section>" +
+      "<section style=\"margin-top:14px;border:1px solid #2a3140;border-radius:22px;padding:14px;background:#12161dcc\">" +
+      "<div style=\"font-size:11px;letter-spacing:.16em;font-weight:900;color:#8b93a7;margin:2px 2px 8px\">RESISTANCE ZONES</div>" +
+      (res.length ? res.map(function (l) { return zoneCard(l, true); }).join("<div style=\"height:8px\"></div>") : "<div style=\"color:#8b93a7;font-size:13px\">No resistance with enough evidence.</div>") +
+      "<div style=\"display:flex;align-items:center;gap:8px;margin:14px 0\"><span style=\"flex:1;border-top:1px dashed #2a3140\"></span>" +
+      "<div style=\"border:1px solid #e6b84d;color:#e6b84d;border-radius:99px;padding:8px 14px;font-weight:900;font-size:14px;white-space:nowrap\">Current Price " + money(spot) + "</div>" +
+      "<span style=\"flex:1;border-top:1px dashed #2a3140\"></span></div>" +
+      "<div style=\"font-size:11px;letter-spacing:.16em;font-weight:900;color:#8b93a7;margin:2px 2px 8px\">SUPPORT ZONES</div>" +
+      (sup.length ? sup.map(function (l) { return zoneCard(l, false); }).join("<div style=\"height:8px\"></div>") : "<div style=\"color:#8b93a7;font-size:13px\">No support with enough evidence.</div>") +
+      "</section>";
     var sel = $("fe-ca");
     if (sel) sel.addEventListener("change", function () {
       ca = sel.value;
