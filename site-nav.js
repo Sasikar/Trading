@@ -42,6 +42,30 @@ if(fresh) fresh.addEventListener('click',async function(){
       await Promise.all(ks.map(k=>caches.delete(k)));
     }
   }catch(e){}
+  let sha='';
+  try{
+    const meta=await fetch('https://api.github.com/repos/Sasikar/Trading/commits/master',{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});
+    const body=await meta.json();
+    sha=body&&body.sha||'';
+  }catch(e){}
+  if(sha){
+    try{
+      const base='https://cdn.jsdelivr.net/gh/Sasikar/Trading@'+sha+'/';
+      const r=await fetch(base+'index.html',{cache:'no-store'});
+      if(r.ok){
+        let html=await r.text();
+        if(html.indexOf('id="tf-tabs"')>=0){
+          html=html.replace(/\s(src|href)="(?!https?:|\/\/|#|data:|mailto:)([^"]+)"/g,function(_m,attr,path){
+            return ' '+attr+'="'+base+String(path).replace(/^\.\//,'')+'"';
+          });
+          document.open();
+          document.write(html);
+          document.close();
+          return;
+        }
+      }
+    }catch(e){}
+  }
   try{
     const r=await fetch('https://raw.githubusercontent.com/Sasikar/Trading/master/index.html?t='+Date.now(),{cache:'no-store'});
     if(r.ok){

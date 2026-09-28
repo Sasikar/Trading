@@ -4177,6 +4177,7 @@ function coinRecentsUpsert(entry){
   arr.unshift(item);
   coinRecentsSaveLocal(arr);
   coinRecentsRender();
+  try { coinRecentsSync(true); } catch (e) {}
 }
 function coinRecentsRemove(chain, ca){
   coinRecentsTomb(chain, ca, true);

@@ -231,11 +231,22 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   }
 
   function coinRows() {
+    cards = mergeCards(cards, localItems());
+    var fresh = {};
+    localItems().forEach(function (e) { fresh[String(e.ca || "").toLowerCase()] = +e.t || 0; });
     var q = query.trim().toLowerCase();
     var shown = cards.filter(function (c) {
       if (!q) return true;
       var id = String(c.ca).toLowerCase();
-      return (c.name || "").toLowerCase().indexOf(q) >= 0 || id.indexOf(q) >= 0;
+      var name = (c.name || "").toLowerCase();
+      var base = (c.base || "").toLowerCase();
+      return name.indexOf(q) >= 0 || base.indexOf(q) >= 0 || id.indexOf(q) >= 0;
+    });
+    shown.sort(function (a, b) {
+      var ta = fresh[String(a.ca || "").toLowerCase()] || 0;
+      var tb = fresh[String(b.ca || "").toLowerCase()] || 0;
+      if (tb !== ta) return tb - ta;
+      return String(a.name || "").localeCompare(String(b.name || ""));
     });
     var mintish = /^[1-9A-HJ-NP-Za-km-z]{32,48}$/.test(query.trim());
     var rows = shown.slice(0, 80).map(function (c) {
@@ -487,9 +498,10 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     (items || []).forEach(function (e) {
       var id = String(e.ca || "").toLowerCase();
       if (!id) return;
-      if (!by[id]) by[id] = { ca: e.ca, name: e.name || e.base || id.slice(0, 6), chain: e.chain || "", poolAddress: e.poolAddress || "", mcap: 0, ew: null };
+      if (!by[id]) by[id] = { ca: e.ca, name: e.name || e.base || id.slice(0, 6), base: e.base || "", chain: e.chain || "", poolAddress: e.poolAddress || "", mcap: 0, ew: null };
       else {
-        if (!by[id].name && (e.name || e.base)) by[id].name = e.name || e.base;
+        if (e.name || e.base) by[id].name = e.name || e.base || by[id].name;
+        if (e.base) by[id].base = e.base;
         if (!by[id].poolAddress && e.poolAddress) by[id].poolAddress = e.poolAddress;
         if (!by[id].chain && e.chain) by[id].chain = e.chain;
       }
