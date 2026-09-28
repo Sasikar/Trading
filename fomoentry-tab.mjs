@@ -15,7 +15,6 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   var last = null;
   var query = "";
   var menuOpen = false;
-  var mcaps = {};
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -32,7 +31,7 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     if (!(n > 0)) return "—";
     if (n >= 1) return "$" + n.toFixed(2);
     if (n >= 0.01) return "$" + trim(n.toFixed(4));
-    return "$" + trim(n.toFixed(6));
+    return "$" + n.toPrecision(4);
   }
   function pct(n) {
     n = +n;
@@ -50,10 +49,11 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
     if (n >= 1e3) return "$" + trim((n / 1e3).toFixed(n >= 1e5 ? 0 : 1)) + "k";
     return "$" + Math.round(n);
   }
+  var quotes = {};
   function mcOf(c) {
     var id = String(c.ca || "").toLowerCase();
-    var live = +mcaps[id];
-    if (live > 0) return live;
+    var q = quotes[id];
+    if (q && q.mc > 0) return q.mc;
     return +c.mcap || 0;
   }
   function horizon(id) {
@@ -257,28 +257,43 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   }
 
   var mcAt = 0;
+  async function dexJson(cas) {
+    var path = "/latest/dex/tokens/" + cas.map(encodeURIComponent).join(",");
+    try {
+      var r = await fetch("https://api.dexscreener.com" + path, { cache: "no-store" });
+      if (r.ok) return await r.json();
+    } catch (e) {}
+    var pr = await fetch("https://trading-proxy.sasipudi.workers.dev/dex?path=" + encodeURIComponent(path), { cache: "no-store" });
+    if (!pr.ok) throw new Error("dex " + pr.status);
+    return pr.json();
+  }
+  function keepBest(body) {
+    var best = {};
+    (body.pairs || []).forEach(function (p) {
+      var mint = String((p.baseToken && p.baseToken.address) || "").toLowerCase();
+      var mc = +p.marketCap || +p.fdv || 0;
+      var price = +p.priceUsd || 0;
+      var liq = +((p.liquidity && p.liquidity.usd) || 0);
+      if (!mint || !(mc > 0 || price > 0)) return;
+      if (!best[mint] || liq > best[mint].liq) best[mint] = { mc: mc, price: price, liq: liq };
+    });
+    Object.keys(best).forEach(function (k) { quotes[k] = best[k]; });
+  }
   async function fillMc() {
     var now = Date.now();
-    if (mcAt && now - mcAt < 60000) return;
+    if (mcAt && now - mcAt < 45000) return;
     var need = cards.map(function (c) { return String(c.ca || ""); }).filter(Boolean);
     if (!need.length) return;
     mcAt = now;
     try {
       for (var i = 0; i < need.length; i += 30) {
-        var chunk = need.slice(i, i + 30);
-        var res = await fetch("https://api.dexscreener.com/latest/dex/tokens/" + chunk.join(","));
-        var body = await res.json();
-        var best = {};
-        (body.pairs || []).forEach(function (p) {
-          var mint = String((p.baseToken && p.baseToken.address) || "").toLowerCase();
-          var mc = +p.marketCap || +p.fdv || 0;
-          var liq = +((p.liquidity && p.liquidity.usd) || 0);
-          if (!mint || !(mc > 0)) return;
-          if (!best[mint] || liq > best[mint].liq) best[mint] = { mc: mc, liq: liq };
-        });
-        Object.keys(best).forEach(function (k) { mcaps[k] = best[k].mc; });
+        keepBest(await dexJson(need.slice(i, i + 30)));
       }
-      if (last) paint(last);
+      if (last) {
+        var live = quotes[ca];
+        if (live && live.price > 0) last.currentPrice = live.price;
+        paint(last);
+      }
     } catch (e) {
       mcAt = 0;
     }
@@ -298,7 +313,9 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
       if (!ca) throw new Error("No saved coins");
       var bars = await barsOf(ca);
       var card = cards.find(function (c) { return String(c.ca).toLowerCase() === ca; });
-      var spot = (card && card.ew && +card.ew.spot) || (bars["5m"] && bars["5m"].length && +bars["5m"][bars["5m"].length - 1].c) || 0;
+      try { keepBest(await dexJson([ca])); } catch (e) {}
+      var live = quotes[ca];
+      var spot = (live && live.price > 0 && live.price) || (card && card.ew && +card.ew.spot) || (bars["5m"] && bars["5m"].length && +bars["5m"][bars["5m"].length - 1].c) || 0;
       var next = buildFomoEntry({
         ca: ca, lookback: look, bars: bars, spot: spot, now: Date.now(), prev: prev,
         entryWindow: card && card.ew, confirm: false
