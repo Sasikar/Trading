@@ -513,7 +513,8 @@ export function buildFomoEntry(input) {
       if (!(l.price > 0) || !(spot > 0)) return false;
       const under = l.price < spot && (spot - l.price) / spot <= 0.12;
       const inShelf = l.low <= spot && spot <= Math.max(l.high, l.price) * 1.005;
-      return under || inShelf;
+      const testing = l.price >= spot && (l.price - spot) / l.price <= 0.03;
+      return under || inShelf || testing;
     })
     .sort((a, b) => b.price - a.price);
 
@@ -542,10 +543,10 @@ export function buildFomoEntry(input) {
     reason = "Extended off " + anchor.touchCount + "-touch support. Next bid is the cluster, not the high.";
   } else if (resistance.length && spot < resistance[0].low && (resistance[0].price - spot) / spot <= 0.015 && resistance[0].strength >= 40) {
     setupType = "MOMENTUM BREAKOUT";
-  } else if (resistance.length && nearSupport.length && spot < resistance[0].price && spot >= nearSupport[0].low) {
+  } else if (nearSupport.length) {
     anchor = nearSupport[0];
     setupType = "RANGE BID";
-    reason = "Inside the range. The bid is the " + anchor.touchCount + "-touch support. The breakout is the resistance, not a chase.";
+    reason = "The bid is the " + anchor.touchCount + "-touch support. The breakout is the resistance, not a chase.";
   }
 
   if (setupType === "MOMENTUM BREAKOUT" || setupType === "RANGE BREAKOUT") {
