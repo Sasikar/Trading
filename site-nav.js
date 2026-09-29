@@ -30,57 +30,14 @@ const nav=document.createElement('nav');nav.id='site-nav';
 nav.innerHTML=`<a class="site-brand" href="index.html">TRADING<i>.</i></a><div class="site-links">${primary.map(([l,h,pri])=>`<a class="site-link${pri?' pri':''}${isActive(h)?' active':''}" href="${h}">${l}</a>`).join('')}</div><button type="button" class="site-fresh" id="site-fresh">Refresh</button>`;
 document.body.insertBefore(nav,document.body.firstChild);
 const fresh=document.getElementById('site-fresh');
-if(fresh) fresh.addEventListener('click',async function(){
+if(fresh) fresh.addEventListener('click', function(){
   fresh.textContent='Refreshing…';
-  try{
-    if(navigator.serviceWorker){
-      const rs=await navigator.serviceWorker.getRegistrations();
-      await Promise.all(rs.map(r=>r.unregister()));
-    }
-    if(window.caches){
-      const ks=await caches.keys();
-      await Promise.all(ks.map(k=>caches.delete(k)));
-    }
-  }catch(e){}
-  let sha='';
-  try{
-    const meta=await fetch('https://api.github.com/repos/Sasikar/Trading/commits/master',{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});
-    const body=await meta.json();
-    sha=body&&body.sha||'';
-  }catch(e){}
-  if(sha){
-    try{
-      const base='https://cdn.jsdelivr.net/gh/Sasikar/Trading@'+sha+'/';
-      const r=await fetch(base+'index.html',{cache:'no-store'});
-      if(r.ok){
-        let html=await r.text();
-        if(html.indexOf('id="tf-tabs"')>=0){
-          html=html.replace(/\s(src|href)="(?!https?:|\/\/|#|data:|mailto:)([^"]+)"/g,function(_m,attr,path){
-            return ' '+attr+'="'+base+String(path).replace(/^\.\//,'')+'"';
-          });
-          document.open();
-          document.write(html);
-          document.close();
-          return;
-        }
-      }
-    }catch(e){}
-  }
-  try{
-    const r=await fetch('https://raw.githubusercontent.com/Sasikar/Trading/master/index.html?t='+Date.now(),{cache:'no-store'});
-    if(r.ok){
-      const html=await r.text();
-      if(html.indexOf('id="tf-tabs"')>=0){
-        document.open();
-        document.write(html);
-        document.close();
-        return;
-      }
-    }
-  }catch(e){}
-  const u=new URL(location.href);
-  u.searchParams.set('fresh',Date.now());
-  location.replace(u.href);
+  const t=Date.now();
+  const go=function(id){ location.replace('index.html?commit='+encodeURIComponent(id)+'&t='+t); };
+  fetch('https://api.github.com/repos/Sasikar/Trading/commits/master',{cache:'no-store',headers:{Accept:'application/vnd.github+json'}})
+    .then(function(r){return r.json();})
+    .then(function(j){ go((j&&j.sha)||t); })
+    .catch(function(){ go(t); });
 });
 if(!document.querySelector('script[src*="wallets-observe"]')){
   const s=document.createElement('script');
