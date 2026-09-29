@@ -12,8 +12,7 @@
   }
   const $ = (id) => document.getElementById(id);
   let timer = null;
-  let cards = [];
-  let query = '';
+  const bag = window.__hdBag || (window.__hdBag = { cards: [], query: '' });
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -137,19 +136,22 @@
     return j;
   }
 
+  function hits() {
+    const q = bag.query.trim().toLowerCase();
+    if (!q) return bag.cards.slice();
+    return bag.cards.filter(function (h) {
+      const name = String(h.name || '').toLowerCase();
+      const ca = String(h.ca || '').toLowerCase();
+      return name.indexOf(q) >= 0 || ca.indexOf(q) >= 0;
+    });
+  }
   function paint() {
     const list = $('hd-list');
     if (!list) return;
-    const q = query.trim().toLowerCase();
-    const shown = !q
-      ? cards
-      : cards.filter(function (h) {
-          const name = String(h.name || '').toLowerCase();
-          const ca = String(h.ca || '').toLowerCase();
-          return name.indexOf(q) >= 0 || ca.indexOf(q) >= 0;
-        });
-    if (!cards.length) {
-      list.innerHTML = '<div style="font-size:12px;color:#8491a1">No SOL coins on the watchlist yet.</div>';
+    const q = bag.query.trim();
+    const shown = hits();
+    if (!bag.cards.length) {
+      if (!q) list.innerHTML = '<div style="font-size:12px;color:#8491a1">No SOL coins on the watchlist yet.</div>';
       return;
     }
     if (!shown.length) {
@@ -157,6 +159,40 @@
       return;
     }
     list.innerHTML = shown.map(renderCard).join('');
+  }
+  function suggest() {
+    const box = $('hd-suggest');
+    if (!box) return;
+    const q = bag.query.trim().toLowerCase();
+    const shown = q ? hits().slice(0, 8) : [];
+    if (!shown.length) {
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+    box.style.display = 'block';
+    box.innerHTML = shown
+      .map(function (h) {
+        const ca = h.ca && h.ca.length > 12 ? h.ca.slice(0, 4) + '…' + h.ca.slice(-4) : h.ca || '';
+        return (
+          '<button type="button" data-pick="' +
+          esc(h.name || h.ca || '') +
+          '" style="display:flex;width:100%;justify-content:space-between;gap:10px;padding:12px 14px;border:0;border-bottom:1px solid #1c2733;background:#0e151d;color:#e8eef6;font-weight:800;text-align:left;cursor:pointer"><span>' +
+          esc(h.name || '—') +
+          '</span><span style="color:#8491a1;font-weight:700">' +
+          esc(ca) +
+          '</span></button>'
+        );
+      })
+      .join('');
+  }
+  function statusLine(extra) {
+    const st = $('hd-status');
+    if (!st) return;
+    const n = bag.cards.length;
+    const q = bag.query.trim();
+    const shown = hits().length;
+    st.textContent = (q && n ? shown + ' of ' + n : n + ' SOL coins') + (extra || '');
   }
 
   async function load(force) {
@@ -167,23 +203,11 @@
       if (st) st.textContent = force ? 'Refreshing…' : 'Loading holders…';
       const j = force ? await api('/holders', { method: 'POST' }) : await api('/holders');
       if (src) src.textContent = j.scannedAt ? 'JUPITER · ' + ago(j.scannedAt) : 'JUPITER';
-      if (st) {
-        const n = (j.cards || []).length;
-        const q = query.trim();
-        const shown = !q
-          ? n
-          : (j.cards || []).filter(function (h) {
-              const name = String(h.name || '').toLowerCase();
-              const ca = String(h.ca || '').toLowerCase();
-              return name.indexOf(q.toLowerCase()) >= 0 || ca.indexOf(q.toLowerCase()) >= 0;
-            }).length;
-        st.textContent =
-          (q ? shown + ' of ' + n : n + ' SOL coins') +
-          (j.ethSkipped ? ' · ETH skipped' : '') +
-          (j.scannedAt ? ' · ' + ago(j.scannedAt) : '');
-      }
-      cards = j.cards || [];
+      bag.cards = j.cards || [];
+      const tail = (j.ethSkipped ? ' · ETH skipped' : '') + (j.scannedAt ? ' · ' + ago(j.scannedAt) : '');
+      statusLine(tail);
       paint();
+      suggest();
     } catch (e) {
       if (st) st.textContent = String(e && e.message ? e.message : e);
       if (list) list.innerHTML = '<div style="font-size:12px;color:#ff6f7c">Holders feed failed.</div>';
@@ -251,19 +275,37 @@
     return load(true);
   };
   const qbox = $('hd-q');
-  if (qbox) {
+  const sug = $('hd-suggest');
+  if (qbox && qbox.getAttribute('data-hd') !== '1') {
+    qbox.setAttribute('data-hd', '1');
     qbox.addEventListener('input', function () {
-      query = qbox.value || '';
+      bag.query = qbox.value || '';
       paint();
-      const st = $('hd-status');
-      if (!st || !cards.length) return;
-      const q = query.trim().toLowerCase();
-      const shown = !q
-        ? cards.length
-        : cards.filter(function (h) {
-            return String(h.name || '').toLowerCase().indexOf(q) >= 0 || String(h.ca || '').toLowerCase().indexOf(q) >= 0;
-          }).length;
-      st.textContent = q ? shown + ' of ' + cards.length + ' SOL coins' : cards.length + ' SOL coins';
+      suggest();
+      statusLine('');
+    });
+    qbox.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      const first = hits()[0];
+      if (!first) return;
+      bag.query = first.name || first.ca || '';
+      qbox.value = bag.query;
+      paint();
+      if (sug) sug.style.display = 'none';
+      statusLine('');
+    });
+  }
+  if (sug && sug.getAttribute('data-hd') !== '1') {
+    sug.setAttribute('data-hd', '1');
+    sug.addEventListener('click', function (ev) {
+      const b = ev.target && ev.target.closest && ev.target.closest('[data-pick]');
+      if (!b) return;
+      bag.query = b.getAttribute('data-pick') || '';
+      if (qbox) qbox.value = bag.query;
+      paint();
+      sug.style.display = 'none';
+      statusLine('');
     });
   }
 
