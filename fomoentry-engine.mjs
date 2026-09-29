@@ -438,7 +438,17 @@ export function buildFomoEntry(input) {
   const barsByTf = (input && input.bars) || {};
   const sliced = sliceLookback(barsByTf, lookback, now);
   for (const tf of sliced.order) sliced.bars[tf] = cleanPrints(sliced.bars[tf]);
-  const primaryTf = sliced.order.find((tf) => closedBars(sliced.bars[tf], tf, now).length >= 8) || sliced.order[0];
+  const spotHint = +((input && input.spot) || 0);
+  if (spotHint > 0) {
+    for (const tf of sliced.order) {
+      const raw = sliced.bars[tf] || [];
+      const kept = raw.filter((b) => +b.c > spotHint / 8 && +b.c < spotHint * 8);
+      if (kept.length !== raw.length) sliced.bars[tf] = kept;
+    }
+  }
+  const counted = sliced.order.map((tf) => ({ tf, n: closedBars(sliced.bars[tf] || [], tf, now).length }));
+  const primaryTf =
+    (counted.find((x) => x.n >= 12) || counted.find((x) => x.n >= 8) || counted[0] || {}).tf || sliced.order[0];
   const primary = closedBars(sliced.bars[primaryTf] || [], primaryTf, now);
   const allClosed = [];
   for (const tf of sliced.order) allClosed.push(...closedBars(sliced.bars[tf] || [], tf, now));
@@ -532,11 +542,10 @@ export function buildFomoEntry(input) {
     reason = "Extended off " + anchor.touchCount + "-touch support. Next bid is the cluster, not the high.";
   } else if (resistance.length && spot < resistance[0].low && (resistance[0].price - spot) / spot <= 0.015 && resistance[0].strength >= 40) {
     setupType = "MOMENTUM BREAKOUT";
-  } else if (resistance.length && nearSupport.length && spot < resistance[0].price && spot > nearSupport[0].price) {
-    const rangeTight = (resistance[0].price - nearSupport[0].price) / spot < 0.18;
-    if (rangeTight && resistance[0].touchCount >= 2 && nearSupport[0].touchCount >= 2) {
-      setupType = "RANGE BREAKOUT";
-    }
+  } else if (resistance.length && nearSupport.length && spot < resistance[0].price && spot >= nearSupport[0].low) {
+    anchor = nearSupport[0];
+    setupType = "RANGE BID";
+    reason = "Inside the range. The bid is the " + anchor.touchCount + "-touch support. The breakout is the resistance, not a chase.";
   }
 
   if (setupType === "MOMENTUM BREAKOUT" || setupType === "RANGE BREAKOUT") {

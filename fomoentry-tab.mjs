@@ -1,4 +1,4 @@
-import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260928-shelf";
+import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-engine.mjs?v=20260929-zone";
 
 (function () {
   if (window.__fomoEntryDesk) return;
