@@ -32,12 +32,30 @@ document.body.insertBefore(nav,document.body.firstChild);
 const fresh=document.getElementById('site-fresh');
 if(fresh) fresh.addEventListener('click', function(){
   fresh.textContent='Refreshing…';
-  const t=Date.now();
-  const go=function(id){ location.replace('index.html?commit='+encodeURIComponent(id)+'&t='+t); };
-  fetch('https://api.github.com/repos/Sasikar/Trading/commits/master',{cache:'no-store',headers:{Accept:'application/vnd.github+json'}})
-    .then(function(r){return r.json();})
-    .then(function(j){ go((j&&j.sha)||t); })
-    .catch(function(){ go(t); });
+  var clears=[];
+  if(navigator.serviceWorker) clears.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));
+  if(window.caches) clears.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));
+  Promise.all(clears).catch(function(){}).then(function(){
+    return fetch('https://api.github.com/repos/Sasikar/Trading/commits/master',{cache:'no-store',headers:{Accept:'application/vnd.github+json'}});
+  }).then(function(r){return r.json();}).then(function(j){
+    var sha=j&&j.sha;
+    if(!sha) throw new Error('no sha');
+    var base='https://cdn.jsdelivr.net/gh/Sasikar/Trading@'+sha+'/';
+    return fetch(base+'index.html',{cache:'no-store'}).then(function(r){
+      if(!r.ok) throw new Error('cdn');
+      return r.text().then(function(html){
+        return html.replace(/\s(src|href)="(?!https?:|\/\/|#|data:|mailto:)([^"]+)"/g,function(_m,attr,path){
+          return ' '+attr+'="'+base+String(path).replace(/^\.\//,'')+'"';
+        });
+      });
+    });
+  }).then(function(html){
+    if(!html || html.indexOf('id="tf-tabs"')<0) throw new Error('html');
+    sessionStorage.setItem('trading-refresh-html', html);
+    location.replace('index.html?boot='+Date.now());
+  }).catch(function(){
+    location.replace('index.html?boot='+Date.now());
+  });
 });
 if(!document.querySelector('script[src*="wallets-observe"]')){
   const s=document.createElement('script');

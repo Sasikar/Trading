@@ -1,5 +1,16 @@
 <!doctype html>
 <html lang="en"><head>
+<script>
+(function(){
+  var html=null;
+  try{ html=sessionStorage.getItem('trading-refresh-html'); }catch(e){}
+  if(!html || html.indexOf('id="tf-tabs"')<0) return;
+  try{ sessionStorage.removeItem('trading-refresh-html'); }catch(e){}
+  document.open();
+  document.write(html);
+  document.close();
+})();
+</script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -1633,5 +1644,5 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="gmgn-tab.js?v=20260923-pf1"></script>
 <script src="wallets-tab.js?v=20260923-pf1"></script>
 <script src="pumpfun-tab.js?v=20260923-pf2"></script>
-<script src="site-nav.js?v=20260929-nav"></script>
+<script src="site-nav.js?v=20260929-boot"></script>
 </body></html>
