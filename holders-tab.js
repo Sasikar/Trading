@@ -12,6 +12,8 @@
   }
   const $ = (id) => document.getElementById(id);
   let timer = null;
+  let cards = [];
+  let query = '';
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
@@ -135,6 +137,28 @@
     return j;
   }
 
+  function paint() {
+    const list = $('hd-list');
+    if (!list) return;
+    const q = query.trim().toLowerCase();
+    const shown = !q
+      ? cards
+      : cards.filter(function (h) {
+          const name = String(h.name || '').toLowerCase();
+          const ca = String(h.ca || '').toLowerCase();
+          return name.indexOf(q) >= 0 || ca.indexOf(q) >= 0;
+        });
+    if (!cards.length) {
+      list.innerHTML = '<div style="font-size:12px;color:#8491a1">No SOL coins on the watchlist yet.</div>';
+      return;
+    }
+    if (!shown.length) {
+      list.innerHTML = '<div style="font-size:12px;color:#8491a1">No coin matches.</div>';
+      return;
+    }
+    list.innerHTML = shown.map(renderCard).join('');
+  }
+
   async function load(force) {
     const list = $('hd-list');
     const st = $('hd-status');
@@ -144,19 +168,22 @@
       const j = force ? await api('/holders', { method: 'POST' }) : await api('/holders');
       if (src) src.textContent = j.scannedAt ? 'JUPITER · ' + ago(j.scannedAt) : 'JUPITER';
       if (st) {
+        const n = (j.cards || []).length;
+        const q = query.trim();
+        const shown = !q
+          ? n
+          : (j.cards || []).filter(function (h) {
+              const name = String(h.name || '').toLowerCase();
+              const ca = String(h.ca || '').toLowerCase();
+              return name.indexOf(q.toLowerCase()) >= 0 || ca.indexOf(q.toLowerCase()) >= 0;
+            }).length;
         st.textContent =
-          (j.cards || []).length +
-          ' SOL coins' +
+          (q ? shown + ' of ' + n : n + ' SOL coins') +
           (j.ethSkipped ? ' · ETH skipped' : '') +
           (j.scannedAt ? ' · ' + ago(j.scannedAt) : '');
       }
-      if (list) {
-        if (!(j.cards || []).length) {
-          list.innerHTML = '<div style="font-size:12px;color:#8491a1">No SOL coins on the watchlist yet.</div>';
-        } else {
-          list.innerHTML = j.cards.map(renderCard).join('');
-        }
-      }
+      cards = j.cards || [];
+      paint();
     } catch (e) {
       if (st) st.textContent = String(e && e.message ? e.message : e);
       if (list) list.innerHTML = '<div style="font-size:12px;color:#ff6f7c">Holders feed failed.</div>';
@@ -223,6 +250,22 @@
   window.refreshHoldersTab = function () {
     return load(true);
   };
+  const qbox = $('hd-q');
+  if (qbox) {
+    qbox.addEventListener('input', function () {
+      query = qbox.value || '';
+      paint();
+      const st = $('hd-status');
+      if (!st || !cards.length) return;
+      const q = query.trim().toLowerCase();
+      const shown = !q
+        ? cards.length
+        : cards.filter(function (h) {
+            return String(h.name || '').toLowerCase().indexOf(q) >= 0 || String(h.ca || '').toLowerCase().indexOf(q) >= 0;
+          }).length;
+      st.textContent = q ? shown + ' of ' + cards.length + ' SOL coins' : cards.length + ' SOL coins';
+    });
+  }
 
   const tabs = document.getElementById('tf-tabs');
   if (tabs) {
