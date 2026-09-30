@@ -542,14 +542,24 @@ export default {
         if (!env.AI) throw new Error('AI is not on this worker');
         const dataUrl = 'data:image/jpeg;base64,' + image;
         const prompt = 'This is a screenshot of an X post, replies, or comments. Extract only the useful human sentences. Return JSON only: {"notes":["sentence"]}. One note per tweet or reply, in the person\'s own words. Drop names, @handles, times, view counts, likes, ads, buttons, and "Post your reply". Do not invent text. If nothing useful is readable, return {"notes":[]}.';
-        const result = await env.AI.run('@cf/meta/llama-3.2-11b-vision-instruct', {
+        const input = {
           messages: [
             { role: 'system', content: 'You extract clean notes from screenshots. Reply with JSON only.' },
             { role: 'user', content: prompt }
           ],
           image: dataUrl,
           max_tokens: 900
-        });
+        };
+        const model = '@cf/meta/llama-3.2-11b-vision-instruct';
+        let result;
+        try {
+          result = await env.AI.run(model, input);
+        } catch (err) {
+          const msg = String(err && err.message ? err.message : err);
+          if (!/5016|submit the prompt|hereby agree/i.test(msg)) throw err;
+          await env.AI.run(model, { prompt: 'agree' });
+          result = await env.AI.run(model, input);
+        }
         const text = typeof result === 'string'
           ? result
           : String((result && (result.response || result.description || result.result)) || JSON.stringify(result || {}));
