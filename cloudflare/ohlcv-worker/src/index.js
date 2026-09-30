@@ -565,19 +565,55 @@ export default {
           }
           result = await env.AI.run(model, input);
         }
-        const text = typeof result === 'string'
-          ? result
-          : String((result && (result.response || result.description || result.result)) || JSON.stringify(result || {}));
+        function modelText(result) {
+          if (typeof result === 'string') return result;
+          if (!result || typeof result !== 'object') return '';
+          const direct = result.response || result.description || result.result || result.output;
+          if (typeof direct === 'string') return direct;
+          try { return JSON.stringify(direct != null ? direct : result); } catch (e) { return ''; }
+        }
+        function noteLine(value, depth) {
+          if (depth > 4 || value == null) return [];
+          if (typeof value === 'string' || typeof value === 'number') {
+            const s = String(value).replace(/\s+/g, ' ').replace(/^[\s\-"“”']+|[\s"“”']+$/g, '').trim();
+            if (!s || s === '[object Object]' || s.indexOf('[object Object]') >= 0) return [];
+            if (!/[a-z]/i.test(s) || (s.match(/[a-z]/gi) || []).length < 3) return [];
+            if (/^(post your reply|relevant|view quotes|following|show more|reply|ad)$/i.test(s)) return [];
+            return [s];
+          }
+          if (Array.isArray(value)) return value.flatMap((v) => noteLine(v, depth + 1));
+          if (typeof value === 'object') {
+            const prefer = ['text', 'note', 'sentence', 'content', 'line', 'quote', 'body', 'message', 'caption'];
+            for (const key of prefer) {
+              if (value[key] != null) {
+                const hit = noteLine(value[key], depth + 1);
+                if (hit.length) return hit;
+              }
+            }
+            const rest = Object.keys(value).flatMap((k) => noteLine(value[k], depth + 1));
+            const sentences = rest.filter((line) => line.split(/\s+/).length >= 3);
+            return sentences.length ? sentences : rest;
+          }
+          return [];
+        }
+        const text = modelText(result);
         let notes = [];
         const match = text.match(/\{[\s\S]*\}/);
         if (match) {
           try {
             const parsed = JSON.parse(match[0]);
-            if (parsed && Array.isArray(parsed.notes)) notes = parsed.notes;
+            if (parsed && parsed.notes != null) notes = noteLine(parsed.notes, 0);
+            else if (Array.isArray(parsed)) notes = noteLine(parsed, 0);
           } catch (e) {}
         }
-        if (!notes.length) notes = text.split(/\n/);
-        notes = notes.map((s) => String(s || '').replace(/^[\s\-"']+|[\s"']+$/g, '')).filter((s) => /[a-z]/i.test(s) && s.length > 1);
+        if (!notes.length) notes = noteLine(text.split(/\n/), 0);
+        const seen = {};
+        notes = notes.filter((line) => {
+          const key = line.toLowerCase();
+          if (seen[key]) return false;
+          seen[key] = 1;
+          return true;
+        });
         return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });

@@ -45,7 +45,7 @@
   }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-      return c === '&' ? '&' : c === '<' ? '<' : c === '>' ? '>' : '"';
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
   }
   function when(t) {
@@ -57,9 +57,11 @@
     var dead = tombs();
     var map = {};
     items.concat(remote || []).forEach(function (it) {
-      if (!it || !it.id || !it.text || dead[it.id]) return;
+      if (!it || !it.id || dead[it.id]) return;
+      var text = it.text && typeof it.text === 'object' ? ((noteLine(it.text, 0)[0]) || '') : String(it.text || '').replace(/\s+/g, ' ').trim();
+      if (!text || text === '[object Object]' || text.indexOf('[object Object]') >= 0) { markTomb(it.id, true); return; }
       var prev = map[it.id];
-      if (!prev || (it.t || 0) >= (prev.t || 0)) map[it.id] = { id: it.id, text: String(it.text), t: it.t || 0 };
+      if (!prev || (it.t || 0) >= (prev.t || 0)) map[it.id] = { id: it.id, text: text, t: it.t || 0 };
     });
     items = Object.keys(map).map(function (k) { return map[k]; });
     items.sort(function (a, b) { return (b.t || 0) - (a.t || 0); });
@@ -250,11 +252,34 @@
     try { if (canvas) { canvas.width = 1; canvas.height = 1; } } catch (e) {}
   }
   var PROMPT = 'This is a screenshot of an X post, replies, or comments. Extract only the useful human sentences. Return JSON only: {"notes":["sentence"]}. One note per tweet or reply, in the person\'s own words. Drop names, @handles, times, view counts, likes, ads, buttons, and "Post your reply". Do not invent text. If nothing useful is readable, return {"notes":[]}.';
-  function keepNote(s) {
-    s = String(s || '').replace(/\s+/g, ' ').replace(/^[\s\-"“”']+|[\s"“”']+$/g, '').trim();
-    if (!s || /^(post your reply|relevant|view quotes|following|show more|reply|ad)$/i.test(s)) return '';
-    if ((s.match(/[a-z]/gi) || []).length < 3) return '';
-    return s;
+  function noteLine(value, depth) {
+    if (depth > 4 || value == null) return [];
+    if (typeof value === 'string' || typeof value === 'number') {
+      var s = String(value).replace(/\s+/g, ' ').replace(/^[\s\-\"\u201c\u201d']+|[\s\"\u201c\u201d']+$/g, '').trim();
+      if (!s || s === '[object Object]' || s.indexOf('[object Object]') >= 0) return [];
+      if ((s.match(/[a-z]/gi) || []).length < 3) return [];
+      if (/^(post your reply|relevant|view quotes|following|show more|reply|ad)$/i.test(s)) return [];
+      return [s];
+    }
+    if (Array.isArray(value)) {
+      var out = [];
+      value.forEach(function (v) { out = out.concat(noteLine(v, depth + 1)); });
+      return out;
+    }
+    if (typeof value === 'object') {
+      var prefer = ['text', 'note', 'sentence', 'content', 'line', 'quote', 'body', 'message', 'caption'];
+      for (var i = 0; i < prefer.length; i++) {
+        if (value[prefer[i]] != null) {
+          var hit = noteLine(value[prefer[i]], depth + 1);
+          if (hit.length) return hit;
+        }
+      }
+      var rest = [];
+      Object.keys(value).forEach(function (k) { rest = rest.concat(noteLine(value[k], depth + 1)); });
+      var sentences = rest.filter(function (line) { return line.split(/\s+/).length >= 3; });
+      return sentences.length ? sentences : rest;
+    }
+    return [];
   }
   function notesFromAi(raw) {
     var text = '';
@@ -262,7 +287,6 @@
     else if (raw && typeof raw.text === 'string') text = raw.text;
     else if (raw && raw.message && typeof raw.message.content === 'string') text = raw.message.content;
     else if (raw && raw.message && Array.isArray(raw.message.content)) text = raw.message.content.map(function (p) { return p && (p.text || p.content) || ''; }).join('\n');
-    else if (raw && typeof raw.toString === 'function' && raw.toString() !== '[object Object]') text = raw.toString();
     else {
       try { text = JSON.stringify(raw || ''); } catch (e) { text = ''; }
     }
@@ -271,13 +295,13 @@
     if (match) {
       try {
         var parsed = JSON.parse(match[0]);
-        if (parsed && Array.isArray(parsed.notes)) notes = parsed.notes;
+        if (parsed && parsed.notes != null) notes = noteLine(parsed.notes, 0);
+        else if (Array.isArray(parsed)) notes = noteLine(parsed, 0);
       } catch (e) {}
     }
-    if (!notes.length) notes = String(text).split(/\n/);
+    if (!notes.length) notes = noteLine(String(text).split(/\n/), 0);
     var seen = {};
-    return notes.map(keepNote).filter(function (n) {
-      if (!n) return false;
+    return notes.filter(function (n) {
       var k = n.toLowerCase();
       if (seen[k]) return false;
       seen[k] = 1;
