@@ -180,13 +180,13 @@
       var band = row ? bandOf(row.time) : '';
       if (band) counts[band] += 1;
       var cls = 'sl-day' + (band ? ' ' + band : '') + (key === today ? ' today' : '') + (key === openKey ? ' on' : '');
-      cells += '<button type="button" class="' + cls + '" data-day="' + key + '"><span class="n">' + d + '</span>' +
-        (row ? '<span class="tm">' + clock(row.time) + '</span>' : '') + '</button>';
+      cells += '<button type="button" class="' + cls + '" data-day="' + key + '"><span class="n">' + d + '</span><span class="tm">' +
+        (row ? clock(row.time) : '') + '</span></button>';
     }
     var edit = '';
     if (openKey) {
       var have = days[openKey];
-      edit = '<div class="sl-edit"><div class="sl-edit-top"><strong>' + dayTitle(openKey) + '</strong><span id="sl-preview" class="sl-preview' + (have ? ' ' + bandOf(have.time) : '') + '">' + (have ? pretty(have.time) : 'Pick a time') + '</span></div>' +
+      edit = '<div class="sl-back" data-act="cancel"></div><div class="sl-edit"><div class="sl-edit-top"><strong>' + dayTitle(openKey) + '</strong><span id="sl-preview" class="sl-preview' + (have ? ' ' + bandOf(have.time) : '') + '">' + (have ? pretty(have.time) : 'Pick a time') + '</span></div>' +
         '<input id="sl-time" type="time" step="60" aria-label="Sleep time">' +
         '<p>Before 10:00 pm green. 10:00 to 10:30 yellow. After 10:30, or after midnight, red.</p>' +
         '<div class="sl-row"><button type="button" data-act="cancel">Cancel</button>' +
@@ -196,7 +196,7 @@
     cal.innerHTML =
       '<div class="sl-top"><button type="button" class="sl-nav" data-act="prev" aria-label="Previous month">‹</button><h3>' + monthLabel(y, m) + '</h3><button type="button" class="sl-nav" data-act="next" aria-label="Next month">›</button></div>' +
       '<div class="sl-score"><div class="green"><b>' + counts.green + '</b><i>Before 10</i></div><div class="yellow"><b>' + counts.yellow + '</b><i>By 10:30</i></div><div class="red"><b>' + counts.red + '</b><i>After 10:30</i></div></div>' +
-      '<div class="sl-week"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>' +
+      '<div class="sl-week"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>' +
       '<div class="sl-grid">' + cells + '</div>' + edit;
     var input = $('sl-time');
     if (input) {
@@ -227,8 +227,17 @@
     paint();
     persist();
   }
+  function marketSection() {
+    var el = $('market-source');
+    return el && el.closest ? el.closest('section') : null;
+  }
   function solo(on) {
     document.body.classList.toggle('sl-on', !!on);
+    var sec = marketSection();
+    if (sec) {
+      if (on) sec.style.setProperty('display', 'none', 'important');
+      else sec.style.removeProperty('display');
+    }
     var main = document.querySelector('main');
     if (!main || on) return;
     Array.prototype.forEach.call(main.children, function (el) {
@@ -261,7 +270,7 @@
   if (!document.getElementById('sl-style')) {
     var css = document.createElement('style');
     css.id = 'sl-style';
-    css.textContent = '#sl-cal{color:#f4f7fb}.sl-top{display:flex;align-items:center;justify-content:space-between;margin:2px 0 14px}.sl-top h3{margin:0;font-size:22px;font-weight:800;letter-spacing:-.03em}.sl-nav{width:40px;height:40px;border-radius:14px;border:0;background:#1a222e;color:#f4f7fb;font-size:22px;line-height:1;cursor:pointer}.sl-score{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}.sl-score div{border-radius:16px;padding:12px 6px 10px;text-align:center}.sl-score b{display:block;font-size:26px;font-weight:800;line-height:1;letter-spacing:-.04em}.sl-score i{display:block;margin-top:5px;font-style:normal;font-size:11px;font-weight:700}.sl-score .green{background:#123524;color:#7ddea8}.sl-score .yellow{background:#3a2c0c;color:#f3d48a}.sl-score .red{background:#3c1822;color:#ff9aa8}.sl-week,.sl-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}.sl-week{margin-bottom:6px}.sl-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.sl-day{aspect-ratio:1;min-height:0;border:0;border-radius:14px;background:transparent;color:#d7dee8;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;font-weight:800}.sl-day .n{font-size:15px;line-height:1}.sl-day .tm{font-size:9px;line-height:1.1;font-weight:800}.sl-day.green{background:#1f8a4d;color:#fff}.sl-day.yellow{background:#e6b023;color:#1a1406}.sl-day.red{background:#e15d6a;color:#fff}.sl-day.today{box-shadow:inset 0 0 0 2px #f4f7fb}.sl-day.on{box-shadow:0 0 0 2px #f4f7fb}.sl-day.today.on{box-shadow:inset 0 0 0 2px #111, 0 0 0 2px #f4f7fb}.sl-edit{margin-top:14px;padding:14px;border-radius:18px;background:#10161f}.sl-edit-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.sl-preview{border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;background:#1a222e;color:#f4f7fb}.sl-preview.green{background:#1f8a4d;color:#fff}.sl-preview.yellow{background:#e6b023;color:#1a1406}.sl-preview.red{background:#e15d6a;color:#fff}.sl-edit p{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:650}#sl-time{width:100%;box-sizing:border-box;margin-top:10px;padding:14px;border:0;border-radius:14px;background:#0b1016;color:#fff;font-size:28px;font-weight:800;color-scheme:dark}.sl-row{display:flex;gap:8px;margin-top:10px}.sl-row button{flex:1;padding:14px 8px;border:0;border-radius:12px;font-weight:800;cursor:pointer;background:#1a222e;color:#e8eef6}.sl-row button[data-act="save"]{background:#f4f7fb;color:#111}.sl-row button[data-act="clear"]{background:#3c1822;color:#ff9aa8}body.sl-on main>section.section,body.sl-on main>.trend-panel:not(#sleep-panel),body.sl-on main>.struct-trend-panel,body.sl-on main>.macro-panel,body.sl-on #tf-panels{display:none!important}body.sl-on #sleep-panel{display:block!important}';
+    css.textContent = '#sleep-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#sleep-panel .head p{max-width:240px}#sl-status{color:#8b95a5!important}#sl-cal{color:#f4f7fb}.sl-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 14px}.sl-top h3{margin:0;font-size:26px;font-weight:800;letter-spacing:-.04em}.sl-nav{width:36px;height:36px;border-radius:50%;border:0;background:#1a222e;color:#f4f7fb;font-size:20px;cursor:pointer}.sl-score{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}.sl-score div{border-radius:18px;padding:14px 6px 12px;text-align:center}.sl-score b{display:block;font-size:28px;font-weight:800;line-height:1;letter-spacing:-.04em}.sl-score i{display:block;margin-top:6px;font-style:normal;font-size:11px;font-weight:700}.sl-score .green{background:#123524;color:#7ddea8}.sl-score .yellow{background:#3a2c0c;color:#f3d48a}.sl-score .red{background:#3c1822;color:#ff9aa8}.sl-week,.sl-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px 0}.sl-week{margin-bottom:8px}.sl-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.sl-day{min-height:58px;height:auto;aspect-ratio:auto;border:0;border-radius:0;background:transparent;color:#d7dee8;padding:2px 0 0;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font-weight:800}.sl-day .n{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1}.sl-day .tm{height:12px;font-size:10px;line-height:1;font-weight:800;color:transparent}.sl-day.green .n{background:#1f8a4d;color:#fff}.sl-day.yellow .n{background:#e6b023;color:#1a1406}.sl-day.red .n{background:#e15d6a;color:#fff}.sl-day.green .tm{color:#7ddea8}.sl-day.yellow .tm{color:#f3d48a}.sl-day.red .tm{color:#ff9aa8}.sl-day.today .n{box-shadow:0 0 0 2px #f4f7fb}.sl-day.on .n{box-shadow:0 0 0 2px #fff}.sl-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}.sl-edit{position:fixed;left:12px;right:12px;bottom:12px;z-index:41;margin:0;padding:16px;border-radius:22px;background:#141b24;box-shadow:0 16px 50px rgba(0,0,0,.45)}.sl-edit-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.sl-preview{border-radius:999px;padding:6px 10px;font-size:12px;font-weight:800;background:#1a222e;color:#f4f7fb}.sl-preview.green{background:#1f8a4d;color:#fff}.sl-preview.yellow{background:#e6b023;color:#1a1406}.sl-preview.red{background:#e15d6a;color:#fff}.sl-edit p{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:650}#sl-time{width:100%;box-sizing:border-box;margin-top:12px;padding:14px;border:0;border-radius:14px;background:#0b1016;color:#fff;font-size:28px;font-weight:800;color-scheme:dark}.sl-row{display:flex;gap:8px;margin-top:12px}.sl-row button{flex:1;padding:14px 8px;border:0;border-radius:12px;font-weight:800;cursor:pointer;background:#1a222e;color:#e8eef6}.sl-row button[data-act="save"]{background:#f4f7fb;color:#111}.sl-row button[data-act="clear"]{background:#3c1822;color:#ff9aa8}body.sl-on main>section.section,body.sl-on main>.trend-panel:not(#sleep-panel),body.sl-on main>.struct-trend-panel,body.sl-on main>.macro-panel,body.sl-on #tf-panels{display:none!important}body.sl-on #sleep-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
