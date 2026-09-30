@@ -354,6 +354,17 @@ export class OhlcvEngine {
         const board = readFavSupports(this.store);
         return new Response(JSON.stringify({ ok: true, ...board }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       }
+      if (path === '/coinstats' || path === '/api/coinstats') {
+        const wallet = (new URL(request.url).searchParams.get('wallet') || '').trim();
+        try {
+          const data = await scanWallet(this.env, wallet, this.store);
+          return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+        } catch (e) {
+          const message = String(e && e.message ? e.message : e);
+          const error = /max usage reached|not valid JSON/i.test(message) ? 'Helius daily limit is used up. Try again later.' : message.slice(0, 180);
+          return new Response(JSON.stringify({ ok: false, error: error }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+      }
       if (path === '/coinstats-wallets' || path === '/api/coinstats-wallets') {
         if (request.method === 'POST') {
           const body = await request.json().catch(() => ({}));
@@ -615,15 +626,6 @@ export default {
           return true;
         });
         return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
-      } catch (e) {
-        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
-      }
-    }
-    if (path === '/coinstats' || path === '/api/coinstats') {
-      const wallet = (new URL(request.url).searchParams.get('wallet') || '').trim();
-      try {
-        const data = await scanWallet(env, wallet);
-        return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }

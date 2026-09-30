@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { holdingsFromDas, historyRows, labelHistory, writeWallets, readWallets, judgeSells, sellLine, writeChartPoint, readChart } from './coinstats.js';
+import { holdingsFromDas, historyRows, labelHistory, writeWallets, readWallets, judgeSells, sellLine, writeChartPoint, readChart, writeWalletCache, readWalletCache, markHeliusLimit, heliusCooling, heliusLimitedMessage } from './coinstats.js';
 
 test('holdings keep priced tokens and native sol', () => {
   const out = holdingsFromDas({
@@ -89,4 +89,21 @@ test('a chart keeps one point per hour for one day', () => {
   series = writeChartPoint(store, mint, { hour: '2026-09-26T00', total: 30, coin: 3 });
   assert.equal(series.length, 24);
   assert.equal(series[0].hour, '2026-09-25T01');
+});
+
+test('helius limit text is recognised and the last wallet read is kept', () => {
+  assert.equal(heliusLimitedMessage('max usage reached'), true);
+  const bag = {};
+  const store = {
+    getMeta(k) { return bag[k] || ''; },
+    setMeta(k, v) { bag[k] = v; }
+  };
+  writeWalletCache(store, 'WALLET', { total: 10, holdings: [{ mint: 'M', symbol: 'JEAN', value: 10 }], history: [], truncated: false }, 1000);
+  const saved = readWalletCache(store, 'WALLET');
+  assert.equal(saved.total, 10);
+  assert.equal(saved.holdings[0].symbol, 'JEAN');
+  assert.equal(heliusCooling(store, 1000), false);
+  markHeliusLimit(store, 1000);
+  assert.equal(heliusCooling(store, 1000 + 60 * 1000), true);
+  assert.equal(heliusCooling(store, 1000 + 21 * 60 * 1000), false);
 });

@@ -160,6 +160,72 @@ export function labelHistory(rows, holdings) {
   });
 }
 
+const CACHE_KEY = 'cs_wallet_cache';
+const BLOCK_KEY = 'cs_helius_until';
+const COOL_MS = 20 * 60 * 1000;
+export const HELIUS_NOTE = 'Helius daily limit is used up. Showing the last saved holdings.';
+
+export function heliusLimitedMessage(text) {
+  return /max usage reached|daily limit is used up/i.test(String(text || ''));
+}
+
+function limitError() {
+  const err = new Error('Helius daily limit is used up.');
+  err.limited = true;
+  return err;
+}
+
+async function asJson(res) {
+  const text = await res.text();
+  if (heliusLimitedMessage(text)) throw limitError();
+  if (!text) return {};
+  try { return JSON.parse(text); }
+  catch (e) { throw new Error('Wallet read failed'); }
+}
+
+export function readWalletCache(store, wallet) {
+  try {
+    const all = JSON.parse(store.getMeta(CACHE_KEY) || '{}');
+    const row = all && all[wallet];
+    return row && Array.isArray(row.holdings) ? row : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function writeWalletCache(store, wallet, data, now) {
+  let all = {};
+  try { all = JSON.parse(store.getMeta(CACHE_KEY) || '{}') || {}; } catch (e) { all = {}; }
+  all[wallet] = {
+    wallet: wallet,
+    total: data.total,
+    holdings: data.holdings,
+    history: data.history || [],
+    truncated: !!data.truncated,
+    at: now || Date.now()
+  };
+  const keys = Object.keys(all);
+  if (keys.length > 30) {
+    keys.sort((a, b) => (all[a].at || 0) - (all[b].at || 0)).slice(0, keys.length - 30).forEach((key) => { delete all[key]; });
+  }
+  store.setMeta(CACHE_KEY, JSON.stringify(all));
+  return all[wallet];
+}
+
+export function heliusCooling(store, now) {
+  return (+store.getMeta(BLOCK_KEY) || 0) > (now || Date.now());
+}
+
+export function markHeliusLimit(store, now) {
+  store.setMeta(BLOCK_KEY, String((now || Date.now()) + COOL_MS));
+}
+
+function fromCache(store, wallet) {
+  const cached = store && readWalletCache(store, wallet);
+  if (!cached) return null;
+  return Object.assign({ stale: true, notice: HELIUS_NOTE }, cached);
+}
+
 async function rpc(key, method, params) {
   const res = await fetch('https://mainnet.helius-rpc.com/?api-key=' + encodeURIComponent(key), {
     method: 'POST',
@@ -167,7 +233,9 @@ async function rpc(key, method, params) {
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: method, params: params }),
     signal: AbortSignal.timeout(20000)
   });
-  const body = await res.json();
+  const body = await asJson(res);
+  const message = body && body.error && (body.error.message || body.error);
+  if (heliusLimitedMessage(message)) throw limitError();
   if (!res.ok || body.error) throw new Error('Wallet read failed');
   return body;
 }
@@ -180,8 +248,11 @@ async function recentTxs(key, wallet, since) {
     let url = 'https://api.helius.xyz/v0/addresses/' + encodeURIComponent(wallet) + '/transactions?api-key=' + encodeURIComponent(key) + '&limit=100';
     if (before) url += '&before=' + encodeURIComponent(before);
     const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    const text = await res.text();
+    if (heliusLimitedMessage(text)) throw limitError();
     if (!res.ok) break;
-    const rows = await res.json().catch(() => []);
+    let rows = [];
+    try { rows = text ? JSON.parse(text) : []; } catch (e) { break; }
     if (!Array.isArray(rows) || !rows.length) break;
     let old = false;
     rows.forEach((tx) => {
@@ -215,30 +286,59 @@ async function priceHoldings(rows) {
   }
 }
 
-export async function scanWallet(env, wallet) {
+export async function scanWallet(env, wallet, store) {
   if (!valid(wallet)) throw new Error('Paste a Solana wallet address.');
   const key = env && env.HELIUS_API_KEY;
   if (!key) throw new Error('Helius key is missing on the worker.');
+  if (store && heliusCooling(store)) {
+    const cached = fromCache(store, wallet);
+    if (cached) return cached;
+    throw new Error('Helius daily limit is used up. Try again later.');
+  }
   const since = Date.now() - WEEK;
-  const [das, book] = await Promise.all([
-    rpc(key, 'getAssetsByOwner', {
-      ownerAddress: wallet,
-      page: 1,
-      limit: 1000,
-      displayOptions: { showFungible: true, showNativeBalance: true }
-    }),
-    recentTxs(key, wallet, since)
-  ]);
+  let das;
+  let book;
+  try {
+    const pair = await Promise.all([
+      rpc(key, 'getAssetsByOwner', {
+        ownerAddress: wallet,
+        page: 1,
+        limit: 1000,
+        displayOptions: { showFungible: true, showNativeBalance: true }
+      }),
+      recentTxs(key, wallet, since).catch((err) => {
+        if (err && err.limited) return { txs: [], truncated: false, limited: true };
+        throw err;
+      })
+    ]);
+    das = pair[0];
+    book = pair[1];
+  } catch (err) {
+    const cached = fromCache(store, wallet);
+    if (err && err.limited && store) markHeliusLimit(store);
+    if (cached && err && err.limited) return cached;
+    if (err && err.limited) throw new Error('Helius daily limit is used up. Try again later.');
+    throw err;
+  }
   const held = holdingsFromDas(das);
   const rows = await priceHoldings(held.rows);
   const total = rows.reduce((sum, row) => sum + (Number(row.value) || 0), 0);
-  return {
+  const out = {
     wallet: wallet,
     total: total,
     holdings: rows,
     history: labelHistory(historyRows(book.txs, wallet, since), rows),
     truncated: book.truncated
   };
+  if (book.limited && store) {
+    markHeliusLimit(store);
+    const prev = readWalletCache(store, wallet);
+    if (prev && prev.history && prev.history.length && !out.history.length) out.history = prev.history;
+    out.stale = true;
+    out.notice = HELIUS_NOTE;
+  }
+  if (store) writeWalletCache(store, wallet, out);
+  return out;
 }
 
 const SNAP_KEY = 'cs_hold_snap';
@@ -304,7 +404,12 @@ const TOKEN_PROGRAMS = [
 async function balanceOf(key, wallet, mint) {
   let total = 0;
   for (let i = 0; i < TOKEN_PROGRAMS.length; i++) {
-    const res = await rpc(key, 'getTokenAccountsByOwner', [wallet, { programId: TOKEN_PROGRAMS[i] }, { encoding: 'jsonParsed' }]).catch(() => null);
+    let res = null;
+    try {
+      res = await rpc(key, 'getTokenAccountsByOwner', [wallet, { programId: TOKEN_PROGRAMS[i] }, { encoding: 'jsonParsed' }]);
+    } catch (err) {
+      if (err && err.limited) throw err;
+    }
     ((res && res.value) || []).forEach((row) => {
       const info = row && row.account && row.account.data && row.account.data.parsed && row.account.data.parsed.info;
       if (!info || info.mint !== mint) return;
@@ -331,13 +436,28 @@ export async function scanSells(env, store, mint, wallets, now) {
       at: prev.at
     };
   }
+  if (store && heliusCooling(store)) {
+    if (prev && prev.line) {
+      return { mint: mint, score: prev.score || list.length, sold: prev.sold || 0, holding: prev.holding || 0, hadBaseline: true, line: prev.line, at: prev.at };
+    }
+    return { mint: mint, score: list.length, sold: 0, holding: 0, hadBaseline: false, line: 'Helius daily limit is used up.', at: at };
+  }
   const key = env && env.HELIUS_API_KEY;
   if (!key) throw new Error('Helius key is missing on the worker.');
   const balances = {};
-  for (let i = 0; i < list.length; i += 6) {
-    const chunk = list.slice(i, i + 6);
-    const rows = await Promise.all(chunk.map((wallet) => balanceOf(key, wallet, mint).catch(() => 0)));
-    chunk.forEach((wallet, n) => { balances[wallet] = rows[n]; });
+  try {
+    for (let i = 0; i < list.length; i += 6) {
+      const chunk = list.slice(i, i + 6);
+      const rows = await Promise.all(chunk.map((wallet) => balanceOf(key, wallet, mint)));
+      chunk.forEach((wallet, n) => { balances[wallet] = rows[n]; });
+    }
+  } catch (err) {
+    if (err && err.limited && store) markHeliusLimit(store);
+    if (prev && prev.line) {
+      return { mint: mint, score: prev.score || list.length, sold: prev.sold || 0, holding: prev.holding || 0, hadBaseline: true, line: prev.line, at: prev.at };
+    }
+    if (err && err.limited) return { mint: mint, score: list.length, sold: 0, holding: 0, hadBaseline: false, line: 'Helius daily limit is used up.', at: at };
+    throw err;
   }
   const out = applySnap(store, mint, list, balances, at);
   return out;

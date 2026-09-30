@@ -163,7 +163,11 @@
       if (i >= capped.length) return Promise.resolve();
       var address = capped[i++];
       return fetch(API + "/coinstats?wallet=" + encodeURIComponent(address), { cache: "no-store" })
-        .then(function (res) { return res.json(); })
+        .then(function (res) { return res.text(); })
+        .then(function (text) {
+          try { return JSON.parse(text); }
+          catch (e) { return { ok: false, error: friendly(text) }; }
+        })
         .then(function (body) {
           var held = ((body && body.holdings) || []).filter(function (row) { return row.mint === mint; })[0];
           if (held && goodName(held.symbol, mint)) rememberName(mint, held.symbol);
@@ -363,15 +367,16 @@
     } else if (!bag) {
       held = "<div style=\"font-size:13px;color:#8491a1\">Reading holdings…</div>";
     } else if (bag.ok === false) {
-      held = "<div style=\"font-size:13px;color:#e07a7a\">" + esc(bag.error || "Could not read that wallet") + "</div>";
+      held = "<div style=\"font-size:13px;color:#e07a7a\">" + esc(friendly(bag.error)) + "</div>";
     } else if (view === "assets") {
       var rows = bag.holdings || [];
-      held = rows.length ? rows.map(function (row) {
+      var note = bag.notice ? "<div style=\"margin-bottom:8px;font-size:13px;color:#f5a14a\">" + esc(bag.notice) + "</div>" : "";
+      held = note + (rows.length ? rows.map(function (row) {
         return "<div style=\"display:grid;grid-template-columns:1fr auto;gap:8px;padding:12px 0;border-bottom:1px solid #243041\">" +
           "<div><div style=\"font-weight:900;color:#e8eef6\">" + esc(row.symbol) + " <span style=\"font-weight:600;color:#8491a1\">" + qty(row.amount) + "</span></div>" +
           "<div style=\"margin-top:4px;font-size:13px;color:#c5d0dc\">" + money(row.value) + "</div></div>" +
           "<div style=\"text-align:right;font-weight:800;color:#e8eef6\">" + (row.price ? money(row.price) : "—") + "</div></div>";
-      }).join("") : "<div style=\"font-size:13px;color:#8491a1\">No holding above $1.</div>";
+      }).join("") : "<div style=\"font-size:13px;color:#8491a1\">No holding above $1.</div>");
     } else {
       var q = query.trim().toLowerCase();
       var list = (bag.history || []).filter(function (row) {
@@ -497,11 +502,20 @@
       .catch(function () { return body; });
   }
 
+  function friendly(err) {
+    var s = String(err || "");
+    if (/max usage|not valid JSON|daily limit is used up/i.test(s)) return "Helius daily limit is used up. Try again later.";
+    return s || "Could not read that wallet";
+  }
   function loadWallet(address) {
     var st = $("cs-status");
     if (st) st.textContent = "READING";
     fetch(API + "/coinstats?wallet=" + encodeURIComponent(address), { cache: "no-store" })
-      .then(function (res) { return res.json(); })
+      .then(function (res) { return res.text(); })
+      .then(function (text) {
+        try { return JSON.parse(text); }
+        catch (e) { return { ok: false, error: friendly(text || e.message) }; }
+      })
       .then(function (body) { return withLivePrices(body || { ok: false, error: "Could not read that wallet" }); })
       .then(function (body) {
         if (selected !== address) return;
