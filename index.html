@@ -1001,14 +1001,21 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <div id="keywords-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head">
-    <div><h2>Keywords</h2><p>Type a word. It joins the bubbles. Tap a bubble to remove it.</p></div>
+    <div><h2>Keywords</h2><p>Type a word. Tap a bubble to edit it. Saved on GitHub.</p></div>
   </div>
   <div class="card" style="padding:12px">
     <form id="kw-form" style="display:flex;gap:8px;align-items:center">
       <input id="kw-input" type="text" maxlength="32" placeholder="Type a keyword" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;padding:12px 14px;border-radius:12px;border:1px solid #3d4d63;background:#0b121a;color:#f4f7fb;font-size:16px;font-weight:800">
       <button type="submit" style="padding:12px 16px;border-radius:12px;border:0;background:#e6b84d;color:#1a1406;font-weight:900;cursor:pointer">Add</button>
+      <span id="kw-status" style="font-size:12px;color:#8491a1;font-weight:700"></span>
     </form>
     <div id="kw-stage"></div>
+    <div id="kw-edit">
+      <input id="kw-edit-text" type="text" maxlength="32" autocomplete="off" spellcheck="false">
+      <button type="button" id="kw-edit-save">Save</button>
+      <button type="button" id="kw-edit-del">Delete</button>
+      <button type="button" id="kw-edit-x">Cancel</button>
+    </div>
   </div>
 </section>
 </div>
@@ -1640,7 +1647,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260929-suggest"></script>
-<script src="keywords-tab.js?v=20260930-kw"></script>
+<script src="keywords-tab.js?v=20260930-kw2"></script>
 <script src="commentary.js?v=20260924-c3"></script>
 <script src="tiers-tab.js?v=20260925-flow4"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
