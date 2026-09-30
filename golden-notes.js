@@ -249,6 +249,35 @@
     try { if (img) img.src = ''; } catch (e) {}
     try { if (canvas) { canvas.width = 1; canvas.height = 1; } } catch (e) {}
   }
+  function loadTess() {
+    if (window.Tesseract && typeof window.Tesseract.createWorker === 'function') return Promise.resolve(window.Tesseract);
+    return import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.esm.min.js').then(function (mod) {
+      var api = mod && typeof mod.createWorker === 'function' ? mod : (mod && mod.default);
+      if (api && typeof api.createWorker !== 'function' && api.default) api = api.default;
+      if (api && typeof api.createWorker === 'function') return api;
+      return new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+        s.onload = function () {
+          if (window.Tesseract && typeof window.Tesseract.createWorker === 'function') resolve(window.Tesseract);
+          else reject(new Error('Text reader failed to start'));
+        };
+        s.onerror = function () { reject(new Error('Text reader failed to load')); };
+        document.head.appendChild(s);
+      });
+    }).catch(function () {
+      return new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+        s.onload = function () {
+          if (window.Tesseract && typeof window.Tesseract.createWorker === 'function') resolve(window.Tesseract);
+          else reject(new Error('Text reader failed to start'));
+        };
+        s.onerror = function () { reject(new Error('Text reader failed to load')); };
+        document.head.appendChild(s);
+      });
+    });
+  }
   async function readFiles(fileList) {
     var files = Array.prototype.slice.call(fileList || []);
     if (!files.length || busy) return;
@@ -258,7 +287,7 @@
     var worker = null;
     try {
       setStatus('Reading 1 of ' + files.length + '…');
-      var mod = await import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.esm.min.js');
+      var mod = await loadTess();
       worker = await mod.createWorker('eng');
       for (var n = 0; n < files.length; n++) {
         setStatus('Reading ' + (n + 1) + ' of ' + files.length + '…');
