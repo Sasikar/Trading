@@ -310,6 +310,21 @@
       if (id === 'tf-panels') el.classList.add('hidden');
     });
   }
+  function solo(on) {
+    var main = document.querySelector('main');
+    if (!main) return;
+    Array.prototype.forEach.call(main.children, function (el) {
+      if (el.id === 'tf-tabs' || el.id === 'dip-alert' || el.id === 'gnotes-panel') return;
+      if (on) {
+        if (el.getAttribute('data-gn-prev') == null) el.setAttribute('data-gn-prev', el.style.display || ' ');
+        el.style.display = 'none';
+      } else if (el.getAttribute('data-gn-prev') != null) {
+        var prev = el.getAttribute('data-gn-prev');
+        el.style.display = prev === ' ' ? '' : prev;
+        el.removeAttribute('data-gn-prev');
+      }
+    });
+  }
   function showGoldenNotes(on) {
     var p = $('gnotes-panel');
     if (!p) return;
@@ -317,13 +332,17 @@
       p.style.display = 'none';
       p.classList.remove('on');
       editing = null;
+      solo(false);
       return;
     }
+    solo(true);
     hideOthers();
     p.style.display = 'block';
     p.classList.add('on');
     paint();
     persist();
+    var tabs = $('tf-tabs');
+    if (tabs && tabs.scrollIntoView) tabs.scrollIntoView({ block: 'start' });
   }
   window.showGoldenNotes = showGoldenNotes;
 
