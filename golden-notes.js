@@ -152,9 +152,9 @@
     list.innerHTML = slice.map(function (it, i) {
       var n = start + i + 1;
       if (editing === it.id) {
-        return '<div class="gn-card on"><div class="gn-no">' + n + '</div><div class="gn-body"><textarea id="gn-edit" rows="4">' + esc(it.text) + '</textarea><div class="gn-row"><button type="button" data-act="save" data-id="' + esc(it.id) + '">Save</button><button type="button" data-act="del" data-id="' + esc(it.id) + '">Delete</button><button type="button" data-act="cancel">Cancel</button></div></div></div>';
+        return '<div class="gn-card on"><div class="gn-no">' + n + '</div><div class="gn-body"><textarea id="gn-edit" rows="4">' + esc(it.text) + '</textarea><div class="gn-row"><button type="button" data-act="save" data-id="' + esc(it.id) + '">Save</button><button type="button" data-act="ask" data-id="' + esc(it.id) + '">Delete</button><button type="button" data-act="cancel">Cancel</button></div></div></div>';
       }
-      return '<button type="button" class="gn-card" data-act="edit" data-id="' + esc(it.id) + '"><div class="gn-no">' + n + '</div><div class="gn-body"><div class="gn-text">' + esc(it.text) + '</div><div class="gn-time">' + esc(when(it.t)) + ' IST · tap to edit</div></div></button>';
+      return '<div class="gn-card"><div class="gn-no">' + n + '</div><button type="button" class="gn-body" data-act="edit" data-id="' + esc(it.id) + '"><div class="gn-text">' + esc(it.text) + '</div><div class="gn-time">' + esc(when(it.t)) + ' IST · tap to edit</div></button><button type="button" class="gn-x" data-act="ask" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></div>';
     }).join('');
     if (!pager) return;
     var nums = [];
@@ -479,9 +479,50 @@
   if (!document.getElementById('gn-style')) {
     var css = document.createElement('style');
     css.id = 'gn-style';
-    css.textContent = '#gn-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:12px}.gn-sizes{display:flex;align-items:center;gap:6px;color:#a89058;font-size:12px;font-weight:800}.gn-sizes button,.gn-sizes input,#gn-pages button{border:1px solid #3d3420;background:#12100c;color:#f4e7c3;border-radius:999px;min-width:36px;height:34px;padding:0 12px;font-weight:900;cursor:pointer}.gn-sizes button.on,#gn-pages button.on{background:#e6b84d;color:#1a1406;border-color:#e6b84d}.gn-sizes input{width:72px;text-align:center}#gn-pages{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.gn-gap{color:#6d7688;padding:0 2px}.gn-count{color:#a89058;font-size:12px;font-weight:800;margin-left:4px}#gn-pages button:disabled{opacity:.35;cursor:default}.gn-empty{color:#8b93a7;font-weight:700;padding:8px 2px}.gn-card{display:flex;gap:12px;width:100%;text-align:left;border:1px solid #6b5420;background:linear-gradient(180deg,#1a150c,#100e0a);color:#f4e7c3;border-radius:18px;padding:14px;font-weight:700;line-height:1.45;cursor:pointer}.gn-card.on{border-color:#e6b84d}.gn-no{flex:0 0 auto;width:36px;height:36px;border-radius:12px;background:#e6b84d;color:#1a1406;display:flex;align-items:center;justify-content:center;font-weight:900}.gn-body{flex:1;min-width:0}.gn-text{font-size:16px;white-space:pre-wrap}.gn-time{margin-top:8px;color:#a89058;font-size:11px;font-weight:800;letter-spacing:.04em}.gn-card textarea{width:100%;box-sizing:border-box;min-height:110px;border-radius:12px;border:1px solid #e6b84d;background:#0b121a;color:#f4f7fb;font:700 15px/1.45 Inter,system-ui,sans-serif;padding:10px}.gn-row{display:flex;gap:8px;margin-top:8px}.gn-row button{padding:10px 12px;border:0;border-radius:10px;font-weight:900;cursor:pointer;background:#243041;color:#e8eef6}.gn-row button[data-act="save"]{background:#e6b84d;color:#1a1406}.gn-row button[data-act="del"]{background:#3a1820;color:#ff8a9a}';
+    css.textContent = '#gn-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:12px}.gn-sizes{display:flex;align-items:center;gap:6px;color:#a89058;font-size:12px;font-weight:800}.gn-sizes button,.gn-sizes input,#gn-pages button{border:1px solid #3d3420;background:#12100c;color:#f4e7c3;border-radius:999px;min-width:36px;height:34px;padding:0 12px;font-weight:900;cursor:pointer}.gn-sizes button.on,#gn-pages button.on{background:#e6b84d;color:#1a1406;border-color:#e6b84d}.gn-sizes input{width:72px;text-align:center}#gn-pages{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.gn-gap{color:#6d7688;padding:0 2px}.gn-count{color:#a89058;font-size:12px;font-weight:800;margin-left:4px}#gn-pages button:disabled{opacity:.35;cursor:default}.gn-empty{color:#8b93a7;font-weight:700;padding:8px 2px}.gn-card{display:flex;gap:12px;width:100%;text-align:left;border:1px solid #6b5420;background:linear-gradient(180deg,#1a150c,#100e0a);color:#f4e7c3;border-radius:18px;padding:14px;font-weight:700;line-height:1.45;cursor:pointer}.gn-card.on{border-color:#e6b84d}.gn-no{flex:0 0 auto;width:36px;height:36px;border-radius:12px;background:#e6b84d;color:#1a1406;display:flex;align-items:center;justify-content:center;font-weight:900}.gn-body{flex:1;min-width:0}.gn-text{font-size:16px;white-space:pre-wrap}.gn-time{margin-top:8px;color:#a89058;font-size:11px;font-weight:800;letter-spacing:.04em}.gn-card textarea{width:100%;box-sizing:border-box;min-height:110px;border-radius:12px;border:1px solid #e6b84d;background:#0b121a;color:#f4f7fb;font:700 15px/1.45 Inter,system-ui,sans-serif;padding:10px}.gn-row{display:flex;gap:8px;margin-top:8px}.gn-row button{padding:10px 12px;border:0;border-radius:10px;font-weight:900;cursor:pointer;background:#243041;color:#e8eef6}.gn-row button[data-act="save"]{background:#e6b84d;color:#1a1406}.gn-row button[data-act="ask"]{background:#3a1820;color:#ff8a9a}.gn-card .gn-body{display:block;background:none;border:0;color:inherit;font:inherit;text-align:left;padding:0;cursor:pointer}.gn-x{flex:0 0 auto;width:28px;height:28px;margin-top:2px;border-radius:999px;border:1px solid #7a3038;background:#241014;color:#ff8d9c;font:900 18px/1 Inter,system-ui,sans-serif;cursor:pointer;padding:0}.gn-modal{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.66);display:flex;align-items:flex-end;justify-content:center;padding:16px}.gn-modal[hidden]{display:none!important}.gn-sheet{width:min(440px,100%);background:#16130e;border:1px solid #e6b84d;border-radius:20px;padding:18px 16px 16px;color:#f4e7c3;box-shadow:0 18px 50px rgba(0,0,0,.45)}.gn-sheet h3{margin:0;font-size:18px;font-weight:900}.gn-sheet p{margin:8px 0 0;color:#a89058;font-size:13px;font-weight:800}.gn-sheet .gn-modal-line{margin:12px 0 16px;font-size:15px;font-weight:700;line-height:1.4;white-space:pre-wrap}.gn-sheet .gn-row{justify-content:flex-end}.gn-sheet button[data-act="modal-yes"]{background:#3a1820;color:#ff8a9a}';
     document.head.appendChild(css);
   }
+  var pendingDelete = null;
+  function askDelete(id) {
+    var it = null;
+    items.forEach(function (row) { if (row.id === id) it = row; });
+    if (!it) return;
+    pendingDelete = id;
+    var line = $('gn-modal-line');
+    if (line) line.textContent = it.text;
+    var modal = $('gn-modal');
+    if (modal) modal.hidden = false;
+  }
+  function closeAsk() {
+    pendingDelete = null;
+    var modal = $('gn-modal');
+    if (modal) modal.hidden = true;
+  }
+  function confirmDelete() {
+    var id = pendingDelete;
+    if (!id) return closeAsk();
+    markTomb(id, true);
+    items = items.filter(function (it) { return it.id !== id; });
+    editing = null;
+    closeAsk();
+    saveLocal();
+    paint();
+    persist();
+  }
+  if (!document.getElementById('gn-modal')) {
+    var modal = document.createElement('div');
+    modal.id = 'gn-modal';
+    modal.className = 'gn-modal';
+    modal.hidden = true;
+    modal.innerHTML = '<div class="gn-sheet" role="dialog" aria-modal="true"><h3>Are you sure?</h3><p>This note will be deleted.</p><div class="gn-modal-line" id="gn-modal-line"></div><div class="gn-row"><button type="button" data-act="modal-no">Cancel</button><button type="button" data-act="modal-yes">Delete</button></div></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function (ev) {
+      var yes = ev.target && ev.target.closest && ev.target.closest('[data-act="modal-yes"]');
+      if (yes) { confirmDelete(); return; }
+      if (ev.target === modal || (ev.target.closest && ev.target.closest('[data-act="modal-no"]'))) closeAsk();
+    });
+  }
+
   loadLocal();
   var pick = $('gn-pick');
   var file = $('gn-file');
@@ -511,15 +552,7 @@
     var id = b.getAttribute('data-id');
     if (act === 'edit') { editing = id; paint(); return; }
     if (act === 'cancel') { editing = null; paint(); return; }
-    if (act === 'del') {
-      markTomb(id, true);
-      items = items.filter(function (it) { return it.id !== id; });
-      editing = null;
-      saveLocal();
-      paint();
-      persist();
-      return;
-    }
+    if (act === 'ask') { askDelete(id); return; }
     if (act === 'save') {
       var box = $('gn-edit');
       var text = (box && box.value || '').trim();
