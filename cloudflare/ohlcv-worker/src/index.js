@@ -557,7 +557,12 @@ export default {
         } catch (err) {
           const msg = String(err && err.message ? err.message : err);
           if (!/5016|submit the prompt|hereby agree/i.test(msg)) throw err;
-          await env.AI.run(model, { prompt: 'agree' });
+          try {
+            await env.AI.run(model, { prompt: 'agree' });
+          } catch (agreed) {
+            const thanks = String(agreed && agreed.message ? agreed.message : agreed);
+            if (!/thank you for agreeing|5016/i.test(thanks)) throw agreed;
+          }
           result = await env.AI.run(model, input);
         }
         const text = typeof result === 'string'
