@@ -22,6 +22,9 @@
   "triggers": {
     "crons": ["*/5 * * * *"]
   },
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "WATCHLIST_URL": "https://sasikar.github.io/Trading/data/ca-recents.json",
     "NTFY_TOPIC": "MyTradingMemeBreakout44",

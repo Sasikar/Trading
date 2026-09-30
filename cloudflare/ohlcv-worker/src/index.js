@@ -534,6 +534,40 @@ export default {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
     }
+    if (path === '/golden-read' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const image = String(body.image || '').replace(/^data:image\/\w+;base64,/, '').trim();
+        if (image.length < 40) throw new Error('No image');
+        if (!env.AI) throw new Error('AI is not on this worker');
+        const dataUrl = 'data:image/jpeg;base64,' + image;
+        const prompt = 'This is a screenshot of an X post, replies, or comments. Extract only the useful human sentences. Return JSON only: {"notes":["sentence"]}. One note per tweet or reply, in the person\'s own words. Drop names, @handles, times, view counts, likes, ads, buttons, and "Post your reply". Do not invent text. If nothing useful is readable, return {"notes":[]}.';
+        const result = await env.AI.run('@cf/meta/llama-3.2-11b-vision-instruct', {
+          messages: [
+            { role: 'system', content: 'You extract clean notes from screenshots. Reply with JSON only.' },
+            { role: 'user', content: prompt }
+          ],
+          image: dataUrl,
+          max_tokens: 900
+        });
+        const text = typeof result === 'string'
+          ? result
+          : String((result && (result.response || result.description || result.result)) || JSON.stringify(result || {}));
+        let notes = [];
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[0]);
+            if (parsed && Array.isArray(parsed.notes)) notes = parsed.notes;
+          } catch (e) {}
+        }
+        if (!notes.length) notes = text.split(/\n/);
+        notes = notes.map((s) => String(s || '').replace(/^[\s\-"']+|[\s"']+$/g, '')).filter((s) => /[a-z]/i.test(s) && s.length > 1);
+        return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
     if (path === '/coinstats' || path === '/api/coinstats') {
       const wallet = (new URL(request.url).searchParams.get('wallet') || '').trim();
       try {

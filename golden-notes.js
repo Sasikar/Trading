@@ -204,7 +204,7 @@
     });
   }
   function trimShot(img) {
-    var maxW = 1280;
+    var maxW = 900;
     var scale = Math.min(1, maxW / (img.naturalWidth || img.width || 1));
     var c = document.createElement('canvas');
     c.width = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
@@ -249,34 +249,115 @@
     try { if (img) img.src = ''; } catch (e) {}
     try { if (canvas) { canvas.width = 1; canvas.height = 1; } } catch (e) {}
   }
-  function loadTess() {
-    if (window.Tesseract && typeof window.Tesseract.createWorker === 'function') return Promise.resolve(window.Tesseract);
-    return import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.esm.min.js').then(function (mod) {
-      var api = mod && typeof mod.createWorker === 'function' ? mod : (mod && mod.default);
-      if (api && typeof api.createWorker !== 'function' && api.default) api = api.default;
-      if (api && typeof api.createWorker === 'function') return api;
-      return new Promise(function (resolve, reject) {
-        var s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-        s.onload = function () {
-          if (window.Tesseract && typeof window.Tesseract.createWorker === 'function') resolve(window.Tesseract);
-          else reject(new Error('Text reader failed to start'));
-        };
-        s.onerror = function () { reject(new Error('Text reader failed to load')); };
-        document.head.appendChild(s);
-      });
-    }).catch(function () {
-      return new Promise(function (resolve, reject) {
-        var s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
-        s.onload = function () {
-          if (window.Tesseract && typeof window.Tesseract.createWorker === 'function') resolve(window.Tesseract);
-          else reject(new Error('Text reader failed to start'));
-        };
-        s.onerror = function () { reject(new Error('Text reader failed to load')); };
-        document.head.appendChild(s);
-      });
+  var PROMPT = 'This is a screenshot of an X post, replies, or comments. Extract only the useful human sentences. Return JSON only: {"notes":["sentence"]}. One note per tweet or reply, in the person\'s own words. Drop names, @handles, times, view counts, likes, ads, buttons, and "Post your reply". Do not invent text. If nothing useful is readable, return {"notes":[]}.';
+  function keepNote(s) {
+    s = String(s || '').replace(/\s+/g, ' ').replace(/^[\s\-"“”']+|[\s"“”']+$/g, '').trim();
+    if (!s || /^(post your reply|relevant|view quotes|following|show more|reply|ad)$/i.test(s)) return '';
+    if ((s.match(/[a-z]/gi) || []).length < 3) return '';
+    return s;
+  }
+  function notesFromAi(raw) {
+    var text = '';
+    if (typeof raw === 'string') text = raw;
+    else if (raw && typeof raw.text === 'string') text = raw.text;
+    else if (raw && raw.message && typeof raw.message.content === 'string') text = raw.message.content;
+    else if (raw && raw.message && Array.isArray(raw.message.content)) text = raw.message.content.map(function (p) { return p && (p.text || p.content) || ''; }).join('\n');
+    else if (raw && typeof raw.toString === 'function' && raw.toString() !== '[object Object]') text = raw.toString();
+    else {
+      try { text = JSON.stringify(raw || ''); } catch (e) { text = ''; }
+    }
+    var notes = [];
+    var match = String(text).match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        var parsed = JSON.parse(match[0]);
+        if (parsed && Array.isArray(parsed.notes)) notes = parsed.notes;
+      } catch (e) {}
+    }
+    if (!notes.length) notes = String(text).split(/\n/);
+    var seen = {};
+    return notes.map(keepNote).filter(function (n) {
+      if (!n) return false;
+      var k = n.toLowerCase();
+      if (seen[k]) return false;
+      seen[k] = 1;
+      return true;
     });
+  }
+  function shotBlob(canvas) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (!blob) reject(new Error('Could not read that image'));
+        else resolve(blob);
+      }, 'image/jpeg', 0.68);
+    });
+  }
+  function blobB64(blob) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () {
+        var s = String(reader.result || '');
+        resolve(s.slice(s.indexOf(',') + 1));
+      };
+      reader.onerror = function () { reject(new Error('Could not read that image')); };
+      reader.readAsDataURL(blob);
+    });
+  }
+  async function readWithCloudflare(b64) {
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 25000);
+    try {
+      var res = await fetch('https://trading-ohlcv.sasipudi.workers.dev/golden-read', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ image: b64 }),
+        signal: ctrl.signal
+      });
+      var data = await res.json();
+      if (!data || !data.ok || !data.notes) throw new Error((data && data.error) || 'Cloudflare reader missed');
+      return notesFromAi(JSON.stringify({ notes: data.notes }));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  function loadPuter() {
+    if (window.puter && window.puter.ai) return Promise.resolve(window.puter);
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://js.puter.com/v2/';
+      s.onload = function () {
+        if (window.puter && window.puter.ai) resolve(window.puter);
+        else reject(new Error('AI reader failed to start'));
+      };
+      s.onerror = function () { reject(new Error('AI reader failed to load')); };
+      document.head.appendChild(s);
+    });
+  }
+  async function readWithPuter(blob) {
+    var puter = await loadPuter();
+    var file = new File([blob], 'note.jpg', { type: 'image/jpeg' });
+    var models = ['openai/gpt-5.4-nano', 'google/gemini-2.5-flash'];
+    var last = null;
+    for (var i = 0; i < models.length; i++) {
+      try {
+        var raw = await puter.ai.chat(PROMPT, file, { model: models[i] });
+        var notes = notesFromAi(raw);
+        if (notes.length) return notes;
+        last = new Error('No useful lines in that screenshot');
+      } catch (e) {
+        last = e;
+      }
+    }
+    throw last || new Error('AI reader failed');
+  }
+  async function readShot(canvas) {
+    var blob = await shotBlob(canvas);
+    var b64 = await blobB64(blob);
+    try {
+      var cloud = await readWithCloudflare(b64);
+      if (cloud.length) return cloud;
+    } catch (e) {}
+    return readWithPuter(blob);
   }
   async function readFiles(fileList) {
     var files = Array.prototype.slice.call(fileList || []);
@@ -284,13 +365,10 @@
     busy = true;
     var kept = 0;
     var missed = 0;
-    var worker = null;
+    var missed = 0;
     try {
-      setStatus('Reading 1 of ' + files.length + '…');
-      var mod = await loadTess();
-      worker = await mod.createWorker('eng');
       for (var n = 0; n < files.length; n++) {
-        setStatus('Reading ' + (n + 1) + ' of ' + files.length + '…');
+        setStatus('Reading ' + (n + 1) + ' of ' + files.length + ' with AI…');
         var img = new Image();
         var url = URL.createObjectURL(files[n]);
         var canvas = null;
@@ -301,30 +379,29 @@
             img.src = url;
           });
           canvas = trimShot(img);
-          var result = await worker.recognize(canvas);
-          var lines = goodLines(result && result.data && result.data.text);
+          var lines = await readShot(canvas);
           if (!lines.length) missed++;
           var now = Date.now();
           lines.forEach(function (text, i) {
             items.unshift({ id: now.toString(36) + n.toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5), text: text, t: now + n * 1000 + i });
             kept++;
           });
+          page = 0;
+          saveLocal();
+          paint();
         } catch (e) {
           missed++;
+          setStatus(String(e && e.message ? e.message : e));
         } finally {
           URL.revokeObjectURL(url);
           destroyImage(img, canvas);
         }
       }
-      page = 0;
-      saveLocal();
-      paint();
-      setStatus(kept + ' lines from ' + files.length + ' images' + (missed ? ' · ' + missed + ' had nothing' : '') + ' · images discarded');
+      setStatus(kept + ' notes from ' + files.length + ' images' + (missed ? ' · ' + missed + ' had nothing' : '') + ' · images discarded');
       persist();
     } catch (e) {
       setStatus(String(e && e.message ? e.message : e));
     } finally {
-      try { if (worker) await worker.terminate(); } catch (e) {}
       var input = $('gn-file');
       if (input) input.value = '';
       busy = false;
