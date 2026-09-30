@@ -278,7 +278,7 @@
     persist();
   }
   function hideOthers() {
-    ['tf-panels','fe-panel','alerts-panel','trend-panel','struct-panel','macro-panel','signal-panel','memegate-panel','coin-panel','antifomo-panel','hunter-panel','breakouts-panel','holders-panel','failures-panel','inmemory-panel','sentiment-panel','keep-panel','verdict-panel','entrywindow-panel','position-panel','wowdip-panel','omg-panel','pitfalls-panel','strategy-panel','decision-panel','gmgn-panel','wallets-panel','pumpfun-panel','fomo-panel','fx-panel','fd-panel','coinstats-panel','emotion-panel','tiers-panel'].forEach(function (id) {
+    ['tf-panels','fe-panel','alerts-panel','trend-panel','struct-panel','macro-panel','signal-panel','memegate-panel','coin-panel','antifomo-panel','hunter-panel','breakouts-panel','holders-panel','failures-panel','inmemory-panel','sentiment-panel','keep-panel','verdict-panel','entrywindow-panel','position-panel','wowdip-panel','omg-panel','pitfalls-panel','strategy-panel','decision-panel','gmgn-panel','wallets-panel','pumpfun-panel','fomo-panel','fx-panel','fd-panel','coinstats-panel','emotion-panel','tiers-panel','gnotes-panel'].forEach(function (id) {
       var el = $(id);
       if (!el) return;
       el.style.display = 'none';
