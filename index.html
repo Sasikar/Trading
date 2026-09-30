@@ -1027,8 +1027,12 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <span class="source" id="gn-status">READY</span>
   </div>
   <div class="card" style="padding:12px">
-    <input id="gn-file" type="file" accept="image/*" hidden>
-    <button type="button" id="gn-pick" style="width:100%;padding:14px;border-radius:14px;border:1px dashed #e6b84d;background:#1a1408;color:#e6b84d;font-weight:900;cursor:pointer">Upload screenshot</button>
+    <input id="gn-file" type="file" accept="image/*" multiple hidden>
+    <button type="button" id="gn-pick" style="width:100%;padding:14px;border-radius:14px;border:1px dashed #e6b84d;background:#1a1408;color:#e6b84d;font-weight:900;cursor:pointer">Upload screenshots</button>
+    <div id="gn-tools">
+      <div class="gn-sizes"><span>Show</span><button type="button" data-size="10">10</button><button type="button" data-size="20">20</button><input id="gn-any" inputmode="numeric" min="1" max="100" placeholder="Any"></div>
+      <div id="gn-pages"></div>
+    </div>
     <div id="gn-list" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
   </div>
 </section>
@@ -1662,7 +1666,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20260929-suggest"></script>
 <script src="keywords-tab.js?v=20260930-kw2"></script>
-<script src="golden-notes.js?v=20260930-gn"></script>
+<script src="golden-notes.js?v=20260930-gn2"></script>
 <script src="commentary.js?v=20260924-c3"></script>
 <script src="tiers-tab.js?v=20260925-flow4"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>

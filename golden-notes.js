@@ -8,6 +8,12 @@
   var editing = null;
   var syncing = false;
   var busy = false;
+  var page = 0;
+  var pageSize = 10;
+  try {
+    var savedSize = parseInt(localStorage.getItem('gn_page_size') || '10', 10);
+    if (savedSize >= 1 && savedSize <= 100) pageSize = savedSize;
+  } catch (e) {}
 
   function $(id) { return document.getElementById(id); }
   function token() {
@@ -110,19 +116,61 @@
       syncing = false;
     }
   }
+  function pageCount() {
+    return Math.max(1, Math.ceil(items.length / pageSize) || 1);
+  }
+  function setPageSize(n) {
+    n = parseInt(n, 10);
+    if (!(n >= 1)) n = 10;
+    if (n > 100) n = 100;
+    pageSize = n;
+    page = 0;
+    try { localStorage.setItem('gn_page_size', String(pageSize)); } catch (e) {}
+    paint();
+  }
   function paint() {
     var list = $('gn-list');
+    var pager = $('gn-pages');
     if (!list) return;
+    document.querySelectorAll('#gn-tools [data-size]').forEach(function (b) {
+      b.classList.toggle('on', parseInt(b.getAttribute('data-size'), 10) === pageSize);
+    });
+    var any = $('gn-any');
+    if (any && document.activeElement !== any) any.value = pageSize === 10 || pageSize === 20 ? '' : String(pageSize);
     if (!items.length) {
-      list.innerHTML = '<div style="color:#8b93a7;font-weight:700;padding:8px 2px">No notes yet. Upload a tweet screenshot.</div>';
+      list.innerHTML = '<div class="gn-empty">No notes yet. Upload one or many tweet screenshots.</div>';
+      if (pager) pager.innerHTML = '';
       return;
     }
-    list.innerHTML = items.map(function (it) {
+    var max = pageCount();
+    if (page > max - 1) page = max - 1;
+    if (page < 0) page = 0;
+    var start = page * pageSize;
+    var slice = items.slice(start, start + pageSize);
+    list.innerHTML = slice.map(function (it, i) {
+      var n = start + i + 1;
       if (editing === it.id) {
-        return '<div class="gn-card on"><textarea id="gn-edit" rows="4">' + esc(it.text) + '</textarea><div class="gn-row"><button type="button" data-act="save" data-id="' + esc(it.id) + '">Save</button><button type="button" data-act="del" data-id="' + esc(it.id) + '">Delete</button><button type="button" data-act="cancel">Cancel</button></div></div>';
+        return '<div class="gn-card on"><div class="gn-no">' + n + '</div><div class="gn-body"><textarea id="gn-edit" rows="4">' + esc(it.text) + '</textarea><div class="gn-row"><button type="button" data-act="save" data-id="' + esc(it.id) + '">Save</button><button type="button" data-act="del" data-id="' + esc(it.id) + '">Delete</button><button type="button" data-act="cancel">Cancel</button></div></div></div>';
       }
-      return '<button type="button" class="gn-card" data-act="edit" data-id="' + esc(it.id) + '"><div class="gn-text">' + esc(it.text) + '</div><div class="gn-time">' + esc(when(it.t)) + ' IST · tap to edit</div></button>';
+      return '<button type="button" class="gn-card" data-act="edit" data-id="' + esc(it.id) + '"><div class="gn-no">' + n + '</div><div class="gn-body"><div class="gn-text">' + esc(it.text) + '</div><div class="gn-time">' + esc(when(it.t)) + ' IST · tap to edit</div></div></button>';
     }).join('');
+    if (!pager) return;
+    var nums = [];
+    var from = Math.max(0, page - 2);
+    var to = Math.min(max - 1, page + 2);
+    if (from > 0) nums.push(0);
+    if (from > 1) nums.push(-1);
+    for (var p = from; p <= to; p++) nums.push(p);
+    if (to < max - 2) nums.push(-1);
+    if (to < max - 1) nums.push(max - 1);
+    pager.innerHTML =
+      '<button type="button" data-page="prev"' + (page === 0 ? ' disabled' : '') + '>‹</button>' +
+      nums.map(function (p) {
+        if (p < 0) return '<span class="gn-gap">…</span>';
+        return '<button type="button" data-page="' + p + '"' + (p === page ? ' class="on"' : '') + '>' + (p + 1) + '</button>';
+      }).join('') +
+      '<button type="button" data-page="next"' + (page >= max - 1 ? ' disabled' : '') + '>›</button>' +
+      '<span class="gn-count">' + (start + 1) + '–' + (start + slice.length) + ' of ' + items.length + '</span>';
   }
   function goodLines(text) {
     var junk = /^(reply|replies|repost|reposts|like|likes|share|bookmark|follow|following|more|show more|quote|view|views|home|search|notifications|messages|grok|post|posted|subscribe|sign up|log in|for you|following)$/i;
@@ -201,40 +249,53 @@
     try { if (img) img.src = ''; } catch (e) {}
     try { if (canvas) { canvas.width = 1; canvas.height = 1; } } catch (e) {}
   }
-  async function readFile(file) {
-    if (!file || busy) return;
+  async function readFiles(fileList) {
+    var files = Array.prototype.slice.call(fileList || []);
+    if (!files.length || busy) return;
     busy = true;
-    setStatus('Reading screenshot…');
-    var img = new Image();
-    var url = URL.createObjectURL(file);
-    var canvas = null;
+    var kept = 0;
+    var missed = 0;
+    var worker = null;
     try {
-      await new Promise(function (resolve, reject) {
-        img.onload = resolve;
-        img.onerror = function () { reject(new Error('Could not read that image')); };
-        img.src = url;
-      });
-      canvas = trimShot(img);
-      setStatus('Pulling the good lines…');
+      setStatus('Reading 1 of ' + files.length + '…');
       var mod = await import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.esm.min.js');
-      var worker = await mod.createWorker('eng');
-      var result = await worker.recognize(canvas);
-      await worker.terminate();
-      var lines = goodLines(result && result.data && result.data.text);
-      if (!lines.length) throw new Error('No useful lines in that screenshot');
-      var now = Date.now();
-      lines.forEach(function (text, i) {
-        items.unshift({ id: now.toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5), text: text, t: now + i });
-      });
+      worker = await mod.createWorker('eng');
+      for (var n = 0; n < files.length; n++) {
+        setStatus('Reading ' + (n + 1) + ' of ' + files.length + '…');
+        var img = new Image();
+        var url = URL.createObjectURL(files[n]);
+        var canvas = null;
+        try {
+          await new Promise(function (resolve, reject) {
+            img.onload = resolve;
+            img.onerror = function () { reject(new Error('bad image')); };
+            img.src = url;
+          });
+          canvas = trimShot(img);
+          var result = await worker.recognize(canvas);
+          var lines = goodLines(result && result.data && result.data.text);
+          if (!lines.length) missed++;
+          var now = Date.now();
+          lines.forEach(function (text, i) {
+            items.unshift({ id: now.toString(36) + n.toString(36) + i.toString(36) + Math.random().toString(36).slice(2, 5), text: text, t: now + n * 1000 + i });
+            kept++;
+          });
+        } catch (e) {
+          missed++;
+        } finally {
+          URL.revokeObjectURL(url);
+          destroyImage(img, canvas);
+        }
+      }
+      page = 0;
       saveLocal();
       paint();
-      setStatus(lines.length + ' lines kept · image discarded');
+      setStatus(kept + ' lines from ' + files.length + ' images' + (missed ? ' · ' + missed + ' had nothing' : '') + ' · images discarded');
       persist();
     } catch (e) {
       setStatus(String(e && e.message ? e.message : e));
     } finally {
-      URL.revokeObjectURL(url);
-      destroyImage(img, canvas);
+      try { if (worker) await worker.terminate(); } catch (e) {}
       var input = $('gn-file');
       if (input) input.value = '';
       busy = false;
@@ -269,7 +330,7 @@
   if (!document.getElementById('gn-style')) {
     var css = document.createElement('style');
     css.id = 'gn-style';
-    css.textContent = '.gn-card{display:block;width:100%;text-align:left;border:1px solid #6b5420;background:#141006;color:#f4e7c3;border-radius:16px;padding:14px;font-weight:700;line-height:1.45;cursor:pointer}.gn-card.on{border-color:#e6b84d}.gn-text{font-size:16px;white-space:pre-wrap}.gn-time{margin-top:8px;color:#a89058;font-size:11px;font-weight:800;letter-spacing:.04em}.gn-card textarea{width:100%;box-sizing:border-box;min-height:110px;border-radius:12px;border:1px solid #e6b84d;background:#0b121a;color:#f4f7fb;font:700 15px/1.45 Inter,system-ui,sans-serif;padding:10px}.gn-row{display:flex;gap:8px;margin-top:8px}.gn-row button{padding:10px 12px;border:0;border-radius:10px;font-weight:900;cursor:pointer;background:#243041;color:#e8eef6}.gn-row button[data-act="save"]{background:#e6b84d;color:#1a1406}.gn-row button[data-act="del"]{background:#3a1820;color:#ff8a9a}';
+    css.textContent = '#gn-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:12px}.gn-sizes{display:flex;align-items:center;gap:6px;color:#a89058;font-size:12px;font-weight:800}.gn-sizes button,.gn-sizes input,#gn-pages button{border:1px solid #3d3420;background:#12100c;color:#f4e7c3;border-radius:999px;min-width:36px;height:34px;padding:0 12px;font-weight:900;cursor:pointer}.gn-sizes button.on,#gn-pages button.on{background:#e6b84d;color:#1a1406;border-color:#e6b84d}.gn-sizes input{width:72px;text-align:center}#gn-pages{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.gn-gap{color:#6d7688;padding:0 2px}.gn-count{color:#a89058;font-size:12px;font-weight:800;margin-left:4px}#gn-pages button:disabled{opacity:.35;cursor:default}.gn-empty{color:#8b93a7;font-weight:700;padding:8px 2px}.gn-card{display:flex;gap:12px;width:100%;text-align:left;border:1px solid #6b5420;background:linear-gradient(180deg,#1a150c,#100e0a);color:#f4e7c3;border-radius:18px;padding:14px;font-weight:700;line-height:1.45;cursor:pointer}.gn-card.on{border-color:#e6b84d}.gn-no{flex:0 0 auto;width:36px;height:36px;border-radius:12px;background:#e6b84d;color:#1a1406;display:flex;align-items:center;justify-content:center;font-weight:900}.gn-body{flex:1;min-width:0}.gn-text{font-size:16px;white-space:pre-wrap}.gn-time{margin-top:8px;color:#a89058;font-size:11px;font-weight:800;letter-spacing:.04em}.gn-card textarea{width:100%;box-sizing:border-box;min-height:110px;border-radius:12px;border:1px solid #e6b84d;background:#0b121a;color:#f4f7fb;font:700 15px/1.45 Inter,system-ui,sans-serif;padding:10px}.gn-row{display:flex;gap:8px;margin-top:8px}.gn-row button{padding:10px 12px;border:0;border-radius:10px;font-weight:900;cursor:pointer;background:#243041;color:#e8eef6}.gn-row button[data-act="save"]{background:#e6b84d;color:#1a1406}.gn-row button[data-act="del"]{background:#3a1820;color:#ff8a9a}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -277,8 +338,22 @@
   var file = $('gn-file');
   if (pick && file) {
     pick.addEventListener('click', function () { file.click(); });
-    file.addEventListener('change', function () { if (file.files && file.files[0]) readFile(file.files[0]); });
+    file.addEventListener('change', function () { if (file.files && file.files.length) readFiles(file.files); });
   }
+  var tools = $('gn-tools');
+  if (tools) tools.addEventListener('click', function (ev) {
+    var b = ev.target && ev.target.closest && ev.target.closest('[data-size],[data-page]');
+    if (!b || b.disabled) return;
+    if (b.hasAttribute('data-size')) { setPageSize(b.getAttribute('data-size')); return; }
+    var go = b.getAttribute('data-page');
+    if (go === 'prev') page = Math.max(0, page - 1);
+    else if (go === 'next') page = Math.min(pageCount() - 1, page + 1);
+    else page = parseInt(go, 10) || 0;
+    editing = null;
+    paint();
+  });
+  var any = $('gn-any');
+  if (any) any.addEventListener('change', function () { if (any.value) setPageSize(any.value); });
   var list = $('gn-list');
   if (list) list.addEventListener('click', function (ev) {
     var b = ev.target && ev.target.closest && ev.target.closest('[data-act]');
