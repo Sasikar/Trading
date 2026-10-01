@@ -27,25 +27,36 @@ async function loadMarket(){
   try{
     let btc=null,eth=null,src='';
     try{
-      const j=await jget('https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD');
+      const stamp=Date.now();
+      const j=await jget('https://api.kraken.com/0/public/Ticker?pair=XBTUSD,ETHUSD&_='+stamp);
       const r=j&&j.result||{};
       const b=r.XXBTZUSD||r.XBTUSD; const e=r.XETHZUSD||r.ETHUSD;
-      if(b){btc={price:+b.c[0], pct:((+b.c[0]-+b.o)/+b.o)*100};}
-      if(e){eth={price:+e.c[0], pct:((+e.c[0]-+e.o)/+e.o)*100};}
+      if(b&&b.c&&b.c[0]){btc={price:+b.c[0], pct:((+b.c[0]-+b.o)/+b.o)*100};}
+      if(e&&e.c&&e.c[0]){eth={price:+e.c[0], pct:((+e.c[0]-+e.o)/+e.o)*100};}
       if(btc||eth) src='Kraken';
+      const cb=await jget('https://api.coinbase.com/v2/prices/BTC-USD/spot?_='+stamp);
+      const ce=await jget('https://api.coinbase.com/v2/prices/ETH-USD/spot?_='+stamp);
+      const cbp=cb&&cb.data&&+cb.data.amount;
+      const cep=ce&&ce.data&&+ce.data.amount;
+      if(cbp){
+        if(!btc || Math.abs(btc.price-cbp)/cbp>0.015){ btc={price:cbp, pct:btc?btc.pct:null}; src='Coinbase'; }
+      }
+      if(cep){
+        if(!eth || Math.abs(eth.price-cep)/cep>0.015){ eth={price:cep, pct:eth?eth.pct:null}; if(src!=='Coinbase') src=src?src+'+CB':'Coinbase'; }
+      }
     }catch(e){}
     if(!btc||!eth){
       try{
-        const d=await jget('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true');
+        const d=await jget('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true&_='+Date.now());
         if(!btc&&d&&d.bitcoin) btc={price:+d.bitcoin.usd, pct:+d.bitcoin.usd_24h_change};
         if(!eth&&d&&d.ethereum) eth={price:+d.ethereum.usd, pct:+d.ethereum.usd_24h_change};
         if(!src) src='CoinGecko';
         else src=src+'+CG';
       }catch(e){}
     }
-    if(btc){set('btc-price', money(btc.price)); set('btc-change', (btc.pct>=0?'+':'')+btc.pct.toFixed(2)+'%', btc.pct>=0?'#62e3a0':'#ff6f7c'); any=true;}
+    if(btc){set('btc-price', money(btc.price)); if(btc.pct!=null&&isFinite(btc.pct)) set('btc-change', (btc.pct>=0?'+':'')+btc.pct.toFixed(2)+'%', btc.pct>=0?'#62e3a0':'#ff6f7c'); any=true;}
     else set('btc-price','—');
-    if(eth){set('eth-price', money(eth.price)); set('eth-change', (eth.pct>=0?'+':'')+eth.pct.toFixed(2)+'%', eth.pct>=0?'#62e3a0':'#ff6f7c'); any=true;}
+    if(eth){set('eth-price', money(eth.price)); if(eth.pct!=null&&isFinite(eth.pct)) set('eth-change', (eth.pct>=0?'+':'')+eth.pct.toFixed(2)+'%', eth.pct>=0?'#62e3a0':'#ff6f7c'); any=true;}
     else set('eth-price','—');
     if($('market-source')) $('market-source').textContent=src||'OFFLINE';
   }catch(e){console.warn('btc/eth',e);}
@@ -5735,7 +5746,9 @@ else if(at==='keywords'){const panels=$('tf-panels');if(panels){panels.classList
 else if(at==='gnotes'){const panels=$('tf-panels');if(panels){panels.classList.add('hidden');panels.style.display='none';}try{window.showGoldenNotes&&window.showGoldenNotes(true);}catch(e){}}
 else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'){const panels=$('tf-panels');if(panels){panels.classList.add('hidden');panels.style.display='none';}try{if(at==='fd')window.showFavDips(true);else if(at==='fomo')window.showFomoEntry(true);else if(at==='fe')window.showFomoEntryDesk&&window.showFomoEntryDesk(true);else if(at==='alerts')window.showAlerts&&window.showAlerts(true);else window.showFomoExperiences(true);}catch(e){}}
 else{showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}await loadTF(at);}
-}tick();setInterval(()=>loadMarket(),60000);setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='memegate')loadMemeGate();else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'||at==='coinstats'||at==='emotion'||at==='keywords'||at==='gnotes')return;else loadTF(currentTF);},60000);
+}tick();setInterval(()=>loadMarket(),60000);
+window.addEventListener('pageshow',()=>loadMarket());
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') loadMarket(); });setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='memegate')loadMemeGate();else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'||at==='coinstats'||at==='emotion'||at==='keywords'||at==='gnotes')return;else loadTF(currentTF);},60000);
 
 function initTabReorder(){
   const bar=document.getElementById('tf-tabs');
