@@ -64,7 +64,9 @@ function whaleCompare(earlier, later) {
   var days = {};
   var fromDate = todayISO();
   var toDate = todayISO();
-  var uploadSlot = 'from';
+  var mint = '';
+  var coins = [];
+  var liveHtml = '';
   var syncing = false;
   var busy = false;
   var reportHtml = '';
@@ -187,30 +189,24 @@ function whaleCompare(earlier, later) {
       syncing = false;
     }
   }
+  function shortAddr(addr) {
+    addr = String(addr || '');
+    return addr.length > 12 ? addr.slice(0, 4) + '...' + addr.slice(-4) : addr;
+  }
   function line(row, extra) {
     var pct = row.pct != null && isFinite(+row.pct) ? ' · ' + (+row.pct).toFixed(2) + '%' : '';
-    return '<li><b>' + esc(row.addr) + '</b> ' + esc(extra) + esc(pct) + '</li>';
+    var pool = row.pool ? ' · pool' : '';
+    return '<li><b>' + esc(shortAddr(row.addr)) + '</b> ' + esc(extra) + esc(pct) + pool + '</li>';
   }
-  function writeReport(list) {
+  function writeReport(dateA, snapA, dateB, snapB) {
     errorText = '';
-    if (list.length < 2) {
-      reportHtml = '';
-      errorText = 'Need at least 2 screenshots to compare.';
-      return;
-    }
-    var ordered = list.slice().sort();
-    var a = days[ordered[0]];
-    var b = days[ordered[ordered.length - 1]];
+    var pair = [{ date: dateA, snap: snapA }, { date: dateB, snap: snapB }].sort(function (a, b) { return a.date < b.date ? -1 : 1; });
+    var a = pair[0].snap;
+    var b = pair[1].snap;
     var diff = whaleCompare(a, b);
-    var coin = a.coin && b.coin && a.coin !== b.coin ? (a.coin + ' → ' + b.coin) : (b.coin || a.coin || 'Token');
-    var hold = '';
-    if (a.holders || b.holders) {
-      var dh = (b.holders || 0) - (a.holders || 0);
-      hold = 'Holders ' + (a.holders || '—') + ' → ' + (b.holders || '—') + (a.holders && b.holders ? ' (' + (dh > 0 ? '+' : '') + dh + ').' : '.');
-    }
-    var html = '<div class="wh-report"><div class="wh-kicker">' + esc(coin) + '</div><h3>' + esc(dayLabel(ordered[0])) + ' → ' + esc(dayLabel(ordered[ordered.length - 1])) + '</h3>';
-    if (ordered.length > 2) html += '<p class="wh-sub">Using the oldest and newest of the ' + ordered.length + ' days you picked.</p>';
-    html += '<p>' + esc(hold) + ' This is the holder table only. It is not a buy.</p>';
+    var coin = b.coin || a.coin || 'Token';
+    var html = '<div class="wh-report"><div class="wh-kicker">' + esc(coin) + '</div><h3>' + esc(dayLabel(pair[0].date)) + ' → ' + esc(dayLabel(pair[1].date)) + '</h3>';
+    html += '<p>Top 10 wallets only. Not a buy. A row marked pool is the liquidity pool, not a person.</p>';
     function block(title, items) {
       if (!items.length) return '<h4>' + title + '</h4><p class="wh-none">None.</p>';
       return '<h4>' + title + '</h4><ul>' + items + '</ul>';
@@ -236,31 +232,92 @@ function whaleCompare(earlier, later) {
     if (biggestSell && (!biggestAdd || Math.abs(biggestSell.d) > biggestAdd.d * 1.4)) lean = 'The largest move is a sale. One wallet is feeding the dip more than the others are absorbing it.';
     else if (biggestAdd && diff.acc.length >= diff.sold.length) lean = 'The bigger wallets added while the holder count did the other thing. That is accumulation inside the top list, not the whole market.';
     html += '<h4>Read</h4><p>' + esc(lean) + '</p>';
-    html += '<p class="wh-foot">On Dexscreener the first row is often the liquidity pool, not a person. Check that address before you call it a whale.</p></div>';
+    html += '<p class="wh-foot">Saved on this phone and GitHub when you check a coin. Open it once a day and that day is kept.</p></div>';
     reportHtml = html;
   }
+  function snapKey(date, id) { return date + '|' + id; }
   function slotStatus(date) {
-    var snap = days[date];
-    if (!snap) return 'No screenshot on this day';
+    var snap = mint && days[snapKey(date, mint)];
+    if (!snap) return 'No snapshot on this day';
     return (snap.coin || 'Saved') + ' · ' + snap.rows.length + ' wallets';
   }
-  function slotBox(which, date) {
-    var title = which === 'from' ? 'From' : 'To';
-    return '<section class="wh-slot"><h3>' + title + '</h3><input id="wh-' + which + '" type="date" value="' + esc(date) + '" aria-label="' + title + ' date"><p class="wh-slot-status">' + esc(slotStatus(date)) + '</p><button type="button" class="wh-upload" data-act="upload" data-slot="' + which + '"' + (busy ? ' disabled' : '') + '>' + (busy && uploadSlot === which ? 'Reading the table…' : 'Upload this day') + '</button></section>';
+  function money(n) {
+    if (n == null || !isFinite(n)) return '';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+    return '$' + Math.round(n);
+  }
+  function liveTable(rows) {
+    if (!rows || !rows.length) return '';
+    return '<div class="wh-live"><h3>Top 10 now</h3><ul>' + rows.map(function (row) {
+      var usd = money(row.value);
+      return '<li><b>' + esc(shortAddr(row.addr)) + '</b> ' + esc(whaleFmt(row.n, false)) + (row.pct != null ? ' · ' + (+row.pct).toFixed(2) + '%' : '') + (usd ? ' · ' + esc(usd) : '') + (row.pool ? ' · pool' : '') + '</li>';
+    }).join('') + '</ul></div>';
   }
   function paint() {
     var root = $('wh-app');
     if (!root) return;
-    var coinEl = $('wh-coin');
-    var coinVal = coinEl ? coinEl.value : '';
+    var options = coins.map(function (c) {
+      return '<option value="' + esc(c.ca) + '"' + (c.ca === mint ? ' selected' : '') + '>' + esc(c.name || shortAddr(c.ca)) + '</option>';
+    }).join('');
     root.innerHTML =
-      slotBox('from', fromDate) +
-      slotBox('to', toDate) +
-      '<label class="wh-coin">Coin<input id="wh-coin" type="text" maxlength="32" placeholder="Optional" value="' + esc(coinVal) + '"></label>' +
-      '<input id="wh-file" type="file" accept="image/*" hidden>' +
+      '<label class="wh-coin">Coin<select id="wh-mint">' + (options || '<option value="">No saved coins</option>') + '</select></label>' +
+      '<button type="button" class="wh-upload" data-act="check"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Reading holders…' : 'Check now') + '</button>' +
+      '<section class="wh-slot"><h3>From</h3><input id="wh-from" type="date" value="' + esc(fromDate) + '"><p class="wh-slot-status">' + esc(slotStatus(fromDate)) + '</p></section>' +
+      '<section class="wh-slot"><h3>To</h3><input id="wh-to" type="date" value="' + esc(toDate) + '"><p class="wh-slot-status">' + esc(slotStatus(toDate)) + '</p></section>' +
       '<button type="button" class="wh-go" data-act="compare">Compare these two days</button>' +
       (errorText ? '<div class="wh-error">' + esc(errorText) + '</div>' : '') +
+      liveHtml +
       reportHtml;
+  }
+  function saveSnap(date, data) {
+    markTomb(snapKey(date, data.mint), false);
+    days[snapKey(date, data.mint)] = {
+      coin: data.coin || '',
+      mint: data.mint,
+      rows: data.rows,
+      t: Date.now()
+    };
+  }
+  async function checkNow(force) {
+    if (!mint || busy) return;
+    var key = snapKey(todayISO(), mint);
+    if (!force && days[key] && days[key].rows && days[key].rows.length >= 3) {
+      liveHtml = liveTable(days[key].rows);
+      paint();
+      return;
+    }
+    busy = true;
+    errorText = '';
+    paint();
+    try {
+      var res = await fetch('https://trading-ohlcv.sasipudi.workers.dev/whale-holders?mint=' + encodeURIComponent(mint), { cache: 'no-store' });
+      var data = await res.json();
+      if (!data || !data.ok || !data.rows || data.rows.length < 3) throw new Error((data && data.error) || 'Could not load holders');
+      saveSnap(todayISO(), data);
+      liveHtml = liveTable(data.rows);
+      setStatus('Saved ' + (data.coin || 'coin') + ' · ' + dayLabel(todayISO()));
+      paint();
+      persist();
+    } catch (e) {
+      errorText = (e && e.message) || 'Could not load holders';
+      paint();
+    } finally {
+      busy = false;
+      paint();
+    }
+  }
+  function comparePicked() {
+    var a = mint && days[snapKey(fromDate, mint)];
+    var b = mint && days[snapKey(toDate, mint)];
+    if (!a || !b || fromDate === toDate) {
+      reportHtml = '';
+      errorText = 'Need at least 2 days saved for this coin.';
+      paint();
+      return;
+    }
+    writeReport(fromDate, a, toDate, b);
+    paint();
   }
   function shotBlob(canvas) {
     return new Promise(function (resolve, reject) {
@@ -349,16 +406,6 @@ function whaleCompare(earlier, later) {
       paint();
     }
   }
-  function comparePicked() {
-    if (!days[fromDate] || !days[toDate] || fromDate === toDate) {
-      reportHtml = '';
-      errorText = 'Need at least 2 screenshots to compare.';
-      paint();
-      return;
-    }
-    writeReport([fromDate, toDate]);
-    paint();
-  }
   function solo(on) {
     document.body.classList.toggle('wh-on', !!on);
     var main = document.querySelector('main');
@@ -396,7 +443,7 @@ function whaleCompare(earlier, later) {
   if (!document.getElementById('wh-style')) {
     var css = document.createElement('style');
     css.id = 'wh-style';
-    css.textContent = '#whale-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#wh-app{color:#f4f7fb}.wh-slot{margin:0 0 14px;padding:14px;border-radius:18px;background:#10161f}.wh-slot h3{margin:0 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#8b95a5}.wh-slot input[type=date],.wh-coin input{width:100%;box-sizing:border-box;padding:14px;border:0;border-radius:14px;background:#1a222e;color:#f4f7fb;font-size:18px;font-weight:800}.wh-slot-status{margin:8px 0 10px;color:#8b95a5;font-size:13px;font-weight:700}.wh-upload,.wh-go{width:100%;padding:14px;border:0;border-radius:14px;font-weight:800;cursor:pointer}.wh-upload{background:#243044;color:#f4f7fb}.wh-go{margin-top:4px;background:#f4f7fb;color:#111}.wh-coin{display:block;margin:0 0 12px;color:#8b95a5;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.wh-coin input{margin-top:8px;text-transform:none;letter-spacing:0;font-weight:700}.wh-error{margin-top:12px;padding:12px 14px;border-radius:14px;background:#3c1822;color:#ffb4be;font-weight:800}.wh-report{margin-top:16px;padding:16px;border-radius:18px;background:#10161f}.wh-report h3{margin:4px 0 8px;font-size:22px;letter-spacing:-.03em}.wh-report h4{margin:14px 0 6px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5}.wh-report p,.wh-report li{font-size:14px;line-height:1.45}.wh-report ul{margin:0;padding-left:18px}.wh-kicker{color:#7ddea8;font-size:12px;font-weight:800}.wh-sub,.wh-none,.wh-foot{color:#8b95a5}.wh-foot{font-size:12px!important}body.wh-on #tf-tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;position:sticky;top:52px;z-index:80;max-height:48px}body.wh-on main>section.section,body.wh-on main>.trend-panel:not(#whale-panel),body.wh-on main>.struct-trend-panel,body.wh-on main>.macro-panel,body.wh-on #tf-panels{display:none!important}body.wh-on #whale-panel{display:block!important}';
+    css.textContent = '#whale-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#wh-app{color:#f4f7fb}.wh-slot{margin:0 0 14px;padding:14px;border-radius:18px;background:#10161f}.wh-slot h3{margin:0 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#8b95a5}.wh-slot input[type=date],.wh-coin select{width:100%;box-sizing:border-box;padding:14px;border:0;border-radius:14px;background:#1a222e;color:#f4f7fb;font-size:18px;font-weight:800}.wh-slot-status{margin:8px 0 0;color:#8b95a5;font-size:13px;font-weight:700}.wh-upload,.wh-go{width:100%;padding:14px;border:0;border-radius:14px;font-weight:800;cursor:pointer}.wh-upload{background:#243044;color:#f4f7fb;margin-bottom:12px}.wh-go{margin-top:4px;background:#f4f7fb;color:#111}.wh-coin{display:block;margin:0 0 12px;color:#8b95a5;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.wh-coin select{margin-top:8px}.wh-live{margin-top:16px;padding:16px;border-radius:18px;background:#10161f}.wh-live h3{margin:0 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#8b95a5}.wh-live ul{margin:0;padding-left:18px}.wh-live li{font-size:14px;line-height:1.45}.wh-error{margin-top:12px;padding:12px 14px;border-radius:14px;background:#3c1822;color:#ffb4be;font-weight:800}.wh-report{margin-top:16px;padding:16px;border-radius:18px;background:#10161f}.wh-report h3{margin:4px 0 8px;font-size:22px;letter-spacing:-.03em}.wh-report h4{margin:14px 0 6px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5}.wh-report p,.wh-report li{font-size:14px;line-height:1.45}.wh-report ul{margin:0;padding-left:18px}.wh-kicker{color:#7ddea8;font-size:12px;font-weight:800}.wh-sub,.wh-none,.wh-foot{color:#8b95a5}.wh-foot{font-size:12px!important}body.wh-on #tf-tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;position:sticky;top:52px;z-index:80;max-height:48px}body.wh-on main>section.section,body.wh-on main>.trend-panel:not(#whale-panel),body.wh-on main>.struct-trend-panel,body.wh-on main>.macro-panel,body.wh-on #tf-panels{display:none!important}body.wh-on #whale-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -406,21 +453,21 @@ function whaleCompare(earlier, later) {
       var b = ev.target && ev.target.closest && ev.target.closest('[data-act]');
       if (!b) return;
       var act = b.getAttribute('data-act');
-      if (act === 'upload') {
-        uploadSlot = b.getAttribute('data-slot') === 'to' ? 'to' : 'from';
-        var input = $('wh-file');
-        if (input) input.click();
-      }
+      if (act === 'check') checkNow(true);
       if (act === 'compare') comparePicked();
     });
     root.addEventListener('change', function (ev) {
       if (!ev.target) return;
       if (ev.target.id === 'wh-from') { fromDate = ev.target.value || fromDate; errorText = ''; paint(); return; }
       if (ev.target.id === 'wh-to') { toDate = ev.target.value || toDate; errorText = ''; paint(); return; }
-      if (ev.target.id !== 'wh-file') return;
-      var f = ev.target.files && ev.target.files[0];
-      ev.target.value = '';
-      if (f) saveShot(f);
+      if (ev.target.id === 'wh-mint') {
+        mint = ev.target.value || '';
+        liveHtml = '';
+        reportHtml = '';
+        errorText = '';
+        paint();
+        checkNow(false);
+      }
     });
   }
   var tabs = $('tf-tabs');
@@ -429,6 +476,21 @@ function whaleCompare(earlier, later) {
     if (!b || b.getAttribute('data-tf') === 'whale') return;
     showWhale(false);
   }, true);
+  fetch('data/ca-recents.json?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
+    return res.ok ? res.json() : null;
+  }).then(function (data) {
+    var items = (data && data.items) || [];
+    var seen = {};
+    coins = [];
+    items.forEach(function (it) {
+      if (!it || !it.ca || seen[it.ca]) return;
+      seen[it.ca] = 1;
+      coins.push({ ca: it.ca, name: it.name || it.base || it.ca.slice(0, 4) });
+    });
+    coins.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (!mint && coins.length) mint = coins[0].ca;
+    paint();
+  }).catch(function () {});
   fetch(PATH + '?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
     return res.ok ? res.json() : null;
   }).then(function (data) {

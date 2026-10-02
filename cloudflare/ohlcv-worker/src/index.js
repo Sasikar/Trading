@@ -650,6 +650,47 @@ async function runWhaleVision(env, model, image, prompt) {
   throw new Error(last);
 }
 
+async function readTopHolders(mint) {
+  mint = String(mint || '').trim();
+  if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) throw new Error('Pick a Solana coin');
+  const reportRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + mint + '/report', {
+    headers: { accept: 'application/json', 'user-agent': 'trading-ohlcv' }
+  });
+  if (!reportRes.ok) throw new Error('Holder list is not available for that coin');
+  const report = await reportRes.json();
+  const list = Array.isArray(report.topHolders) ? report.topHolders : [];
+  let price = 0;
+  let pair = '';
+  let symbol = (report.tokenMeta && (report.tokenMeta.symbol || report.tokenMeta.name)) || '';
+  try {
+    const px = await fetch('https://api.dexscreener.com/tokens/v1/solana/' + mint, { headers: { accept: 'application/json' } });
+    if (px.ok) {
+      const pairs = await px.json();
+      const best = (Array.isArray(pairs) ? pairs : []).slice().sort((a, b) => ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0))[0];
+      if (best) {
+        price = Number(best.priceUsd) || 0;
+        pair = best.pairAddress || '';
+        symbol = symbol || (best.baseToken && best.baseToken.symbol) || '';
+      }
+    }
+  } catch (e) {}
+  const rows = list.slice(0, 10).map((h) => {
+    const owner = String(h.owner || h.address || '').trim();
+    const n = Number(h.uiAmount);
+    const pct = Number(h.pct);
+    const usd = price && isFinite(n) ? price * n : null;
+    return {
+      addr: owner,
+      pct: isFinite(pct) ? Math.round(pct * 100) / 100 : null,
+      n: isFinite(n) ? n : null,
+      value: usd,
+      pool: !!(pair && owner === pair)
+    };
+  }).filter((row) => row.addr && row.n != null);
+  if (rows.length < 3) throw new Error('That coin has no holder list yet');
+  return { coin: String(symbol || '').slice(0, 40), mint, price, rows };
+}
+
 async function readWhaleShot(env, image) {
   const prompt = 'Copy the Holders table you see. Do not reuse this example. First line: holders 12345. Second line: coin Example. Then one wallet per line, amount is the token holding not the dollar value: AbC1...xYz9 | 1.25 | 12.3M | $50.0K. Ignore the supply number repeated beside the grey bar. Do not invent rows.';
   const models = ['@cf/meta/llama-3.2-11b-vision-instruct', '@cf/meta/llama-4-scout-17b-16e-instruct'];
@@ -812,6 +853,15 @@ export default {
           return true;
         });
         return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
+    if (path === '/whale-holders' && request.method === 'GET') {
+      try {
+        const mint = new URL(request.url).searchParams.get('mint') || '';
+        const shot = await readTopHolders(mint);
+        return new Response(JSON.stringify({ ok: true, ...shot }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
