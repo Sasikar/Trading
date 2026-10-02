@@ -62,7 +62,9 @@ function whaleCompare(earlier, later) {
   var PATH = 'data/whale-days.json';
   var GH = 'https://api.github.com/repos/Sasikar/Trading/contents/' + PATH;
   var days = {};
-  var picked = {};
+  var fromDate = todayISO();
+  var toDate = todayISO();
+  var uploadSlot = 'from';
   var syncing = false;
   var busy = false;
   var reportHtml = '';
@@ -237,28 +239,26 @@ function whaleCompare(earlier, later) {
     html += '<p class="wh-foot">On Dexscreener the first row is often the liquidity pool, not a person. Check that address before you call it a whale.</p></div>';
     reportHtml = html;
   }
+  function slotStatus(date) {
+    var snap = days[date];
+    if (!snap) return 'No screenshot on this day';
+    return (snap.coin || 'Saved') + ' · ' + snap.rows.length + ' wallets';
+  }
+  function slotBox(which, date) {
+    var title = which === 'from' ? 'From' : 'To';
+    return '<section class="wh-slot"><h3>' + title + '</h3><input id="wh-' + which + '" type="date" value="' + esc(date) + '" aria-label="' + title + ' date"><p class="wh-slot-status">' + esc(slotStatus(date)) + '</p><button type="button" class="wh-upload" data-act="upload" data-slot="' + which + '"' + (busy ? ' disabled' : '') + '>' + (busy && uploadSlot === which ? 'Reading the table…' : 'Upload this day') + '</button></section>';
+  }
   function paint() {
     var root = $('wh-app');
     if (!root) return;
-    var list = dates();
-    var dateVal = todayISO();
-    var coinVal = '';
-    var dateEl = $('wh-date');
     var coinEl = $('wh-coin');
-    if (dateEl) dateVal = dateEl.value || dateVal;
-    if (coinEl) coinVal = coinEl.value || '';
-    var chips = list.map(function (date) {
-      var snap = days[date];
-      var on = picked[date] ? ' on' : '';
-      return '<button type="button" class="wh-day' + on + '" data-date="' + esc(date) + '"><b>' + esc(dayLabel(date)) + '</b><span>' + esc(snap.coin || 'Saved') + ' · ' + snap.rows.length + ' wallets</span></button>';
-    }).join('');
+    var coinVal = coinEl ? coinEl.value : '';
     root.innerHTML =
-      '<div class="wh-save"><label>Day<input id="wh-date" type="date" value="' + esc(dateVal) + '"></label><label>Coin<input id="wh-coin" type="text" maxlength="32" placeholder="Optional" value="' + esc(coinVal) + '"></label></div>' +
+      slotBox('from', fromDate) +
+      slotBox('to', toDate) +
+      '<label class="wh-coin">Coin<input id="wh-coin" type="text" maxlength="32" placeholder="Optional" value="' + esc(coinVal) + '"></label>' +
       '<input id="wh-file" type="file" accept="image/*" hidden>' +
-      '<button type="button" class="wh-upload" data-act="upload"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Reading the table…' : 'Upload holders screenshot') + '</button>' +
-      '<div class="wh-label">Saved days · tap two or more</div>' +
-      '<div class="wh-days">' + (chips || '<p class="wh-none">No days yet.</p>') + '</div>' +
-      '<button type="button" class="wh-go" data-act="compare">Compare</button>' +
+      '<button type="button" class="wh-go" data-act="compare">Compare these two days</button>' +
       (errorText ? '<div class="wh-error">' + esc(errorText) + '</div>' : '') +
       reportHtml;
   }
@@ -301,9 +301,8 @@ function whaleCompare(earlier, later) {
     });
   }
   async function saveShot(file) {
-    var dateEl = $('wh-date');
+    var date = uploadSlot === 'to' ? toDate : fromDate;
     var coinEl = $('wh-coin');
-    var date = dateEl && dateEl.value;
     var typed = coinEl && coinEl.value.trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) {
       errorText = 'Pick the calendar date for this screenshot.';
@@ -347,12 +346,30 @@ function whaleCompare(earlier, later) {
     }
   }
   function comparePicked() {
-    var list = Object.keys(picked).filter(function (d) { return picked[d] && days[d]; });
-    writeReport(list);
+    if (!days[fromDate] || !days[toDate] || fromDate === toDate) {
+      reportHtml = '';
+      errorText = 'Need at least 2 screenshots to compare.';
+      paint();
+      return;
+    }
+    writeReport([fromDate, toDate]);
     paint();
   }
   function solo(on) {
     document.body.classList.toggle('wh-on', !!on);
+    var main = document.querySelector('main');
+    if (!main) return;
+    Array.prototype.forEach.call(main.children, function (el) {
+      if (el.id === 'tf-tabs' || el.id === 'dip-alert' || el.id === 'whale-panel') return;
+      if (on) {
+        if (el.getAttribute('data-wh-prev') == null) el.setAttribute('data-wh-prev', el.style.display || ' ');
+        el.style.display = 'none';
+      } else if (el.getAttribute('data-wh-prev') != null) {
+        var prev = el.getAttribute('data-wh-prev');
+        el.style.display = prev === ' ' ? '' : prev;
+        el.removeAttribute('data-wh-prev');
+      }
+    });
   }
   function showWhale(on) {
     var p = $('whale-panel');
@@ -363,44 +380,40 @@ function whaleCompare(earlier, later) {
       solo(false);
       return;
     }
+    var tabs = $('tf-tabs');
+    if (tabs && tabs.nextSibling !== p) tabs.insertAdjacentElement('afterend', p);
     solo(true);
     p.style.display = 'block';
     p.classList.add('on');
     paint();
-    var tabs = $('tf-tabs');
-    if (tabs && tabs.scrollIntoView) tabs.scrollIntoView({ block: 'start' });
   }
   window.showWhale = showWhale;
 
   if (!document.getElementById('wh-style')) {
     var css = document.createElement('style');
     css.id = 'wh-style';
-    css.textContent = '#whale-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#wh-app{color:#f4f7fb}.wh-save{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}.wh-save label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:800;color:#8b95a5}.wh-save input{width:100%;box-sizing:border-box;padding:12px;border:0;border-radius:14px;background:#141b24;color:#f4f7fb;font-size:16px;font-weight:700}.wh-upload,.wh-go{width:100%;padding:14px;border:0;border-radius:14px;font-weight:800;cursor:pointer}.wh-upload{background:#1a222e;color:#f4f7fb}.wh-go{margin-top:12px;background:#f4f7fb;color:#111}.wh-label{margin:16px 0 8px;color:#8b95a5;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.wh-days{display:flex;flex-direction:column;gap:8px}.wh-day{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;padding:12px 14px;border-radius:16px;border:0;background:#141b24;color:#f4f7fb;cursor:pointer}.wh-day b{display:block;font-size:15px}.wh-day span{display:block;margin-top:3px;color:#8b95a5;font-size:12px;font-weight:700}.wh-day.on{background:#1f8a4d;color:#fff}.wh-day.on span{color:#d9ffe8}.wh-error{margin-top:12px;padding:12px 14px;border-radius:14px;background:#3c1822;color:#ffb4be;font-weight:800}.wh-report{margin-top:16px;padding:16px;border-radius:18px;background:#10161f}.wh-report h3{margin:4px 0 8px;font-size:22px;letter-spacing:-.03em}.wh-report h4{margin:14px 0 6px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5}.wh-report p,.wh-report li{font-size:14px;line-height:1.45}.wh-report ul{margin:0;padding-left:18px}.wh-kicker{color:#7ddea8;font-size:12px;font-weight:800}.wh-sub,.wh-none,.wh-foot{color:#8b95a5}.wh-foot{font-size:12px!important}body.wh-on main>section.section,body.wh-on main>.trend-panel:not(#whale-panel),body.wh-on main>.struct-trend-panel,body.wh-on main>.macro-panel,body.wh-on #tf-panels{display:none!important}body.wh-on #whale-panel{display:block!important}';
+    css.textContent = '#whale-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#wh-app{color:#f4f7fb}.wh-slot{margin:0 0 14px;padding:14px;border-radius:18px;background:#10161f}.wh-slot h3{margin:0 0 8px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#8b95a5}.wh-slot input[type=date],.wh-coin input{width:100%;box-sizing:border-box;padding:14px;border:0;border-radius:14px;background:#1a222e;color:#f4f7fb;font-size:18px;font-weight:800}.wh-slot-status{margin:8px 0 10px;color:#8b95a5;font-size:13px;font-weight:700}.wh-upload,.wh-go{width:100%;padding:14px;border:0;border-radius:14px;font-weight:800;cursor:pointer}.wh-upload{background:#243044;color:#f4f7fb}.wh-go{margin-top:4px;background:#f4f7fb;color:#111}.wh-coin{display:block;margin:0 0 12px;color:#8b95a5;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.wh-coin input{margin-top:8px;text-transform:none;letter-spacing:0;font-weight:700}.wh-error{margin-top:12px;padding:12px 14px;border-radius:14px;background:#3c1822;color:#ffb4be;font-weight:800}.wh-report{margin-top:16px;padding:16px;border-radius:18px;background:#10161f}.wh-report h3{margin:4px 0 8px;font-size:22px;letter-spacing:-.03em}.wh-report h4{margin:14px 0 6px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5}.wh-report p,.wh-report li{font-size:14px;line-height:1.45}.wh-report ul{margin:0;padding-left:18px}.wh-kicker{color:#7ddea8;font-size:12px;font-weight:800}.wh-sub,.wh-none,.wh-foot{color:#8b95a5}.wh-foot{font-size:12px!important}body.wh-on #tf-tabs{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;position:sticky;top:52px;z-index:80;max-height:48px}body.wh-on main>section.section,body.wh-on main>.trend-panel:not(#whale-panel),body.wh-on main>.struct-trend-panel,body.wh-on main>.macro-panel,body.wh-on #tf-panels{display:none!important}body.wh-on #whale-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
   var root = $('wh-app');
   if (root) {
     root.addEventListener('click', function (ev) {
-      var b = ev.target && ev.target.closest && ev.target.closest('[data-act],[data-date]');
+      var b = ev.target && ev.target.closest && ev.target.closest('[data-act]');
       if (!b) return;
-      if (b.getAttribute('data-date')) {
-        var date = b.getAttribute('data-date');
-        if (picked[date]) delete picked[date];
-        else picked[date] = 1;
-        errorText = '';
-        paint();
-        return;
-      }
       var act = b.getAttribute('data-act');
       if (act === 'upload') {
+        uploadSlot = b.getAttribute('data-slot') === 'to' ? 'to' : 'from';
         var input = $('wh-file');
         if (input) input.click();
       }
       if (act === 'compare') comparePicked();
     });
     root.addEventListener('change', function (ev) {
-      if (!ev.target || ev.target.id !== 'wh-file') return;
+      if (!ev.target) return;
+      if (ev.target.id === 'wh-from') { fromDate = ev.target.value || fromDate; errorText = ''; paint(); return; }
+      if (ev.target.id === 'wh-to') { toDate = ev.target.value || toDate; errorText = ''; paint(); return; }
+      if (ev.target.id !== 'wh-file') return;
       var f = ev.target.files && ev.target.files[0];
       ev.target.value = '';
       if (f) saveShot(f);
