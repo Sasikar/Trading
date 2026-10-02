@@ -546,7 +546,7 @@ function lineWallets(text) {
     const pctM = after.match(/(\d+(?:\.\d+)?)\s*%/);
     if (pctM) pct = pctM[1];
     else {
-      const bare = after.match(/(\d+(?:\.\d+)?)(?!\s*[KMB])/i);
+      const bare = after.match(/(\d+(?:\.\d+)?)(?!\s*[KMB]|\.\d)/i);
       if (bare && Number(bare[1]) > 0 && Number(bare[1]) <= 100) pct = bare[1];
     }
     const val = line.match(/\$\s*[0-9.,]+\s*[KMB]?/i);
