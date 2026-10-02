@@ -523,36 +523,75 @@ function pushWhaleRow(rows, seen, addr, pct, amount, value) {
   seen[key] = 1;
   rows.push({
     addr,
-    pct: Number(pct),
+    pct: pct === '' || pct == null || !isFinite(Number(pct)) ? null : Number(pct),
     amount: num[1] + num[2].toUpperCase(),
     value: String(value || '').replace(/\s+/g, '')
   });
 }
 
-function rowsFromWhaleText(text) {
+function lineWallets(text) {
   const rows = [];
   const seen = {};
+  const pending = [];
+  String(text || '').split(/\n/).forEach((line) => {
+    const addrM = line.match(/[A-Za-z0-9]{2,14}(?:\.{2,3}|\u2026)[A-Za-z0-9]{2,14}/);
+    if (!addrM) return;
+    const after = line.slice(addrM.index + addrM[0].length);
+    const amounts = [];
+    const re = /(\d+(?:\.\d+)?)\s*([KMB])\b/gi;
+    let m;
+    while ((m = re.exec(after))) amounts.push(m[1] + m[2].toUpperCase());
+    if (!amounts.length) return;
+    let pct = '';
+    const pctM = after.match(/(\d+(?:\.\d+)?)\s*%/);
+    if (pctM) pct = pctM[1];
+    else {
+      const bare = after.match(/(\d+(?:\.\d+)?)(?!\s*[KMB])/i);
+      if (bare && Number(bare[1]) > 0 && Number(bare[1]) <= 100) pct = bare[1];
+    }
+    const val = line.match(/\$\s*[0-9.,]+\s*[KMB]?/i);
+    pending.push({
+      addr: addrM[0].replace(/\u2026/g, '...'),
+      pct,
+      amounts,
+      value: val ? val[0].replace(/\s+/g, '') : ''
+    });
+  });
+  const freq = {};
+  pending.forEach((row) => row.amounts.forEach((a) => { freq[a] = (freq[a] || 0) + 1; }));
+  let supply = '';
+  Object.keys(freq).forEach((k) => {
+    if (freq[k] >= 3 && freq[k] > (freq[supply] || 0)) supply = k;
+  });
+  pending.forEach((row) => {
+    const holding = row.amounts.find((a) => a !== supply) || row.amounts[0];
+    pushWhaleRow(rows, seen, row.addr, row.pct, holding, row.value);
+  });
+  return rows;
+}
+
+function rowsFromWhaleText(text) {
   const parsed = looseObject(text);
+  const fromLines = lineWallets(text);
+  const fromJson = [];
+  const seen = {};
   const list = parsed && (parsed.rows || parsed.wallets);
   if (Array.isArray(list)) {
     list.forEach((row) => {
       if (!row || typeof row !== 'object') return;
-      pushWhaleRow(rows, seen, row.addr || row.address, row.pct != null ? row.pct : row.percent, row.amount || row.holding, row.value || row.usd);
+      pushWhaleRow(fromJson, seen, row.addr || row.address || row.wallet, row.pct != null ? row.pct : row.percent, row.amount || row.holding || row.tokens, row.value || row.usd);
     });
   }
-  const raw = String(text || '');
-  const re = /([A-Za-z0-9]{2,14}(?:\.{2,3}|\u2026)[A-Za-z0-9]{2,14})[^\n]{0,28}?(\d+(?:\.\d+)?)\s*%?[^\n]{0,40}?(\d+(?:\.\d+)?\s*[KMB])/gi;
-  let m;
-  while ((m = re.exec(raw))) {
-    const slice = raw.slice(m.index, m.index + 140);
-    const val = slice.match(/\$\s*[0-9.,]+\s*[KMB]?/i);
-    pushWhaleRow(rows, seen, m[1], m[2], m[3], val ? val[0] : '');
+  function score(rows) {
+    return rows.reduce((n, row) => n + 10 + (/\d\.\d/.test(row.amount) ? 3 : 0) + (row.pct ? 1 : 0), 0);
   }
+  const rows = score(fromLines) >= score(fromJson) ? fromLines : fromJson;
   let holders = parsed && Number(parsed.holders);
   let coin = parsed && parsed.coin ? String(parsed.coin) : '';
+  const raw = String(text || '');
   if (!holders) {
-    const hm = raw.match(/holders[^\d]{0,20}(\d{3,8})/i);
-    if (hm) holders = Number(hm[1]);
+    const hm = raw.match(/holders[^\d]{0,24}(\d{1,3}(?:,\d{3})+|\d{3,8})/i);
+    if (hm) holders = Number(String(hm[1]).replace(/,/g, ''));
   }
   if (!coin) {
     const cm = raw.match(/coin\s*[:\-]?\s*([A-Za-z0-9][^\n|]{1,32})/i);

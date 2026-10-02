@@ -321,7 +321,11 @@ function whaleCompare(earlier, later) {
         body: JSON.stringify({ image: b64 })
       });
       var data = await res.json();
-      if (!data || !data.ok || !data.rows || data.rows.length < 3) throw new Error((data && data.error) || 'Could not read wallets in that screenshot');
+      if (!data || !data.ok || !data.rows || data.rows.length < 3) {
+        var msg = (data && data.error) || 'Could not read wallets in that screenshot';
+        if (/json|double-quoted|unexpected token|position \d+/i.test(msg)) msg = 'Could not read that holders table. Crop to the Holders list and try again.';
+        throw new Error(msg);
+      }
       var rows = data.rows.map(function (row) {
         return { addr: row.addr, pct: isFinite(+row.pct) ? +row.pct : null, amount: row.amount, value: row.value || '', n: whaleParseAmt(row.amount) };
       }).filter(function (row) { return row.addr && row.n != null; });
