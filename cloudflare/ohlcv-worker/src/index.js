@@ -487,47 +487,146 @@ function stub(request) {
 }
 
 
-async function readWhaleShot(env, image) {
-  const model = '@cf/meta/llama-3.2-11b-vision-instruct';
-  const dataUrl = 'data:image/jpeg;base64,' + image;
-  const prompt = 'This image is a crypto holders table, usually Dexscreener. Read only rows you can actually see. Return JSON only, no markdown: {"coin":"","holders":0,"rows":[{"addr":"4R8...ZeNj","pct":4,"amount":"38.8M","value":"$127.4K"}]}. addr is the truncated address exactly as printed. amount and value are the printed labels. pct is the percent number. holders is the Holders count in the tab title, or 0 if it is not visible. coin is the token name in the header if visible. Do not invent wallets. Skip buttons and column titles.';
-  const input = {
-    messages: [
-      { role: 'system', content: 'You read holder tables from screenshots. Reply with JSON only.' },
-      { role: 'user', content: prompt }
-    ],
-    image: dataUrl,
-    max_tokens: 1200
-  };
-  let result;
-  try {
-    result = await env.AI.run(model, input);
-  } catch (err) {
-    const msg = String(err && err.message ? err.message : err);
-    if (!/5016|submit the prompt|hereby agree/i.test(msg)) throw err;
-    try { await env.AI.run(model, { prompt: 'agree' }); } catch (agreed) {
-      const thanks = String(agreed && agreed.message ? agreed.message : agreed);
-      if (!/thank you for agreeing|5016/i.test(thanks)) throw agreed;
-    }
-    result = await env.AI.run(model, input);
+function whaleModelText(result) {
+  if (typeof result === 'string') return result;
+  if (!result || typeof result !== 'object') return '';
+  const direct = result.response || result.description || result.result || result.output;
+  if (typeof direct === 'string') return direct;
+  if (direct && typeof direct === 'object' && typeof direct.response === 'string') return direct.response;
+  try { return JSON.stringify(direct != null ? direct : result); } catch (e) { return ''; }
+}
+
+function looseObject(text) {
+  const raw = String(text || '');
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  const body = raw.slice(start, end + 1);
+  const fixed = body
+    .replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:/g, '$1"$2":')
+    .replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, '"$1"')
+    .replace(/,\s*([}\]])/g, '$1');
+  for (const item of [body, fixed]) {
+    try { return JSON.parse(item); } catch (e) {}
   }
-  const text = typeof result === 'string' ? result : (result && (result.response || result.description || result.result)) || JSON.stringify(result || '');
-  const match = String(text).match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Could not read wallets in that screenshot');
-  const parsed = JSON.parse(match[0]);
-  const rows = Array.isArray(parsed.rows) ? parsed.rows : [];
-  const clean = rows.map((row) => ({
-    addr: String(row.addr || row.address || '').replace(/\s+/g, '').trim(),
-    pct: Number(row.pct),
-    amount: String(row.amount || '').trim(),
-    value: String(row.value || row.usd || '').trim()
-  })).filter((row) => row.addr && row.amount);
-  if (clean.length < 3) throw new Error('Need a holders table with at least 3 wallets');
+  return null;
+}
+
+function pushWhaleRow(rows, seen, addr, pct, amount, value) {
+  addr = String(addr || '').replace(/\s+/g, '').replace(/\u2026/g, '...');
+  amount = String(amount || '').replace(/\s+/g, '');
+  if (!/^[A-Za-z0-9]{2,14}\.\.\.[A-Za-z0-9]{2,14}$/.test(addr)) return;
+  const num = amount.match(/^(\d+(?:\.\d+)?)([KMB])$/i);
+  if (!num) return;
+  const key = addr.toLowerCase();
+  if (seen[key]) return;
+  seen[key] = 1;
+  rows.push({
+    addr,
+    pct: Number(pct),
+    amount: num[1] + num[2].toUpperCase(),
+    value: String(value || '').replace(/\s+/g, '')
+  });
+}
+
+function rowsFromWhaleText(text) {
+  const rows = [];
+  const seen = {};
+  const parsed = looseObject(text);
+  const list = parsed && (parsed.rows || parsed.wallets);
+  if (Array.isArray(list)) {
+    list.forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      pushWhaleRow(rows, seen, row.addr || row.address, row.pct != null ? row.pct : row.percent, row.amount || row.holding, row.value || row.usd);
+    });
+  }
+  const raw = String(text || '');
+  const re = /([A-Za-z0-9]{2,14}(?:\.{2,3}|\u2026)[A-Za-z0-9]{2,14})[^\n]{0,28}?(\d+(?:\.\d+)?)\s*%?[^\n]{0,40}?(\d+(?:\.\d+)?\s*[KMB])/gi;
+  let m;
+  while ((m = re.exec(raw))) {
+    const slice = raw.slice(m.index, m.index + 140);
+    const val = slice.match(/\$\s*[0-9.,]+\s*[KMB]?/i);
+    pushWhaleRow(rows, seen, m[1], m[2], m[3], val ? val[0] : '');
+  }
+  let holders = parsed && Number(parsed.holders);
+  let coin = parsed && parsed.coin ? String(parsed.coin) : '';
+  if (!holders) {
+    const hm = raw.match(/holders[^\d]{0,20}(\d{3,8})/i);
+    if (hm) holders = Number(hm[1]);
+  }
+  if (!coin) {
+    const cm = raw.match(/coin\s*[:\-]?\s*([A-Za-z0-9][^\n|]{1,32})/i);
+    if (cm) coin = cm[1].trim();
+  }
   return {
-    coin: String(parsed.coin || '').replace(/\s+/g, ' ').trim().slice(0, 40),
-    holders: Number(parsed.holders) || 0,
-    rows: clean.slice(0, 20)
+    rows,
+    holders: Number(holders) || 0,
+    coin: coin.replace(/\s+/g, ' ').trim().slice(0, 40)
   };
+}
+
+async function runWhaleVision(env, model, image, prompt) {
+  const dataUrl = 'data:image/jpeg;base64,' + image;
+  const attempts = [
+    {
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: dataUrl } }
+        ]
+      }],
+      max_tokens: 1600
+    },
+    {
+      messages: [
+        { role: 'system', content: 'You copy holder tables exactly. No markdown.' },
+        { role: 'user', content: prompt }
+      ],
+      image: dataUrl,
+      max_tokens: 1600
+    }
+  ];
+  let last = 'AI reader failed';
+  for (const input of attempts) {
+    try {
+      const result = await env.AI.run(model, input);
+      const text = whaleModelText(result);
+      if (text && text.length > 12) return text;
+    } catch (err) {
+      const msg = String(err && err.message ? err.message : err);
+      last = msg.slice(0, 160);
+      if (/5016|submit the prompt|hereby agree/i.test(msg)) {
+        try { await env.AI.run(model, { prompt: 'agree' }); } catch (e) {}
+        try {
+          const result = await env.AI.run(model, input);
+          const text = whaleModelText(result);
+          if (text && text.length > 12) return text;
+        } catch (e2) {
+          last = String(e2 && e2.message ? e2.message : e2).slice(0, 160);
+        }
+      }
+    }
+  }
+  throw new Error(last);
+}
+
+async function readWhaleShot(env, image) {
+  const prompt = 'Read the Holders table. First line: holders 16935. Second line: coin Jean Phil. Then one wallet per line: 4R8...ZeNj | 4.00 | 38.8M | $127.4K. Amount is the LEFT number in the AMOUNT column, the wallet holding. Ignore the supply number beside the grey bar. Do not invent rows.';
+  const models = ['@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/meta/llama-3.2-11b-vision-instruct'];
+  let text = '';
+  let last = 'Could not read wallets in that screenshot';
+  for (const model of models) {
+    try {
+      text = await runWhaleVision(env, model, image, prompt);
+      const shot = rowsFromWhaleText(text);
+      if (shot.rows.length >= 3) return { coin: shot.coin, holders: shot.holders, rows: shot.rows.slice(0, 20) };
+      last = 'Could not read wallets in that screenshot';
+    } catch (err) {
+      last = String(err && err.message ? err.message : err).slice(0, 160);
+    }
+  }
+  throw new Error(/json|double-quoted|position \d+/i.test(last) ? 'Could not read wallets in that screenshot' : last);
 }
 
 export default {
