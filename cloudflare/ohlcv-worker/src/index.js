@@ -536,7 +536,7 @@ function lineWallets(text) {
   String(text || '').split(/\n/).forEach((line) => {
     const addrM = line.match(/[A-Za-z0-9]{2,14}(?:\.{2,3}|\u2026)[A-Za-z0-9]{2,14}/);
     if (!addrM) return;
-    const after = line.slice(addrM.index + addrM[0].length);
+    const after = line.slice(addrM.index + addrM[0].length).replace(/\$\s*[0-9.,]+\s*[KMB]?/gi, ' ');
     const amounts = [];
     const re = /(\d+(?:\.\d+)?)\s*([KMB])\b/gi;
     let m;
@@ -651,8 +651,8 @@ async function runWhaleVision(env, model, image, prompt) {
 }
 
 async function readWhaleShot(env, image) {
-  const prompt = 'Read the Holders table. First line: holders 16935. Second line: coin Jean Phil. Then one wallet per line: 4R8...ZeNj | 4.00 | 38.8M | $127.4K. Amount is the LEFT number in the AMOUNT column, the wallet holding. Ignore the supply number beside the grey bar. Do not invent rows.';
-  const models = ['@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/meta/llama-3.2-11b-vision-instruct'];
+  const prompt = 'Copy the Holders table you see. Do not reuse this example. First line: holders 12345. Second line: coin Example. Then one wallet per line, amount is the token holding not the dollar value: AbC1...xYz9 | 1.25 | 12.3M | $50.0K. Ignore the supply number repeated beside the grey bar. Do not invent rows.';
+  const models = ['@cf/meta/llama-3.2-11b-vision-instruct', '@cf/meta/llama-4-scout-17b-16e-instruct'];
   let text = '';
   let raw = '';
   let last = 'Could not read wallets in that screenshot';
