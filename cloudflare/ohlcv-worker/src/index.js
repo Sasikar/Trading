@@ -486,6 +486,50 @@ function stub(request) {
   return new Request('https://ohlcv.local' + new URL(request.url).pathname + new URL(request.url).search, request);
 }
 
+
+async function readWhaleShot(env, image) {
+  const model = '@cf/meta/llama-3.2-11b-vision-instruct';
+  const dataUrl = 'data:image/jpeg;base64,' + image;
+  const prompt = 'This image is a crypto holders table, usually Dexscreener. Read only rows you can actually see. Return JSON only, no markdown: {"coin":"","holders":0,"rows":[{"addr":"4R8...ZeNj","pct":4,"amount":"38.8M","value":"$127.4K"}]}. addr is the truncated address exactly as printed. amount and value are the printed labels. pct is the percent number. holders is the Holders count in the tab title, or 0 if it is not visible. coin is the token name in the header if visible. Do not invent wallets. Skip buttons and column titles.';
+  const input = {
+    messages: [
+      { role: 'system', content: 'You read holder tables from screenshots. Reply with JSON only.' },
+      { role: 'user', content: prompt }
+    ],
+    image: dataUrl,
+    max_tokens: 1200
+  };
+  let result;
+  try {
+    result = await env.AI.run(model, input);
+  } catch (err) {
+    const msg = String(err && err.message ? err.message : err);
+    if (!/5016|submit the prompt|hereby agree/i.test(msg)) throw err;
+    try { await env.AI.run(model, { prompt: 'agree' }); } catch (agreed) {
+      const thanks = String(agreed && agreed.message ? agreed.message : agreed);
+      if (!/thank you for agreeing|5016/i.test(thanks)) throw agreed;
+    }
+    result = await env.AI.run(model, input);
+  }
+  const text = typeof result === 'string' ? result : (result && (result.response || result.description || result.result)) || JSON.stringify(result || '');
+  const match = String(text).match(/\{[\s\S]*\}/);
+  if (!match) throw new Error('Could not read wallets in that screenshot');
+  const parsed = JSON.parse(match[0]);
+  const rows = Array.isArray(parsed.rows) ? parsed.rows : [];
+  const clean = rows.map((row) => ({
+    addr: String(row.addr || row.address || '').replace(/\s+/g, '').trim(),
+    pct: Number(row.pct),
+    amount: String(row.amount || '').trim(),
+    value: String(row.value || row.usd || '').trim()
+  })).filter((row) => row.addr && row.amount);
+  if (clean.length < 3) throw new Error('Need a holders table with at least 3 wallets');
+  return {
+    coin: String(parsed.coin || '').replace(/\s+/g, ' ').trim().slice(0, 40),
+    holders: Number(parsed.holders) || 0,
+    rows: clean.slice(0, 20)
+  };
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -626,6 +670,18 @@ export default {
           return true;
         });
         return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
+    if (path === '/whale-read' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const image = String(body.image || '').replace(/^data:image\/\w+;base64,/, '').trim();
+        if (image.length < 40) throw new Error('No image');
+        if (!env.AI) throw new Error('AI is not on this worker');
+        const shot = await readWhaleShot(env, image);
+        return new Response(JSON.stringify({ ok: true, ...shot }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }

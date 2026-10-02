@@ -610,6 +610,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab active" data-tf="fe" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntryDesk&&window.showFomoEntryDesk(true);}catch(e){}">FomoEntry</button>
   <button type="button" class="tab" data-tf="keywords" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showKeywords&&window.showKeywords(true);}catch(e){}">Keywords</button>
   <button type="button" class="tab" data-tf="gnotes" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showGoldenNotes&&window.showGoldenNotes(true);}catch(e){}">Golden Notes</button>
+  <button type="button" class="tab" data-tf="whale" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showWhale&&window.showWhale(true);}catch(e){}">Whales</button>
   <button type="button" class="tab" data-tf="sleep" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showSleep&&window.showSleep(true);}catch(e){}">Healthy<span class="tab-sub">Sleep</span></button>
   <button type="button" class="tab" data-tf="memegate">MemeGate</button>
   <button type="button" class="tab" data-tf="coin">CA</button>
@@ -1035,6 +1036,17 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
       <div id="gn-pages"></div>
     </div>
     <div id="gn-list" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
+  </div>
+</section>
+</div>
+<div id="whale-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Whale Wallets</h2><p>One holders screenshot is one day. Pick two saved days to compare.</p></div>
+    <span class="source" id="wh-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="wh-app"></div>
   </div>
 </section>
 </div>
@@ -1703,5 +1715,6 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="gmgn-tab.js?v=20260923-pf1"></script>
 <script src="wallets-tab.js?v=20260923-pf1"></script>
 <script src="pumpfun-tab.js?v=20260923-pf2"></script>
+<script src="whale-tab.js?v=20261002-wh1"></script>
 <script src="site-nav.js?v=20261001-nodel"></script>
 </body></html>
