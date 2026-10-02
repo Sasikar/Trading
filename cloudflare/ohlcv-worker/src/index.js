@@ -659,6 +659,13 @@ async function readTopHolders(mint) {
   if (!reportRes.ok) throw new Error('Holder list is not available for that coin');
   const report = await reportRes.json();
   const list = Array.isArray(report.topHolders) ? report.topHolders : [];
+  const pools = {};
+  (Array.isArray(report.markets) ? report.markets : []).forEach((m) => {
+    if (!m) return;
+    if (m.pubkey) pools[m.pubkey] = 1;
+    if (m.liquidityAAccount && m.liquidityAAccount.owner) pools[m.liquidityAAccount.owner] = 1;
+    if (m.liquidityBAccount && m.liquidityBAccount.owner) pools[m.liquidityBAccount.owner] = 1;
+  });
   let price = 0;
   let pair = '';
   let symbol = (report.tokenMeta && (report.tokenMeta.symbol || report.tokenMeta.name)) || '';
@@ -684,7 +691,7 @@ async function readTopHolders(mint) {
       pct: isFinite(pct) ? Math.round(pct * 100) / 100 : null,
       n: isFinite(n) ? n : null,
       value: usd,
-      pool: !!(pair && owner === pair)
+      pool: !!(pools[owner] || (pair && owner === pair))
     };
   }).filter((row) => row.addr && row.n != null);
   if (rows.length < 3) throw new Error('That coin has no holder list yet');
