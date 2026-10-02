@@ -615,18 +615,22 @@ async function readWhaleShot(env, image) {
   const prompt = 'Read the Holders table. First line: holders 16935. Second line: coin Jean Phil. Then one wallet per line: 4R8...ZeNj | 4.00 | 38.8M | $127.4K. Amount is the LEFT number in the AMOUNT column, the wallet holding. Ignore the supply number beside the grey bar. Do not invent rows.';
   const models = ['@cf/meta/llama-4-scout-17b-16e-instruct', '@cf/meta/llama-3.2-11b-vision-instruct'];
   let text = '';
+  let raw = '';
   let last = 'Could not read wallets in that screenshot';
   for (const model of models) {
     try {
       text = await runWhaleVision(env, model, image, prompt);
       const shot = rowsFromWhaleText(text);
       if (shot.rows.length >= 3) return { coin: shot.coin, holders: shot.holders, rows: shot.rows.slice(0, 20) };
-      last = 'Could not read wallets in that screenshot';
+      raw = text.slice(0, 700);
     } catch (err) {
       last = String(err && err.message ? err.message : err).slice(0, 160);
+      if (err && err.raw) raw = String(err.raw).slice(0, 700);
     }
   }
-  throw new Error(/json|double-quoted|position \d+/i.test(last) ? 'Could not read wallets in that screenshot' : last);
+  const err = new Error(/json|double-quoted|position \d+/i.test(last) ? 'Could not read wallets in that screenshot' : last);
+  err.raw = raw;
+  throw err;
 }
 
 export default {
@@ -782,7 +786,7 @@ export default {
         const shot = await readWhaleShot(env, image);
         return new Response(JSON.stringify({ ok: true, ...shot }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
-        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180), raw: e && e.raw ? String(e.raw).slice(0, 700) : '' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
     }
     return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
