@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-02T02:03:41.133Z",
+  "updated": "2026-10-02T02:16:17.628Z",
   "days": {
     "2026-10-02": {
       "coin": "Example",
@@ -77,6 +77,83 @@
         }
       ],
       "t": 1790906619854
+    },
+    "2026-10-02|GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump": {
+      "coin": "JEANPHIL",
+      "mint": "GTBxUiw6wJdmmkCGZgRHLyYxqu1vG4KtRpeox6yDpump",
+      "rows": [
+        {
+          "addr": "4R8CiMnJWDNoes3fQi1ccPFJygPXazaHaWpHrN3rZeNj",
+          "pct": 5.02,
+          "n": 48697485.37983,
+          "value": null,
+          "pool": true
+        },
+        {
+          "addr": "JoeqiCNkuT2NnZWRbvnvMVEvWyFYC2xvvmemVMDw3N3",
+          "pct": 4.01,
+          "n": 38881659.268303,
+          "value": null,
+          "pool": false
+        },
+        {
+          "addr": "DSHEK6GuXDErBdGkC8Qd5NeBBbbfPkfm1WYRN5KSedi5",
+          "pct": 1.62,
+          "n": 15691195.245175,
+          "value": null,
+          "pool": false
+        },
+        {
+          "addr": "5u7PMsDxbaALbV9viti9Y4pEBVJqWSSp69uEsXGtiANq",
+          "pct": 1.59,
+          "n": 15384355.975406,
+          "value": null,
+          "pool": true
+        },
+        {
+          "addr": "83Y8aqfDxz8XSerVACBubyinHm8rQ6REg9j5YXvT8b57",
+          "pct": 1.46,
+          "n": 14145419.239877,
+          "value": null,
+          "pool": false
+        },
+        {
+          "addr": "5sAQHDFzem7erKy5u3H6zTU8dbrYjfkEzhgn3dnek5qe",
+          "pct": 1.38,
+          "n": 13409996.368835,
+          "value": null,
+          "pool": false
+        },
+        {
+          "addr": "5ioF1kj7RyFbtARwUhRSi9tFYc7nMoo46V4nFJeqGFsW",
+          "pct": 1.23,
+          "n": 11896409.602875,
+          "value": null,
+          "pool": false
+        },
+        {
+          "addr": "ASTyfSima4LLAdDgoFGkgqoKowG1LZFDr9fAQrg7iaJZ",
+          "pct": 1.16,
+          "n": 11226302.060613,
+          "value": null,
+          "pool": false
+        },
+        {
+          "addr": "DCRSAhR9Q4RVSKX19oc2Zq7j8qCw3V4X632etRRX8Lr4",
+          "pct": 1.09,
+          "n": 10585550.99895,
+          "value": null,
+          "pool": false
+        },
+        {
+          "addr": "EFeexw9qnf6Q9oTRQy3ZFTb86RJz33cT81deMBKiViSA",
+          "pct": 1.09,
+          "n": 10522169.550779,
+          "value": null,
+          "pool": false
+        }
+      ],
+      "t": 1790907376751
     }
   }
 }
