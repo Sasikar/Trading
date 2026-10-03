@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T10:28:09.852Z",
+  "updated": "2026-10-03T10:29:09.532Z",
   "topics": [
     {
       "id": "heart",
@@ -44,6 +44,12 @@
   ],
   "tabs": {
     "heart": [
+      {
+        "id": "mus923yyxbn2",
+        "text": "Lipoprotein(a) [Lp(a)] once in Life Time",
+        "url": "",
+        "t": 1791023348122
+      },
       {
         "id": "mus90u4yw2n6",
         "text": "Lipoprotein(a) [Lp(a)]",
