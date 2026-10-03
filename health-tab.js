@@ -56,12 +56,23 @@
     var map = {};
     (list || []).forEach(function (it) {
       if (!it || !it.id || !it.text || dead[it.id]) return;
-      var row = { id: String(it.id), text: String(it.text).replace(/\s+/g, ' ').trim().slice(0, 240), url: it.url ? String(it.url).slice(0, 400) : '', t: it.t || 0 };
+      var row = { id: String(it.id), text: String(it.text).replace(/\s+/g, ' ').trim().slice(0, 240), url: it.url ? String(it.url).slice(0, 400) : '', t: it.t || 0, ord: typeof it.ord === 'number' ? it.ord : null };
       if (!row.text) return;
       var prev = map[row.id];
+      if (prev && row.ord == null && typeof prev.ord === 'number') row.ord = prev.ord;
+      if (prev && prev.ord == null) prev.ord = null;
       if (!prev || row.t >= (prev.t || 0)) map[row.id] = row;
+      else if (prev.ord == null && typeof row.ord === 'number') prev.ord = row.ord;
     });
-    return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return (b.t || 0) - (a.t || 0); });
+    var rows = Object.keys(map).map(function (k) { return map[k]; });
+    rows.sort(function (a, b) {
+      var ao = typeof a.ord === 'number' ? a.ord : -1e12;
+      var bo = typeof b.ord === 'number' ? b.ord : -1e12;
+      if (ao !== bo) return ao - bo;
+      return (b.t || 0) - (a.t || 0);
+    });
+    rows.forEach(function (r, i) { r.ord = i; });
+    return rows;
   }
   function defaults() {
     return DEFAULTS.map(function (t) { return { id: t[0], name: t[1] }; });
@@ -145,7 +156,7 @@
       if (asking === it.id) {
         return '<li class="hl-row ask"><span>' + esc(it.text) + '</span><span class="hl-ask">Delete this?<button type="button" data-act="yes" data-id="' + esc(it.id) + '">Delete</button><button type="button" data-act="no">Keep</button></span></li>';
       }
-      return '<li class="hl-row"><span>' + esc(it.text) + (it.url ? ' <a class="hl-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">link</a>' : '') + '</span><span class="hl-actions"><button type="button" class="hl-pen" data-act="word-edit" data-id="' + esc(it.id) + '" aria-label="Edit">' + PENCIL + '</button><button type="button" class="hl-x" data-act="ask" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></span></li>';
+      return '<li class="hl-row" data-id="' + esc(it.id) + '"><button type="button" class="hl-grip" data-drag="' + esc(it.id) + '" aria-label="Drag to reorder"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M9 5h2v2H9zm4 0h2v2h-2zM9 11h2v2H9zm4 0h2v2h-2zM9 17h2v2H9zm4 0h2v2h-2z"/></svg></button><span>' + esc(it.text) + (it.url ? ' <a class="hl-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">link</a>' : '') + '</span><span class="hl-actions"><button type="button" class="hl-pen" data-act="word-edit" data-id="' + esc(it.id) + '" aria-label="Edit">' + PENCIL + '</button><button type="button" class="hl-x" data-act="ask" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></span></li>';
     }).join('');
     root.innerHTML =
       '<div class="hl-tabs">' + chips + '<button type="button" class="hl-tab add" data-act="add-topic">+ Topic</button></div>' +
@@ -210,7 +221,7 @@
     if (!text || !current) return;
     var list = tabs[current] || (tabs[current] = []);
     if (list.some(function (it) { return it.text.toLowerCase() === text.toLowerCase(); })) return;
-    list.unshift({ id: nid(), text: text, t: Date.now() });
+    list.unshift({ id: nid(), text: text, t: Date.now(), ord: -1 });
     saveLocal();
     paint();
     persist();
@@ -277,14 +288,69 @@
   if (!document.getElementById('hl-style')) {
     var css = document.createElement('style');
     css.id = 'hl-style';
-    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.hl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px 12px 14px;border-radius:16px;background:#10161f}.hl-row>span:first-child{font-weight:750;line-height:1.3}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}';
+    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.hl-dragging{opacity:.55;background:#1c2836}.hl-row{display:flex;align-items:center;gap:8px;padding:10px 12px 10px 4px;border-radius:16px;background:#10161f}.hl-row>span{flex:1;min-width:0;font-weight:750;line-height:1.3}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}';
     document.head.appendChild(css);
   }
   loadLocal();
   paint();
   var root = $('hl-app');
   if (root) {
-    root.addEventListener('click', function (ev) {
+    function applyOrder(ids) {
+    var list = tabs[current] || [];
+    var map = {};
+    list.forEach(function (it) { map[it.id] = it; });
+    var now = Date.now();
+    var next = [];
+    ids.forEach(function (id, i) {
+      var it = map[id];
+      if (!it) return;
+      it.ord = i;
+      it.t = now;
+      next.push(it);
+      delete map[id];
+    });
+    Object.keys(map).forEach(function (id) { next.push(map[id]); });
+    tabs[current] = next;
+    saveLocal();
+    persist();
+  }
+  var drag = null;
+  root.addEventListener('pointerdown', function (ev) {
+    var handle = ev.target && ev.target.closest && ev.target.closest('[data-drag]');
+    if (!handle) return;
+    var row = handle.closest('.hl-row');
+    if (!row) return;
+    drag = { row: row };
+    row.classList.add('hl-dragging');
+    try { handle.setPointerCapture(ev.pointerId); } catch (e) {}
+    ev.preventDefault();
+  });
+  root.addEventListener('pointermove', function (ev) {
+    if (!drag) return;
+    var rows = root.querySelectorAll('.hl-row[data-id]');
+    for (var i = 0; i < rows.length; i++) {
+      var over = rows[i];
+      if (over === drag.row) continue;
+      var box = over.getBoundingClientRect();
+      if (ev.clientY < box.top || ev.clientY > box.bottom) continue;
+      var list = drag.row.parentNode;
+      if (ev.clientY < box.top + box.height / 2) list.insertBefore(drag.row, over);
+      else list.insertBefore(drag.row, over.nextSibling);
+      break;
+    }
+  });
+  function endDrag() {
+    if (!drag) return;
+    drag.row.classList.remove('hl-dragging');
+    var ids = Array.prototype.map.call(root.querySelectorAll('.hl-row[data-id]'), function (row) {
+      return row.getAttribute('data-id');
+    });
+    drag = null;
+    applyOrder(ids);
+  }
+  root.addEventListener('pointerup', endDrag);
+  root.addEventListener('pointercancel', endDrag);
+  root.addEventListener('click', function (ev) {
       var tab = ev.target && ev.target.closest && ev.target.closest('[data-tab]');
       if (tab && !(ev.target.closest && ev.target.closest('[data-act]'))) {
         current = tab.getAttribute('data-tab') || current;
