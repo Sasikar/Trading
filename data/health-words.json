@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T10:31:31.154Z",
+  "updated": "2026-10-03T10:31:42.028Z",
   "topics": [
     {
       "id": "heart",
@@ -44,6 +44,12 @@
   ],
   "tabs": {
     "heart": [
+      {
+        "id": "mus95dsvpfz1",
+        "text": "High-Sensitivity C-Reactive Protein",
+        "url": "",
+        "t": 1791023500832
+      },
       {
         "id": "mus94m32kd29",
         "text": "CT Coronary Calcium Scoring",
