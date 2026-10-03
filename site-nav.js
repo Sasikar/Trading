@@ -3,7 +3,7 @@ if('serviceWorker' in navigator){
   navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
   if(window.caches)caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});
 }
-const primary=[['Overview','index.html',true],['Health','health.html?v=20261003-hl11',true],['Pulse','pulse.html',true],['Entry Window','index.html?tab=entrywindow',true],['Hunter','index.html?tab=hunter',true],['Holders','index.html?tab=holders',true],['Anti-FOMO','index.html?tab=antifomo',true],['Position','index.html?tab=position',true],['WOW DIP','index.html?tab=wowdip',true],['OMG','index.html?tab=omg',true],['Pitfalls','index.html?tab=pitfalls',true],['Strategy','index.html?tab=strategy',true],['Decision Check','index.html?tab=decision',true],['GMGN','index.html?tab=gmgn',true],['Pumpfun','index.html?tab=pumpfun',true],['Wallet tracker','index.html?tab=wallets',true],['Markets','watchlist.html',false],['Memes','memes.html',false],['MemeGate','index.html?tab=memegate',true],['Portfolio','portfolio.html',false],['Catalysts','market-catalysts.html',false],['Process','pre-entry-checklist.html',false],['Scanner','scanner.html',false],['Tax','tax-qa.html',false],['Goals','goals.html',false]];
+const primary=[['Overview','index.html',true],['Health','health.html?v=20261003-hl12',true],['Pulse','pulse.html',true],['Entry Window','index.html?tab=entrywindow',true],['Hunter','index.html?tab=hunter',true],['Holders','index.html?tab=holders',true],['Anti-FOMO','index.html?tab=antifomo',true],['Position','index.html?tab=position',true],['WOW DIP','index.html?tab=wowdip',true],['OMG','index.html?tab=omg',true],['Pitfalls','index.html?tab=pitfalls',true],['Strategy','index.html?tab=strategy',true],['Decision Check','index.html?tab=decision',true],['GMGN','index.html?tab=gmgn',true],['Pumpfun','index.html?tab=pumpfun',true],['Wallet tracker','index.html?tab=wallets',true],['Markets','watchlist.html',false],['Memes','memes.html',false],['MemeGate','index.html?tab=memegate',true],['Portfolio','portfolio.html',false],['Catalysts','market-catalysts.html',false],['Process','pre-entry-checklist.html',false],['Scanner','scanner.html',false],['Tax','tax-qa.html',false],['Goals','goals.html',false]];
 const current=(location.pathname.split('/').pop()||'index.html').toLowerCase();
 const tabQ=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
 const isActive=h=>{
@@ -32,10 +32,8 @@ document.body.insertBefore(nav,document.body.firstChild);
 const fresh=document.getElementById('site-fresh');
 if(fresh) fresh.addEventListener('click', function(){
   fresh.textContent='Refreshing…';
-  if ((location.pathname || '').toLowerCase().indexOf('health.html') >= 0) {
-    location.replace('health.html?v=' + Date.now());
-    return;
-  }
+  var page=(location.pathname.split('/').pop()||'index.html').split('?')[0]||'index.html';
+  if(!/\.html$/i.test(page)) page='index.html';
   var clears=[];
   if(navigator.serviceWorker) clears.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));
   if(window.caches) clears.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));
@@ -45,7 +43,7 @@ if(fresh) fresh.addEventListener('click', function(){
     var sha=j&&j.sha;
     if(!sha) throw new Error('no sha');
     var base='https://cdn.jsdelivr.net/gh/Sasikar/Trading@'+sha+'/';
-    return fetch(base+'index.html',{cache:'no-store'}).then(function(r){
+    return fetch(base+page+'?t='+Date.now(),{cache:'no-store'}).then(function(r){
       if(!r.ok) throw new Error('cdn');
       return r.text().then(function(html){
         return html.replace(/\s(src|href)="(?!https?:|\/\/|#|data:|mailto:)([^"]+)"/g,function(_m,attr,path){
@@ -54,11 +52,12 @@ if(fresh) fresh.addEventListener('click', function(){
       });
     });
   }).then(function(html){
-    if(!html || html.indexOf('id="tf-tabs"')<0) throw new Error('html');
-    sessionStorage.setItem('trading-refresh-html', html);
-    location.replace('index.html?boot='+Date.now());
+    if(!html || html.length<200) throw new Error('html');
+    document.open();
+    document.write(html);
+    document.close();
   }).catch(function(){
-    location.replace('index.html?boot='+Date.now());
+    location.replace(page+'?boot='+Date.now());
   });
 });
 if(!document.querySelector('script[src*="wallets-observe"]')){
