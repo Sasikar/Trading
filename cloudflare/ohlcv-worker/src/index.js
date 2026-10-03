@@ -768,6 +768,24 @@ async function healthPageText(url) {
   return { text, watched: false, titleOnly: false };
 }
 
+async function transcribeHealth(env, audio) {
+  const clean = String(audio || '').replace(/^data:audio\/[\w.+-]+;base64,/, '').trim();
+  if (clean.length < 80) throw new Error('No speech in that video');
+  const models = ['@cf/openai/whisper-large-v3-turbo', '@cf/openai/whisper'];
+  let last = 'Could not transcribe that video';
+  for (const model of models) {
+    try {
+      const result = await env.AI.run(model, { audio: clean, task: 'transcribe' });
+      const spoken = String((result && (result.text || result.transcription)) || whaleModelText(result) || '').replace(/\s+/g, ' ').trim();
+      if (spoken.length > 8) return spoken.slice(0, 8000);
+      last = 'No speech heard in that video';
+    } catch (err) {
+      last = String(err && err.message ? err.message : err).slice(0, 160);
+    }
+  }
+  throw new Error(last);
+}
+
 async function readHealthTips(env, body) {
   const allowed = (Array.isArray(body.topics) ? body.topics : []).map((t) => ({
     id: String(t && t.id || '').slice(0, 40),
@@ -777,12 +795,16 @@ async function readHealthTips(env, body) {
   if (!env.AI) throw new Error('AI is not on this worker');
   const image = String(body.image || '').replace(/^data:image\/\w+;base64,/, '').trim();
   const url = String(body.url || '').trim();
+  const spoken = String(body.audio || '').trim();
+  const pasted = String(body.text || '').trim();
   let source = null;
-  if (url) source = await healthPageText(url);
+  if (spoken) source = { text: await transcribeHealth(env, spoken), titleOnly: false };
+  else if (pasted) source = { text: pasted.slice(0, 8000), titleOnly: false };
+  else if (url) source = await healthPageText(url);
   if (!image && !source) throw new Error('Add a photo, video, or link');
   const menu = allowed.map((t) => t.id + '=' + t.name).join(', ');
   const prompt = (source
-    ? 'Source text: ' + source.text + '\n'
+    ? 'Source text from a health video or article: ' + source.text + '\n'
     : 'Read this health image. It may be a tip, a lab test, or a screenshot.\n') +
     'File only tips or tests that are actually there. Topics: ' + menu + '. Return JSON only: {"items":[{"tab":"foods","text":"one short tip"}]}. tab must be one of those ids. Do not invent advice. If nothing useful is readable, return {"items":[]}.';
   const model = image ? '@cf/meta/llama-3.2-11b-vision-instruct' : '@cf/meta/llama-3.1-8b-instruct';

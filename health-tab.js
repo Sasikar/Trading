@@ -415,6 +415,122 @@
       video.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Could not read that video')); };
     });
   }
+  function wavChunksFromBuffer(audio) {
+    var src = audio.getChannelData(0);
+    var srcRate = audio.sampleRate;
+    var rate = 16000;
+    var total = Math.max(1, Math.floor(src.length * rate / srcRate));
+    var span = rate * 45;
+    var chunks = [];
+    function sample(i) {
+      var at = Math.min(src.length - 1, Math.floor(i * srcRate / rate));
+      var s = src[at] || 0;
+      s = Math.max(-1, Math.min(1, s));
+      return s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    for (var start = 0; start < total; start += span) {
+      var n = Math.min(span, total - start);
+      var header = 44;
+      var bytes = new Uint8Array(header + n * 2);
+      var view = new DataView(bytes.buffer);
+      var write = function (off, str) { for (var k = 0; k < str.length; k++) bytes[off + k] = str.charCodeAt(k); };
+      write(0, 'RIFF');
+      view.setUint32(4, 36 + n * 2, true);
+      write(8, 'WAVEfmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, rate, true);
+      view.setUint32(28, rate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      write(36, 'data');
+      view.setUint32(40, n * 2, true);
+      for (var i = 0; i < n; i++) view.setInt16(header + i * 2, sample(start + i), true);
+      var bin = '';
+      for (var p = 0; p < bytes.length; p += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(p, p + 0x8000));
+      chunks.push(btoa(bin));
+    }
+    return chunks;
+  }
+  function speechFromFile(file, onTick) {
+    if (file.size > 40000000) return recordSpeech(file, onTick);
+    return file.arrayBuffer().then(function (buf) {
+      var ctx = new AudioContext();
+      return ctx.decodeAudioData(buf.slice(0)).then(function (audio) {
+        ctx.close();
+        return wavChunksFromBuffer(audio).slice(0, 4);
+      }).catch(function () {
+        ctx.close();
+        return recordSpeech(file, onTick);
+      });
+    });
+  }
+  function recordSpeech(file, onTick) {
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file);
+      var video = document.createElement('video');
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.src = url;
+      video.onloadedmetadata = function () {
+        var cap = Math.min(isFinite(video.duration) ? video.duration : 0, 180);
+        var stream = video.captureStream ? video.captureStream() : null;
+        var tracks = stream && stream.getAudioTracks ? stream.getAudioTracks() : [];
+        if (!cap || !tracks.length || !window.MediaRecorder) {
+          URL.revokeObjectURL(url);
+          resolve([]);
+          return;
+        }
+        var mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].filter(function (t) {
+          return MediaRecorder.isTypeSupported(t);
+        })[0] || '';
+        var rec;
+        try { rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime } : undefined); }
+        catch (e) { URL.revokeObjectURL(url); resolve([]); return; }
+        var chunks = [];
+        rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
+        rec.onstop = function () {
+          URL.revokeObjectURL(url);
+          var blob = new Blob(chunks, { type: mime || 'audio/webm' });
+          blob.arrayBuffer().then(function (buf) {
+            var ctx = new AudioContext();
+            return ctx.decodeAudioData(buf.slice(0)).then(function (audio) {
+              ctx.close();
+              resolve(wavChunksFromBuffer(audio).slice(0, 4));
+            });
+          }).catch(function () { resolve([]); });
+        };
+        try { rec.start(1000); } catch (e) { URL.revokeObjectURL(url); resolve([]); return; }
+        var timer = setInterval(function () {
+          if (onTick) onTick(video.currentTime || 0, cap);
+          if ((video.currentTime || 0) >= cap - 0.25) {
+            clearInterval(timer);
+            video.pause();
+            if (rec.state !== 'inactive') rec.stop();
+          }
+        }, 400);
+        video.onended = function () {
+          clearInterval(timer);
+          if (rec.state !== 'inactive') rec.stop();
+        };
+        video.play().catch(function () {
+          clearInterval(timer);
+          if (rec.state !== 'inactive') rec.stop();
+        });
+      };
+      video.onerror = function () { URL.revokeObjectURL(url); resolve([]); };
+    });
+  }
+  async function tipsFromSpeech(chunks) {
+    var items = [];
+    for (var i = 0; i < chunks.length; i++) {
+      dropStatus('Hearing the video ' + (i + 1) + ' of ' + chunks.length + '…');
+      var data = await askHealth({ audio: chunks[i] });
+      items = items.concat((data && data.items) || []);
+    }
+    return { items: items };
+  }
   async function readImages(images, note) {
     var merged = { items: [], titleOnly: false };
     for (var i = 0; i < images.length; i++) {
@@ -445,22 +561,39 @@
     fileInput.value = '';
     if (!files.length) return;
     dropStatus('Reading…');
-    var job = Promise.resolve([]);
-    var videos = 0;
+    var chain = Promise.resolve({ items: [] });
     files.forEach(function (file) {
-      job = job.then(function (images) {
+      chain = chain.then(function (acc) {
         if ((file.type || '').indexOf('video') === 0) {
-          videos += 1;
-          return videoFrames(file).then(function (frames) { return images.concat(frames); });
+          dropStatus('Listening to the video…');
+          return Promise.all([
+            videoFrames(file),
+            speechFromFile(file, function (now, cap) {
+              dropStatus('Listening ' + Math.round(now) + 's of ' + Math.round(cap) + 's…');
+            })
+          ]).then(function (pair) {
+            return readImages(pair[0] || [], 'Reading the picture').then(function (seen) {
+              return tipsFromSpeech(pair[1] || []).catch(function (err) {
+                acc.speechError = err && err.message;
+                return { items: [] };
+              }).then(function (heard) {
+                acc.items = acc.items.concat(seen.items || [], heard.items || []);
+                return acc;
+              });
+            });
+          });
         }
-        return imageJpeg(file).then(function (jpeg) { return images.concat([jpeg]); });
+        return imageJpeg(file).then(function (jpeg) {
+          return readImages([jpeg], 'Reading photo').then(function (seen) {
+            acc.items = acc.items.concat(seen.items || []);
+            return acc;
+          });
+        });
       });
     });
-    job.then(function (images) {
-      return readImages(images, videos ? 'Reading a moment' : 'Reading photo');
-    }).then(function (data) {
-      var msg = storeTips(data);
-      if (videos) msg += ' A few moments were read, not the whole video.';
+    chain.then(function (acc) {
+      var msg = storeTips(acc);
+      if (acc.speechError && (!acc.items || !acc.items.length)) msg = acc.speechError;
       dropStatus(msg);
     }).catch(function (e) {
       dropStatus((e && e.message) || 'Could not read that file');
