@@ -26,7 +26,11 @@
   var arranging = false;
   var foods = {};
   var habits = {};
+  var sections = ['food', 'habit', 'tests'];
   var section = 'tests';
+  var sectionStamp = 0;
+  var topicStamp = 0;
+  var SECTION_NAME = { food: 'Food', habit: 'Habit', tests: 'Tests' };
   var pickedDay = '';
   var calCursor = new Date();
   var coloring = '';
@@ -131,7 +135,14 @@
       if (!name) return;
       map[topic.id] = { id: String(topic.id), name: name };
     });
-    topics = Object.keys(map).map(function (k) { return map[k]; });
+    var seen = {};
+    var order = [];
+    (list || []).concat(defaults()).forEach(function (topic) {
+      if (!topic || !topic.id || seen[topic.id] || !map[topic.id]) return;
+      seen[topic.id] = true;
+      order.push(topic.id);
+    });
+    topics = order.map(function (id) { return map[id]; });
     if (!topics.length) topics = defaults().filter(function (t) { return !dead['topic:' + t.id]; });
     var next = {};
     topics.forEach(function (topic) {
@@ -150,6 +161,10 @@
       if (saved && saved.foods) foods = saved.foods;
       if (saved && saved.habits) habits = saved.habits;
       if (saved && saved.section) section = saved.section;
+      if (saved && saved.sections) sections = saved.sections;
+      if (saved && saved.sectionStamp) sectionStamp = saved.sectionStamp;
+      if (saved && saved.topicStamp) topicStamp = saved.topicStamp;
+      cleanSections();
       applyTopics((saved && saved.topics) || [], tabs, tombs());
       cleanFoods(tombs());
     } catch (e) {
@@ -157,7 +172,7 @@
     }
   }
   function saveLocal() {
-    try { localStorage.setItem(KEY, JSON.stringify({ current: current, section: section, topics: topics, tabs: tabs, foods: foods, habits: habits })); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify({ current: current, section: section, sections: sections, sectionStamp: sectionStamp, topicStamp: topicStamp, topics: topics, tabs: tabs, foods: foods, habits: habits })); } catch (e) {}
   }
   function setStatus(text) {
     var el = $('hl-status');
@@ -169,7 +184,10 @@
     topics.forEach(function (topic) { words[topic.id] = tabs[topic.id] || []; });
     var src = (remote && remote.tabs) || {};
     Object.keys(src).forEach(function (id) { words[id] = (words[id] || []).concat(src[id] || []); });
-    applyTopics(topics.concat((remote && remote.topics) || []), words, dead);
+    var remoteStamp = remote && remote.topicStamp || 0;
+    var orderedTopics = remoteStamp > topicStamp ? (remote.topics || []).concat(topics) : topics.concat((remote && remote.topics) || []);
+    if (remoteStamp > topicStamp) topicStamp = remoteStamp;
+    applyTopics(orderedTopics, words, dead);
     var foodWords = {};
     topics.forEach(function (topic) { foodWords[topic.id] = foods[topic.id] || []; });
     var fsrc = (remote && remote.foods) || {};
@@ -200,6 +218,23 @@
       });
     });
     habits = nextHabit;
+    var secStamp = remote && remote.sectionStamp || 0;
+    if (secStamp > sectionStamp) {
+      sections = (remote && remote.sections) || sections;
+      sectionStamp = secStamp;
+    }
+    cleanSections();
+  }
+  function cleanSections() {
+    var next = [];
+    (sections || []).forEach(function (id) {
+      if (SECTION_NAME[id] && next.indexOf(id) < 0) next.push(id);
+    });
+    ['food', 'habit', 'tests'].forEach(function (id) {
+      if (next.indexOf(id) < 0) next.push(id);
+    });
+    sections = next;
+    if (!SECTION_NAME[section]) section = sections[0];
   }
   function cleanFoods(dead) {
     var next = {};
@@ -285,7 +320,9 @@
       }).join('') + '</span>' : '';
       return '<li class="hl-row' + (arranging ? ' arrange' : '') + (swatch ? ' c-' + swatch : '') + '" data-id="' + esc(it.id) + '"' + (arranging ? ' data-drag="1"' : '') + '><span class="hl-name">' + esc(it.text) + (it.url ? ' <a class="hl-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">link</a>' : '') + '</span>' + actions + palette + '</li>';
     }).join('');
-    var secs = '<div class="hl-secs"><button type="button" class="hl-sec' + (section === 'food' ? ' on' : '') + '" data-act="sec" data-sec="food">Food</button><button type="button" class="hl-sec' + (section === 'habit' ? ' on' : '') + '" data-act="sec" data-sec="habit">Habit</button><button type="button" class="hl-sec' + (section === 'tests' ? ' on' : '') + '" data-act="sec" data-sec="tests">Tests</button></div>';
+    var secs = '<div class="hl-secs">' + sections.map(function (id) {
+      return '<button type="button" class="hl-sec' + (section === id ? ' on' : '') + '" data-act="sec" data-sec="' + id + '">' + SECTION_NAME[id] + '</button>';
+    }).join('') + '</div>';
     var body = section === 'habit'
       ? habitView()
       : '<form id="hl-form" class="hl-add"><input id="hl-input" maxlength="80" placeholder="' + (section === 'food' ? 'Add a food' : 'Add a test') + '" value="' + esc(draft) + '" autocomplete="off"><button type="submit">Add</button><span id="hl-status"></span></form>' +
@@ -332,7 +369,7 @@
       }
       var body = {
         message: 'Health words',
-        content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), topics: topics, tabs: tabs, foods: foods, habits: habits }, null, 2)))),
+        content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), topics: topics, topicStamp: topicStamp, sections: sections, sectionStamp: sectionStamp, tabs: tabs, foods: foods, habits: habits }, null, 2)))),
         branch: 'master'
       };
       if (sha) body.sha = sha;
@@ -426,7 +463,7 @@
   if (!document.getElementById('hl-style')) {
     var css = document.createElement('style');
     css.id = 'hl-style';
-    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%}.hl-row{display:flex;align-items:center;flex-wrap:wrap;width:100%;box-sizing:border-box;gap:8px;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}.hl-name{flex:1 1 auto;min-width:0;font-size:16px;font-weight:750;line-height:1.3;white-space:normal;overflow:visible}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}.hl-swatch,.hl-dot{width:32px;height:32px;border:0;border-radius:50%;padding:0;cursor:pointer;flex:0 0 auto}.hl-swatch.empty,.hl-dot.empty{background:conic-gradient(#e85d6a,#e8923a,#e6c878,#3ecf8e,#3ec6c0,#5b9dff,#a78bfa,#f472b6,#e85d6a)}.hl-palette{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:8px;padding-top:4px}.hl-dot{width:28px;height:28px}.hl-dot.on{box-shadow:0 0 0 2px #fff}.hl-row.c-red{background:#2a161b;box-shadow:inset 4px 0 0 #e85d6a}.hl-row.c-orange{background:#2a1c12;box-shadow:inset 4px 0 0 #e8923a}.hl-row.c-gold{background:#2a2414;box-shadow:inset 4px 0 0 #e6c878}.hl-row.c-green{background:#12241c;box-shadow:inset 4px 0 0 #3ecf8e}.hl-row.c-teal{background:#122426;box-shadow:inset 4px 0 0 #3ec6c0}.hl-row.c-blue{background:#142033;box-shadow:inset 4px 0 0 #5b9dff}.hl-row.c-purple{background:#1c1830;box-shadow:inset 4px 0 0 #a78bfa}.hl-row.c-pink{background:#2a1622;box-shadow:inset 4px 0 0 #f472b6}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.arrange{touch-action:none;outline:1px solid rgba(230,200,120,.45)}.hl-arrange{border:0;border-radius:999px;padding:8px 12px;background:#243044;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-arrange.on{background:#e6c878;color:#1a1406}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}.hl-secs{display:flex;gap:8px;margin-top:12px}.hl-sec{flex:1;border:0;border-radius:12px;padding:10px 8px;background:#17202b;color:#c5d0dc;font-weight:800;cursor:pointer}.hl-sec.on{background:#e6c878;color:#1a1406}.hl-cal{margin-top:12px;background:#10161f;border-radius:18px;padding:14px}.hl-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.hl-cal-head b{font-size:16px}.hl-cal-head button{width:36px;height:36px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:20px;cursor:pointer}.hl-week,.hl-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.hl-week{margin-bottom:6px}.hl-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.hl-day{aspect-ratio:1;border:0;border-radius:50%;background:#17202b;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-day.g{background:#1c6b45}.hl-day.y{background:#8a6a22}.hl-day.r{background:#8a3038}.hl-day.today{box-shadow:inset 0 0 0 2px #e6c878}.hl-day.on{box-shadow:0 0 0 2px #f4f7fb}.hl-marks{display:flex;gap:8px;margin-top:14px}.hl-marks button{flex:1;border:0;border-radius:12px;padding:10px 6px;font-weight:800;cursor:pointer;color:#1a1406}.hl-marks button[data-mark=green]{background:#3ecf8e}.hl-marks button[data-mark=yellow]{background:#e6c878}.hl-marks button[data-mark=red]{background:#e85d6a;color:#1a0c10}.hl-marks button[data-mark=""]{background:#243044;color:#f4f7fb}.hl-picked{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700;text-align:center}';
+    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:grab;white-space:nowrap;touch-action:none}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%}.hl-row{display:flex;align-items:center;flex-wrap:wrap;width:100%;box-sizing:border-box;gap:8px;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}.hl-name{flex:1 1 auto;min-width:0;font-size:16px;font-weight:750;line-height:1.3;white-space:normal;overflow:visible}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}.hl-swatch,.hl-dot{width:32px;height:32px;border:0;border-radius:50%;padding:0;cursor:pointer;flex:0 0 auto}.hl-swatch.empty,.hl-dot.empty{background:conic-gradient(#e85d6a,#e8923a,#e6c878,#3ecf8e,#3ec6c0,#5b9dff,#a78bfa,#f472b6,#e85d6a)}.hl-palette{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:8px;padding-top:4px}.hl-dot{width:28px;height:28px}.hl-dot.on{box-shadow:0 0 0 2px #fff}.hl-row.c-red{background:#2a161b;box-shadow:inset 4px 0 0 #e85d6a}.hl-row.c-orange{background:#2a1c12;box-shadow:inset 4px 0 0 #e8923a}.hl-row.c-gold{background:#2a2414;box-shadow:inset 4px 0 0 #e6c878}.hl-row.c-green{background:#12241c;box-shadow:inset 4px 0 0 #3ecf8e}.hl-row.c-teal{background:#122426;box-shadow:inset 4px 0 0 #3ec6c0}.hl-row.c-blue{background:#142033;box-shadow:inset 4px 0 0 #5b9dff}.hl-row.c-purple{background:#1c1830;box-shadow:inset 4px 0 0 #a78bfa}.hl-row.c-pink{background:#2a1622;box-shadow:inset 4px 0 0 #f472b6}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.arrange{touch-action:none;outline:1px solid rgba(230,200,120,.45)}.hl-arrange{border:0;border-radius:999px;padding:8px 12px;background:#243044;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-arrange.on{background:#e6c878;color:#1a1406}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}.hl-secs{display:flex;gap:8px;margin-top:12px}.hl-sec{flex:1;border:0;border-radius:12px;padding:10px 8px;background:#17202b;color:#c5d0dc;font-weight:800;cursor:grab;touch-action:none}.hl-sec.on{background:#e6c878;color:#1a1406}.hl-moving{opacity:.55}.hl-cal{margin-top:12px;background:#10161f;border-radius:18px;padding:14px}.hl-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.hl-cal-head b{font-size:16px}.hl-cal-head button{width:36px;height:36px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:20px;cursor:pointer}.hl-week,.hl-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.hl-week{margin-bottom:6px}.hl-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.hl-day{aspect-ratio:1;border:0;border-radius:50%;background:#17202b;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-day.g{background:#1c6b45}.hl-day.y{background:#8a6a22}.hl-day.r{background:#8a3038}.hl-day.today{box-shadow:inset 0 0 0 2px #e6c878}.hl-day.on{box-shadow:0 0 0 2px #f4f7fb}.hl-marks{display:flex;gap:8px;margin-top:14px}.hl-marks button{flex:1;border:0;border-radius:12px;padding:10px 6px;font-weight:800;cursor:pointer;color:#1a1406}.hl-marks button[data-mark=green]{background:#3ecf8e}.hl-marks button[data-mark=yellow]{background:#e6c878}.hl-marks button[data-mark=red]{background:#e85d6a;color:#1a0c10}.hl-marks button[data-mark=""]{background:#243044;color:#f4f7fb}.hl-picked{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700;text-align:center}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -454,7 +491,59 @@
     persist();
   }
   var drag = null;
+  var chipDrag = null;
+  var chipMoved = false;
+  function moveChip(ev) {
+    if (!chipDrag) return;
+    if (Math.abs(ev.clientX - chipDrag.x) + Math.abs(ev.clientY - chipDrag.y) > 8) chipMoved = true;
+    if (!chipMoved) return;
+    chipDrag.el.classList.add('hl-moving');
+    var sel = chipDrag.kind === 'sec' ? '.hl-sec[data-sec]' : '.hl-tab[data-tab]';
+    var nodes = root.querySelectorAll(sel);
+    for (var i = 0; i < nodes.length; i++) {
+      var over = nodes[i];
+      if (over === chipDrag.el) continue;
+      var box = over.getBoundingClientRect();
+      if (ev.clientX < box.left || ev.clientX > box.right || ev.clientY < box.top || ev.clientY > box.bottom) continue;
+      var ahead = ev.clientX < box.left + box.width / 2;
+      var parent = chipDrag.el.parentNode;
+      if (ahead) parent.insertBefore(chipDrag.el, over);
+      else parent.insertBefore(chipDrag.el, over.nextSibling);
+      break;
+    }
+    ev.preventDefault();
+  }
+  function endChip() {
+    if (!chipDrag) return;
+    chipDrag.el.classList.remove('hl-moving');
+    if (chipMoved) {
+      if (chipDrag.kind === 'sec') {
+        sections = Array.prototype.map.call(root.querySelectorAll('.hl-sec[data-sec]'), function (el) { return el.getAttribute('data-sec'); });
+        sectionStamp = Date.now();
+        cleanSections();
+      } else {
+        var ids = Array.prototype.map.call(root.querySelectorAll('.hl-tab[data-tab]'), function (el) { return el.getAttribute('data-tab'); });
+        var map = {};
+        topics.forEach(function (t) { map[t.id] = t; });
+        var next = [];
+        ids.forEach(function (id) { if (map[id]) { next.push(map[id]); delete map[id]; } });
+        Object.keys(map).forEach(function (id) { next.push(map[id]); });
+        topics = next;
+        topicStamp = Date.now();
+      }
+      saveLocal();
+      persist();
+    }
+    chipDrag = null;
+  }
   root.addEventListener('pointerdown', function (ev) {
+    var chip = ev.target && ev.target.closest && ev.target.closest('.hl-tab[data-tab], .hl-sec[data-sec]');
+    if (chip) {
+      chipDrag = { el: chip, x: ev.clientX, y: ev.clientY, kind: chip.hasAttribute('data-sec') ? 'sec' : 'topic' };
+      chipMoved = false;
+      try { chip.setPointerCapture(ev.pointerId); } catch (e) {}
+      return;
+    }
     if (ev.target && ev.target.closest && ev.target.closest('button, a, input, form')) return;
     var row = ev.target && ev.target.closest && ev.target.closest('.hl-row[data-drag]');
     if (!row) return;
@@ -464,6 +553,7 @@
     ev.preventDefault();
   });
   root.addEventListener('pointermove', function (ev) {
+    if (chipDrag) { moveChip(ev); return; }
     if (!drag) return;
     var rows = root.querySelectorAll('.hl-row[data-id]');
     for (var i = 0; i < rows.length; i++) {
@@ -478,6 +568,7 @@
     }
   });
   function endDrag() {
+    endChip();
     if (!drag) return;
     drag.row.classList.remove('hl-dragging');
     var ids = Array.prototype.map.call(root.querySelectorAll('.hl-row[data-id]'), function (row) {
@@ -489,6 +580,7 @@
   root.addEventListener('pointerup', endDrag);
   root.addEventListener('pointercancel', endDrag);
   root.addEventListener('click', function (ev) {
+      if (chipMoved) { chipMoved = false; return; }
       var tab = ev.target && ev.target.closest && ev.target.closest('[data-tab]');
       if (tab && !(ev.target.closest && ev.target.closest('[data-act]'))) {
         current = tab.getAttribute('data-tab') || current;
