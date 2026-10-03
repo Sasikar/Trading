@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T10:37:57.800Z",
+  "updated": "2026-10-03T10:39:31.142Z",
   "topics": [
     {
       "id": "heart",
@@ -40,6 +40,10 @@
     {
       "id": "water",
       "name": "Water"
+    },
+    {
+      "id": "bad-food",
+      "name": "Bad Food"
     }
   ],
   "tabs": {
@@ -89,6 +93,7 @@
     "sugars": [],
     "refined": [],
     "sleep": [],
-    "water": []
+    "water": [],
+    "bad-food": []
   }
 }
