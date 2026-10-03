@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T12:08:21.748Z",
+  "updated": "2026-10-03T12:08:54.661Z",
   "topics": [
     {
       "id": "heart",
@@ -60,77 +60,77 @@
         "id": "musbjb7n5ve0",
         "text": "Ceramide risk score (plasma ceramides, e.g. Mostly Available in US only",
         "url": "",
-        "t": 1791029300120,
+        "t": 1791029333315,
         "ord": 0
       },
       {
         "id": "musc916t1wxp",
         "text": "Natriuretic Peptides Test",
         "url": "",
-        "t": 1791029300120,
+        "t": 1791029333315,
         "ord": 1
       },
       {
         "id": "musbjtieg70f",
         "text": "Urine ACR (Urine Albumin-to-Creatinine Ratio",
         "url": "",
-        "t": 1791029300120,
+        "t": 1791029333315,
         "ord": 2
       },
       {
         "id": "musb6wrwvzaz",
         "text": "Vitamin B12 - Homocysteine",
         "url": "",
-        "t": 1791029300120,
+        "t": 1791029333315,
         "ord": 3
       },
       {
         "id": "musaz2aa3xm8",
         "text": "Carotid Doppler Ultrasound",
         "url": "",
-        "t": 1791029300120,
+        "t": 1791029333315,
         "ord": 4
-      },
-      {
-        "id": "mus9desp3snf",
-        "text": "Troponin I",
-        "url": "",
-        "t": 1791029300120,
-        "ord": 5
       },
       {
         "id": "mus9ajegscn3",
         "text": "NT-proBNP",
         "url": "",
-        "t": 1791029300120,
-        "ord": 6
+        "t": 1791029333315,
+        "ord": 5
       },
       {
         "id": "mus95s649mee",
         "text": "High-Sensitivity C-Reactive Protein ( HS crp)",
         "url": "",
-        "t": 1791029300120,
-        "ord": 7
+        "t": 1791029333315,
+        "ord": 6
       },
       {
         "id": "mus94m32kd29",
         "text": "CT Coronary Calcium Scoring",
         "url": "",
-        "t": 1791029300120,
+        "t": 1791029333315,
+        "ord": 7
+      },
+      {
+        "id": "mus9desp3snf",
+        "text": "Troponin I",
+        "url": "",
+        "t": 1791029333315,
         "ord": 8
       },
       {
         "id": "mus923yyxbn2",
         "text": "Lipoprotein(a) [Lp(a)] once in Life Time",
         "url": "",
-        "t": 1791029300120,
+        "t": 1791029333315,
         "ord": 9
       },
       {
         "id": "mus90998a6uz",
         "text": "Apolipoprotein B (ApoB)",
         "url": "",
-        "t": 1791029300120,
+        "t": 1791029333315,
         "ord": 10
       }
     ],
