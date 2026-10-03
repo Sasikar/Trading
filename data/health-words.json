@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T10:39:31.142Z",
+  "updated": "2026-10-03T10:39:42.187Z",
   "topics": [
     {
       "id": "heart",
@@ -94,6 +94,13 @@
     "refined": [],
     "sleep": [],
     "water": [],
-    "bad-food": []
+    "bad-food": [
+      {
+        "id": "mus9foklmxm5",
+        "text": "Processed Meat",
+        "url": "",
+        "t": 1791023981350
+      }
+    ]
   }
 }
