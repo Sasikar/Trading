@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T10:39:42.187Z",
+  "updated": "2026-10-03T11:22:46.226Z",
   "topics": [
     {
       "id": "heart",
@@ -48,6 +48,12 @@
   ],
   "tabs": {
     "heart": [
+      {
+        "id": "musaz2aa3xm8",
+        "text": "Carotid Doppler Ultrasound",
+        "url": "",
+        "t": 1791026565202
+      },
       {
         "id": "mus9desp3snf",
         "text": "Troponin I",
