@@ -24,6 +24,11 @@
   var editingWord = '';
   var topicMode = '';
   var arranging = false;
+  var foods = {};
+  var habits = {};
+  var section = 'tests';
+  var pickedDay = '';
+  var calCursor = new Date();
   var coloring = '';
   var COLORS = [
     ['', '#1a2330'],
@@ -100,8 +105,10 @@
     for (var i = 0; i < COLORS.length; i++) if (COLORS[i][0] === key) return COLORS[i][1];
     return COLORS[0][1];
   }
+  function lists() { return section === 'food' ? foods : tabs; }
   function setColor(id, name) {
-    var list = tabs[current] || [];
+    var box = lists();
+    var list = box[current] || [];
     var key = validColor(name);
     list.forEach(function (it) {
       if (it.id !== id) return;
@@ -140,13 +147,17 @@
       var saved = JSON.parse(localStorage.getItem(KEY) || '{}');
       if (saved && saved.current) current = saved.current;
       if (saved && saved.tabs) tabs = saved.tabs;
+      if (saved && saved.foods) foods = saved.foods;
+      if (saved && saved.habits) habits = saved.habits;
+      if (saved && saved.section) section = saved.section;
       applyTopics((saved && saved.topics) || [], tabs, tombs());
+      cleanFoods(tombs());
     } catch (e) {
       applyTopics([], {}, tombs());
     }
   }
   function saveLocal() {
-    try { localStorage.setItem(KEY, JSON.stringify({ current: current, topics: topics, tabs: tabs })); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify({ current: current, section: section, topics: topics, tabs: tabs, foods: foods, habits: habits })); } catch (e) {}
   }
   function setStatus(text) {
     var el = $('hl-status');
@@ -159,6 +170,46 @@
     var src = (remote && remote.tabs) || {};
     Object.keys(src).forEach(function (id) { words[id] = (words[id] || []).concat(src[id] || []); });
     applyTopics(topics.concat((remote && remote.topics) || []), words, dead);
+    var foodWords = {};
+    topics.forEach(function (topic) { foodWords[topic.id] = foods[topic.id] || []; });
+    var fsrc = (remote && remote.foods) || {};
+    Object.keys(fsrc).forEach(function (id) { foodWords[id] = (foodWords[id] || []).concat(fsrc[id] || []); });
+    foods = foodWords;
+    cleanFoods(dead);
+    var nextHabit = {};
+    function takeHabit(srcMap) {
+      Object.keys(srcMap || {}).forEach(function (topicId) {
+        var bag = srcMap[topicId] || {};
+        if (!nextHabit[topicId]) nextHabit[topicId] = {};
+        Object.keys(bag).forEach(function (day) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+          var row = bag[day] || {};
+          var c = row.c || '';
+          if (c !== 'red' && c !== 'yellow' && c !== 'green' && c !== '') return;
+          var t = row.t || 0;
+          var prev = nextHabit[topicId][day];
+          if (!prev || t >= (prev.t || 0)) nextHabit[topicId][day] = { c: c, t: t };
+        });
+      });
+    }
+    takeHabit(habits);
+    takeHabit(remote && remote.habits);
+    Object.keys(nextHabit).forEach(function (topicId) {
+      Object.keys(nextHabit[topicId]).forEach(function (day) {
+        if (!nextHabit[topicId][day].c) delete nextHabit[topicId][day];
+      });
+    });
+    habits = nextHabit;
+  }
+  function cleanFoods(dead) {
+    var next = {};
+    var ids = {};
+    topics.forEach(function (topic) { ids[topic.id] = true; });
+    Object.keys(foods || {}).forEach(function (id) { ids[id] = true; });
+    Object.keys(ids).forEach(function (id) {
+      next[id] = cleanList(foods[id] || [], dead || {});
+    });
+    foods = next;
   }
   function decodeContent(gj) {
     return JSON.parse(decodeURIComponent(escape(atob(String(gj.content || '').replace(/\s/g, '')))));
@@ -167,13 +218,45 @@
     for (var i = 0; i < topics.length; i++) if (topics[i].id === id) return topics[i];
     return null;
   }
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+  function isoDate(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function setHabit(day, color) {
+    if (!current || !/^\d{4}-\d{2}-\d{2}$/.test(day || '')) return;
+    var bag = habits[current] || (habits[current] = {});
+    if (color === 'red' || color === 'yellow' || color === 'green') bag[day] = { c: color, t: Date.now() };
+    else bag[day] = { c: '', t: Date.now() };
+    pickedDay = day;
+    saveLocal();
+    paint();
+    persist();
+  }
+  function habitView() {
+    var y = calCursor.getFullYear();
+    var m = calCursor.getMonth();
+    var names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    var first = new Date(y, m, 1);
+    var padN = (first.getDay() + 6) % 7;
+    var count = new Date(y, m + 1, 0).getDate();
+    var bag = habits[current] || {};
+    var today = isoDate(new Date());
+    var cells = '';
+    for (var i = 0; i < padN; i++) cells += '<span></span>';
+    for (var d = 1; d <= count; d++) {
+      var key = isoDate(new Date(y, m, d));
+      var mark = bag[key] && bag[key].c;
+      var cls = 'hl-day' + (mark === 'green' ? ' g' : mark === 'yellow' ? ' y' : mark === 'red' ? ' r' : '') + (key === today ? ' today' : '') + (key === pickedDay ? ' on' : '');
+      cells += '<button type="button" class="' + cls + '" data-act="day" data-date="' + key + '">' + d + '</button>';
+    }
+    var marks = pickedDay ? '<div class="hl-marks"><button type="button" data-act="mark" data-mark="green">Green</button><button type="button" data-act="mark" data-mark="yellow">Yellow</button><button type="button" data-act="mark" data-mark="red">Red</button><button type="button" data-act="mark" data-mark="">Clear</button></div><p class="hl-picked">' + pickedDay + '</p>' : '<p class="hl-picked">Tap a date, then pick a color.</p>';
+    return '<div class="hl-cal"><div class="hl-cal-head"><button type="button" data-act="month" data-dir="-1" aria-label="Previous month">‹</button><b>' + names[m] + ' ' + y + '</b><button type="button" data-act="month" data-dir="1" aria-label="Next month">›</button></div><div class="hl-week"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div><div class="hl-days">' + cells + '</div>' + marks + '</div>';
+  }
   function paint() {
     var root = $('hl-app');
     if (!root) return;
     var input = $('hl-input');
     var draft = input ? input.value : '';
     var topic = topicById(current);
-    var list = (topic && tabs[topic.id]) || [];
+    var list = (topic && (lists()[topic.id] || [])) || [];
     var chips = topics.map(function (t) {
       var n = (tabs[t.id] || []).length;
       return '<button type="button" class="hl-tab' + (t.id === current ? ' on' : '') + '" data-tab="' + esc(t.id) + '">' + esc(t.name) + (n ? '<i>' + n + '</i>' : '') + '</button>';
@@ -186,7 +269,7 @@
     } else if (topic && topicMode === 'drop') {
       menu = '<div class="hl-ask topic">Delete ' + esc(topic.name) + ' and its words?<button type="button" data-act="topic-yes">Delete</button><button type="button" data-act="topic-cancel">Keep</button></div>';
     } else if (topic) {
-      menu = '<div class="hl-tools"><b>' + esc(topic.name) + '</b><button type="button" class="hl-arrange' + (arranging ? ' on' : '') + '" data-act="' + (arranging ? 'arrange-done' : 'arrange') + '">' + (arranging ? 'Save order' : 'Arrange') + '</button><button type="button" class="hl-pen" data-act="rename" aria-label="Edit topic">' + PENCIL + '</button><button type="button" class="hl-x" data-act="drop" aria-label="Delete topic">×</button></div>';
+      menu = '<div class="hl-tools"><b>' + esc(topic.name) + '</b>' + (section === 'habit' ? '' : '<button type="button" class="hl-arrange' + (arranging ? ' on' : '') + '" data-act="' + (arranging ? 'arrange-done' : 'arrange') + '">' + (arranging ? 'Save order' : 'Arrange') + '</button>') + '<button type="button" class="hl-pen" data-act="rename" aria-label="Edit topic">' + PENCIL + '</button><button type="button" class="hl-x" data-act="drop" aria-label="Delete topic">×</button></div>';
     }
     var rows = list.map(function (it) {
       if (editingWord === it.id) {
@@ -202,11 +285,16 @@
       }).join('') + '</span>' : '';
       return '<li class="hl-row' + (arranging ? ' arrange' : '') + (swatch ? ' c-' + swatch : '') + '" data-id="' + esc(it.id) + '"' + (arranging ? ' data-drag="1"' : '') + '><span class="hl-name">' + esc(it.text) + (it.url ? ' <a class="hl-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">link</a>' : '') + '</span>' + actions + palette + '</li>';
     }).join('');
+    var secs = '<div class="hl-secs"><button type="button" class="hl-sec' + (section === 'food' ? ' on' : '') + '" data-act="sec" data-sec="food">Food</button><button type="button" class="hl-sec' + (section === 'habit' ? ' on' : '') + '" data-act="sec" data-sec="habit">Habit</button><button type="button" class="hl-sec' + (section === 'tests' ? ' on' : '') + '" data-act="sec" data-sec="tests">Tests</button></div>';
+    var body = section === 'habit'
+      ? habitView()
+      : '<form id="hl-form" class="hl-add"><input id="hl-input" maxlength="80" placeholder="' + (section === 'food' ? 'Add a food' : 'Add a test') + '" value="' + esc(draft) + '" autocomplete="off"><button type="submit">Add</button><span id="hl-status"></span></form>' +
+        (rows ? '<ul class="hl-list">' + rows + '</ul>' : '<p class="hl-empty">Nothing saved here yet.</p>');
     root.innerHTML =
       '<div class="hl-tabs">' + chips + '<button type="button" class="hl-tab add" data-act="add-topic">+ Topic</button></div>' +
       menu +
-      '<form id="hl-form" class="hl-add"><input id="hl-input" maxlength="80" placeholder="Add a keyword" value="' + esc(draft) + '" autocomplete="off"><button type="submit">Add</button><span id="hl-status"></span></form>' +
-      (rows ? '<ul class="hl-list">' + rows + '</ul>' : '<p class="hl-empty">Nothing saved in this topic yet.</p>');
+      secs +
+      body;
     var focus = topicMode ? $('hl-topic-name') : (draft ? $('hl-input') : null);
     if (focus) {
       focus.focus();
@@ -244,7 +332,7 @@
       }
       var body = {
         message: 'Health words',
-        content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), topics: topics, tabs: tabs }, null, 2)))),
+        content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), topics: topics, tabs: tabs, foods: foods, habits: habits }, null, 2)))),
         branch: 'master'
       };
       if (sha) body.sha = sha;
@@ -263,7 +351,8 @@
   function add(raw) {
     var text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 240);
     if (!text || !current) return;
-    var list = tabs[current] || (tabs[current] = []);
+    var box = lists();
+    var list = box[current] || (box[current] = []);
     if (list.some(function (it) { return it.text.toLowerCase() === text.toLowerCase(); })) return;
     list.unshift({ id: nid(), text: text, t: Date.now(), ord: -1 });
     saveLocal();
@@ -272,7 +361,8 @@
   }
   function remove(id) {
     markTomb(id, true);
-    tabs[current] = (tabs[current] || []).filter(function (it) { return it.id !== id; });
+    var box = lists();
+    box[current] = (box[current] || []).filter(function (it) { return it.id !== id; });
     asking = '';
     editingWord = '';
     saveLocal();
@@ -281,7 +371,7 @@
   }
   function saveWord(id, raw) {
     var text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 240);
-    var list = tabs[current] || [];
+    var list = (lists()[current]) || [];
     list.forEach(function (it) {
       if (it.id === id && text) { it.text = text; it.t = Date.now(); }
     });
@@ -299,6 +389,7 @@
     markTomb('topic:' + id, false);
     topics.push({ id: id, name: name });
     tabs[id] = [];
+    foods[id] = [];
     current = id;
     topicMode = '';
     saveLocal();
@@ -319,7 +410,10 @@
     if (!topic) return;
     markTomb('topic:' + topic.id, true);
     (tabs[topic.id] || []).forEach(function (it) { markTomb(it.id, true); });
+    (foods[topic.id] || []).forEach(function (it) { markTomb(it.id, true); });
     delete tabs[topic.id];
+    delete foods[topic.id];
+    delete habits[topic.id];
     topics = topics.filter(function (t) { return t.id !== topic.id; });
     current = topics[0] ? topics[0].id : '';
     topicMode = '';
@@ -332,7 +426,7 @@
   if (!document.getElementById('hl-style')) {
     var css = document.createElement('style');
     css.id = 'hl-style';
-    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%}.hl-row{display:flex;align-items:center;flex-wrap:wrap;width:100%;box-sizing:border-box;gap:8px;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}.hl-name{flex:1 1 auto;min-width:0;font-size:16px;font-weight:750;line-height:1.3;white-space:normal;overflow:visible}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}.hl-swatch,.hl-dot{width:32px;height:32px;border:0;border-radius:50%;padding:0;cursor:pointer;flex:0 0 auto}.hl-swatch.empty,.hl-dot.empty{background:conic-gradient(#e85d6a,#e8923a,#e6c878,#3ecf8e,#3ec6c0,#5b9dff,#a78bfa,#f472b6,#e85d6a)}.hl-palette{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:8px;padding-top:4px}.hl-dot{width:28px;height:28px}.hl-dot.on{box-shadow:0 0 0 2px #fff}.hl-row.c-red{background:#2a161b;box-shadow:inset 4px 0 0 #e85d6a}.hl-row.c-orange{background:#2a1c12;box-shadow:inset 4px 0 0 #e8923a}.hl-row.c-gold{background:#2a2414;box-shadow:inset 4px 0 0 #e6c878}.hl-row.c-green{background:#12241c;box-shadow:inset 4px 0 0 #3ecf8e}.hl-row.c-teal{background:#122426;box-shadow:inset 4px 0 0 #3ec6c0}.hl-row.c-blue{background:#142033;box-shadow:inset 4px 0 0 #5b9dff}.hl-row.c-purple{background:#1c1830;box-shadow:inset 4px 0 0 #a78bfa}.hl-row.c-pink{background:#2a1622;box-shadow:inset 4px 0 0 #f472b6}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.arrange{touch-action:none;outline:1px solid rgba(230,200,120,.45)}.hl-arrange{border:0;border-radius:999px;padding:8px 12px;background:#243044;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-arrange.on{background:#e6c878;color:#1a1406}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}';
+    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%}.hl-row{display:flex;align-items:center;flex-wrap:wrap;width:100%;box-sizing:border-box;gap:8px;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}.hl-name{flex:1 1 auto;min-width:0;font-size:16px;font-weight:750;line-height:1.3;white-space:normal;overflow:visible}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}.hl-swatch,.hl-dot{width:32px;height:32px;border:0;border-radius:50%;padding:0;cursor:pointer;flex:0 0 auto}.hl-swatch.empty,.hl-dot.empty{background:conic-gradient(#e85d6a,#e8923a,#e6c878,#3ecf8e,#3ec6c0,#5b9dff,#a78bfa,#f472b6,#e85d6a)}.hl-palette{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:8px;padding-top:4px}.hl-dot{width:28px;height:28px}.hl-dot.on{box-shadow:0 0 0 2px #fff}.hl-row.c-red{background:#2a161b;box-shadow:inset 4px 0 0 #e85d6a}.hl-row.c-orange{background:#2a1c12;box-shadow:inset 4px 0 0 #e8923a}.hl-row.c-gold{background:#2a2414;box-shadow:inset 4px 0 0 #e6c878}.hl-row.c-green{background:#12241c;box-shadow:inset 4px 0 0 #3ecf8e}.hl-row.c-teal{background:#122426;box-shadow:inset 4px 0 0 #3ec6c0}.hl-row.c-blue{background:#142033;box-shadow:inset 4px 0 0 #5b9dff}.hl-row.c-purple{background:#1c1830;box-shadow:inset 4px 0 0 #a78bfa}.hl-row.c-pink{background:#2a1622;box-shadow:inset 4px 0 0 #f472b6}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.arrange{touch-action:none;outline:1px solid rgba(230,200,120,.45)}.hl-arrange{border:0;border-radius:999px;padding:8px 12px;background:#243044;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-arrange.on{background:#e6c878;color:#1a1406}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}.hl-secs{display:flex;gap:8px;margin-top:12px}.hl-sec{flex:1;border:0;border-radius:12px;padding:10px 8px;background:#17202b;color:#c5d0dc;font-weight:800;cursor:pointer}.hl-sec.on{background:#e6c878;color:#1a1406}.hl-cal{margin-top:12px;background:#10161f;border-radius:18px;padding:14px}.hl-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.hl-cal-head b{font-size:16px}.hl-cal-head button{width:36px;height:36px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:20px;cursor:pointer}.hl-week,.hl-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.hl-week{margin-bottom:6px}.hl-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.hl-day{aspect-ratio:1;border:0;border-radius:50%;background:#17202b;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-day.g{background:#1c6b45}.hl-day.y{background:#8a6a22}.hl-day.r{background:#8a3038}.hl-day.today{box-shadow:inset 0 0 0 2px #e6c878}.hl-day.on{box-shadow:0 0 0 2px #f4f7fb}.hl-marks{display:flex;gap:8px;margin-top:14px}.hl-marks button{flex:1;border:0;border-radius:12px;padding:10px 6px;font-weight:800;cursor:pointer;color:#1a1406}.hl-marks button[data-mark=green]{background:#3ecf8e}.hl-marks button[data-mark=yellow]{background:#e6c878}.hl-marks button[data-mark=red]{background:#e85d6a;color:#1a0c10}.hl-marks button[data-mark=""]{background:#243044;color:#f4f7fb}.hl-picked{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700;text-align:center}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -340,7 +434,7 @@
   var root = $('hl-app');
   if (root) {
     function applyOrder(ids) {
-    var list = tabs[current] || [];
+    var list = (lists()[current]) || [];
     var map = {};
     list.forEach(function (it) { map[it.id] = it; });
     var now = Date.now();
@@ -354,7 +448,8 @@
       delete map[id];
     });
     Object.keys(map).forEach(function (id) { next.push(map[id]); });
-    tabs[current] = next;
+    var box = lists();
+    box[current] = next;
     saveLocal();
     persist();
   }
@@ -402,6 +497,7 @@
         topicMode = '';
         arranging = false;
         coloring = '';
+        pickedDay = '';
         saveLocal();
         paint();
         return;
@@ -424,6 +520,24 @@
         paint();
       }
       if (act === 'pick') setColor(b.getAttribute('data-id'), b.getAttribute('data-color'));
+      if (act === 'day') { pickedDay = b.getAttribute('data-date') || ''; paint(); }
+      if (act === 'mark') setHabit(pickedDay, b.getAttribute('data-mark') || '');
+      if (act === 'month') {
+        calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth() + Number(b.getAttribute('data-dir') || 0), 1);
+        pickedDay = '';
+        paint();
+      }
+      var sec = b.getAttribute('data-sec');
+      if (!sec && b.hasAttribute('data-sec')) sec = '';
+      if (b.hasAttribute('data-sec')) {
+        section = b.getAttribute('data-sec') || 'tests';
+        asking = '';
+        editingWord = '';
+        arranging = false;
+        coloring = '';
+        saveLocal();
+        paint();
+      }
       if (act === 'rename') { topicMode = 'rename'; paint(); }
       if (act === 'drop') { topicMode = 'drop'; paint(); }
       if (act === 'topic-yes') deleteTopic();
