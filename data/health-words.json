@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T10:35:43.075Z",
+  "updated": "2026-10-03T10:37:57.800Z",
   "topics": [
     {
       "id": "heart",
@@ -44,6 +44,12 @@
   ],
   "tabs": {
     "heart": [
+      {
+        "id": "mus9desp3snf",
+        "text": "Troponin I",
+        "url": "",
+        "t": 1791023875369
+      },
       {
         "id": "mus9ajegscn3",
         "text": "NT-proBNP",
