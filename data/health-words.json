@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T11:41:30.547Z",
+  "updated": "2026-10-03T11:58:31.477Z",
   "topics": [
     {
       "id": "heart",
@@ -56,6 +56,12 @@
   ],
   "tabs": {
     "heart": [
+      {
+        "id": "musc916t1wxp",
+        "text": "Natriuretic Peptides Test",
+        "url": "",
+        "t": 1791028709957
+      },
       {
         "id": "musbjb7n5ve0",
         "text": "Ceramide risk score (plasma ceramides, e.g. Mostly Available in US only",
