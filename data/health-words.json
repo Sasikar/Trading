@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-03T11:31:33.566Z",
+  "updated": "2026-10-03T11:32:07.989Z",
   "topics": [
     {
       "id": "heart",
@@ -123,6 +123,13 @@
       }
     ],
     "brain": [],
-    "habits": []
+    "habits": [
+      {
+        "id": "musbb3eaujnd",
+        "text": "500ml water after wakeup to make blood from thickness of non water entire night",
+        "url": "",
+        "t": 1791027126515
+      }
+    ]
   }
 }
