@@ -24,6 +24,18 @@
   var editingWord = '';
   var topicMode = '';
   var arranging = false;
+  var coloring = '';
+  var COLORS = [
+    ['', '#1a2330'],
+    ['red', '#e85d6a'],
+    ['orange', '#e8923a'],
+    ['gold', '#e6c878'],
+    ['green', '#3ecf8e'],
+    ['teal', '#3ec6c0'],
+    ['blue', '#5b9dff'],
+    ['purple', '#a78bfa'],
+    ['pink', '#f472b6']
+  ];
 
   function $(id) { return document.getElementById(id); }
   function token() {
@@ -56,13 +68,17 @@
     var map = {};
     (list || []).forEach(function (it) {
       if (!it || !it.id || !it.text || dead[it.id]) return;
-      var row = { id: String(it.id), text: String(it.text).replace(/\s+/g, ' ').trim().slice(0, 240), url: it.url ? String(it.url).slice(0, 400) : '', t: it.t || 0, ord: typeof it.ord === 'number' ? it.ord : null };
+      var color = validColor(it.color);
+      var row = { id: String(it.id), text: String(it.text).replace(/\s+/g, ' ').trim().slice(0, 240), url: it.url ? String(it.url).slice(0, 400) : '', t: it.t || 0, ord: typeof it.ord === 'number' ? it.ord : null, color: color };
       if (!row.text) return;
       var prev = map[row.id];
       if (prev && row.ord == null && typeof prev.ord === 'number') row.ord = prev.ord;
-      if (prev && prev.ord == null) prev.ord = null;
+      if (prev && !row.color && prev.color) row.color = prev.color;
       if (!prev || row.t >= (prev.t || 0)) map[row.id] = row;
-      else if (prev.ord == null && typeof row.ord === 'number') prev.ord = row.ord;
+      else {
+        if (prev.ord == null && typeof row.ord === 'number') prev.ord = row.ord;
+        if (!prev.color && row.color) prev.color = row.color;
+      }
     });
     var rows = Object.keys(map).map(function (k) { return map[k]; });
     rows.sort(function (a, b) {
@@ -73,6 +89,29 @@
     });
     rows.forEach(function (r, i) { r.ord = i; });
     return rows;
+  }
+  function validColor(name) {
+    var key = String(name || '');
+    for (var i = 0; i < COLORS.length; i++) if (COLORS[i][0] === key) return key;
+    return '';
+  }
+  function colorHex(name) {
+    var key = validColor(name);
+    for (var i = 0; i < COLORS.length; i++) if (COLORS[i][0] === key) return COLORS[i][1];
+    return COLORS[0][1];
+  }
+  function setColor(id, name) {
+    var list = tabs[current] || [];
+    var key = validColor(name);
+    list.forEach(function (it) {
+      if (it.id !== id) return;
+      it.color = key;
+      it.t = Date.now();
+    });
+    coloring = '';
+    saveLocal();
+    paint();
+    persist();
   }
   function defaults() {
     return DEFAULTS.map(function (t) { return { id: t[0], name: t[1] }; });
@@ -156,8 +195,12 @@
       if (asking === it.id) {
         return '<li class="hl-row ask"><span>' + esc(it.text) + '</span><span class="hl-ask">Delete this?<button type="button" data-act="yes" data-id="' + esc(it.id) + '">Delete</button><button type="button" data-act="no">Keep</button></span></li>';
       }
-      var actions = '<span class="hl-actions"><button type="button" class="hl-pen" data-act="word-edit" data-id="' + esc(it.id) + '" aria-label="Edit">' + PENCIL + '</button><button type="button" class="hl-x" data-act="ask" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></span>';
-      return '<li class="hl-row' + (arranging ? ' arrange' : '') + '" data-id="' + esc(it.id) + '"' + (arranging ? ' data-drag="1"' : '') + '><span class="hl-name">' + esc(it.text) + (it.url ? ' <a class="hl-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">link</a>' : '') + '</span>' + actions + '</li>';
+      var swatch = validColor(it.color);
+      var actions = '<span class="hl-actions"><button type="button" class="hl-swatch' + (swatch ? '' : ' empty') + '" data-act="color" data-id="' + esc(it.id) + '" style="' + (swatch ? 'background:' + colorHex(swatch) : '') + '" aria-label="Highlight color"></button><button type="button" class="hl-pen" data-act="word-edit" data-id="' + esc(it.id) + '" aria-label="Edit">' + PENCIL + '</button><button type="button" class="hl-x" data-act="ask" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></span>';
+      var palette = coloring === it.id ? '<span class="hl-palette">' + COLORS.map(function (c) {
+        return '<button type="button" class="hl-dot' + (c[0] === swatch ? ' on' : '') + (c[0] ? '' : ' empty') + '" data-act="pick" data-id="' + esc(it.id) + '" data-color="' + esc(c[0]) + '" style="' + (c[0] ? 'background:' + c[1] : '') + '" aria-label="' + (c[0] || 'None') + '"></button>';
+      }).join('') + '</span>' : '';
+      return '<li class="hl-row' + (arranging ? ' arrange' : '') + (swatch ? ' c-' + swatch : '') + '" data-id="' + esc(it.id) + '"' + (arranging ? ' data-drag="1"' : '') + '><span class="hl-name">' + esc(it.text) + (it.url ? ' <a class="hl-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">link</a>' : '') + '</span>' + actions + palette + '</li>';
     }).join('');
     root.innerHTML =
       '<div class="hl-tabs">' + chips + '<button type="button" class="hl-tab add" data-act="add-topic">+ Topic</button></div>' +
@@ -289,7 +332,7 @@
   if (!document.getElementById('hl-style')) {
     var css = document.createElement('style');
     css.id = 'hl-style';
-    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%}.hl-row{display:flex;align-items:center;width:100%;box-sizing:border-box;gap:8px;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}.hl-name{flex:1 1 auto;min-width:0;font-size:16px;font-weight:750;line-height:1.3;white-space:normal;overflow:visible}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.arrange{touch-action:none;outline:1px solid rgba(230,200,120,.45)}.hl-arrange{border:0;border-radius:999px;padding:8px 12px;background:#243044;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-arrange.on{background:#e6c878;color:#1a1406}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}';
+    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%}.hl-row{display:flex;align-items:center;flex-wrap:wrap;width:100%;box-sizing:border-box;gap:8px;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}.hl-name{flex:1 1 auto;min-width:0;font-size:16px;font-weight:750;line-height:1.3;white-space:normal;overflow:visible}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}.hl-swatch,.hl-dot{width:32px;height:32px;border:0;border-radius:50%;padding:0;cursor:pointer;flex:0 0 auto}.hl-swatch.empty,.hl-dot.empty{background:conic-gradient(#e85d6a,#e8923a,#e6c878,#3ecf8e,#3ec6c0,#5b9dff,#a78bfa,#f472b6,#e85d6a)}.hl-palette{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:8px;padding-top:4px}.hl-dot{width:28px;height:28px}.hl-dot.on{box-shadow:0 0 0 2px #fff}.hl-row.c-red{background:#2a161b;box-shadow:inset 4px 0 0 #e85d6a}.hl-row.c-orange{background:#2a1c12;box-shadow:inset 4px 0 0 #e8923a}.hl-row.c-gold{background:#2a2414;box-shadow:inset 4px 0 0 #e6c878}.hl-row.c-green{background:#12241c;box-shadow:inset 4px 0 0 #3ecf8e}.hl-row.c-teal{background:#122426;box-shadow:inset 4px 0 0 #3ec6c0}.hl-row.c-blue{background:#142033;box-shadow:inset 4px 0 0 #5b9dff}.hl-row.c-purple{background:#1c1830;box-shadow:inset 4px 0 0 #a78bfa}.hl-row.c-pink{background:#2a1622;box-shadow:inset 4px 0 0 #f472b6}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.arrange{touch-action:none;outline:1px solid rgba(230,200,120,.45)}.hl-arrange{border:0;border-radius:999px;padding:8px 12px;background:#243044;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-arrange.on{background:#e6c878;color:#1a1406}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -358,6 +401,7 @@
         editingWord = '';
         topicMode = '';
         arranging = false;
+        coloring = '';
         saveLocal();
         paint();
         return;
@@ -370,8 +414,16 @@
       if (act === 'yes') remove(b.getAttribute('data-id'));
       if (act === 'word-edit') { editingWord = b.getAttribute('data-id') || ''; asking = ''; paint(); }
       if (act === 'add-topic') { topicMode = 'add'; paint(); }
-      if (act === 'arrange') { arranging = true; asking = ''; editingWord = ''; paint(); }
+      if (act === 'arrange') { arranging = true; asking = ''; editingWord = ''; coloring = ''; paint(); }
       if (act === 'arrange-done') { arranging = false; paint(); }
+      if (act === 'color') {
+        var cid = b.getAttribute('data-id') || '';
+        coloring = coloring === cid ? '' : cid;
+        asking = '';
+        editingWord = '';
+        paint();
+      }
+      if (act === 'pick') setColor(b.getAttribute('data-id'), b.getAttribute('data-color'));
       if (act === 'rename') { topicMode = 'rename'; paint(); }
       if (act === 'drop') { topicMode = 'drop'; paint(); }
       if (act === 'topic-yes') deleteTopic();
