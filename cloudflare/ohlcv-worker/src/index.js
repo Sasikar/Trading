@@ -808,18 +808,58 @@ async function readHealthTips(env, body) {
     : 'Read this health image. It may be a tip, a lab test, or a screenshot.\n') +
     'File only tips or tests that are actually there. Topics: ' + menu + '. Return JSON only: {"items":[{"tab":"foods","text":"one short tip"}]}. tab must be one of those ids. Do not invent advice. If nothing useful is readable, return {"items":[]}.';
   const model = image ? '@cf/meta/llama-3.2-11b-vision-instruct' : '@cf/meta/llama-3.1-8b-instruct';
-  const input = image
-    ? { messages: [{ role: 'user', content: prompt }], image: 'data:image/jpeg;base64,' + image, max_tokens: 900 }
-    : { messages: [{ role: 'user', content: prompt }], max_tokens: 700 };
+  const dataUrl = image ? 'data:image/jpeg;base64,' + image : '';
+  const attempts = image
+    ? [
+      {
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            { type: 'image_url', image_url: { url: dataUrl } }
+          ]
+        }],
+        max_tokens: 900
+      },
+      {
+        messages: [
+          { role: 'system', content: 'You file health tips. Reply with JSON only.' },
+          { role: 'user', content: prompt }
+        ],
+        image: dataUrl,
+        max_tokens: 900
+      }
+    ]
+    : [{
+      messages: [
+        { role: 'system', content: 'You file health tips. Reply with JSON only.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 700
+    }];
   let result;
-  try {
-    result = await env.AI.run(model, input);
-  } catch (err) {
-    const msg = String(err && err.message ? err.message : err);
-    if (!/5016|submit the prompt|hereby agree/i.test(msg)) throw err;
-    try { await env.AI.run(model, { prompt: 'agree' }); } catch (e) {}
-    result = await env.AI.run(model, input);
+  let last = 'Could not read that';
+  for (const input of attempts) {
+    try {
+      result = await env.AI.run(model, input);
+      const got = whaleModelText(result);
+      if (got && got.length > 2) { last = ''; break; }
+    } catch (err) {
+      const msg = String(err && err.message ? err.message : err);
+      last = msg.slice(0, 180);
+      if (/5016|submit the prompt|hereby agree/i.test(msg)) {
+        try { await env.AI.run(model, { prompt: 'agree' }); } catch (e) {}
+        try {
+          result = await env.AI.run(model, input);
+          last = '';
+          break;
+        } catch (again) {
+          last = String(again && again.message ? again.message : again).slice(0, 180);
+        }
+      }
+    }
   }
+  if (last) throw new Error(/3030|no user-supplied/i.test(last) ? 'The photo could not be read. Try a smaller image.' : last);
   const text = whaleModelText(result);
   const parsed = looseObject(text) || {};
   const list = parsed.items || parsed.tips || parsed.notes || [];
