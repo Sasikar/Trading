@@ -720,6 +720,104 @@ async function readWhaleShot(env, image) {
   throw err;
 }
 
+async function healthPageText(url) {
+  let parsed;
+  try { parsed = new URL(url); } catch (e) { throw new Error('That link is not valid'); }
+  if (!/^https?:$/.test(parsed.protocol)) throw new Error('That link is not valid');
+  const href = parsed.toString();
+  const host = parsed.hostname.replace(/^www\./, '');
+  const pull = async (target, accept) => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      return await fetch(target, { signal: ctrl.signal, redirect: 'follow', headers: { accept: accept || 'text/html', 'user-agent': 'Mozilla/5.0' } });
+    } finally { clearTimeout(timer); }
+  };
+  if (/youtu\.be$|youtube\.com$|youtube-nocookie\.com$/i.test(host)) {
+    try {
+      const page = await pull(href, 'text/html');
+      if (page.ok) {
+        const html = (await page.text()).slice(0, 400000);
+        const raw = html.match(/"shortDescription":"((?:\\.|[^"\\])*)"/);
+        if (raw) {
+          const desc = JSON.parse('"' + raw[1] + '"').replace(/\s+/g, ' ').trim();
+          if (desc.length > 40) return { text: desc.slice(0, 1800), watched: false, titleOnly: false };
+        }
+      }
+    } catch (e) {}
+    const oe = await pull('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(href), 'application/json');
+    if (!oe.ok) throw new Error('Could not read that video link');
+    const data = await oe.json();
+    const title = String(data.title || '').replace(/\s+/g, ' ').trim();
+    if (!title) throw new Error('That video has no readable title');
+    return { text: title, watched: false, titleOnly: true };
+  }
+  const res = await pull(href, 'text/html');
+  if (!res.ok) throw new Error('Could not open that link');
+  const html = (await res.text()).slice(0, 250000);
+  const pick = (re) => {
+    const m = html.match(re);
+    return m ? m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+  };
+  const text = [
+    pick(/<title[^>]*>([\s\S]*?)<\/title>/i),
+    pick(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)/i) || pick(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i),
+    pick(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)/i)
+  ].filter(Boolean).join('. ').slice(0, 1800);
+  if (text.length < 8) throw new Error('That link has no readable text');
+  return { text, watched: false, titleOnly: false };
+}
+
+async function readHealthTips(env, body) {
+  const allowed = (Array.isArray(body.topics) ? body.topics : []).map((t) => ({
+    id: String(t && t.id || '').slice(0, 40),
+    name: String(t && t.name || '').replace(/\s+/g, ' ').trim().slice(0, 24)
+  })).filter((t) => t.id && t.name).slice(0, 24);
+  if (!allowed.length) throw new Error('Add a health topic first');
+  if (!env.AI) throw new Error('AI is not on this worker');
+  const image = String(body.image || '').replace(/^data:image\/\w+;base64,/, '').trim();
+  const url = String(body.url || '').trim();
+  let source = null;
+  if (url) source = await healthPageText(url);
+  if (!image && !source) throw new Error('Add a photo, video, or link');
+  const menu = allowed.map((t) => t.id + '=' + t.name).join(', ');
+  const prompt = (source
+    ? 'Source text: ' + source.text + '\n'
+    : 'Read this health image. It may be a tip, a lab test, or a screenshot.\n') +
+    'File only tips or tests that are actually there. Topics: ' + menu + '. Return JSON only: {"items":[{"tab":"foods","text":"one short tip"}]}. tab must be one of those ids. Do not invent advice. If nothing useful is readable, return {"items":[]}.';
+  const model = image ? '@cf/meta/llama-3.2-11b-vision-instruct' : '@cf/meta/llama-3.1-8b-instruct';
+  const input = image
+    ? { messages: [{ role: 'user', content: prompt }], image: 'data:image/jpeg;base64,' + image, max_tokens: 900 }
+    : { messages: [{ role: 'user', content: prompt }], max_tokens: 700 };
+  let result;
+  try {
+    result = await env.AI.run(model, input);
+  } catch (err) {
+    const msg = String(err && err.message ? err.message : err);
+    if (!/5016|submit the prompt|hereby agree/i.test(msg)) throw err;
+    try { await env.AI.run(model, { prompt: 'agree' }); } catch (e) {}
+    result = await env.AI.run(model, input);
+  }
+  const text = whaleModelText(result);
+  const parsed = looseObject(text) || {};
+  const list = parsed.items || parsed.tips || parsed.notes || [];
+  const ids = {};
+  allowed.forEach((t) => { ids[t.id.toLowerCase()] = t.id; ids[t.name.toLowerCase()] = t.id; });
+  const seen = {};
+  const items = (Array.isArray(list) ? list : []).map((row) => {
+    if (!row || typeof row !== 'object') return null;
+    const key = String(row.tab || row.topic || '').toLowerCase().trim();
+    const tab = ids[key];
+    const tip = String(row.text || row.tip || row.note || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+    if (!tab || tip.length < 3) return null;
+    const mark = tab + '|' + tip.toLowerCase();
+    if (seen[mark]) return null;
+    seen[mark] = 1;
+    return { tab, text: tip, url: url || '' };
+  }).filter(Boolean).slice(0, 12);
+  return { items, titleOnly: !!(source && source.titleOnly) };
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -860,6 +958,15 @@ export default {
           return true;
         });
         return new Response(JSON.stringify({ ok: true, notes }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
+    }
+    if (path === '/health-read' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        const data = await readHealthTips(env, body);
+        return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }

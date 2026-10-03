@@ -55,7 +55,7 @@
     var map = {};
     (list || []).forEach(function (it) {
       if (!it || !it.id || !it.text || dead[it.id]) return;
-      var row = { id: String(it.id), text: String(it.text).replace(/\s+/g, ' ').trim().slice(0, 80), t: it.t || 0 };
+      var row = { id: String(it.id), text: String(it.text).replace(/\s+/g, ' ').trim().slice(0, 240), url: it.url ? String(it.url).slice(0, 400) : '', t: it.t || 0 };
       if (!row.text) return;
       var prev = map[row.id];
       if (!prev || row.t >= (prev.t || 0)) map[row.id] = row;
@@ -144,7 +144,7 @@
       if (asking === it.id) {
         return '<li class="hl-row ask"><span>' + esc(it.text) + '</span><span class="hl-ask">Delete this?<button type="button" data-act="yes" data-id="' + esc(it.id) + '">Delete</button><button type="button" data-act="no">Keep</button></span></li>';
       }
-      return '<li class="hl-row"><span>' + esc(it.text) + '</span><span class="hl-actions"><button type="button" class="hl-pen" data-act="word-edit" data-id="' + esc(it.id) + '" aria-label="Edit">Edit</button><button type="button" class="hl-x" data-act="ask" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></span></li>';
+      return '<li class="hl-row"><span>' + esc(it.text) + (it.url ? ' <a class="hl-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">link</a>' : '') + '</span><span class="hl-actions"><button type="button" class="hl-pen" data-act="word-edit" data-id="' + esc(it.id) + '" aria-label="Edit">Edit</button><button type="button" class="hl-x" data-act="ask" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></span></li>';
     }).join('');
     root.innerHTML =
       '<div class="hl-tabs">' + chips + '<button type="button" class="hl-tab add" data-act="add-topic">+ Topic</button></div>' +
@@ -205,7 +205,7 @@
     }
   }
   function add(raw) {
-    var text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    var text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 240);
     if (!text || !current) return;
     var list = tabs[current] || (tabs[current] = []);
     if (list.some(function (it) { return it.text.toLowerCase() === text.toLowerCase(); })) return;
@@ -224,7 +224,7 @@
     persist();
   }
   function saveWord(id, raw) {
-    var text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    var text = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 240);
     var list = tabs[current] || [];
     list.forEach(function (it) {
       if (it.id === id && text) { it.text = text; it.t = Date.now(); }
@@ -276,7 +276,7 @@
   if (!document.getElementById('hl-style')) {
     var css = document.createElement('style');
     css.id = 'hl-style';
-    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.hl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px 12px 14px;border-radius:16px;background:#10161f}.hl-row>span:first-child{font-weight:750;line-height:1.3}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}.hl-pen{border:0;border-radius:999px;padding:7px 10px;background:#243044;color:#d5dde8;font-weight:800;cursor:pointer}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-empty{color:#8b95a5;font-weight:700}';
+    css.textContent = '#hl-app{color:#f4f7fb;overflow:hidden}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}.hl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 12px 12px 14px;border-radius:16px;background:#10161f}.hl-row>span:first-child{font-weight:750;line-height:1.3}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto}.hl-pen{border:0;border-radius:999px;padding:7px 10px;background:#243044;color:#d5dde8;font-weight:800;cursor:pointer}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -326,6 +326,146 @@
       }
     });
   }
+  function dropStatus(text) {
+    var el = $('hl-drop-status');
+    if (el) el.textContent = text || '';
+  }
+  function topicPayload() {
+    return topics.map(function (t) { return { id: t.id, name: t.name }; });
+  }
+  async function askHealth(payload) {
+    var res = await fetch('https://trading-ohlcv.sasipudi.workers.dev/health-read', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(Object.assign({ topics: topicPayload() }, payload))
+    });
+    var data = await res.json();
+    if (!data || !data.ok) throw new Error((data && data.error) || 'Could not read that');
+    return data;
+  }
+  function storeTips(data) {
+    var names = {};
+    var count = 0;
+    (data.items || []).forEach(function (it) {
+      if (!it || !tabs[it.tab]) return;
+      var text = String(it.text || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+      if (text.length < 3) return;
+      var list = tabs[it.tab];
+      if (list.some(function (row) { return row.text.toLowerCase() === text.toLowerCase(); })) return;
+      list.unshift({ id: nid(), text: text, url: it.url || '', t: Date.now() });
+      var topic = topicById(it.tab);
+      names[topic ? topic.name : it.tab] = 1;
+      count += 1;
+    });
+    if (!count) return data.titleOnly ? 'Only the title was readable, and it had no tip to file. The video itself was not watched.' : 'Nothing useful to file.';
+    saveLocal();
+    paint();
+    persist();
+    return 'Added ' + count + ' to ' + Object.keys(names).join(', ') + (data.titleOnly ? '. Only the title was read, not the video.' : '.');
+  }
+  function jpegFromCanvas(canvas) {
+    return canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+  }
+  function imageJpeg(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var url = URL.createObjectURL(file);
+      img.onload = function () {
+        var scale = Math.min(1, 1000 / Math.max(img.width, img.height));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(img.width * scale));
+        canvas.height = Math.max(1, Math.round(img.height * scale));
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(jpegFromCanvas(canvas));
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Could not read that image')); };
+      img.src = url;
+    });
+  }
+  function videoFrames(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var video = document.createElement('video');
+      video.preload = 'auto';
+      video.muted = true;
+      video.playsInline = true;
+      video.src = url;
+      video.onloadeddata = function () {
+        var duration = video.duration || 0;
+        if (!duration || !isFinite(duration)) duration = 1;
+        var marks = [0.08, 0.35, 0.62, 0.88].map(function (p) { return Math.min(duration * p, Math.max(0, duration - 0.05)); });
+        var shots = [];
+        var i = 0;
+        video.onseeked = function () {
+          var canvas = document.createElement('canvas');
+          var w = video.videoWidth || 640;
+          var h = video.videoHeight || 360;
+          var scale = Math.min(1, 900 / Math.max(w, h));
+          canvas.width = Math.max(1, Math.round(w * scale));
+          canvas.height = Math.max(1, Math.round(h * scale));
+          canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+          shots.push(jpegFromCanvas(canvas));
+          i += 1;
+          if (i < marks.length) video.currentTime = marks[i];
+          else { URL.revokeObjectURL(url); resolve(shots); }
+        };
+        video.currentTime = marks[0];
+      };
+      video.onerror = function () { URL.revokeObjectURL(url); reject(new Error('Could not read that video')); };
+    });
+  }
+  async function readImages(images, note) {
+    var merged = { items: [], titleOnly: false };
+    for (var i = 0; i < images.length; i++) {
+      dropStatus((note || 'Reading') + ' ' + (i + 1) + ' of ' + images.length + '…');
+      var data = await askHealth({ image: images[i] });
+      merged.items = merged.items.concat(data.items || []);
+    }
+    return merged;
+  }
+  var linkForm = $('hl-link');
+  if (linkForm) linkForm.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var input = $('hl-url');
+    var url = input && input.value.trim();
+    if (!url) return;
+    dropStatus('Reading the link…');
+    askHealth({ url: url }).then(function (data) {
+      if (input) input.value = '';
+      (data.items || []).forEach(function (it) { it.url = it.url || url; });
+      dropStatus(storeTips(data));
+    }).catch(function (e) {
+      dropStatus((e && e.message) || 'Could not read that link');
+    });
+  });
+  var fileInput = $('hl-file');
+  if (fileInput) fileInput.addEventListener('change', function () {
+    var files = Array.prototype.slice.call(fileInput.files || []);
+    fileInput.value = '';
+    if (!files.length) return;
+    dropStatus('Reading…');
+    var job = Promise.resolve([]);
+    var videos = 0;
+    files.forEach(function (file) {
+      job = job.then(function (images) {
+        if ((file.type || '').indexOf('video') === 0) {
+          videos += 1;
+          return videoFrames(file).then(function (frames) { return images.concat(frames); });
+        }
+        return imageJpeg(file).then(function (jpeg) { return images.concat([jpeg]); });
+      });
+    });
+    job.then(function (images) {
+      return readImages(images, videos ? 'Reading a moment' : 'Reading photo');
+    }).then(function (data) {
+      var msg = storeTips(data);
+      if (videos) msg += ' A few moments were read, not the whole video.';
+      dropStatus(msg);
+    }).catch(function (e) {
+      dropStatus((e && e.message) || 'Could not read that file');
+    });
+  });
   fetch(PATH + '?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
     return res.ok ? res.json() : null;
   }).then(function (data) {
