@@ -598,7 +598,17 @@
         return;
       }
       var b = ev.target && ev.target.closest && ev.target.closest('[data-act]');
-      if (!b) return;
+      if (!b) {
+        var name = ev.target && ev.target.closest && ev.target.closest('.hl-name');
+        var row = name && name.closest('.hl-row[data-id]');
+        if (row && !arranging && !(ev.target.closest && ev.target.closest('a'))) {
+          editingWord = row.getAttribute('data-id') || '';
+          asking = '';
+          coloring = '';
+          paint();
+        }
+        return;
+      }
       var act = b.getAttribute('data-act');
       if (act === 'clear-box') {
         var box = b.parentNode;
@@ -606,6 +616,7 @@
         if (field) { field.value = ''; field.focus(); }
         return;
       }
+      if (act === 'ask') { asking = b.getAttribute('data-id') || ''; editingWord = ''; coloring = ''; paint(); }
       if (act === 'no' || act === 'word-cancel' || act === 'topic-cancel') { asking = ''; editingWord = ''; topicMode = ''; paint(); }
       if (act === 'yes') remove(b.getAttribute('data-id'));
       if (act === 'word-edit') { editingWord = b.getAttribute('data-id') || ''; asking = ''; paint(); }
