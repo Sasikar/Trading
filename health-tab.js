@@ -30,7 +30,9 @@
   var section = 'tests';
   var sectionStamp = 0;
   var topicStamp = 0;
-  var SECTION_NAME = { food: 'Food', habit: 'Habit', tests: 'Tests' };
+  var ateLog = {};
+  var ateDay = '';
+  var SECTION_NAME = { ate: 'Ate', food: 'Food', habit: 'Habit', tests: 'Tests' };
   var pickedDay = '';
   var calCursor = new Date();
   var coloring = '';
@@ -175,6 +177,7 @@
       if (saved && saved.tabs) tabs = saved.tabs;
       if (saved && saved.foods) foods = saved.foods;
       if (saved && saved.habits) habits = saved.habits;
+      if (saved && saved.ateLog) ateLog = saved.ateLog;
       if (saved && saved.section) section = saved.section;
       if (saved && saved.sections) sections = saved.sections;
       if (saved && saved.sectionStamp) sectionStamp = saved.sectionStamp;
@@ -187,7 +190,7 @@
     }
   }
   function saveLocal() {
-    try { localStorage.setItem(KEY, JSON.stringify({ current: current, section: section, sections: sections, sectionStamp: sectionStamp, topicStamp: topicStamp, topics: topics, tabs: tabs, foods: foods, habits: habits })); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify({ current: current, section: section, sections: sections, sectionStamp: sectionStamp, topicStamp: topicStamp, topics: topics, tabs: tabs, foods: foods, habits: habits, ateLog: ateLog })); } catch (e) {}
   }
   function setStatus(text) {
     var el = $('hl-status');
@@ -234,6 +237,7 @@
       });
     });
     habits = nextHabit;
+    ateLog = mergeAte(ateLog, remote && remote.ateLog);
     var secStamp = remote && remote.sectionStamp || 0;
     if (secStamp > sectionStamp) {
       sections = (remote && remote.sections) || sections;
@@ -246,7 +250,7 @@
     (sections || []).forEach(function (id) {
       if (SECTION_NAME[id] && next.indexOf(id) < 0) next.push(id);
     });
-    ['food', 'habit', 'tests'].forEach(function (id) {
+    ['ate', 'food', 'habit', 'tests'].forEach(function (id) {
       if (next.indexOf(id) < 0) next.push(id);
     });
     sections = next;
@@ -301,6 +305,81 @@
     var marks = pickedDay ? '<div class="hl-marks"><button type="button" data-act="mark" data-mark="green">Green</button><button type="button" data-act="mark" data-mark="yellow">Yellow</button><button type="button" data-act="mark" data-mark="red">Red</button><button type="button" data-act="mark" data-mark="">Clear</button></div><p class="hl-picked">' + pickedDay + '</p>' : '<p class="hl-picked">Tap a date, then pick a color.</p>';
     return '<div class="hl-cal"><div class="hl-cal-head"><button type="button" data-act="month" data-dir="-1" aria-label="Previous month">‹</button><b>' + names[m] + ' ' + y + '</b><button type="button" data-act="month" data-dir="1" aria-label="Next month">›</button></div><div class="hl-week"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div><div class="hl-days">' + cells + '</div>' + marks + '</div>';
   }
+  function dayTitle(iso) {
+    var p = iso.split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    var w = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    var m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var label = w[d.getDay()] + ', ' + d.getDate() + ' ' + m[d.getMonth()];
+    if (iso === isoDate(new Date())) label = 'Today · ' + label;
+    return label;
+  }
+  function shiftIso(iso, dir) {
+    var p = iso.split('-');
+    var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    d.setDate(d.getDate() + dir);
+    return isoDate(d);
+  }
+  function ateItems(day) {
+    var dead = tombs();
+    return (ateLog[day] || []).filter(function (it) { return it && it.text && !dead[it.id]; });
+  }
+  function ateView(draft) {
+    var day = ateDay || isoDate(new Date());
+    ateDay = day;
+    var p = day.split('-');
+    var cur = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+    var start = new Date(cur);
+    start.setDate(cur.getDate() - ((cur.getDay() + 6) % 7));
+    var letters = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+    var strip = '';
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(start);
+      d.setDate(start.getDate() + i);
+      var key = isoDate(d);
+      strip += '<button type="button" class="hl-chipday' + (key === day ? ' on' : '') + (ateItems(key).length ? ' has' : '') + '" data-act="ate-day" data-date="' + key + '"><small>' + letters[i] + '</small>' + d.getDate() + '</button>';
+    }
+    var rows = ateItems(day).map(function (it) {
+      if (asking === it.id) return '<li class="hl-row ask"><span class="hl-name">' + esc(it.text) + '</span><span class="hl-ask">Delete this?<button type="button" data-act="yes" data-id="' + esc(it.id) + '">Delete</button><button type="button" data-act="no">Keep</button></span></li>';
+      return '<li class="hl-row" data-id="' + esc(it.id) + '"><span class="hl-name">' + esc(it.text) + '</span><span class="hl-actions"><button type="button" class="hl-x" data-act="ask" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></span></li>';
+    }).join('');
+    return '<div class="hl-weekstrip">' + strip + '</div><div class="hl-ate-head"><button type="button" data-act="ate-shift" data-dir="-1" aria-label="Previous day">‹</button><b>' + dayTitle(day) + '</b><button type="button" data-act="ate-shift" data-dir="1" aria-label="Next day">›</button></div><form id="hl-form" class="hl-add"><span class="hl-box"><textarea id="hl-input" placeholder="What did you eat?">' + esc(draft || '') + '</textarea><button type="button" class="hl-clear" data-act="clear-box" aria-label="Clear">×</button></span><button type="submit">Add</button><span id="hl-status"></span></form>' + (rows ? '<ul class="hl-list">' + rows + '</ul>' : '<p class="hl-empty">Nothing logged this day.</p>');
+  }
+  function mergeAte(local, remote) {
+    var dead = tombs();
+    var map = {};
+    function take(src) {
+      Object.keys(src || {}).forEach(function (day) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+        (src[day] || []).forEach(function (it) {
+          if (!it || !it.id || !it.text || dead[it.id]) return;
+          if (!map[day]) map[day] = {};
+          var row = { id: String(it.id), text: keepText(it.text), t: it.t || 0 };
+          var prev = map[day][row.id];
+          if (!prev || row.t >= prev.t) map[day][row.id] = row;
+        });
+      });
+    }
+    take(local);
+    take(remote);
+    var out = {};
+    Object.keys(map).forEach(function (day) {
+      var rows = Object.keys(map[day]).map(function (id) { return map[day][id]; });
+      rows.sort(function (a, b) { return (a.t || 0) - (b.t || 0); });
+      if (rows.length) out[day] = rows;
+    });
+    return out;
+  }
+  function addAte(raw) {
+    var text = keepText(raw);
+    if (!text) return;
+    var day = ateDay || isoDate(new Date());
+    var list = ateLog[day] || (ateLog[day] = []);
+    list.push({ id: nid(), text: text, t: Date.now() });
+    saveLocal();
+    paint();
+    persist();
+  }
   function paint() {
     var root = $('hl-app');
     if (!root) return;
@@ -319,6 +398,8 @@
       menu = '<form id="hl-topic" class="hl-topic"><input id="hl-topic-name" maxlength="24" value="' + esc(topic.name) + '" autocomplete="off"><button type="submit">Save</button><button type="button" data-act="topic-cancel">Cancel</button></form>';
     } else if (topic && topicMode === 'drop') {
       menu = '<div class="hl-ask topic">Delete ' + esc(topic.name) + ' and its words?<button type="button" data-act="topic-yes">Delete</button><button type="button" data-act="topic-cancel">Keep</button></div>';
+    } else if (section === 'ate') {
+      menu = '<div class="hl-tools"><b>What I ate</b></div>';
     } else if (topic) {
       menu = '<div class="hl-tools"><b>' + esc(topic.name) + '</b>' + (section === 'habit' ? '' : '<button type="button" class="hl-arrange' + (arranging ? ' on' : '') + '" data-act="' + (arranging ? 'arrange-done' : 'arrange') + '">' + (arranging ? 'Save order' : 'Arrange') + '</button>') + '<button type="button" class="hl-pen" data-act="rename" aria-label="Edit topic">' + PENCIL + '</button><button type="button" class="hl-x" data-act="drop" aria-label="Delete topic">×</button></div>';
     }
@@ -340,10 +421,7 @@
     var secs = '<div class="hl-secs">' + sections.map(function (id) {
       return '<button type="button" class="hl-sec' + (section === id ? ' on' : '') + '" data-act="sec" data-sec="' + id + '">' + SECTION_NAME[id] + '</button>';
     }).join('') + '</div>';
-    var body = section === 'habit'
-      ? habitView()
-      : '<form id="hl-form" class="hl-add"><span class="hl-box"><textarea id="hl-input" placeholder="' + (section === 'food' ? 'Add a food' : 'Add a test') + '">' + esc(draft) + '</textarea><button type="button" class="hl-clear" data-act="clear-box" aria-label="Clear">×</button></span><button type="submit">Add</button><span id="hl-status"></span></form>' +
-        (rows ? '<ul class="hl-list">' + rows + '</ul>' : '<p class="hl-empty">Nothing saved here yet.</p>');
+    var body = section === 'habit' ? habitView() : section === 'ate' ? ateView(draft) : '<form id="hl-form" class="hl-add"><span class="hl-box"><textarea id="hl-input" placeholder="' + (section === 'food' ? 'Add a food' : 'Add a test') + '">' + esc(draft) + '</textarea><button type="button" class="hl-clear" data-act="clear-box" aria-label="Clear">×</button></span><button type="submit">Add</button><span id="hl-status"></span></form>' + (rows ? '<ul class="hl-list">' + rows + '</ul>' : '<p class="hl-empty">Nothing saved here yet.</p>');
     root.innerHTML =
       '<div class="hl-tabs">' + chips + '<button type="button" class="hl-tab add" data-act="add-topic">+ Topic</button></div>' +
       menu +
@@ -386,7 +464,7 @@
       }
       var body = {
         message: 'Health words',
-        content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), topics: topics, topicStamp: topicStamp, sections: sections, sectionStamp: sectionStamp, tabs: tabs, foods: foods, habits: habits }, null, 2)))),
+        content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), topics: topics, topicStamp: topicStamp, sections: sections, sectionStamp: sectionStamp, tabs: tabs, foods: foods, habits: habits, ateLog: ateLog }, null, 2)))),
         branch: 'master'
       };
       if (sha) body.sha = sha;
@@ -415,6 +493,16 @@
   }
   function remove(id) {
     markTomb(id, true);
+    if (section === 'ate') {
+      var day = ateDay || isoDate(new Date());
+      ateLog[day] = (ateLog[day] || []).filter(function (it) { return it.id !== id; });
+      if (ateLog[day] && !ateLog[day].length) delete ateLog[day];
+      asking = '';
+      saveLocal();
+      paint();
+      persist();
+      return;
+    }
     var box = lists();
     box[current] = (box[current] || []).filter(function (it) { return it.id !== id; });
     asking = '';
@@ -481,7 +569,7 @@
   if (!document.getElementById('hl-style')) {
     var css = document.createElement('style');
     css.id = 'hl-style';
-    css.textContent = '#hl-app{color:#f4f7fb;overflow:visible}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:grab;white-space:nowrap;touch-action:none}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input,.hl-edit textarea{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add .hl-box textarea,.hl-edit .hl-box textarea{flex:1;width:100%;min-width:0;min-height:72px;padding:14px 40px 14px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.35 Inter,system-ui,sans-serif;resize:vertical;box-sizing:border-box}.hl-box{position:relative;flex:1;min-width:0;display:flex}.hl-clear{position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:18px;line-height:1;cursor:pointer}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%}.hl-row{display:flex;align-items:center;flex-wrap:wrap;width:100%;box-sizing:border-box;gap:8px;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}.hl-name{flex:1 1 100%;min-width:0;font-size:16px;font-weight:750;line-height:1.35;white-space:pre-wrap;overflow:visible;word-break:break-word}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}.hl-move{width:32px;height:32px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:16px;font-weight:800;cursor:pointer}.hl-swatch,.hl-dot{width:32px;height:32px;border:0;border-radius:50%;padding:0;cursor:pointer;flex:0 0 auto}.hl-swatch.empty,.hl-dot.empty{background:conic-gradient(#e85d6a,#e8923a,#e6c878,#3ecf8e,#3ec6c0,#5b9dff,#a78bfa,#f472b6,#e85d6a)}.hl-palette{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:8px;padding-top:4px}.hl-dot{width:28px;height:28px}.hl-dot.on{box-shadow:0 0 0 2px #fff}.hl-row.c-red{background:#2a161b;box-shadow:inset 4px 0 0 #e85d6a}.hl-row.c-orange{background:#2a1c12;box-shadow:inset 4px 0 0 #e8923a}.hl-row.c-gold{background:#2a2414;box-shadow:inset 4px 0 0 #e6c878}.hl-row.c-green{background:#12241c;box-shadow:inset 4px 0 0 #3ecf8e}.hl-row.c-teal{background:#122426;box-shadow:inset 4px 0 0 #3ec6c0}.hl-row.c-blue{background:#142033;box-shadow:inset 4px 0 0 #5b9dff}.hl-row.c-purple{background:#1c1830;box-shadow:inset 4px 0 0 #a78bfa}.hl-row.c-pink{background:#2a1622;box-shadow:inset 4px 0 0 #f472b6}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.arrange{touch-action:none;outline:1px solid rgba(230,200,120,.45)}.hl-arrange{border:0;border-radius:999px;padding:8px 12px;background:#243044;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-arrange.on{background:#e6c878;color:#1a1406}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}.hl-secs{display:flex;gap:8px;margin-top:12px}.hl-sec{flex:1;border:0;border-radius:12px;padding:10px 8px;background:#17202b;color:#c5d0dc;font-weight:800;cursor:grab;touch-action:none}.hl-sec.on{background:#e6c878;color:#1a1406}.hl-moving{opacity:.55}.hl-cal{margin-top:12px;background:#10161f;border-radius:18px;padding:14px}.hl-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.hl-cal-head b{font-size:16px}.hl-cal-head button{width:36px;height:36px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:20px;cursor:pointer}.hl-week,.hl-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.hl-week{margin-bottom:6px}.hl-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.hl-day{aspect-ratio:1;border:0;border-radius:50%;background:#17202b;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-day.g{background:#1c6b45}.hl-day.y{background:#8a6a22}.hl-day.r{background:#8a3038}.hl-day.today{box-shadow:inset 0 0 0 2px #e6c878}.hl-day.on{box-shadow:0 0 0 2px #f4f7fb}.hl-marks{display:flex;gap:8px;margin-top:14px}.hl-marks button{flex:1;border:0;border-radius:12px;padding:10px 6px;font-weight:800;cursor:pointer;color:#1a1406}.hl-marks button[data-mark=green]{background:#3ecf8e}.hl-marks button[data-mark=yellow]{background:#e6c878}.hl-marks button[data-mark=red]{background:#e85d6a;color:#1a0c10}.hl-marks button[data-mark=""]{background:#243044;color:#f4f7fb}.hl-picked{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700;text-align:center}';
+    css.textContent = '#hl-app{color:#f4f7fb;overflow:visible}.hl-tabs{display:flex;flex-wrap:wrap;gap:8px;overflow:visible}.hl-tab{flex:0 1 auto;border:0;border-radius:999px;padding:9px 12px;background:#17202b;color:#c5d0dc;font-weight:800;font-size:14px;cursor:grab;white-space:nowrap;touch-action:none}.hl-tab.on{background:#e6c878;color:#1a1406}.hl-tab.add{background:#243044;color:#f4f7fb}.hl-tab i{margin-left:6px;font-style:normal;font-size:11px;opacity:.75}.hl-tools,.hl-topic{display:flex;gap:8px;align-items:center;margin-top:12px}.hl-tools b{flex:1;font-size:16px}.hl-tools button,.hl-topic button,.hl-edit button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}.hl-tools button[data-act=drop]{background:#2a1a22;color:#ff8b98}.hl-topic input,.hl-edit input,.hl-edit textarea{flex:1;min-width:0;padding:10px 12px;border:0;border-radius:12px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}.hl-topic button[type=submit],.hl-edit button[type=submit]{background:#e6c878;color:#1a1406}.hl-add{display:flex;gap:8px;align-items:center;margin:12px 0}.hl-add .hl-box textarea,.hl-edit .hl-box textarea{flex:1;width:100%;min-width:0;min-height:72px;padding:14px 40px 14px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.35 Inter,system-ui,sans-serif;resize:vertical;box-sizing:border-box}.hl-box{position:relative;flex:1;min-width:0;display:flex}.hl-clear{position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:18px;line-height:1;cursor:pointer}.hl-add button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.hl-add span{color:#8b95a5;font-size:12px;font-weight:700}.hl-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;width:100%}.hl-row{display:flex;align-items:center;flex-wrap:wrap;width:100%;box-sizing:border-box;gap:8px;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}.hl-name{flex:1 1 100%;min-width:0;font-size:16px;font-weight:750;line-height:1.35;white-space:pre-wrap;overflow:visible;word-break:break-word}.hl-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}.hl-move{width:32px;height:32px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:16px;font-weight:800;cursor:pointer}.hl-swatch,.hl-dot{width:32px;height:32px;border:0;border-radius:50%;padding:0;cursor:pointer;flex:0 0 auto}.hl-swatch.empty,.hl-dot.empty{background:conic-gradient(#e85d6a,#e8923a,#e6c878,#3ecf8e,#3ec6c0,#5b9dff,#a78bfa,#f472b6,#e85d6a)}.hl-palette{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:8px;padding-top:4px}.hl-dot{width:28px;height:28px}.hl-dot.on{box-shadow:0 0 0 2px #fff}.hl-row.c-red{background:#2a161b;box-shadow:inset 4px 0 0 #e85d6a}.hl-row.c-orange{background:#2a1c12;box-shadow:inset 4px 0 0 #e8923a}.hl-row.c-gold{background:#2a2414;box-shadow:inset 4px 0 0 #e6c878}.hl-row.c-green{background:#12241c;box-shadow:inset 4px 0 0 #3ecf8e}.hl-row.c-teal{background:#122426;box-shadow:inset 4px 0 0 #3ec6c0}.hl-row.c-blue{background:#142033;box-shadow:inset 4px 0 0 #5b9dff}.hl-row.c-purple{background:#1c1830;box-shadow:inset 4px 0 0 #a78bfa}.hl-row.c-pink{background:#2a1622;box-shadow:inset 4px 0 0 #f472b6}.hl-grip{width:28px;border:0;background:transparent;color:#7d8796;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;padding:0;flex:0 0 auto}.hl-row.arrange{touch-action:none;outline:1px solid rgba(230,200,120,.45)}.hl-arrange{border:0;border-radius:999px;padding:8px 12px;background:#243044;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-arrange.on{background:#e6c878;color:#1a1406}.hl-pen{width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#243044;color:#d5dde8;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}.hl-tools .hl-pen,.hl-tools .hl-x{width:32px;height:32px;padding:0}.hl-x{width:32px;height:32px;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}.hl-edit{display:flex;gap:8px;align-items:center;width:100%}.hl-ask{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:#ffb4be;font-size:13px;font-weight:800}.hl-ask.topic{margin-top:12px}.hl-ask button{border:0;border-radius:999px;padding:7px 10px;font-weight:800;cursor:pointer}.hl-ask button[data-act=yes],.hl-ask button[data-act=topic-yes]{background:#ff6f7c;color:#1a0c10}.hl-ask button[data-act=no],.hl-ask button[data-act=topic-cancel]{background:#243044;color:#f4f7fb}.hl-link{color:#e6c878;font-weight:800}.hl-secs{display:flex;gap:8px;margin-top:12px}.hl-sec{flex:1;border:0;border-radius:12px;padding:10px 8px;background:#17202b;color:#c5d0dc;font-weight:800;cursor:grab;touch-action:none}.hl-sec.on{background:#e6c878;color:#1a1406}.hl-moving{opacity:.55}.hl-cal{margin-top:12px;background:#10161f;border-radius:18px;padding:14px}.hl-cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.hl-cal-head b{font-size:16px}.hl-cal-head button{width:36px;height:36px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:20px;cursor:pointer}.hl-week,.hl-days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}.hl-week{margin-bottom:6px}.hl-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.hl-day{aspect-ratio:1;border:0;border-radius:50%;background:#17202b;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-day.g{background:#1c6b45}.hl-day.y{background:#8a6a22}.hl-day.r{background:#8a3038}.hl-day.today{box-shadow:inset 0 0 0 2px #e6c878}.hl-day.on{box-shadow:0 0 0 2px #f4f7fb}.hl-marks{display:flex;gap:8px;margin-top:14px}.hl-marks button{flex:1;border:0;border-radius:12px;padding:10px 6px;font-weight:800;cursor:pointer;color:#1a1406}.hl-marks button[data-mark=green]{background:#3ecf8e}.hl-marks button[data-mark=yellow]{background:#e6c878}.hl-marks button[data-mark=red]{background:#e85d6a;color:#1a0c10}.hl-marks button[data-mark=""]{background:#243044;color:#f4f7fb}.hl-picked{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700;text-align:center}.hl-weekstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}.hl-chipday{border:0;border-radius:12px;padding:8px 0 6px;background:#17202b;color:#f4f7fb;font-weight:800;cursor:pointer}.hl-chipday small{display:block;font-size:10px;color:#8b95a5;font-weight:700}.hl-chipday.on{background:#e6c878;color:#1a1406}.hl-chipday.on small{color:#5c4b16}.hl-chipday.has{box-shadow:inset 0 -3px 0 #3ecf8e}.hl-ate-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:12px 0}.hl-ate-head b{font-size:15px;text-align:center;flex:1}.hl-ate-head button{width:36px;height:36px;border:0;border-radius:50%;background:#243044;color:#f4f7fb;font-size:20px;cursor:pointer}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -634,7 +722,7 @@
       if (!b) {
         var name = ev.target && ev.target.closest && ev.target.closest('.hl-name');
         var row = name && name.closest('.hl-row[data-id]');
-        if (row && !arranging && !(ev.target.closest && ev.target.closest('a'))) {
+        if (row && !arranging && section !== 'ate' && !(ev.target.closest && ev.target.closest('a'))) {
           editingWord = row.getAttribute('data-id') || '';
           asking = '';
           coloring = '';
@@ -684,6 +772,8 @@
         saveLocal();
         paint();
       }
+      if (act === 'ate-day') { ateDay = b.getAttribute('data-date') || ateDay; asking = ''; paint(); }
+      if (act === 'ate-shift') { ateDay = shiftIso(ateDay || isoDate(new Date()), Number(b.getAttribute('data-dir') || 0)); asking = ''; paint(); }
       if (act === 'rename') { topicMode = 'rename'; paint(); }
       if (act === 'drop') { topicMode = 'drop'; paint(); }
       if (act === 'topic-yes') deleteTopic();
@@ -693,7 +783,8 @@
       if (ev.target.id === 'hl-form') {
         ev.preventDefault();
         var input = $('hl-input');
-        add(input && input.value);
+        if (section === 'ate') addAte(input && input.value);
+        else add(input && input.value);
       }
       if (ev.target.id === 'hl-topic') {
         ev.preventDefault();
