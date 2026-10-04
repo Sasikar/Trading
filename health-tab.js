@@ -5,6 +5,7 @@
   var PATH = 'data/health-words.json';
   var GH = 'https://api.github.com/repos/Sasikar/Trading/contents/' + PATH;
   var DEFAULTS = [
+    ['ate', 'Ate'],
     ['heart', 'Heart'],
     ['kidney', 'Kidney'],
     ['liver', 'Liver'],
@@ -32,7 +33,7 @@
   var topicStamp = 0;
   var ateLog = {};
   var ateDay = '';
-  var SECTION_NAME = { ate: 'Ate', food: 'Food', habit: 'Habit', tests: 'Tests' };
+  var SECTION_NAME = { food: 'Food', habit: 'Habit', tests: 'Tests' };
   var pickedDay = '';
   var calCursor = new Date();
   var coloring = '';
@@ -138,7 +139,7 @@
       if (!topic || !topic.id) return;
       var tomb = dead['topic:' + topic.id] || 0;
       var t = topic.t || 0;
-      if (tomb && t <= tomb) return;
+      if (topic.id !== 'ate' && tomb && t <= tomb) return;
       var name = String(topic.name || '').replace(/\s+/g, ' ').trim().slice(0, 24);
       if (!name) name = String(topic.id).replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
       var prev = map[topic.id];
@@ -159,6 +160,11 @@
       order.push(topic.id);
     });
     Object.keys(map).forEach(function (id) { if (!seen[id]) order.push(id); });
+    var savedHasAte = (list || []).some(function (topic) { return topic && topic.id === 'ate'; });
+    if (!savedHasAte && map.ate) {
+      order = order.filter(function (id) { return id !== 'ate'; });
+      order.unshift('ate');
+    }
     topics = order.map(function (id) { return map[id]; });
     if (!topics.length) topics = defaults().filter(function (t) { return !dead['topic:' + t.id]; });
     var next = {};
@@ -250,7 +256,7 @@
     (sections || []).forEach(function (id) {
       if (SECTION_NAME[id] && next.indexOf(id) < 0) next.push(id);
     });
-    ['ate', 'food', 'habit', 'tests'].forEach(function (id) {
+    ['food', 'habit', 'tests'].forEach(function (id) {
       if (next.indexOf(id) < 0) next.push(id);
     });
     sections = next;
@@ -398,7 +404,7 @@
       menu = '<form id="hl-topic" class="hl-topic"><input id="hl-topic-name" maxlength="24" value="' + esc(topic.name) + '" autocomplete="off"><button type="submit">Save</button><button type="button" data-act="topic-cancel">Cancel</button></form>';
     } else if (topic && topicMode === 'drop') {
       menu = '<div class="hl-ask topic">Delete ' + esc(topic.name) + ' and its words?<button type="button" data-act="topic-yes">Delete</button><button type="button" data-act="topic-cancel">Keep</button></div>';
-    } else if (section === 'ate') {
+    } else if (current === 'ate') {
       menu = '<div class="hl-tools"><b>What I ate</b></div>';
     } else if (topic) {
       menu = '<div class="hl-tools"><b>' + esc(topic.name) + '</b>' + (section === 'habit' ? '' : '<button type="button" class="hl-arrange' + (arranging ? ' on' : '') + '" data-act="' + (arranging ? 'arrange-done' : 'arrange') + '">' + (arranging ? 'Save order' : 'Arrange') + '</button>') + '<button type="button" class="hl-pen" data-act="rename" aria-label="Edit topic">' + PENCIL + '</button><button type="button" class="hl-x" data-act="drop" aria-label="Delete topic">×</button></div>';
@@ -418,10 +424,10 @@
       }).join('') + '</span>' : '';
       return '<li class="hl-row' + (arranging ? ' arrange' : '') + (swatch ? ' c-' + swatch : '') + '" data-id="' + esc(it.id) + '"' + (arranging ? ' data-drag="1"' : '') + '><span class="hl-name">' + esc(it.text) + (it.url ? ' <a class="hl-link" href="' + esc(it.url) + '" target="_blank" rel="noopener">link</a>' : '') + '</span>' + actions + palette + '</li>';
     }).join('');
-    var secs = '<div class="hl-secs">' + sections.map(function (id) {
+    var secs = current === 'ate' ? '' : '<div class="hl-secs">' + sections.map(function (id) {
       return '<button type="button" class="hl-sec' + (section === id ? ' on' : '') + '" data-act="sec" data-sec="' + id + '">' + SECTION_NAME[id] + '</button>';
     }).join('') + '</div>';
-    var body = section === 'habit' ? habitView() : section === 'ate' ? ateView(draft) : '<form id="hl-form" class="hl-add"><span class="hl-box"><textarea id="hl-input" placeholder="' + (section === 'food' ? 'Add a food' : 'Add a test') + '">' + esc(draft) + '</textarea><button type="button" class="hl-clear" data-act="clear-box" aria-label="Clear">×</button></span><button type="submit">Add</button><span id="hl-status"></span></form>' + (rows ? '<ul class="hl-list">' + rows + '</ul>' : '<p class="hl-empty">Nothing saved here yet.</p>');
+    var body = current === 'ate' ? ateView(draft) : section === 'habit' ? habitView() : '<form id="hl-form" class="hl-add"><span class="hl-box"><textarea id="hl-input" placeholder="' + (section === 'food' ? 'Add a food' : 'Add a test') + '">' + esc(draft) + '</textarea><button type="button" class="hl-clear" data-act="clear-box" aria-label="Clear">×</button></span><button type="submit">Add</button><span id="hl-status"></span></form>' + (rows ? '<ul class="hl-list">' + rows + '</ul>' : '<p class="hl-empty">Nothing saved here yet.</p>');
     root.innerHTML =
       '<div class="hl-tabs">' + chips + '<button type="button" class="hl-tab add" data-act="add-topic">+ Topic</button></div>' +
       menu +
@@ -493,7 +499,7 @@
   }
   function remove(id) {
     markTomb(id, true);
-    if (section === 'ate') {
+    if (current === 'ate') {
       var day = ateDay || isoDate(new Date());
       ateLog[day] = (ateLog[day] || []).filter(function (it) { return it.id !== id; });
       if (ateLog[day] && !ateLog[day].length) delete ateLog[day];
@@ -550,7 +556,7 @@
   }
   function deleteTopic() {
     var topic = topicById(current);
-    if (!topic) return;
+    if (!topic || topic.id === 'ate') return;
     markTomb('topic:' + topic.id, true);
     (tabs[topic.id] || []).forEach(function (it) { markTomb(it.id, true); });
     (foods[topic.id] || []).forEach(function (it) { markTomb(it.id, true); });
@@ -722,7 +728,7 @@
       if (!b) {
         var name = ev.target && ev.target.closest && ev.target.closest('.hl-name');
         var row = name && name.closest('.hl-row[data-id]');
-        if (row && !arranging && section !== 'ate' && !(ev.target.closest && ev.target.closest('a'))) {
+        if (row && !arranging && current !== 'ate' && !(ev.target.closest && ev.target.closest('a'))) {
           editingWord = row.getAttribute('data-id') || '';
           asking = '';
           coloring = '';
@@ -783,7 +789,7 @@
       if (ev.target.id === 'hl-form') {
         ev.preventDefault();
         var input = $('hl-input');
-        if (section === 'ate') addAte(input && input.value);
+        if (current === 'ate') addAte(input && input.value);
         else add(input && input.value);
       }
       if (ev.target.id === 'hl-topic') {
