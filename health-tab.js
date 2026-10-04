@@ -132,11 +132,22 @@
   }
   function applyTopics(list, words, dead) {
     var map = {};
-    defaults().concat(list || []).forEach(function (topic) {
-      if (!topic || !topic.id || dead['topic:' + topic.id]) return;
+    function consider(topic) {
+      if (!topic || !topic.id) return;
+      var tomb = dead['topic:' + topic.id] || 0;
+      var t = topic.t || 0;
+      if (tomb && t <= tomb) return;
       var name = String(topic.name || '').replace(/\s+/g, ' ').trim().slice(0, 24);
-      if (!name) return;
-      map[topic.id] = { id: String(topic.id), name: name };
+      if (!name) name = String(topic.id).replace(/-/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+      var prev = map[topic.id];
+      if (!prev || t >= (prev.t || 0)) map[topic.id] = { id: String(topic.id), name: name, t: t || (prev && prev.t) || 0 };
+    }
+    defaults().concat(list || []).forEach(consider);
+    Object.keys(words || {}).concat(Object.keys(tabs || {}), Object.keys(foods || {})).forEach(function (id) {
+      if (map[id] || dead['topic:' + id]) return;
+      var has = (words[id] && words[id].length) || (tabs[id] && tabs[id].length) || (foods[id] && foods[id].length);
+      if (!has) return;
+      consider({ id: id, name: id, t: Date.now() });
     });
     var seen = {};
     var order = [];
@@ -145,6 +156,7 @@
       seen[topic.id] = true;
       order.push(topic.id);
     });
+    Object.keys(map).forEach(function (id) { if (!seen[id]) order.push(id); });
     topics = order.map(function (id) { return map[id]; });
     if (!topics.length) topics = defaults().filter(function (t) { return !dead['topic:' + t.id]; });
     var next = {};
@@ -187,12 +199,13 @@
     topics.forEach(function (topic) { words[topic.id] = tabs[topic.id] || []; });
     var src = (remote && remote.tabs) || {};
     Object.keys(src).forEach(function (id) { words[id] = (words[id] || []).concat(src[id] || []); });
+    var keptFoods = foods;
     var remoteStamp = remote && remote.topicStamp || 0;
     var orderedTopics = remoteStamp > topicStamp ? (remote.topics || []).concat(topics) : topics.concat((remote && remote.topics) || []);
     if (remoteStamp > topicStamp) topicStamp = remoteStamp;
     applyTopics(orderedTopics, words, dead);
     var foodWords = {};
-    topics.forEach(function (topic) { foodWords[topic.id] = foods[topic.id] || []; });
+    topics.forEach(function (topic) { foodWords[topic.id] = (keptFoods[topic.id] || []).concat(foods[topic.id] || []); });
     var fsrc = (remote && remote.foods) || {};
     Object.keys(fsrc).forEach(function (id) { foodWords[id] = (foodWords[id] || []).concat(fsrc[id] || []); });
     foods = foodWords;
@@ -428,9 +441,10 @@
     var id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'topic';
     if (topics.some(function (t) { return t.id === id; })) id = id + '-' + nid().slice(-4);
     markTomb('topic:' + id, false);
-    topics.push({ id: id, name: name });
-    tabs[id] = [];
-    foods[id] = [];
+    topics.push({ id: id, name: name, t: Date.now() });
+    if (!tabs[id]) tabs[id] = [];
+    if (!foods[id]) foods[id] = [];
+    topicStamp = Date.now();
     current = id;
     topicMode = '';
     saveLocal();
