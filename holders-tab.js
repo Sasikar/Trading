@@ -136,14 +136,25 @@
     return j;
   }
 
+  function byDay(a, b) {
+    const an = Number(a && a.net24h);
+    const bn = Number(b && b.net24h);
+    const aok = Number.isFinite(an);
+    const bok = Number.isFinite(bn);
+    if (aok !== bok) return aok ? -1 : 1;
+    if (aok && an !== bn) return bn - an;
+    return (Number(b && b.n) || 0) - (Number(a && a.n) || 0);
+  }
   function hits() {
     const q = bag.query.trim().toLowerCase();
-    if (!q) return bag.cards.slice();
-    return bag.cards.filter(function (h) {
-      const name = String(h.name || '').toLowerCase();
-      const ca = String(h.ca || '').toLowerCase();
-      return name.indexOf(q) >= 0 || ca.indexOf(q) >= 0;
-    });
+    const rows = !q
+      ? bag.cards.slice()
+      : bag.cards.filter(function (h) {
+          const name = String(h.name || '').toLowerCase();
+          const ca = String(h.ca || '').toLowerCase();
+          return name.indexOf(q) >= 0 || ca.indexOf(q) >= 0;
+        });
+    return rows.sort(byDay);
   }
   function paint() {
     const list = $('hd-list');
