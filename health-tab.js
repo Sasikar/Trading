@@ -1,6 +1,7 @@
 /* Health topics — wrapped tabs you can add, rename, and delete. Words stay saved. */
 (function () {
   var KEY = 'hl_words_v1';
+  var EXTRA_KEY = 'hl_extra_v1';
   var TOMB = 'hl_words_tomb_v1';
   var PATH = 'data/health-words.json';
   var GH = 'https://api.github.com/repos/Sasikar/Trading/contents/' + PATH;
@@ -228,6 +229,40 @@
     tabs = next;
     if (!topics.some(function (t) { return t.id === current; })) current = topics[0] ? topics[0].id : '';
   }
+  function readExtra() {
+    try {
+      var o = JSON.parse(localStorage.getItem(EXTRA_KEY) || '{}');
+      return o && typeof o === 'object' ? o : {};
+    } catch (e) { return {}; }
+  }
+  function unionTabs(a, b) {
+    var map = {};
+    function take(src) {
+      Object.keys(src || {}).forEach(function (topicId) {
+        (src[topicId] || []).forEach(function (tab) {
+          if (!tab || !tab.id || !tab.name) return;
+          if (!map[topicId]) map[topicId] = {};
+          var row = { id: String(tab.id), name: String(tab.name).replace(/\s+/g, ' ').trim().slice(0, 24), t: tab.t || 0 };
+          var prev = map[topicId][row.id];
+          if (!prev || row.t >= prev.t) map[topicId][row.id] = row;
+        });
+      });
+    }
+    take(a);
+    take(b);
+    var out = {};
+    Object.keys(map).forEach(function (topicId) {
+      out[topicId] = Object.keys(map[topicId]).map(function (id) { return map[topicId][id]; });
+    });
+    return out;
+  }
+  function saveExtra() {
+    var pack = { extraTabs: extraTabs, extraLists: extraLists, innerOrder: innerOrder };
+    try { localStorage.setItem(EXTRA_KEY, JSON.stringify(pack)); }
+    catch (e) {
+      try { localStorage.setItem(EXTRA_KEY, JSON.stringify({ extraTabs: extraTabs, innerOrder: innerOrder })); } catch (e2) {}
+    }
+  }
   function loadLocal() {
     tabs = {};
     topics = defaults();
@@ -241,6 +276,18 @@
       if (saved && saved.extraTabs) extraTabs = saved.extraTabs;
       if (saved && saved.extraLists) extraLists = saved.extraLists;
       if (saved && saved.innerOrder) innerOrder = saved.innerOrder;
+      var side = readExtra();
+      extraTabs = unionTabs(extraTabs, side.extraTabs);
+      if (side.extraLists) {
+        Object.keys(side.extraLists).forEach(function (topicId) {
+          if (!extraLists[topicId]) extraLists[topicId] = side.extraLists[topicId];
+        });
+      }
+      if (side.innerOrder) {
+        Object.keys(side.innerOrder).forEach(function (topicId) {
+          if (!innerOrder[topicId]) innerOrder[topicId] = side.innerOrder[topicId];
+        });
+      }
       if (saved && saved.section) section = saved.section;
       if (saved && saved.sections) sections = saved.sections;
       if (saved && saved.sectionStamp) sectionStamp = saved.sectionStamp;
@@ -253,6 +300,7 @@
     }
   }
   function saveLocal() {
+    saveExtra();
     try { localStorage.setItem(KEY, JSON.stringify({ current: current, section: section, sections: sections, sectionStamp: sectionStamp, topicStamp: topicStamp, topics: topics, tabs: tabs, foods: foods, habits: habits, ateLog: ateLog, extraTabs: extraTabs, extraLists: extraLists, innerOrder: innerOrder })); } catch (e) {}
   }
   function setStatus(text) {
@@ -346,6 +394,7 @@
       nextTabs[topicId] = Object.keys(tabMap[topicId]).map(function (id) { return tabMap[topicId][id]; });
     });
     extraTabs = nextTabs;
+    saveExtra();
     var listMap = {};
     function takeLists(src) {
       Object.keys(src || {}).forEach(function (topicId) {
