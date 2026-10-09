@@ -5743,6 +5743,7 @@ else if(at==='struct'){showMemeGate(false);showTrend(false);showMacro(false);sho
 else if(at==='macro'){showMemeGate(false);showTrend(false);showStruct(false);showSignal(false);showMacro(true);await loadMacro();}
 else if(at==='signal'){showSignal(false);showTrend(false);showStruct(false);showMacro(false);showMemeGate(true);await loadMemeGate();}
 else if(at==='cal'){const panels=$('tf-panels');if(panels){panels.classList.add('hidden');panels.style.display='none';}try{window.showCal&&window.showCal(true);}catch(e){}}
+else if(at==='mandates'){const panels=$('tf-panels');if(panels){panels.classList.add('hidden');panels.style.display='none';}try{window.showMandates&&window.showMandates(true);}catch(e){}}
 else if(at==='keywords'){const panels=$('tf-panels');if(panels){panels.classList.add('hidden');panels.style.display='none';}try{window.showKeywords&&window.showKeywords(true);}catch(e){}}
 else if(at==='gnotes'){const panels=$('tf-panels');if(panels){panels.classList.add('hidden');panels.style.display='none';}try{window.showGoldenNotes&&window.showGoldenNotes(true);}catch(e){}}
 else if(at==='whale'){const panels=$('tf-panels');if(panels){panels.classList.add('hidden');panels.style.display='none';}try{window.showWhale&&window.showWhale(true);}catch(e){}}
@@ -5750,7 +5751,7 @@ else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'){const panel
 else{showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}await loadTF(at);}
 }tick();setInterval(()=>loadMarket(),60000);
 window.addEventListener('pageshow',()=>loadMarket());
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') loadMarket(); });setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='memegate')loadMemeGate();else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'||at==='coinstats'||at==='emotion'||at==='keywords'||at==='gnotes'||at==='whale'||at==='cal')return;else loadTF(currentTF);},60000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') loadMarket(); });setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='memegate')loadMemeGate();else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'||at==='coinstats'||at==='emotion'||at==='keywords'||at==='gnotes'||at==='whale'||at==='cal'||at==='mandates')return;else loadTF(currentTF);},60000);
 
 function initTabReorder(){
   const bar=document.getElementById('tf-tabs');

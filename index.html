@@ -609,6 +609,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="alerts" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showAlerts&&window.showAlerts(true);}catch(e){}">Alerts</button>
   <button type="button" class="tab active" data-tf="fe" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntryDesk&&window.showFomoEntryDesk(true);}catch(e){}">FomoEntry</button>
   <button type="button" class="tab" data-tf="cal" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showCal&&window.showCal(true);}catch(e){}">Cal</button>
+  <button type="button" class="tab" data-tf="mandates" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMandates&&window.showMandates(true);}catch(e){}">Mandates</button>
+
 
   <button type="button" class="tab" data-tf="keywords" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showKeywords&&window.showKeywords(true);}catch(e){}">Keywords</button>
   <button type="button" class="tab" data-tf="gnotes" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showGoldenNotes&&window.showGoldenNotes(true);}catch(e){}">Golden Notes</button>
@@ -1049,6 +1051,17 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
   <div class="card" style="padding:12px">
     <div id="wh-app"></div>
+  </div>
+</section>
+</div>
+<div id="md-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Mandates</h2><p></p></div>
+    <span class="source" id="md-source"></span>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="md-app"></div>
   </div>
 </section>
 </div>
@@ -1698,7 +1711,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261009-cal1"></script>
+<script src="overview-app.js?v=20261009-md1"></script>
 <script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20261004-hd1d"></script>
@@ -1706,6 +1719,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
 <script src="golden-notes.js?v=20260930-gn7"></script>
 <script src="sleep-tab.js?v=20260930-sl3"></script>
 <script src="cal-tab.js?v=20261009-cal7"></script>
+<script src="mandates-tab.js?v=20261009-md1"></script>
 <script src="commentary.js?v=20260924-c3"></script>
 <script src="tiers-tab.js?v=20260925-flow4"></script>
 <script src="failures-tab.js?v=20260915-f3"></script>
