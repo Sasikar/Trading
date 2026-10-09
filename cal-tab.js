@@ -151,7 +151,7 @@
       row.soFar = run;
       profitSum = Math.round((profitSum + row.profit) * 100) / 100;
     });
-    var remaining = Math.round((profitSum - run) * 100) / 100;
+    var remaining = run;
     var draftDate = today();
     var draftProfit = '';
     var oldDate = $('cal-date');
@@ -171,13 +171,13 @@
       if (hit) ask = '<div class="cal-ask">Delete ' + esc(hit.date) + ' · ' + money(hit.profit) + '?<button type="button" data-act="yes" data-id="' + esc(hit.id) + '">Delete</button><button type="button" data-act="no">Keep</button></div>';
     }
     root.innerHTML =
-      '<div class="cal-remain"><span>Remaining</span><b>' + money(remaining) + '</b><small>Total profit ' + money(profitSum) + ' · Paid so far ' + money(run) + '</small></div>' +
+      '<div class="cal-remain"><b>' + money(remaining) + '</b></div>' +
       '<form id="cal-add" class="cal-form"><input id="cal-date" type="date" value="' + esc(draftDate) + '" aria-label="Date"><input id="cal-profit" type="number" inputmode="decimal" step="0.01" placeholder="Total profit" value="' + esc(draftProfit) + '" aria-label="Total profit"><button type="submit">Add</button></form>' +
       '<p id="cal-status"></p>' +
       ask +
       (list.length
         ? '<div class="cal-scroll"><table><thead><tr><th>Date</th><th>Total profit</th><th>Total paid</th><th>Total paid so far</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>'
-        : '<p class="cal-empty">No rows yet. Date starts as today. Paid is 32% of the profit.</p>');
+        : '<p class="cal-empty"></p>');
   }
   function add(date, profitRaw) {
     var profit = num(profitRaw);
@@ -238,7 +238,7 @@
   if (!document.getElementById('cal-style')) {
     var css = document.createElement('style');
     css.id = 'cal-style';
-    css.textContent = '#cal-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.cal-remain{border-radius:18px;padding:16px 16px 14px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.cal-remain span{display:block;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#e6c878}.cal-remain b{display:block;margin-top:4px;font-size:34px;line-height:1;letter-spacing:-.04em}.cal-remain small{display:block;margin-top:8px;color:#cbb98a;font-size:12px;font-weight:700}.cal-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cal-form input{flex:1;min-width:140px;padding:12px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.3 Inter,system-ui,sans-serif;color-scheme:dark}.cal-form button{border:0;border-radius:14px;padding:12px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.cal-form button[data-act=cancel]{background:#243044;color:#f4f7fb}#cal-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.cal-scroll{margin-top:12px;overflow-x:auto}.cal-scroll table{width:100%;border-collapse:collapse;min-width:640px}.cal-scroll th{text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5;padding:8px 10px;border-bottom:1px solid #243044}.cal-scroll td{padding:12px 10px;border-bottom:1px solid #1c2733;font-weight:750;white-space:nowrap}.cal-acts{display:flex;gap:6px;justify-content:flex-end}.cal-pen,.cal-x{border:0;border-radius:999px;height:32px;cursor:pointer;font-weight:800}.cal-pen{padding:0 12px;background:#243044;color:#f4f7fb}.cal-x{width:32px;background:#2a1a22;color:#ff8b98;font-size:18px}.cal-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.cal-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.cal-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.cal-ask button[data-act=no]{background:#243044;color:#f4f7fb}.cal-empty{margin:14px 0 0;color:#8b95a5;font-weight:700}body.cal-on main>section.section,body.cal-on main>.trend-panel:not(#cal-panel),body.cal-on main>.struct-trend-panel,body.cal-on main>.macro-panel,body.cal-on #tf-panels{display:none!important}body.cal-on #cal-panel{display:block!important}';
+    css.textContent = '#cal-panel .head p,#cal-panel .source{display:none!important}#cal-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.cal-remain{border-radius:18px;padding:16px 16px 14px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.cal-remain b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.cal-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cal-form input{flex:1;min-width:140px;padding:12px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.3 Inter,system-ui,sans-serif;color-scheme:dark}.cal-form button{border:0;border-radius:14px;padding:12px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.cal-form button[data-act=cancel]{background:#243044;color:#f4f7fb}#cal-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.cal-scroll{margin-top:12px;overflow-x:auto}.cal-scroll table{width:100%;border-collapse:collapse;min-width:640px}.cal-scroll th{text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5;padding:8px 10px;border-bottom:1px solid #243044}.cal-scroll td{padding:12px 10px;border-bottom:1px solid #1c2733;font-weight:750;white-space:nowrap}.cal-acts{display:flex;gap:6px;justify-content:flex-end}.cal-pen,.cal-x{border:0;border-radius:999px;height:32px;cursor:pointer;font-weight:800}.cal-pen{padding:0 12px;background:#243044;color:#f4f7fb}.cal-x{width:32px;background:#2a1a22;color:#ff8b98;font-size:18px}.cal-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.cal-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.cal-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.cal-ask button[data-act=no]{background:#243044;color:#f4f7fb}.cal-empty{margin:14px 0 0;color:#8b95a5;font-weight:700}body.cal-on main>section.section,body.cal-on main>.trend-panel:not(#cal-panel),body.cal-on main>.struct-trend-panel,body.cal-on main>.macro-panel,body.cal-on #tf-panels{display:none!important}body.cal-on #cal-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
