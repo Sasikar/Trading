@@ -286,10 +286,16 @@
     if (gave == null) gave = 0;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || profit == null) return;
     rows.push({ id: nid(), date: date, profit: profit, gave: gave, t: Date.now() });
+    var profitBox = $('cal-profit');
+    var gaveBox = $('cal-gave');
+    var taxBox = $('cal-tax');
+    if (profitBox) profitBox.value = '';
+    if (gaveBox) gaveBox.value = '';
+    if (taxBox) taxBox.value = '';
     saveLocal();
     paint();
-    var profitBox = $('cal-profit');
-    if (profitBox) { profitBox.value = ''; profitBox.focus(); }
+    var again = $('cal-profit');
+    if (again) again.focus();
     persist();
   }
   function saveEdit(id, date, profitRaw, gaveRaw) {
@@ -322,10 +328,12 @@
     var text = noteText(raw);
     if (!text) return;
     notes.unshift({ id: nid(), text: text, t: Date.now() });
+    var box = $('cal-note');
+    if (box) box.value = '';
     saveLocal();
     paint();
-    var box = $('cal-note');
-    if (box) { box.value = ''; box.focus(); }
+    var again = $('cal-note');
+    if (again) again.focus();
     persist();
   }
   function saveNote(id, raw) {

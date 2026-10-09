@@ -171,10 +171,14 @@
     var amount = num(amtRaw);
     if (!text || amount == null) return;
     items.unshift({ id: nid(), text: text, amount: amount, t: Date.now() });
+    var textBox = $('md-text');
+    var amtBox = $('md-amt');
+    if (textBox) textBox.value = '';
+    if (amtBox) amtBox.value = '';
     saveLocal();
     paint();
-    var box = $('md-text');
-    if (box) box.focus();
+    var again = $('md-text');
+    if (again) again.focus();
     persist();
   }
   function saveEdit(id, textRaw, amtRaw) {
