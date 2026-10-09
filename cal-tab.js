@@ -75,7 +75,9 @@
       var profit = num(it.profit);
       var date = String(it.date || '');
       if (profit == null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
-      var row = { id: String(it.id), date: date, profit: profit, t: it.t || 0 };
+      var gave = num(it.gave);
+      if (gave == null) gave = 0;
+      var row = { id: String(it.id), date: date, profit: profit, gave: gave, t: it.t || 0 };
       var prev = map[row.id];
       if (!prev || row.t >= prev.t) map[row.id] = row;
     });
@@ -143,26 +145,31 @@
     var root = $('cal-app');
     if (!root) return;
     var list = ordered();
-    var run = 0;
-    var profitSum = 0;
+    var taxSum = 0;
+    var gaveSum = 0;
     list.forEach(function (row) {
-      row.paid = paidOf(row.profit);
-      run = Math.round((run + row.paid) * 100) / 100;
-      row.soFar = run;
-      profitSum = Math.round((profitSum + row.profit) * 100) / 100;
+      row.tax = paidOf(row.profit);
+      taxSum = Math.round((taxSum + row.tax) * 100) / 100;
+      gaveSum = Math.round((gaveSum + (row.gave || 0)) * 100) / 100;
     });
-    var remaining = run;
+    var remaining = Math.round((taxSum - gaveSum) * 100) / 100;
     var draftDate = today();
     var draftProfit = '';
+    var draftGave = '';
     var oldDate = $('cal-date');
     var oldProfit = $('cal-profit');
+    var oldGave = $('cal-gave');
     if (oldDate && oldDate.value) draftDate = oldDate.value;
     if (oldProfit) draftProfit = oldProfit.value;
+    if (oldGave) draftGave = oldGave.value;
+    var draftTax = '';
+    var typed = num(draftProfit);
+    if (typed != null) draftTax = money(paidOf(typed));
     var body = list.slice().reverse().map(function (row) {
       if (editing === row.id) {
-        return '<tr class="cal-edit"><td colspan="5"><form class="cal-form" data-id="' + esc(row.id) + '"><input type="date" value="' + esc(row.date) + '" aria-label="Date"><input type="number" inputmode="decimal" step="0.01" value="' + esc(row.profit) + '" aria-label="Total profit"><button type="submit">Save</button><button type="button" data-act="cancel">Cancel</button></form></td></tr>';
+        return '<tr class="cal-edit"><td colspan="5"><form class="cal-form" data-id="' + esc(row.id) + '"><input type="date" value="' + esc(row.date) + '" aria-label="Date"><input data-field="profit" inputmode="decimal" value="' + esc(row.profit) + '" placeholder="Total profit" aria-label="Total profit"><input data-field="tax" readonly tabindex="-1" value="' + esc(money(row.tax)) + '" aria-label="32%"><input data-field="gave" inputmode="decimal" value="' + esc(row.gave) + '" placeholder="Paid" aria-label="Paid"><button type="submit">Save</button><button type="button" data-act="cancel">Cancel</button></form></td></tr>';
       }
-      return '<tr><td>' + esc(row.date) + '</td><td>' + money(row.profit) + '</td><td>' + money(row.paid) + '</td><td>' + money(row.soFar) + '</td><td class="cal-acts"><button type="button" class="cal-pen" data-act="edit" data-id="' + esc(row.id) + '" aria-label="Edit">Edit</button><button type="button" class="cal-x" data-act="ask" data-id="' + esc(row.id) + '" aria-label="Delete">×</button></td></tr>';
+      return '<tr><td>' + esc(row.date) + '</td><td>' + money(row.profit) + '</td><td>' + money(row.tax) + '</td><td>' + money(row.gave || 0) + '</td><td class="cal-acts"><button type="button" class="cal-pen" data-act="edit" data-id="' + esc(row.id) + '" aria-label="Edit">Edit</button><button type="button" class="cal-x" data-act="ask" data-id="' + esc(row.id) + '" aria-label="Delete">×</button></td></tr>';
     }).join('');
     var ask = '';
     if (asking) {
@@ -172,30 +179,35 @@
     }
     root.innerHTML =
       '<div class="cal-remain"><b>' + money(remaining) + '</b></div>' +
-      '<form id="cal-add" class="cal-form"><input id="cal-date" type="date" value="' + esc(draftDate) + '" aria-label="Date"><input id="cal-profit" type="number" inputmode="decimal" step="0.01" placeholder="Total profit" value="' + esc(draftProfit) + '" aria-label="Total profit"><button type="submit">Add</button></form>' +
+      '<form id="cal-add" class="cal-form"><input id="cal-date" type="date" value="' + esc(draftDate) + '" aria-label="Date"><input id="cal-profit" data-field="profit" inputmode="decimal" placeholder="Total profit" value="' + esc(draftProfit) + '" aria-label="Total profit"><input id="cal-tax" data-field="tax" readonly tabindex="-1" placeholder="32%" value="' + esc(draftTax) + '" aria-label="32%"><input id="cal-gave" data-field="gave" inputmode="decimal" placeholder="Paid" value="' + esc(draftGave) + '" aria-label="Paid"><button type="submit">Add</button></form>' +
       '<p id="cal-status"></p>' +
       ask +
       (list.length
-        ? '<div class="cal-scroll"><table><thead><tr><th>Date</th><th>Total profit</th><th>Total paid</th><th>Total paid so far</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>'
+        ? '<div class="cal-scroll"><table><thead><tr><th>Date</th><th>Profit</th><th>32%</th><th>Paid</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>'
         : '<p class="cal-empty"></p>');
   }
-  function add(date, profitRaw) {
+  function add(date, profitRaw, gaveRaw) {
     var profit = num(profitRaw);
+    var gave = num(gaveRaw);
+    if (gave == null) gave = 0;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || profit == null) return;
-    rows.push({ id: nid(), date: date, profit: profit, t: Date.now() });
+    rows.push({ id: nid(), date: date, profit: profit, gave: gave, t: Date.now() });
     saveLocal();
     paint();
     var profitBox = $('cal-profit');
     if (profitBox) { profitBox.value = ''; profitBox.focus(); }
     persist();
   }
-  function saveEdit(id, date, profitRaw) {
+  function saveEdit(id, date, profitRaw, gaveRaw) {
     var profit = num(profitRaw);
+    var gave = num(gaveRaw);
+    if (gave == null) gave = 0;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || profit == null) return;
     rows.forEach(function (row) {
       if (row.id !== id) return;
       row.date = date;
       row.profit = profit;
+      row.gave = gave;
       row.t = Date.now();
     });
     editing = '';
@@ -238,7 +250,7 @@
   if (!document.getElementById('cal-style')) {
     var css = document.createElement('style');
     css.id = 'cal-style';
-    css.textContent = '#cal-panel .head p,#cal-panel .source{display:none!important}#cal-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.cal-remain{border-radius:18px;padding:16px 16px 14px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.cal-remain b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.cal-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cal-form input{flex:1;min-width:140px;padding:12px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.3 Inter,system-ui,sans-serif;color-scheme:dark}.cal-form button{border:0;border-radius:14px;padding:12px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.cal-form button[data-act=cancel]{background:#243044;color:#f4f7fb}#cal-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.cal-scroll{margin-top:12px;overflow-x:auto}.cal-scroll table{width:100%;border-collapse:collapse;min-width:640px}.cal-scroll th{text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5;padding:8px 10px;border-bottom:1px solid #243044}.cal-scroll td{padding:12px 10px;border-bottom:1px solid #1c2733;font-weight:750;white-space:nowrap}.cal-acts{display:flex;gap:6px;justify-content:flex-end}.cal-pen,.cal-x{border:0;border-radius:999px;height:32px;cursor:pointer;font-weight:800}.cal-pen{padding:0 12px;background:#243044;color:#f4f7fb}.cal-x{width:32px;background:#2a1a22;color:#ff8b98;font-size:18px}.cal-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.cal-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.cal-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.cal-ask button[data-act=no]{background:#243044;color:#f4f7fb}.cal-empty{margin:14px 0 0;color:#8b95a5;font-weight:700}body.cal-on main>section.section,body.cal-on main>.trend-panel:not(#cal-panel),body.cal-on main>.struct-trend-panel,body.cal-on main>.macro-panel,body.cal-on #tf-panels{display:none!important}body.cal-on #cal-panel{display:block!important}';
+    css.textContent = '#cal-panel .head p,#cal-panel .source{display:none!important}#cal-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.cal-remain{border-radius:18px;padding:16px 16px 14px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.cal-remain b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.cal-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cal-form input{flex:1;min-width:120px;padding:12px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.3 Inter,system-ui,sans-serif;color-scheme:dark}.cal-form input[readonly]{background:#0d141c;color:#e6c878}.cal-form button{border:0;border-radius:14px;padding:12px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.cal-form button[data-act=cancel]{background:#243044;color:#f4f7fb}#cal-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.cal-scroll{margin-top:12px;overflow-x:auto}.cal-scroll table{width:100%;border-collapse:collapse;min-width:640px}.cal-scroll th{text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5;padding:8px 10px;border-bottom:1px solid #243044}.cal-scroll td{padding:12px 10px;border-bottom:1px solid #1c2733;font-weight:750;white-space:nowrap}.cal-acts{display:flex;gap:6px;justify-content:flex-end}.cal-pen,.cal-x{border:0;border-radius:999px;height:32px;cursor:pointer;font-weight:800}.cal-pen{padding:0 12px;background:#243044;color:#f4f7fb}.cal-x{width:32px;background:#2a1a22;color:#ff8b98;font-size:18px}.cal-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.cal-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.cal-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.cal-ask button[data-act=no]{background:#243044;color:#f4f7fb}.cal-empty{margin:14px 0 0;color:#8b95a5;font-weight:700}body.cal-on main>section.section,body.cal-on main>.trend-panel:not(#cal-panel),body.cal-on main>.struct-trend-panel,body.cal-on main>.macro-panel,body.cal-on #tf-panels{display:none!important}body.cal-on #cal-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -249,13 +261,24 @@
       if (!form) return;
       ev.preventDefault();
       if (form.id === 'cal-add') {
-        add(($('cal-date') || {}).value, ($('cal-profit') || {}).value);
+        add(($('cal-date') || {}).value, ($('cal-profit') || {}).value, ($('cal-gave') || {}).value);
         return;
       }
       if (form.classList && form.classList.contains('cal-form')) {
-        var fields = form.querySelectorAll('input');
-        saveEdit(form.getAttribute('data-id'), fields[0] && fields[0].value, fields[1] && fields[1].value);
+        var profit = form.querySelector('[data-field="profit"]');
+        var gave = form.querySelector('[data-field="gave"]');
+        var date = form.querySelector('input[type="date"]');
+        saveEdit(form.getAttribute('data-id'), date && date.value, profit && profit.value, gave && gave.value);
       }
+    });
+    root.addEventListener('input', function (ev) {
+      var box = ev.target;
+      if (!box || box.getAttribute('data-field') !== 'profit') return;
+      var form = box.closest && box.closest('form');
+      var tax = form && form.querySelector('[data-field="tax"]');
+      if (!tax) return;
+      var n = num(box.value);
+      tax.value = n == null ? '' : money(paidOf(n));
     });
     root.addEventListener('click', function (ev) {
       var btn = ev.target && ev.target.closest && ev.target.closest('[data-act]');
