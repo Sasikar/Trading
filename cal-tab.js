@@ -47,7 +47,20 @@
   function money(n) {
     n = Number(n);
     if (!isFinite(n)) n = 0;
-    return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    var sign = n < 0 ? '-' : '';
+    var a = Math.abs(n);
+    var unit = '';
+    if (a >= 100000) { a = a / 100000; unit = 'L'; }
+    else if (a >= 1000) { a = a / 1000; unit = 'K'; }
+    var s = (Math.round(a * 100) / 100).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+    return sign + s + unit;
+  }
+  function shortDate(iso) {
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var p = String(iso || '').split('-');
+    var day = String(+p[2] || '');
+    var month = months[(+p[1] || 1) - 1] || '';
+    return day + ' ' + month;
   }
   function paidOf(profit) {
     return Math.round(Number(profit) * RATE * 100) / 100;
@@ -167,15 +180,15 @@
     if (typed != null) draftTax = money(paidOf(typed));
     var body = list.slice().reverse().map(function (row) {
       if (editing === row.id) {
-        return '<tr class="cal-edit"><td colspan="5"><form class="cal-form" data-id="' + esc(row.id) + '"><input type="date" value="' + esc(row.date) + '" aria-label="Date"><input data-field="profit" inputmode="decimal" value="' + esc(row.profit) + '" placeholder="Total profit" aria-label="Total profit"><input data-field="tax" readonly tabindex="-1" value="' + esc(money(row.tax)) + '" aria-label="32%"><input data-field="gave" inputmode="decimal" value="' + esc(row.gave) + '" placeholder="Paid" aria-label="Paid"><button type="submit">Save</button><button type="button" data-act="cancel">Cancel</button></form></td></tr>';
+        return '<li class="cal-item"><form class="cal-form" data-id="' + esc(row.id) + '"><input type="date" value="' + esc(row.date) + '" aria-label="Date"><input data-field="profit" inputmode="decimal" value="' + esc(row.profit) + '" placeholder="Total profit" aria-label="Total profit"><input data-field="tax" readonly tabindex="-1" value="' + esc(money(row.tax)) + '" aria-label="32%"><input data-field="gave" inputmode="decimal" value="' + esc(row.gave) + '" placeholder="Paid" aria-label="Paid"><button type="submit">Save</button><button type="button" data-act="cancel">Cancel</button></form></li>';
       }
-      return '<tr><td>' + esc(row.date) + '</td><td>' + money(row.profit) + '</td><td>' + money(row.tax) + '</td><td>' + money(row.gave || 0) + '</td><td class="cal-acts"><button type="button" class="cal-pen" data-act="edit" data-id="' + esc(row.id) + '" aria-label="Edit">Edit</button><button type="button" class="cal-x" data-act="ask" data-id="' + esc(row.id) + '" aria-label="Delete">×</button></td></tr>';
+      return '<li class="cal-item"><div class="cal-line"><b>' + esc(shortDate(row.date)) + '</b><span>' + money(row.profit) + '</span><span>' + money(row.tax) + '</span><span>' + money(row.gave || 0) + '</span><span class="cal-acts"><button type="button" class="cal-pen" data-act="edit" data-id="' + esc(row.id) + '" aria-label="Edit">Edit</button><button type="button" class="cal-x" data-act="ask" data-id="' + esc(row.id) + '" aria-label="Delete">×</button></span></div></li>';
     }).join('');
     var ask = '';
     if (asking) {
       var hit = null;
       rows.forEach(function (row) { if (row.id === asking) hit = row; });
-      if (hit) ask = '<div class="cal-ask">Delete ' + esc(hit.date) + ' · ' + money(hit.profit) + '?<button type="button" data-act="yes" data-id="' + esc(hit.id) + '">Delete</button><button type="button" data-act="no">Keep</button></div>';
+      if (hit) ask = '<div class="cal-ask">Delete ' + esc(shortDate(hit.date)) + ' · ' + money(hit.profit) + '?<button type="button" data-act="yes" data-id="' + esc(hit.id) + '">Delete</button><button type="button" data-act="no">Keep</button></div>';
     }
     root.innerHTML =
       '<div class="cal-remain"><b>' + money(remaining) + '</b></div>' +
@@ -183,7 +196,7 @@
       '<p id="cal-status"></p>' +
       ask +
       (list.length
-        ? '<div class="cal-scroll"><table><thead><tr><th>Date</th><th>Profit</th><th>32%</th><th>Paid</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>'
+        ? '<div class="cal-head"><span>Date</span><span>Profit</span><span>32%</span><span>Paid</span><span></span></div><ul class="cal-list">' + body + '</ul>'
         : '<p class="cal-empty"></p>');
   }
   function add(date, profitRaw, gaveRaw) {
@@ -250,7 +263,7 @@
   if (!document.getElementById('cal-style')) {
     var css = document.createElement('style');
     css.id = 'cal-style';
-    css.textContent = '#cal-panel .head p,#cal-panel .source{display:none!important}#cal-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.cal-remain{border-radius:18px;padding:16px 16px 14px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.cal-remain b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.cal-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.cal-form input{flex:1;min-width:120px;padding:12px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.3 Inter,system-ui,sans-serif;color-scheme:dark}.cal-form input[readonly]{background:#0d141c;color:#e6c878}.cal-form button{border:0;border-radius:14px;padding:12px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.cal-form button[data-act=cancel]{background:#243044;color:#f4f7fb}#cal-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.cal-scroll{margin-top:12px;overflow-x:auto}.cal-scroll table{width:100%;border-collapse:collapse;min-width:640px}.cal-scroll th{text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#8b95a5;padding:8px 10px;border-bottom:1px solid #243044}.cal-scroll td{padding:12px 10px;border-bottom:1px solid #1c2733;font-weight:750;white-space:nowrap}.cal-acts{display:flex;gap:6px;justify-content:flex-end}.cal-pen,.cal-x{border:0;border-radius:999px;height:32px;cursor:pointer;font-weight:800}.cal-pen{padding:0 12px;background:#243044;color:#f4f7fb}.cal-x{width:32px;background:#2a1a22;color:#ff8b98;font-size:18px}.cal-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.cal-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.cal-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.cal-ask button[data-act=no]{background:#243044;color:#f4f7fb}.cal-empty{margin:14px 0 0;color:#8b95a5;font-weight:700}body.cal-on main>section.section,body.cal-on main>.trend-panel:not(#cal-panel),body.cal-on main>.struct-trend-panel,body.cal-on main>.macro-panel,body.cal-on #tf-panels{display:none!important}body.cal-on #cal-panel{display:block!important}';
+    css.textContent = '#cal-panel .head p,#cal-panel .source{display:none!important}#cal-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.cal-remain{border-radius:18px;padding:16px 16px 14px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.cal-remain b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.cal-form{display:grid;grid-template-columns:1fr 1fr;gap:8px}.cal-form input{grid-column:1 / -1;width:100%;min-width:0;box-sizing:border-box;padding:12px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.3 Inter,system-ui,sans-serif;color-scheme:dark}.cal-form input[readonly]{background:#0d141c;color:#e6c878}.cal-form button{border:0;border-radius:14px;padding:12px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.cal-form button[data-act=cancel]{background:#243044;color:#f4f7fb}#cal-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}#cal-panel,#cal-app{max-width:100%;overflow-x:hidden}.cal-head,.cal-line{display:grid;grid-template-columns:52px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 64px;gap:4px;align-items:center}.cal-head{margin-top:14px;color:#8b95a5;font-size:11px;font-weight:800;text-transform:uppercase}.cal-list{list-style:none;margin:0;padding:0}.cal-line{padding:12px 0;border-bottom:1px solid #1c2733;font-weight:800;font-size:14px}.cal-line span,.cal-line b{min-width:0;overflow:hidden;text-overflow:ellipsis}.cal-acts{display:flex;gap:4px;justify-content:flex-end}.cal-pen,.cal-x{border:0;border-radius:999px;height:28px;cursor:pointer;font-weight:800}.cal-pen{padding:0 8px;background:#243044;color:#f4f7fb;font-size:12px}.cal-x{width:28px;background:#2a1a22;color:#ff8b98;font-size:18px}.cal-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.cal-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.cal-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.cal-ask button[data-act=no]{background:#243044;color:#f4f7fb}.cal-empty{margin:14px 0 0;color:#8b95a5;font-weight:700}body.cal-on main>section.section,body.cal-on main>.trend-panel:not(#cal-panel),body.cal-on main>.struct-trend-panel,body.cal-on main>.macro-panel,body.cal-on #tf-panels{display:none!important}body.cal-on #cal-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
