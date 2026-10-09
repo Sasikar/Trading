@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#070a0f">
+<title>Banned</title>
+<style>
+  body{margin:0;background:#070a0f;color:#f4f7fb;font-family:Inter,system-ui,sans-serif}
+  main{width:min(720px,calc(100% - 20px));margin:8px auto 48px}
+  h1{margin:8px 0 4px;font-size:26px;letter-spacing:-.03em}
+  .sub{margin:0 0 14px;color:#8b95a5;font-size:13px;font-weight:650}
+  #bn-form{display:flex;gap:8px;align-items:center}
+  #bn-input{flex:1;min-width:0;padding:14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.35 Inter,system-ui,sans-serif}
+  #bn-form button{border:0;border-radius:14px;padding:14px 16px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}
+  #bn-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}
+  #bn-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .bn-row{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}
+  .bn-text{flex:1;min-width:0;font-size:16px;font-weight:750;line-height:1.35;word-break:break-word}
+  .bn-x{width:32px;height:32px;flex:0 0 auto;margin-left:auto;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}
+  .bn-empty{padding:14px;color:#8b95a5;font-weight:700}
+  #bn-modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;padding:20px;z-index:40}
+  #bn-modal[hidden]{display:none}
+  .bn-card{width:min(360px,100%);background:#10161f;border-radius:18px;padding:18px}
+  .bn-card p{margin:0;color:#ffb4be;font-weight:800}
+  #bn-ask{display:block;margin:10px 0 14px;font-size:16px;line-height:1.35;word-break:break-word}
+  .bn-actions{display:flex;gap:8px}
+  .bn-actions button{flex:1;border:0;border-radius:999px;padding:10px 12px;font-weight:800;cursor:pointer}
+  #bn-yes{background:#ff6f7c;color:#1a0c10}
+  #bn-no{background:#243044;color:#f4f7fb}
+</style>
+</head>
+<body>
+<main>
+  <h1>Banned</h1>
+  <p class="sub">Add a value. Delete it with the ×. The list stays saved.</p>
+  <form id="bn-form">
+    <input id="bn-input" placeholder="Add a banned value" autocomplete="off" enterkeyhint="done">
+    <button type="submit">Add</button>
+  </form>
+  <p id="bn-status"></p>
+  <ul id="bn-list"></ul>
+</main>
+<div id="bn-modal" hidden>
+  <div class="bn-card">
+    <p>Delete this?</p>
+    <b id="bn-ask"></b>
+    <div class="bn-actions">
+      <button type="button" id="bn-yes">Delete</button>
+      <button type="button" id="bn-no">Keep</button>
+    </div>
+  </div>
+</div>
+<script src="banned.js?v=20261009-bn1"></script>
+<script src="site-nav.js?v=20261009-bn1"></script>
+</body>
+</html>
