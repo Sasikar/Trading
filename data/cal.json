@@ -1,13 +1,19 @@
 {
-  "updated": "2026-10-09T14:55:31.206Z",
+  "updated": "2026-10-09T14:59:27.613Z",
   "rows": [
     {
       "id": "mv136qgd5jxu",
       "date": "2026-10-09",
       "profit": 409000,
       "gave": 65000,
-      "t": 1791557729874,
-      "tax": 130880
+      "t": 1791557729874
+    }
+  ],
+  "notes": [
+    {
+      "id": "mv13cu2r8erg",
+      "text": "So paid profit is just 6500 according to Jupiter but in Koinly it's 48000 may be market issue, coorect it",
+      "t": 1791557966403
     }
   ]
 }
