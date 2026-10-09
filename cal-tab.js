@@ -92,6 +92,7 @@
   function saveLocal() {
     try { localStorage.setItem(KEY, JSON.stringify(rows)); } catch (e) {}
     try { localStorage.setItem(NKEY, JSON.stringify(notes)); } catch (e) {}
+    try { window.dispatchEvent(new Event('cal-sync')); } catch (e) {}
   }
   function noteTombs() {
     try {

@@ -63,6 +63,26 @@
     try { items = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { items = []; }
     if (!Array.isArray(items)) items = [];
   }
+  function calTax() {
+    var rows = [];
+    try { rows = JSON.parse(localStorage.getItem('cal_rows_v1') || '[]') || []; } catch (e) { rows = []; }
+    if (!Array.isArray(rows)) return 0;
+    var taxSum = 0;
+    var gaveSum = 0;
+    rows.forEach(function (row) {
+      var profit = Number(row && row.profit);
+      if (!isFinite(profit)) return;
+      var tax = Math.round(profit * 0.32 * 100) / 100;
+      var gave = Number(row.gave);
+      if (!isFinite(gave)) gave = 0;
+      taxSum = Math.round((taxSum + tax) * 100) / 100;
+      gaveSum = Math.round((gaveSum + gave) * 100) / 100;
+    });
+    return Math.round((taxSum - gaveSum) * 100) / 100;
+  }
+  function ownItems() {
+    return items.filter(function (row) { return String(row.text || '').toLowerCase() !== 'tax'; });
+  }
   function saveLocal() {
     try { localStorage.setItem(KEY, JSON.stringify(items)); } catch (e) {}
   }
@@ -77,7 +97,7 @@
       if (!it || !it.id || dead[it.id]) return;
       var text = keep(it.text);
       var amount = num(it.amount);
-      if (!text || amount == null) return;
+      if (!text || amount == null || text.toLowerCase() === 'tax') return;
       var row = { id: String(it.id), text: text, amount: amount, t: it.t || 0 };
       var prev = map[row.id];
       if (!prev || row.t >= prev.t) map[row.id] = row;
@@ -140,15 +160,17 @@
   function paint() {
     var root = $('md-app');
     if (!root) return;
-    var total = 0;
-    items.forEach(function (row) { total = Math.round((total + row.amount) * 100) / 100; });
+    var list = ownItems();
+    var tax = calTax();
+    var total = tax;
+    list.forEach(function (row) { total = Math.round((total + row.amount) * 100) / 100; });
     var draftText = '';
     var draftAmt = '';
     var oldText = $('md-text');
     var oldAmt = $('md-amt');
     if (oldText) draftText = oldText.value;
     if (oldAmt) draftAmt = oldAmt.value;
-    var body = items.map(function (row) {
+    var body = list.map(function (row) {
       if (editing === row.id) {
         return '<li class="md-row"><form class="md-form" data-id="' + esc(row.id) + '"><input data-field="text" value="' + esc(row.text) + '" maxlength="80" aria-label="Text"><span class="md-hy">-</span><input data-field="amt" value="' + esc(money(row.amount)) + '" placeholder="2L" aria-label="Amount"><button type="submit">Save</button><button type="button" data-act="cancel" aria-label="Cancel">×</button></form></li>';
       }
@@ -164,12 +186,12 @@
       '<div class="md-total"><b>' + money(total) + '</b></div>' +
       '<form id="md-add" class="md-form"><input id="md-text" data-field="text" maxlength="80" placeholder="Text" value="' + esc(draftText) + '" aria-label="Text"><span class="md-hy">-</span><input id="md-amt" data-field="amt" placeholder="2L" value="' + esc(draftAmt) + '" aria-label="Amount"><button type="submit">Add</button></form>' +
       '<p id="md-status"></p>' + ask +
-      (items.length ? '<ul class="md-list">' + body + '</ul>' : '');
+      '<ul class="md-list"><li class="md-row md-lock"><span class="md-name">Tax</span><span class="md-hy">-</span><b>' + money(tax) + '</b></li>' + body + '</ul>';
   }
   function add(textRaw, amtRaw) {
     var text = keep(textRaw);
     var amount = num(amtRaw);
-    if (!text || amount == null) return;
+    if (!text || amount == null || text.toLowerCase() === 'tax') return;
     items.unshift({ id: nid(), text: text, amount: amount, t: Date.now() });
     var textBox = $('md-text');
     var amtBox = $('md-amt');
@@ -184,7 +206,7 @@
   function saveEdit(id, textRaw, amtRaw) {
     var text = keep(textRaw);
     var amount = num(amtRaw);
-    if (!text || amount == null) return;
+    if (!text || amount == null || text.toLowerCase() === 'tax') return;
     items.forEach(function (row) {
       if (row.id !== id) return;
       row.text = text;
@@ -227,7 +249,7 @@
   if (!document.getElementById('md-style')) {
     var css = document.createElement('style');
     css.id = 'md-style';
-    css.textContent = '#md-panel .head p,#md-panel .source{display:none!important}#md-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#md-panel,#md-app{max-width:100%;overflow-x:hidden}.md-total{border-radius:18px;padding:16px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.md-total b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.md-form{display:flex;flex-wrap:nowrap;gap:6px;align-items:center}.md-form input{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:800 14px/1.2 Inter,system-ui,sans-serif}.md-form input[data-field=amt]{flex:0 0 72px}.md-hy{flex:0 0 auto;color:#8b95a5;font-weight:800}.md-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.md-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}#md-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.md-list{list-style:none;margin:8px 0 0;padding:0}.md-row{display:flex;align-items:center;gap:6px;padding:12px 0;border-bottom:1px solid #1c2733}.md-name{flex:1;min-width:0;font-weight:800;word-break:break-word}.md-row b{flex:0 0 auto;font-size:15px}.md-acts{display:flex;gap:4px;margin-left:auto}.md-pen,.md-x{border:0;border-radius:999px;height:28px;cursor:pointer;font-weight:800}.md-pen{padding:0 8px;background:#243044;color:#f4f7fb;font-size:12px}.md-x{width:28px;background:#2a1a22;color:#ff8b98;font-size:18px}.md-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.md-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.md-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.md-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.md-on main>section.section,body.md-on main>.trend-panel:not(#md-panel),body.md-on main>.struct-trend-panel,body.md-on main>.macro-panel,body.md-on #tf-panels{display:none!important}body.md-on #md-panel{display:block!important}';
+    css.textContent = '#md-panel .head p,#md-panel .source{display:none!important}#md-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#md-panel,#md-app{max-width:100%;overflow-x:hidden}.md-total{border-radius:18px;padding:16px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.md-total b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.md-form{display:flex;flex-wrap:nowrap;gap:6px;align-items:center}.md-form input{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:800 14px/1.2 Inter,system-ui,sans-serif}.md-form input[data-field=amt]{flex:0 0 72px}.md-hy{flex:0 0 auto;color:#8b95a5;font-weight:800}.md-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.md-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}#md-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.md-list{list-style:none;margin:8px 0 0;padding:0}.md-row{display:flex;align-items:center;gap:6px;padding:12px 0;border-bottom:1px solid #1c2733}.md-name{flex:1;min-width:0;font-weight:800;word-break:break-word}.md-row b{flex:0 0 auto;font-size:15px}.md-lock b{color:#e6c878}.md-acts{display:flex;gap:4px;margin-left:auto}.md-pen,.md-x{border:0;border-radius:999px;height:28px;cursor:pointer;font-weight:800}.md-pen{padding:0 8px;background:#243044;color:#f4f7fb;font-size:12px}.md-x{width:28px;background:#2a1a22;color:#ff8b98;font-size:18px}.md-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.md-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.md-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.md-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.md-on main>section.section,body.md-on main>.trend-panel:not(#md-panel),body.md-on main>.struct-trend-panel,body.md-on main>.macro-panel,body.md-on #tf-panels{display:none!important}body.md-on #md-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -263,6 +285,9 @@
     if (!b || b.getAttribute('data-tf') === 'mandates') return;
     showMandates(false);
   }, true);
+  window.addEventListener('cal-sync', function () {
+    if (document.body.classList.contains('md-on')) paint();
+  });
   fetch(PATH + '?t=' + Date.now(), { cache: 'no-store' }).then(function (res) {
     return res.ok ? res.json() : null;
   }).then(function (data) {
