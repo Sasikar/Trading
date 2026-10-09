@@ -7,14 +7,16 @@
   var items = [];
   var syncing = false;
   var asking = '';
+  var editing = '';
+  var PEN = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm14.71-10.21a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>';
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-      if (c === '&') return '&';
-      if (c === '<') return '<';
-      if (c === '>') return '>';
-      return '"';
+      if (c === '&') return '&' + 'amp;';
+      if (c === '<') return '&' + 'lt;';
+      if (c === '>') return '&' + 'gt;';
+      return '&' + 'quot;';
     });
   }
   function token() {
@@ -22,7 +24,7 @@
     catch (e) { return ''; }
   }
   function nid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-  function keep(raw) { return String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 240); }
+  function keep(raw) { return String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 500); }
   function tombs() {
     try {
       var o = JSON.parse(localStorage.getItem(TOMB) || '{}');
@@ -94,7 +96,7 @@
         return;
       }
       var body = {
-        message: 'Banned list',
+        message: 'My rules',
         content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), items: items }, null, 2)))),
         branch: 'master'
       };
@@ -115,12 +117,32 @@
     var list = $('bn-list');
     if (!list) return;
     if (!items.length) {
-      list.innerHTML = '<li class="bn-empty">Nothing banned yet.</li>';
+      list.innerHTML = '<li class="bn-empty">No rules yet.</li>';
       return;
     }
     list.innerHTML = items.map(function (it) {
-      return '<li class="bn-row"><span class="bn-text">' + esc(it.text) + '</span><button type="button" class="bn-x" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></li>';
+      if (editing === it.id) {
+        return '<li class="bn-row"><form class="bn-edit" data-id="' + esc(it.id) + '"><textarea>' + esc(it.text) + '</textarea><span class="bn-edit-actions"><button type="submit">Save</button><button type="button" data-act="cancel">Cancel</button></span></form></li>';
+      }
+      return '<li class="bn-row"><span class="bn-text">' + esc(it.text) + '</span><span class="bn-actions"><button type="button" class="bn-pen" data-act="edit" data-id="' + esc(it.id) + '" aria-label="Edit">' + PEN + '</button><button type="button" class="bn-x" data-act="delete" data-id="' + esc(it.id) + '" aria-label="Delete">×</button></span></li>';
     }).join('');
+    if (editing) {
+      var field = list.querySelector('textarea');
+      if (field) { field.focus(); field.setSelectionRange(field.value.length, field.value.length); }
+    }
+  }
+  function saveEdit(id, raw) {
+    var text = keep(raw);
+    if (!text) return;
+    items.forEach(function (it) {
+      if (it.id !== id) return;
+      it.text = text;
+      it.t = Date.now();
+    });
+    editing = '';
+    saveLocal();
+    paint();
+    persist();
   }
   function add(raw) {
     var text = keep(raw);
@@ -165,11 +187,24 @@
     if (input) input.value = '';
   });
   var list = $('bn-list');
-  if (list) list.addEventListener('click', function (ev) {
-    var btn = ev.target && ev.target.closest && ev.target.closest('.bn-x');
-    if (!btn) return;
-    openAsk(btn.getAttribute('data-id') || '');
-  });
+  if (list) {
+    list.addEventListener('click', function (ev) {
+      var btn = ev.target && ev.target.closest && ev.target.closest('[data-act]');
+      if (!btn) return;
+      var act = btn.getAttribute('data-act');
+      var id = btn.getAttribute('data-id') || '';
+      if (act === 'edit') { editing = id; paint(); }
+      if (act === 'cancel') { editing = ''; paint(); }
+      if (act === 'delete') openAsk(id);
+    });
+    list.addEventListener('submit', function (ev) {
+      var form = ev.target;
+      if (!form || !form.classList || !form.classList.contains('bn-edit')) return;
+      ev.preventDefault();
+      var field = form.querySelector('textarea');
+      saveEdit(form.getAttribute('data-id'), field && field.value);
+    });
+  }
   var yes = $('bn-yes');
   var no = $('bn-no');
   if (yes) yes.addEventListener('click', function () { if (asking) remove(asking); closeAsk(); });

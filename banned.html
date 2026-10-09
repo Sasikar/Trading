@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#070a0f">
-<title>Banned</title>
+<title>My rules</title>
 <style>
   body{margin:0;background:#070a0f;color:#f4f7fb;font-family:Inter,system-ui,sans-serif}
   main{width:min(720px,calc(100% - 20px));margin:8px auto 48px}
@@ -17,7 +17,15 @@
   #bn-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
   .bn-row{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:12px 8px 12px 14px;border-radius:16px;background:#10161f}
   .bn-text{flex:1;min-width:0;font-size:16px;font-weight:750;line-height:1.35;word-break:break-word}
-  .bn-x{width:32px;height:32px;flex:0 0 auto;margin-left:auto;border:0;border-radius:50%;background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1;cursor:pointer}
+  .bn-actions{display:flex;gap:6px;align-items:center;flex:0 0 auto;margin-left:auto}
+  .bn-pen,.bn-x{width:32px;height:32px;flex:0 0 auto;border:0;border-radius:50%;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+  .bn-pen{background:#243044;color:#d5dde8}
+  .bn-x{background:#2a1a22;color:#ff8b98;font-size:18px;line-height:1}
+  .bn-edit{display:flex;flex-wrap:wrap;gap:8px;width:100%;align-items:center}
+  .bn-edit textarea{flex:1 1 100%;min-height:72px;padding:12px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font:700 16px/1.35 Inter,system-ui,sans-serif;resize:vertical;box-sizing:border-box}
+  .bn-edit-actions{display:flex;gap:8px;margin-left:auto}
+  .bn-edit button{border:0;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;background:#243044;color:#f4f7fb}
+  .bn-edit button[type=submit]{background:#e6c878;color:#1a1406}
   .bn-empty{padding:14px;color:#8b95a5;font-weight:700}
   #bn-modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;padding:20px;z-index:40}
   #bn-modal[hidden]{display:none}
@@ -32,10 +40,10 @@
 </head>
 <body>
 <main>
-  <h1>Banned</h1>
-  <p class="sub">Add a value. Delete it with the ×. The list stays saved.</p>
+  <h1>My rules</h1>
+  <p class="sub">Add a rule. Use the pencil to change it. The list stays saved.</p>
   <form id="bn-form">
-    <input id="bn-input" placeholder="Add a banned value" autocomplete="off" enterkeyhint="done">
+    <input id="bn-input" placeholder="Add a rule" autocomplete="off" enterkeyhint="done">
     <button type="submit">Add</button>
   </form>
   <p id="bn-status"></p>
@@ -51,7 +59,7 @@
     </div>
   </div>
 </div>
-<script src="banned.js?v=20261009-bn1"></script>
-<script src="site-nav.js?v=20261009-bn1"></script>
+<script src="banned.js?v=20261009-bn2"></script>
+<script src="site-nav.js?v=20261009-bn2"></script>
 </body>
 </html>
