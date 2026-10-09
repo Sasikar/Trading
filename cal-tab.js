@@ -66,8 +66,16 @@
     return Math.round(Number(profit) * RATE * 100) / 100;
   }
   function num(raw) {
-    var n = Number(String(raw == null ? '' : raw).replace(/,/g, '').trim());
-    return isFinite(n) ? Math.round(n * 100) / 100 : null;
+    var s = String(raw == null ? '' : raw).replace(/,/g, '').trim();
+    if (!s) return null;
+    var m = s.match(/^(-?\d+(?:\.\d+)?)\s*([kKlL])?$/);
+    if (!m) return null;
+    var n = Number(m[1]);
+    if (!isFinite(n)) return null;
+    var unit = (m[2] || '').toLowerCase();
+    if (unit === 'k') n = n * 1000;
+    if (unit === 'l') n = n * 100000;
+    return Math.round(n * 100) / 100;
   }
   function loadLocal() {
     try { rows = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { rows = []; }
@@ -180,7 +188,7 @@
     if (typed != null) draftTax = money(paidOf(typed));
     var body = list.slice().reverse().map(function (row) {
       if (editing === row.id) {
-        return '<li class="cal-item"><form class="cal-form" data-id="' + esc(row.id) + '"><input type="date" value="' + esc(row.date) + '" aria-label="Date"><input data-field="profit" inputmode="decimal" value="' + esc(row.profit) + '" placeholder="Total profit" aria-label="Total profit"><input data-field="tax" readonly tabindex="-1" value="' + esc(money(row.tax)) + '" aria-label="32%"><input data-field="gave" inputmode="decimal" value="' + esc(row.gave) + '" placeholder="Paid" aria-label="Paid"><button type="submit">Save</button><button type="button" data-act="cancel">Cancel</button></form></li>';
+        return '<li class="cal-item"><form class="cal-form" data-id="' + esc(row.id) + '"><input type="date" value="' + esc(row.date) + '" aria-label="Date"><input data-field="profit" inputmode="text" autocapitalize="off" spellcheck="false" value="' + esc(money(row.profit)) + '" placeholder="2L" aria-label="Total profit"><input data-field="tax" readonly tabindex="-1" value="' + esc(money(row.tax)) + '" aria-label="32%"><input data-field="gave" inputmode="text" autocapitalize="off" spellcheck="false" value="' + esc(money(row.gave || 0)) + '" placeholder="50K" aria-label="Paid"><button type="submit">Save</button><button type="button" data-act="cancel">Cancel</button></form></li>';
       }
       return '<li class="cal-item"><div class="cal-line"><b>' + esc(shortDate(row.date)) + '</b><span>' + money(row.profit) + '</span><span>' + money(row.tax) + '</span><span>' + money(row.gave || 0) + '</span><span class="cal-acts"><button type="button" class="cal-pen" data-act="edit" data-id="' + esc(row.id) + '" aria-label="Edit">Edit</button><button type="button" class="cal-x" data-act="ask" data-id="' + esc(row.id) + '" aria-label="Delete">×</button></span></div></li>';
     }).join('');
@@ -192,7 +200,7 @@
     }
     root.innerHTML =
       '<div class="cal-remain"><b>' + money(remaining) + '</b></div>' +
-      '<form id="cal-add" class="cal-form"><input id="cal-date" type="date" value="' + esc(draftDate) + '" aria-label="Date"><input id="cal-profit" data-field="profit" inputmode="decimal" placeholder="Total profit" value="' + esc(draftProfit) + '" aria-label="Total profit"><input id="cal-tax" data-field="tax" readonly tabindex="-1" placeholder="32%" value="' + esc(draftTax) + '" aria-label="32%"><input id="cal-gave" data-field="gave" inputmode="decimal" placeholder="Paid" value="' + esc(draftGave) + '" aria-label="Paid"><button type="submit">Add</button></form>' +
+      '<form id="cal-add" class="cal-form"><input id="cal-date" type="date" value="' + esc(draftDate) + '" aria-label="Date"><input id="cal-profit" data-field="profit" inputmode="text" autocapitalize="off" spellcheck="false" placeholder="2L" value="' + esc(draftProfit) + '" aria-label="Total profit"><input id="cal-tax" data-field="tax" readonly tabindex="-1" placeholder="32%" value="' + esc(draftTax) + '" aria-label="32%"><input id="cal-gave" data-field="gave" inputmode="text" autocapitalize="off" spellcheck="false" placeholder="50K" value="' + esc(draftGave) + '" aria-label="Paid"><button type="submit">Add</button></form>' +
       '<p id="cal-status"></p>' +
       ask +
       (list.length
