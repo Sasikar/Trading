@@ -4,12 +4,12 @@
   var API = "https://trading-ohlcv.sasipudi.workers.dev";
   var KEY = "trading_alert_types_v1";
   var TYPES = [
+    { id: "bestpicks", name: "CA Best Picks", hint: "A saved coin newly becomes Early or Strong on at least one timeframe. Watch-only coins stay quiet.", tone: "#3dbe7a" },
     { id: "breakout", name: "Breakout", hint: "NEW BREAKOUT on a closed candle. One ping per coin and timeframe.", tone: "#ff5d6c" },
     { id: "breakout1m", name: "1 minute", hint: "Focus coin only. Fresh 1m breakout, shorter cooldown.", tone: "#e6b84d" },
     { id: "entry", name: "Entry quality", hint: "WINDOW, EXTENDED, or FAILED after a breakout.", tone: "#3dbe7a" },
     { id: "entrywindow", name: "Entry Window", hint: "NO CHASE, approaching, retest, reclaim, active, invalidated.", tone: "#7eb6ff" },
     { id: "fomoentry", name: "FomoEntry TAKE", hint: "A setup just entered TAKE. Zone, stop, and targets. Not a buy.", tone: "#e6b84d" },
-    { id: "bestpicks", name: "Best Picks", hint: "A saved coin newly becomes Early or Strong on at least one timeframe. Watch-only coins stay quiet.", tone: "#3dbe7a" },
     { id: "parabolic", name: "Parabolic", hint: "Dex smash. Does not wait for a higher-timeframe close.", tone: "#ff8a4a" },
     { id: "wowdip", name: "WOW DIP", hint: "Crash, avoid, or recovery test. Not an entry.", tone: "#ff5d6c" },
     { id: "position", name: "Position", hint: "Existing-position monitor. Not an entry signal.", tone: "#c9a6ff" },
