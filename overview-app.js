@@ -2826,13 +2826,129 @@ document.addEventListener('click', function(ev){
 });
 
 const CA_STATE_TABS=[['WATCH','Watch'],['EARLY','Early'],['STRONG CONFIRMED','Strong'],['STRETCHED','Stretched'],['OFF','Off']];
+const CA_MATRIX_TFS=['1m','5m','10m','15m','30m','1h','2h','4h','1d','1w'];
 let caStatePick='EARLY';
 let caStateBusy=false;
 let caStateQueued=false;
 let caStateTimer=0;
 let caStateLoadingTf='';
 let caStateLeft=0;
+let caMatrixKey='';
+let caMatrixRun=0;
 const caStateCache={};
+const caMatrixLive={};
+function caStateLabel(st){
+  if(!st) return '—';
+  if(st==='STRONG CONFIRMED') return 'STRONG';
+  return st;
+}
+function caStateColor(st){
+  if(st==='EARLY'||st==='STRONG CONFIRMED') return '#62e3a0';
+  if(st==='STRETCHED') return '#f0a060';
+  if(st==='OFF') return '#ff6f7c';
+  if(st==='WATCH') return '#e6c878';
+  return '#8b95a5';
+}
+function caMatrixBtn(on){
+  return '<button type="button" data-st="MATRIX" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:'+(on?'#1a9b6c':'#121a24')+';color:'+(on?'#fff':'#c5d0dc')+'">Matrix</button>';
+}
+function caBindStateTabs(bar){
+  bar.querySelectorAll('button').forEach(function(b){
+    if(b.disabled) return;
+    b.addEventListener('click', function(){
+      caStatePick=b.getAttribute('data-st')||'EARLY';
+      paintCaStates();
+    });
+  });
+}
+function paintMatrix(){
+  const bar=$('ca-sig-tabs');
+  const list=caEnsureStateList();
+  if(!bar||!list) return;
+  list.style.display='block';
+  const note=$('ca-state-note');
+  if(note) note.textContent='';
+  const coins=coinRecentsLoadLocal();
+  bar.innerHTML=CA_STATE_TABS.map(function(s){
+    return '<button type="button" data-st="'+s[0]+'" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:#121a24;color:#c5d0dc">'+s[1]+'</button>';
+  }).join('')+caMatrixBtn(true);
+  caBindStateTabs(bar);
+  if(!coins.length){
+    list.innerHTML='<div style="color:#8491a1;font-size:12px;font-weight:700">No saved coins yet.</div>';
+    return;
+  }
+  if(!caMatrixKey || !coins.some(function(e){ return coinRecentKey(e)===caMatrixKey; })) caMatrixKey=coinRecentKey(coins[0]);
+  const entry=coins.filter(function(e){ return coinRecentKey(e)===caMatrixKey; })[0]||coins[0];
+  const opts=coins.map(function(e){
+    const k=coinRecentKey(e);
+    const chain=(e.chain==='solana'||e.chain==='sol')?'SOL':'ETH';
+    return '<option value="'+k+'">'+(e.name||'Coin')+' · '+chain+'</option>';
+  }).join('');
+  const live=caMatrixLive[caMatrixKey]||{};
+  const rows=CA_MATRIX_TFS.map(function(tf){
+    const st=Object.prototype.hasOwnProperty.call(live, tf) ? live[tf] : ((caStateCache[caMatrixKey+'|'+tf]||{}).state||'');
+    const waiting=!Object.prototype.hasOwnProperty.call(live, tf) && !(caStateCache[caMatrixKey+'|'+tf]&&caStateCache[caMatrixKey+'|'+tf].t);
+    const label=waiting ? '…' : caStateLabel(st);
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid #1c2733"><b style="font-size:13px">'+tf.toUpperCase()+'</b><span style="font-weight:900;color:'+caStateColor(st)+'">'+label+'</span></div>';
+  }).join('');
+  list.innerHTML='<select id="ca-matrix-sel" style="width:100%;box-sizing:border-box;margin:0 0 8px;padding:10px 12px;border-radius:12px;border:0;background:#141c27;color:#f4f7fb;font-weight:800">'+opts+'</select><div data-matrix>'+rows+'</div>';
+  const sel=$('ca-matrix-sel');
+  if(sel){
+    sel.value=caMatrixKey;
+    sel.addEventListener('change', function(){
+      caMatrixKey=sel.value;
+      const hit=coinRecentsLoadLocal().filter(function(e){ return coinRecentKey(e)===caMatrixKey; })[0];
+      if(hit) caLoadMatrix(hit);
+    });
+  }
+}
+function caLoadMatrix(entry){
+  if(!entry) return;
+  const key=coinRecentKey(entry);
+  const run=++caMatrixRun;
+  const live={};
+  CA_MATRIX_TFS.forEach(function(tf){
+    const hit=caStateCache[key+'|'+tf];
+    if(hit && hit.t && (hit.state ? Date.now()-hit.t<10*60*1000 : Date.now()-hit.t<2*60*1000)) live[tf]=hit.state||'';
+  });
+  caMatrixLive[key]=live;
+  if(caStatePick==='MATRIX') paintMatrixBody(key);
+  const todo=CA_MATRIX_TFS.filter(function(tf){ return !Object.prototype.hasOwnProperty.call(live, tf); });
+  if(!todo.length) return;
+  Promise.all(todo.map(function(tf){
+    return caDbBars(entry.ca, tf).then(function(kl){
+      if(!kl||kl.length<8){
+        caStateCache[key+'|'+tf]={state:'', t:Date.now()};
+        live[tf]='';
+        return;
+      }
+      const gate=coinEntryGate(kl, tf);
+      const st=gate.state||'WATCH';
+      caStateCache[key+'|'+tf]={state:st, t:Date.now()};
+      live[tf]=st;
+    }).catch(function(){
+      caStateCache[key+'|'+tf]={state:'', t:Date.now()};
+      live[tf]='';
+    }).then(function(){
+      if(run!==caMatrixRun || caStatePick!=='MATRIX' || caMatrixKey!==key) return;
+      caMatrixLive[key]=live;
+      paintMatrixBody(key);
+    });
+  }));
+}
+function paintMatrixBody(key){
+  const list=$('ca-state-list');
+  if(!list || caStatePick!=='MATRIX') return;
+  const live=caMatrixLive[key]||{};
+  let grid=list.querySelector('[data-matrix]');
+  if(!grid) return;
+  grid.innerHTML=CA_MATRIX_TFS.map(function(tf){
+    const known=Object.prototype.hasOwnProperty.call(live, tf);
+    const st=known ? live[tf] : '';
+    const label=known ? caStateLabel(st) : '…';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid #1c2733"><b style="font-size:13px">'+tf.toUpperCase()+'</b><span style="font-weight:900;color:'+caStateColor(st)+'">'+label+'</span></div>';
+  }).join('');
+}
 function caBeginTf(){
   caStateLoadingTf=coinTF||'4h';
   caStateLeft=coinRecentsLoadLocal().length;
@@ -2867,10 +2983,21 @@ function paintCaStates(){
   const bar=$('ca-sig-tabs');
   const list=caEnsureStateList();
   if(!bar||!list) return;
+  let note=$('ca-state-note');
+  if(caStatePick==='MATRIX'){
+    const had=$('ca-matrix-sel');
+    list.style.display='block';
+    paintMatrix();
+    if(!had){
+      const entry=coinRecentsLoadLocal().filter(function(e){ return coinRecentKey(e)===caMatrixKey; })[0];
+      if(entry) caLoadMatrix(entry);
+    }
+    return;
+  }
+  list.style.display='flex';
   const tf=coinTF||'4h';
   const tfLab=String(tf).toUpperCase();
   const loading=caStateLoadingTf===tf;
-  let note=$('ca-state-note');
   if(!note){
     note=document.createElement('div');
     note.id='ca-state-note';
@@ -2881,7 +3008,8 @@ function paintCaStates(){
   if(loading){
     bar.innerHTML=CA_STATE_TABS.map(function(s){
       return '<button type="button" disabled style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;background:#121a24;color:#5c6774;opacity:.7">'+s[1]+'</button>';
-    }).join('');
+    }).join('')+caMatrixBtn(false);
+    caBindStateTabs(bar);
     list.innerHTML='<div style="color:#e6c878;font-size:12px;font-weight:800">'+tfLab+' is not ready. These are not the last timeframe.</div>';
     return;
   }
@@ -2900,13 +3028,8 @@ function paintCaStates(){
     const n=(buckets[s[0]]||[]).length;
     const on=caStatePick===s[0];
     return '<button type="button" data-st="'+s[0]+'" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:'+(on?'#1a9b6c':'#121a24')+';color:'+(on?'#fff':'#c5d0dc')+'">'+s[1]+(n?' '+n:'')+'</button>';
-  }).join('');
-  bar.querySelectorAll('button').forEach(function(b){
-    b.addEventListener('click', function(){
-      caStatePick=b.getAttribute('data-st')||'EARLY';
-      paintCaStates();
-    });
-  });
+  }).join('')+caMatrixBtn(false);
+  caBindStateTabs(bar);
   const rows=buckets[caStatePick]||[];
   if(!arr.length) list.innerHTML='<div style="color:#8491a1;font-size:12px;font-weight:700">No saved coins yet.</div>';
   else if(pending && !rows.length) list.innerHTML='<div style="color:#8491a1;font-size:12px;font-weight:700">Checking coins… '+pending+' left</div>';
