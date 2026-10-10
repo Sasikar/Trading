@@ -1639,47 +1639,11 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
       <button type="button" data-ctf="1d" onclick="try{window.setCoinTF&&window.setCoinTF('1d')}catch(e){}">1D</button>
       <button type="button" data-ctf="1w" onclick="try{window.setCoinTF&&window.setCoinTF('1w')}catch(e){}">1W</button>
     </div>
+    <div id="ca-sig-tabs" style="display:flex;gap:8px;margin:0 0 10px">
+      <button type="button" data-sig="on" style="padding:8px 16px;border-radius:999px;border:0;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">On</button>
+      <button type="button" data-sig="close" style="padding:8px 16px;border-radius:999px;border:0;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">Close</button>
+    </div>
     <div id="coin-entry-box" style="margin:0 0 14px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c)"><div style="color:#8491a1;font-size:12px">Load CA → CA signal (WATCH / EARLY / STRONG / STRETCHED / OFF)</div></div>
-    <div id="coin-multi-box" style="margin:0 0 16px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:#0d141c">
-      <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:8px">MULTI-CA VALIDATION · FROZEN ENGINE</div>
-      <div style="font-size:11px;color:#8491a1;margin-bottom:8px;line-height:1.45">Historical validation of selected available CAs — not a complete market-universe backtest. Rules frozen. One line per coin: <code style="color:#c5d0dc">sol|CA</code> or <code style="color:#c5d0dc">eth|0x…</code></div>
-      <textarea id="coin-multi-list" rows="12" style="width:100%;box-sizing:border-box;background:#0b121a;color:#c5d0dc;border:1px solid #243041;border-radius:10px;padding:10px;font-size:11px;font-family:ui-monospace,monospace;resize:vertical">sol|Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump
-sol|DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
-sol|EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm
-sol|7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr
-sol|ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82
-sol|MEW1gQWJ3nEXg2qgERiCu7FpZK5tYxoAkjP8A5t9pump
-sol|CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump
-sol|9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump
-sol|2zMMhcVQEXDtdE6vsFS7S7D5oUodfJHE8vd1gnBouauv
-sol|JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN
-sol|HZ1JovNiVvGrGNiiYvEozEVgZ58xbAUv3F5y6pump
-sol|7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU
-sol|A8C3xuqscfmyLrte3VmTqrAq8kgMASius9AFNANwpump
-sol|ED5nyyWEzpPPiWimP8vYm7nuw3F2n5HrjZpjzG8pump
-sol|hntyVP6YFm1Hg25TN9WGLqM12b8TQmcknKrduLvoxTp
-sol|orcaEKTdK7LKz57vaAYr9QeNsVEPfiu6QeMU1kektEV
-sol|Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB
-sol|EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
-sol|So11111111111111111111111111111111111111112
-sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button type="button" id="coin-multi-run" onclick="try{window.runMultiCA&&window.runMultiCA()}catch(e){alert(e)}" style="padding:10px 16px;border-radius:10px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Run 4H + 1D validation</button>
-        <span id="coin-multi-status" style="font-size:12px;color:#8491a1;align-self:center">Idle</span>
-      </div>
-      <div id="coin-multi-summary" style="margin-top:12px;font-size:12px;color:#8491a1"></div>
-      <div id="coin-multi-table" style="margin-top:10px;overflow-x:auto"></div>
-    </div>
-    <div id="coin-hist-box" style="margin:0 0 16px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:#0d141c">
-      <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:8px">CA 30-DAY STATE HISTORY · ALL CLOSED BARS</div>
-      <div id="coin-hist-summary" style="font-size:12px;color:#8491a1">Load a CA — every closed bar state for last 30 days (audit, not transitions only).</div>
-      <div id="coin-hist-table" style="margin-top:10px;overflow-x:auto;max-height:420px;overflow-y:auto"></div>
-    </div>
-    <div id="coin-bt-box" style="margin:0 0 16px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:#0d141c">
-      <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:8px">CA SIGNAL BACKTEST · TRANSITIONS ONLY</div>
-      <div id="coin-bt-summary" style="font-size:12px;color:#8491a1">Performance: EARLY / STRONG / STRETCHED transitions +1/+3/+7.</div>
-      <div id="coin-bt-table" style="margin-top:10px;overflow-x:auto"></div>
-    </div>
     <div class="price-now"><div><div class="big" id="coin-spot">—</div><div class="meta" id="coin-spot-meta">—</div></div><div class="meta" id="coin-bias" style="font-weight:800;text-align:right">—</div></div>
     <div class="coin-stats">
       <div class="st"><div class="lab">RSI 14</div><div class="val" id="coin-rsi">—</div></div>
@@ -1687,10 +1651,6 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
       <div class="st"><div class="lab">VOLUME</div><div class="val" id="coin-vol">—</div></div>
       <div class="st"><div class="lab">CVD</div><div class="val" id="coin-cvd">—</div></div>
     </div>
-    <div class="head" style="padding:12px 0 6px"><div><h2 style="font-size:15px">Fibonacci · <span id="coin-tf-name">4H</span></h2></div></div>
-    <div id="coin-embed" style="margin:8px 0 14px"></div>
-    <div id="coin-fib-tv"></div>
-    <div class="ladder" id="coin-fib-ladder"></div>
     <div class="head" style="padding:16px 0 6px"><div><h2 style="font-size:15px">MACD chart</h2></div></div>
     <div id="coin-macd-tv"></div>
     <div class="head" style="padding:16px 0 6px"><div><h2 style="font-size:15px">S / R pivots</h2></div></div>
@@ -1711,7 +1671,7 @@ sol|mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So</textarea>
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261009-ov3"></script>
+<script src="overview-app.js?v=20261010-ca1"></script>
 <script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20261004-hd1d"></script>

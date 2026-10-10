@@ -3372,13 +3372,19 @@ function coinRenderEntry(gate){
   if(!el) return;
   gate = gate || {state:'WATCH', entry:false, sizePct:0, bigSize:false, reason:'—', confirms:0, groups:{}, detail:{}};
   const st = gate.state || 'WATCH';
-  const isBullState = st==='STRONG CONFIRMED' || st==='EARLY';
+  const open = st==='EARLY' || st==='STRONG CONFIRMED' || !!gate.entry;
+  const word = open ? 'ON' : 'CLOSE';
   const isStretch = st==='STRETCHED';
   const isOff = st==='OFF';
-  const col = isBullState ? '#62e3a0' : (isOff ? '#ff6f7c' : (isStretch ? '#f0a060' : '#e6c878'));
+  const col = open ? '#62e3a0' : '#ff6f7c';
+  document.querySelectorAll('#ca-sig-tabs button').forEach(function(b){
+    const on = b.getAttribute('data-sig') === (open ? 'on' : 'close');
+    b.style.background = on ? (open ? '#1a9b6c' : '#ff6f7c') : '#121a24';
+    b.style.color = on ? '#fff' : '#c5d0dc';
+  });
   const entry = gate.entry
     ? (gate.bigSize ? 'ON · BIG '+(gate.sizePct||85)+'%' : 'ON · '+(gate.sizePct||30)+'%')
-    : 'OFF · 0%';
+    : 'CLOSE · 0%';
   const d = gate.detail || {};
   const g = gate.groups || {};
   const order = ['structure','trend','momentum','breakout','volume','cvd','extension','meme_env'];
@@ -3440,7 +3446,7 @@ function coinRenderEntry(gate){
   el.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
       '<div><div style="font-size:10px;letter-spacing:.08em;color:#8491a1;font-weight:800">CA SIGNAL · '+(d.tf||coinTF||'').toUpperCase()+'</div>'+
-      '<div style="font-size:18px;font-weight:900;color:'+col+';margin-top:4px">'+st+'</div></div>'+
+      '<div style="font-size:22px;font-weight:900;color:'+col+';margin-top:4px">'+word+'</div></div>'+
       '<div style="text-align:right"><div style="font-size:10px;color:#8491a1;font-weight:800">NEW SIZE</div>'+
       '<div style="font-size:16px;font-weight:900;color:'+(gate.entry?'#62e3a0':'#8491a1')+'">'+entry+'</div>'+
       (gate.bigSize?'<div style="font-size:10px;color:#62e3a0;font-weight:800">BIG SIZE OK</div>':'')+
