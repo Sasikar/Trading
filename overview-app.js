@@ -2830,10 +2830,18 @@ let caStatePick='EARLY';
 let caStateBusy=false;
 let caStateQueued=false;
 let caStateTimer=0;
+let caStateLoadingTf='';
+let caStateLeft=0;
 const caStateCache={};
+function caBeginTf(){
+  caStateLoadingTf=coinTF||'4h';
+  caStateLeft=coinRecentsLoadLocal().length;
+  paintCaStates();
+}
 function caScheduleStates(){
+  caBeginTf();
   clearTimeout(caStateTimer);
-  caStateTimer=setTimeout(function(){ caRefreshStates(); }, 300);
+  caStateTimer=setTimeout(function(){ caRefreshStates(); }, 60);
 }
 function caEnsureStateList(){
   const bar=$('ca-sig-tabs');
@@ -2859,6 +2867,24 @@ function paintCaStates(){
   const bar=$('ca-sig-tabs');
   const list=caEnsureStateList();
   if(!bar||!list) return;
+  const tf=coinTF||'4h';
+  const tfLab=String(tf).toUpperCase();
+  const loading=caStateLoadingTf===tf;
+  let note=$('ca-state-note');
+  if(!note){
+    note=document.createElement('div');
+    note.id='ca-state-note';
+    bar.parentNode.insertBefore(note, bar);
+  }
+  note.textContent=loading ? ('Loading '+tfLab+(caStateLeft?(' · '+caStateLeft+' left'):'')) : (tfLab+' states');
+  note.style.cssText='width:100%;font-size:12px;font-weight:800;margin:0 0 8px;color:'+(loading?'#e6c878':'#8b95a5');
+  if(loading){
+    bar.innerHTML=CA_STATE_TABS.map(function(s){
+      return '<button type="button" disabled style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;background:#121a24;color:#5c6774;opacity:.7">'+s[1]+'</button>';
+    }).join('');
+    list.innerHTML='<div style="color:#e6c878;font-size:12px;font-weight:800">'+tfLab+' is not ready. These are not the last timeframe.</div>';
+    return;
+  }
   const arr=coinRecentsLoadLocal();
   const buckets={};
   CA_STATE_TABS.forEach(function(s){ buckets[s[0]]=[]; });
@@ -2922,6 +2948,13 @@ async function caRefreshStates(){
       const age=Date.now()-(hit.t||0);
       return hit.state ? age>10*60*1000 : age>2*60*1000;
     });
+    if(!todo.length){
+      if(caStateLoadingTf===tf) caStateLoadingTf='';
+      paintCaStates();
+      return;
+    }
+    caStateLoadingTf=tf;
+    caStateLeft=todo.length;
     paintCaStates();
     await Promise.all(todo.map(function(e){
       const k=coinRecentKey(e)+'|'+tf;
@@ -2935,9 +2968,14 @@ async function caRefreshStates(){
       }).catch(function(){
         caStateCache[k]={state:'', t:Date.now()};
       }).then(function(){
-        if(panel.style.display!=='none') paintCaStates();
+        if(caStateLoadingTf===tf) caStateLeft=Math.max(0, caStateLeft-1);
+        if(panel.style.display!=='none' && (coinTF||'4h')===tf) paintCaStates();
       });
     }));
+    if((coinTF||'4h')===tf){
+      caStateLoadingTf='';
+      paintCaStates();
+    }
   }finally{
     caStateBusy=false;
     if(caStateQueued){ caStateQueued=false; caRefreshStates(); }
