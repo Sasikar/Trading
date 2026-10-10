@@ -62,6 +62,7 @@
   function loadLocal() {
     try { items = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { items = []; }
     if (!Array.isArray(items)) items = [];
+    sortItems();
   }
   function calTax() {
     var rows = [];
@@ -103,7 +104,10 @@
       if (!prev || row.t >= prev.t) map[row.id] = row;
     });
     items = Object.keys(map).map(function (k) { return map[k]; });
-    items.sort(function (a, b) { return (b.t || 0) - (a.t || 0); });
+    sortItems();
+  }
+  function sortItems() {
+    items.sort(function (a, b) { return (a.amount || 0) - (b.amount || 0); });
   }
   function decodePack(gj) {
     var text = decodeURIComponent(escape(atob(String(gj.content || '').replace(/\s/g, ''))));
@@ -170,7 +174,14 @@
     var oldAmt = $('md-amt');
     if (oldText) draftText = oldText.value;
     if (oldAmt) draftAmt = oldAmt.value;
-    var body = list.map(function (row) {
+    var rows = [{ kind: 'tax', amount: tax }];
+    list.forEach(function (row) { rows.push({ kind: 'item', amount: row.amount, row: row }); });
+    rows.sort(function (a, b) { return (a.amount || 0) - (b.amount || 0); });
+    var body = rows.map(function (entry) {
+      if (entry.kind === 'tax') {
+        return '<li class="md-row md-lock"><span class="md-name">Tax</span><span class="md-hy">-</span><b>' + money(entry.amount) + '</b></li>';
+      }
+      var row = entry.row;
       if (editing === row.id) {
         return '<li class="md-row"><form class="md-form" data-id="' + esc(row.id) + '"><input data-field="text" value="' + esc(row.text) + '" maxlength="80" aria-label="Text"><span class="md-hy">-</span><input data-field="amt" value="' + esc(money(row.amount)) + '" placeholder="2L" aria-label="Amount"><button type="submit">Save</button><button type="button" data-act="cancel" aria-label="Cancel">×</button></form></li>';
       }
@@ -186,13 +197,14 @@
       '<div class="md-total"><b>' + money(total) + '</b></div>' +
       '<form id="md-add" class="md-form"><input id="md-text" data-field="text" maxlength="80" placeholder="Text" value="' + esc(draftText) + '" aria-label="Text"><span class="md-hy">-</span><input id="md-amt" data-field="amt" placeholder="2L" value="' + esc(draftAmt) + '" aria-label="Amount"><button type="submit">Add</button></form>' +
       '<p id="md-status"></p>' + ask +
-      '<ul class="md-list"><li class="md-row md-lock"><span class="md-name">Tax</span><span class="md-hy">-</span><b>' + money(tax) + '</b></li>' + body + '</ul>';
+      '<ul class="md-list">' + body + '</ul>';
   }
   function add(textRaw, amtRaw) {
     var text = keep(textRaw);
     var amount = num(amtRaw);
     if (!text || amount == null || text.toLowerCase() === 'tax') return;
     items.unshift({ id: nid(), text: text, amount: amount, t: Date.now() });
+    sortItems();
     var textBox = $('md-text');
     var amtBox = $('md-amt');
     if (textBox) textBox.value = '';
@@ -214,6 +226,7 @@
       row.t = Date.now();
     });
     editing = '';
+    sortItems();
     saveLocal();
     paint();
     persist();
