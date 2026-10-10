@@ -6188,8 +6188,8 @@ function initTabReorder(){
   const bar=document.getElementById('tf-tabs');
   if(!bar || bar.dataset.reorder==='1') return;
   bar.dataset.reorder='1';
-  const KEY='tf_tab_order_v3';
-  const FIRST=['fe','cal','mandates','alerts','coin','cadelete','holders','sleep','keywords','gnotes','whale','entrywindow'];
+  const KEY='tf_tab_order_v4';
+  const FIRST=['fe','entrywindow','coin','breakouts','position','decision','antifomo'];
   let arranging=false, dragEl=null, moved=false, fromTouch=false;
   function orderNow(){
     return [].slice.call(bar.querySelectorAll('.tab')).map(function(b){return b.getAttribute('data-tf');});
@@ -6207,8 +6207,7 @@ function initTabReorder(){
     const map={};
     bar.querySelectorAll('.tab').forEach(function(b){ map[b.getAttribute('data-tf')]=b; });
     order.forEach(function(id){ if(map[id]) bar.appendChild(map[id]); });
-    Object.keys(map).forEach(function(id){ if(order.indexOf(id)<0 && id!=='cadelete') bar.appendChild(map[id]); });
-    if(map.cadelete && map.coin && order.indexOf('cadelete')<0) map.coin.insertAdjacentElement('afterend', map.cadelete);
+    Object.keys(map).forEach(function(id){ if(order.indexOf(id)<0) bar.appendChild(map[id]); });
     const b=document.getElementById('tab-arrange');
     if(b) bar.appendChild(b);
   }
