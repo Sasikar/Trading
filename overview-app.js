@@ -2835,6 +2835,11 @@ let caStateLoadingTf='';
 let caStateLeft=0;
 let caMatrixKey='';
 let caMatrixRun=0;
+let caBestRun=0;
+let caBestRows=[];
+let caBestLoading=false;
+let caBestStarted=false;
+let caBestLeft=0;
 const caStateCache={};
 const caMatrixLive={};
 function caStateLabel(st){
@@ -2851,6 +2856,22 @@ function caStateColor(st){
 }
 function caMatrixBtn(on){
   return '<button type="button" data-st="MATRIX" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:'+(on?'#1a9b6c':'#121a24')+';color:'+(on?'#fff':'#c5d0dc')+'">Matrix</button>';
+}
+function caBestBtn(on){
+  return '<button type="button" data-st="BEST" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:'+(on?'#1a9b6c':'#121a24')+';color:'+(on?'#fff':'#c5d0dc')+'">Best Picks</button>';
+}
+function caEsc(s){
+  return String(s==null?'':s).replace(/[&<>"]/g, function(c){
+    return c==='&'?'&':c==='<'?'<':c==='>'?'>':'"';
+  });
+}
+function caStatePts(st){
+  if(st==='STRONG CONFIRMED') return 5;
+  if(st==='EARLY') return 4;
+  if(st==='WATCH') return 2;
+  if(st==='STRETCHED') return 1;
+  if(st==='OFF') return 0;
+  return null;
 }
 function caBindStateTabs(bar){
   bar.querySelectorAll('button').forEach(function(b){
@@ -2871,7 +2892,7 @@ function paintMatrix(){
   const coins=coinRecentsLoadLocal();
   bar.innerHTML=CA_STATE_TABS.map(function(s){
     return '<button type="button" data-st="'+s[0]+'" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:#121a24;color:#c5d0dc">'+s[1]+'</button>';
-  }).join('')+caMatrixBtn(true);
+  }).join('')+caMatrixBtn(true)+caBestBtn(false);
   caBindStateTabs(bar);
   if(!coins.length){
     list.innerHTML='<div style="color:#8491a1;font-size:12px;font-weight:700">No saved coins yet.</div>';
@@ -2979,6 +3000,109 @@ function caEnsureStateList(){
   list.style.margin='0 0 14px';
   return list;
 }
+function caScoreCoin(entry){
+  const key=coinRecentKey(entry);
+  const weights={'1m':1,'5m':1,'10m':1,'15m':1,'30m':1,'1h':2,'2h':2,'4h':3,'1d':4,'1w':5};
+  let pts=0, w=0;
+  const states={};
+  CA_MATRIX_TFS.forEach(function(tf){
+    const st=(caStateCache[key+'|'+tf]||{}).state||'';
+    states[tf]=st;
+    const p=caStatePts(st);
+    if(p==null) return;
+    const wt=weights[tf]||1;
+    pts+=p*wt;
+    w+=wt;
+  });
+  return {entry:entry, score:w?pts/w:0, known:w, states:states};
+}
+function caPickBest(coins){
+  const scored=coins.map(caScoreCoin).filter(function(x){ return x.known>=4; });
+  scored.sort(function(a,b){ return b.score-a.score; });
+  if(!scored.length) return [];
+  const mid=scored[Math.floor((scored.length-1)/2)].score;
+  let picks=scored.filter(function(x){
+    if(x.score<=mid) return false;
+    if(x.states['4h']==='OFF' && x.states['1d']==='OFF') return false;
+    return true;
+  });
+  if(!picks.length) picks=scored.filter(function(x){ return x.score>=mid && !(x.states['4h']==='OFF' && x.states['1d']==='OFF'); }).slice(0,5);
+  return picks;
+}
+async function caEnsureCoinTfs(entry){
+  const key=coinRecentKey(entry);
+  await Promise.all(CA_MATRIX_TFS.map(function(tf){
+    const k=key+'|'+tf;
+    const hit=caStateCache[k];
+    if(hit && hit.t && (hit.state ? Date.now()-hit.t<10*60*1000 : Date.now()-hit.t<2*60*1000)) return Promise.resolve();
+    return caDbBars(entry.ca, tf).then(function(kl){
+      if(!kl||kl.length<8){ caStateCache[k]={state:'', t:Date.now()}; return; }
+      const gate=coinEntryGate(kl, tf);
+      caStateCache[k]={state:gate.state||'WATCH', t:Date.now()};
+    }).catch(function(){
+      caStateCache[k]={state:'', t:Date.now()};
+    });
+  }));
+}
+function paintBest(){
+  const bar=$('ca-sig-tabs');
+  const list=caEnsureStateList();
+  if(!bar||!list) return;
+  list.style.display='block';
+  const note=$('ca-state-note');
+  if(note) note.textContent='';
+  bar.innerHTML=CA_STATE_TABS.map(function(s){
+    return '<button type="button" data-st="'+s[0]+'" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:#121a24;color:#c5d0dc">'+s[1]+'</button>';
+  }).join('')+caMatrixBtn(false)+caBestBtn(true);
+  caBindStateTabs(bar);
+  const status=caBestLoading
+    ? ('Comparing all coins'+(caBestLeft?(' · '+caBestLeft+' left'):''))
+    : (caBestRows.length ? (caBestRows.length+' better across timeframes') : 'No coin is ahead across timeframes yet.');
+  const names=caBestRows.map(function(row,i){
+    const chain=(row.entry.chain==='solana'||row.entry.chain==='sol')?'SOL':'ETH';
+    return '<button type="button" data-jump="'+i+'" style="padding:8px 12px;border-radius:999px;border:0;background:#141c27;color:#f4f7fb;font-weight:800;cursor:pointer">'+caEsc(row.entry.name||'Coin')+' · '+chain+'</button>';
+  }).join('');
+  const blocks=caBestRows.map(function(row,i){
+    const chain=(row.entry.chain==='solana'||row.entry.chain==='sol')?'SOL':'ETH';
+    const lines=CA_MATRIX_TFS.map(function(tf){
+      const st=row.states[tf]||'';
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid #1c2733"><b style="font-size:13px">'+tf.toUpperCase()+'</b><span style="font-weight:900;color:'+caStateColor(st)+'">'+caStateLabel(st)+'</span></div>';
+    }).join('');
+    return '<div id="ca-best-'+i+'" style="margin:18px 0 0;padding-top:8px;border-top:1px solid #243041"><div style="font-weight:900;font-size:16px;margin-bottom:4px">'+caEsc(row.entry.name||'Coin')+' <span style="color:#8491a1;font-size:11px">'+chain+'</span></div>'+lines+'</div>';
+  }).join('');
+  list.innerHTML='<div style="color:#8b95a5;font-weight:800;font-size:12px;margin:0 0 8px">'+status+'</div><div style="display:flex;flex-wrap:wrap;gap:6px">'+names+'</div>'+blocks;
+  list.querySelectorAll('[data-jump]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const el=document.getElementById('ca-best-'+btn.getAttribute('data-jump'));
+      if(el && el.scrollIntoView) el.scrollIntoView({behavior:'smooth', block:'start'});
+    });
+  });
+}
+async function caLoadBest(){
+  const run=++caBestRun;
+  const coins=coinRecentsLoadLocal();
+  caBestLoading=true;
+  caBestLeft=coins.length;
+  caBestRows=[];
+  if(caStatePick==='BEST') paintBest();
+  let cursor=0;
+  async function worker(){
+    while(cursor<coins.length){
+      const e=coins[cursor++];
+      await caEnsureCoinTfs(e);
+      if(run!==caBestRun) return;
+      caBestLeft=Math.max(0, coins.length-cursor);
+      caBestRows=caPickBest(coins.slice(0, cursor));
+      if(caStatePick==='BEST') paintBest();
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  if(run!==caBestRun) return;
+  caBestLoading=false;
+  caBestLeft=0;
+  caBestRows=caPickBest(coins);
+  if(caStatePick==='BEST') paintBest();
+}
 function paintCaStates(){
   const bar=$('ca-sig-tabs');
   const list=caEnsureStateList();
@@ -2991,6 +3115,15 @@ function paintCaStates(){
     if(!had){
       const entry=coinRecentsLoadLocal().filter(function(e){ return coinRecentKey(e)===caMatrixKey; })[0];
       if(entry) caLoadMatrix(entry);
+    }
+    return;
+  }
+  if(caStatePick==='BEST'){
+    list.style.display='block';
+    paintBest();
+    if(!caBestStarted){
+      caBestStarted=true;
+      caLoadBest();
     }
     return;
   }
@@ -3008,7 +3141,7 @@ function paintCaStates(){
   if(loading){
     bar.innerHTML=CA_STATE_TABS.map(function(s){
       return '<button type="button" disabled style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;background:#121a24;color:#5c6774;opacity:.7">'+s[1]+'</button>';
-    }).join('')+caMatrixBtn(false);
+    }).join('')+caMatrixBtn(false)+caBestBtn(false);
     caBindStateTabs(bar);
     list.innerHTML='<div style="color:#e6c878;font-size:12px;font-weight:800">'+tfLab+' is not ready. These are not the last timeframe.</div>';
     return;
@@ -3028,7 +3161,7 @@ function paintCaStates(){
     const n=(buckets[s[0]]||[]).length;
     const on=caStatePick===s[0];
     return '<button type="button" data-st="'+s[0]+'" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:'+(on?'#1a9b6c':'#121a24')+';color:'+(on?'#fff':'#c5d0dc')+'">'+s[1]+(n?' '+n:'')+'</button>';
-  }).join('')+caMatrixBtn(false);
+  }).join('')+caMatrixBtn(false)+caBestBtn(false);
   caBindStateTabs(bar);
   const rows=buckets[caStatePick]||[];
   if(!arr.length) list.innerHTML='<div style="color:#8491a1;font-size:12px;font-weight:700">No saved coins yet.</div>';
