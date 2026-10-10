@@ -3,6 +3,7 @@
  * DexScreener is the quote tape. We own the candles.
  */
 import { buildFomoEntry, takeState } from '../../../fomoentry-engine.mjs';
+import { barsToKl, caEntryState } from './ca-gate.js';
 import { decisionCheck, pickDecisionHit } from './decision-check.js';
 import { applySignals } from './ew-signals.js';
 import { GMGN_EVERY_MS, GMGN_MIN_GAP_MS, fetchGmgnHot, fetchGmgnTrending } from './gmgn.js';
@@ -4059,8 +4060,7 @@ export class Engine {
     let bestTf = '';
     let bestState = '';
     for (const tf of tfs) {
-      const det = detectTapeBreakout(this.store.bars(row.ca, tf, 80), tf, tick || {});
-      const st = det.state || 'WATCH';
+      const st = caEntryState(barsToKl(this.store.bars(row.ca, tf, 120)), tf);
       states[tf] = st;
       if (!bestState && (st === 'EARLY' || st === 'STRONG CONFIRMED')) {
         bestState = st;
@@ -4095,7 +4095,7 @@ export class Engine {
     const msg = [
       name + ' (' + (chainIdOf(chain) === 'solana' ? 'SOL' : chainIdOf(chain) === 'ethereum' ? 'ETH' : String(chain || '').toUpperCase()) + ')',
       'New Best Pick. Not a buy.',
-      'Early or Strong on at least one timeframe.',
+      'Same Early or Strong rule as the CA Best Picks tab.',
       lines.join(' · '),
       alertPxMcLine({ spot: tick.price, mcap: tick.mcap }),
       'CA: ' + row.ca,
