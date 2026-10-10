@@ -2209,7 +2209,7 @@ export class Engine {
     return 'all';
   }
   alertTypes() {
-    const ids = ['breakout', 'breakout1m', 'entry', 'entrywindow', 'fomoentry', 'parabolic', 'wowdip', 'position', 'decision', 'wallets'];
+    const ids = ['breakout', 'breakout1m', 'entry', 'entrywindow', 'fomoentry', 'bestpicks', 'parabolic', 'wowdip', 'position', 'decision', 'wallets'];
     let saved = {};
     try {
       saved = JSON.parse(this.store.getMeta('alert_types') || '{}') || {};
@@ -4053,6 +4053,97 @@ export class Engine {
     );
     return true;
   }
+  bestPickStates(row, tick) {
+    const tfs = ['1m', '5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w'];
+    const states = {};
+    let bestTf = '';
+    let bestState = '';
+    for (const tf of tfs) {
+      const det = detectTapeBreakout(this.store.bars(row.ca, tf, 80), tf, tick || {});
+      const st = det.state || 'WATCH';
+      states[tf] = st;
+      if (!bestState && (st === 'EARLY' || st === 'STRONG CONFIRMED')) {
+        bestState = st;
+        bestTf = tf;
+      }
+    }
+    return { states, bestTf, bestState };
+  }
+  async maybeBestPickAlert(row, tick, opts) {
+    if (!row || !row.ca || !tick) return false;
+    const picked = this.bestPickStates(row, tick);
+    const key = String(row.ca).toLowerCase() + '|bestpicks';
+    const qualify = !!picked.bestState;
+    if (opts && opts.seed) {
+      this.store.setAlert(key, qualify ? Date.now() : 0);
+      return false;
+    }
+    if (!qualify) {
+      if (this.store.getAlert(key)) this.store.setAlert(key, 0);
+      return false;
+    }
+    if (!this.typeOn('bestpicks')) return false;
+    if (this.alertMode() === 'off') return false;
+    if (!this.alertsAllowed(row.ca)) return false;
+    if (this.store.getAlert(key)) return false;
+    const name = (tick && tick.name) || row.name || 'coin';
+    const chain = (tick && tick.chain) || row.chain || '';
+    const lines = ['1m', '5m', '10m', '15m', '30m', '1h', '2h', '4h', '1d', '1w']
+      .filter((tf) => picked.states[tf] === 'EARLY' || picked.states[tf] === 'STRONG CONFIRMED')
+      .map((tf) => tf.toUpperCase() + ' ' + (picked.states[tf] === 'STRONG CONFIRMED' ? 'STRONG' : 'EARLY'));
+    const title = 'BEST PICK · ' + name;
+    const msg = [
+      name + ' (' + (chainIdOf(chain) === 'solana' ? 'SOL' : chainIdOf(chain) === 'ethereum' ? 'ETH' : String(chain || '').toUpperCase()) + ')',
+      'New Best Pick. Not a buy.',
+      'Early or Strong on at least one timeframe.',
+      lines.join(' · '),
+      alertPxMcLine({ spot: tick.price, mcap: tick.mcap }),
+      'CA: ' + row.ca,
+      dexHref(row.ca, chain, tick.dexUrl),
+      'https://sasikar.github.io/Trading/index.html?tab=coin'
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const token = this.telegramToken();
+    if (!token) return false;
+    try {
+      let chat = this.telegramChatId();
+      if (!chat) chat = await this.resolveTelegramChat();
+      if (!chat) return false;
+      await sendTelegram(token, chat, title + '\n' + msg);
+      this.telegramErr = '';
+      this.store.setMeta('telegram_err', '');
+    } catch (e) {
+      this.markTelegramFail(e);
+      return false;
+    }
+    this.store.setAlert(key, Date.now());
+    this.store.setMeta(
+      'last_bestpick_alert',
+      JSON.stringify({ name, ca: row.ca, tf: picked.bestTf, state: picked.bestState, at: new Date().toISOString() })
+    );
+    return true;
+  }
+  async testBestPickAlert() {
+    const token = this.telegramToken();
+    if (!token) throw new Error('telegram token not stored yet');
+    const chat = await this.resolveTelegramChat();
+    if (!chat) throw new Error('Open t.me/' + this.telegramWantedUsername() + ' and tap Start, then send hi');
+    await sendTelegram(
+      token,
+      chat,
+      [
+        'BEST PICK · test',
+        'This is a test. Not a buy.',
+        'A saved coin alerts when it newly becomes Early or Strong on at least one timeframe.',
+        'Watch-only coins stay quiet.',
+        'https://sasikar.github.io/Trading/index.html?tab=coin'
+      ].join('\n')
+    );
+    this.telegramErr = '';
+    this.store.setMeta('telegram_err', '');
+    return { ok: true, chatBound: true };
+  }
   async refreshSpotIfStale(maxAgeMs) {
     const now = Date.now();
     const last = +this.store.getMeta('spot_refresh') || 0;
@@ -5098,6 +5189,7 @@ export class Engine {
           if (!avoid && (await this.maybeEwAlert(hit))) nAlert++;
         }
         if (!avoid && (await this.maybeFomoEntryAlert(row, tick, hitsByTf))) nAlert++;
+        if (!avoid && (await this.maybeBestPickAlert(row, tick, { seed: !this.store.getMeta('bestpicks_seeded') }))) nAlert++;
         const p = parabolicFromTick(tick);
         if (p.on) {
           this.touchOmg({
@@ -5149,6 +5241,9 @@ export class Engine {
           this.lastErr = String(e && e.message ? e.message : e).slice(0, 180);
         }
         if (dc && (await this.maybeDecisionAlert(row, dc))) nAlert++;
+      }
+      if (!this.store.getMeta('bestpicks_seeded') && scanned > 0) {
+        this.store.setMeta('bestpicks_seeded', String(now));
       }
       if (scanned > 0) {
         this.rateLimitedUntil = 0;
@@ -5401,6 +5496,19 @@ export async function handleApi(engine, request) {
   if ((path === '/ping-telegram' || path === '/api/ping-telegram') && method === 'POST') {
     try {
       const out = await engine.pingTelegram();
+      return json(out);
+    } catch (e) {
+      engine.markTelegramFail(e);
+      return json({
+        ok: false,
+        needStart: /tap Start/i.test(String(e && e.message ? e.message : e)),
+        error: String(e && e.message ? e.message : e)
+      });
+    }
+  }
+  if ((path === '/best-picks-test' || path === '/api/best-picks-test') && method === 'POST') {
+    try {
+      const out = await engine.testBestPickAlert();
       return json(out);
     } catch (e) {
       engine.markTelegramFail(e);
