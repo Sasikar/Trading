@@ -3236,6 +3236,17 @@ async function caRefreshStates(){
 }
 function showCoin(on, opts){
   const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel'),af=$('antifomo-panel'),bo=$('breakouts-panel');
+  if(on){
+    ['showAlerts','showFomoEntry','showFomoEntryDesk','showFomoExperiences','showFavDips','showCal','showMandates','showKeywords','showSleep','showGoldenNotes','showWhale','showEmotion','showCoinstats','showTiers'].forEach(function(fn){
+      try{ if(window[fn]) window[fn](false); }catch(e){}
+    });
+    document.body.classList.remove('cal-on','md-on','sl-on');
+    document.querySelectorAll('.trend-panel').forEach(function(p){
+      if(p.id==='coin-panel') return;
+      p.style.display='none';
+      p.classList.remove('on');
+    });
+  }
   if(panels){panels.classList.add('hidden');panels.style.display='none';}
   if(trend){trend.classList.remove('on');trend.style.display='none';}
   if(sp){sp.classList.remove('on');sp.style.display='none';}
@@ -3245,7 +3256,18 @@ function showCoin(on, opts){
   if(af){af.style.display='none';af.classList.remove('on');}
   if(on && bo){bo.style.display='none';bo.classList.remove('on');}
   if(cp){
-    if(on){ cp.classList.add('on'); cp.style.display='block'; if(!(opts&&opts.del)) caDelView='coins'; try{wireCoinUI();}catch(e){} try{coinRecentsRender();}catch(e){} try{caScheduleStates();}catch(e){} }
+    if(on){
+      cp.classList.add('on');
+      cp.style.display='block';
+      if(!(opts&&opts.del)) caDelView='coins';
+      try{wireCoinUI();}catch(e){}
+      try{coinRecentsRender();}catch(e){}
+      try{caScheduleStates();}catch(e){}
+      requestAnimationFrame(function(){
+        const y=cp.getBoundingClientRect().top+window.pageYOffset-8;
+        window.scrollTo(0, Math.max(0, y));
+      });
+    }
     else { cp.classList.remove('on'); cp.style.display='none'; }
   }
 }
