@@ -3017,17 +3017,14 @@ function caScoreCoin(entry){
   return {entry:entry, score:w?pts/w:0, known:w, states:states};
 }
 function caPickBest(coins){
-  const scored=coins.map(caScoreCoin).filter(function(x){ return x.known>=4; });
-  scored.sort(function(a,b){ return b.score-a.score; });
-  if(!scored.length) return [];
-  const mid=scored[Math.floor((scored.length-1)/2)].score;
-  let picks=scored.filter(function(x){
-    if(x.score<=mid) return false;
-    if(x.states['4h']==='OFF' && x.states['1d']==='OFF') return false;
-    return true;
+  const scored=coins.map(caScoreCoin).filter(function(x){
+    return CA_MATRIX_TFS.some(function(tf){
+      const st=x.states[tf];
+      return st==='EARLY' || st==='STRONG CONFIRMED';
+    });
   });
-  if(!picks.length) picks=scored.filter(function(x){ return x.score>=mid && !(x.states['4h']==='OFF' && x.states['1d']==='OFF'); }).slice(0,5);
-  return picks;
+  scored.sort(function(a,b){ return b.score-a.score; });
+  return scored;
 }
 async function caEnsureCoinTfs(entry){
   const key=coinRecentKey(entry);
@@ -3057,7 +3054,7 @@ function paintBest(){
   caBindStateTabs(bar);
   const status=caBestLoading
     ? ('Comparing all coins'+(caBestLeft?(' · '+caBestLeft+' left'):''))
-    : (caBestRows.length ? (caBestRows.length+' better across timeframes') : 'No coin is ahead across timeframes yet.');
+    : (caBestRows.length ? (caBestRows.length+' with Early or Strong on at least one timeframe') : 'No coin is Early or Strong on any timeframe.');
   const names=caBestRows.map(function(row,i){
     const chain=(row.entry.chain==='solana'||row.entry.chain==='sol')?'SOL':'ETH';
     return '<button type="button" data-jump="'+i+'" style="padding:8px 12px;border-radius:999px;border:0;background:#141c27;color:#f4f7fb;font-weight:800;cursor:pointer">'+caEsc(row.entry.name||'Coin')+' · '+chain+'</button>';
