@@ -2865,7 +2865,8 @@ function paintCaStates(){
   let pending=0;
   arr.forEach(function(e){
     const hit=caStateCache[coinRecentKey(e)+'|'+coinTF];
-    if(!hit || !hit.state){ pending++; return; }
+    if(!hit){ pending++; return; }
+    if(!hit.state) return;
     const bucket=buckets[hit.state]||buckets.WATCH;
     bucket.push(Object.assign({}, e, {state:hit.state}));
   });
@@ -2897,6 +2898,16 @@ function paintCaStates(){
     });
   });
 }
+async function caDbBars(ca, tf){
+  const n = (tf==='1w'||tf==='1d'||tf==='1M') ? 180 : 250;
+  const url = 'https://trading-ohlcv.sasipudi.workers.dev/candles?ca='+encodeURIComponent(ca)+'&tf='+encodeURIComponent(tf||'4h')+'&n='+n;
+  const r = await fetch(url, {cache:'no-store'});
+  if(!r.ok) throw new Error('candles '+r.status);
+  const j = await r.json();
+  return ((j&&j.bars)||[]).map(function(b){
+    return [+b.t, +b.o, +b.h, +b.l, +b.c, +(b.vol||0)];
+  }).filter(function(k){ return isFinite(k[0]) && isFinite(k[4]); });
+}
 async function caRefreshStates(){
   const panel=$('coin-panel');
   if(!panel || panel.style.display==='none') return;
@@ -2904,26 +2915,29 @@ async function caRefreshStates(){
   caStateBusy=true;
   try{
     const arr=coinRecentsLoadLocal();
+    const tf=coinTF||'4h';
+    const todo=arr.filter(function(e){
+      const hit=caStateCache[coinRecentKey(e)+'|'+tf];
+      if(!hit) return true;
+      const age=Date.now()-(hit.t||0);
+      return hit.state ? age>10*60*1000 : age>2*60*1000;
+    });
     paintCaStates();
-    for(let i=0;i<arr.length;i++){
-      const e=arr[i];
-      const k=coinRecentKey(e)+'|'+coinTF;
-      const hit=caStateCache[k];
-      if(hit && hit.state && Date.now()-hit.t<10*60*1000) continue;
-      try{
-        const chain=(e.chain==='sol'||e.chain==='solana')?'solana':'eth';
-        const pool=(e.poolAddress&&e.poolNetwork)
-          ? {address:e.poolAddress, network:e.poolNetwork, base:e.base||e.name, name:e.name, liq:e.poolLiq}
-          : await coinResolvePool(chain, e.ca);
-        const kl=await coinFetchOHLCV(pool.network, pool.address, coinTF);
-        const gate=coinEntryGate(kl, coinTF);
+    await Promise.all(todo.map(function(e){
+      const k=coinRecentKey(e)+'|'+tf;
+      return caDbBars(e.ca, tf).then(function(kl){
+        if(!kl || kl.length<8){
+          caStateCache[k]={state:'', t:Date.now()};
+          return;
+        }
+        const gate=coinEntryGate(kl, tf);
         caStateCache[k]={state:gate.state||'WATCH', t:Date.now()};
-      }catch(err){
-        caStateCache[k]={state:'', t:Date.now()-9*60*1000};
-      }
-      if(panel.style.display==='none') return;
-      paintCaStates();
-    }
+      }).catch(function(){
+        caStateCache[k]={state:'', t:Date.now()};
+      }).then(function(){
+        if(panel.style.display!=='none') paintCaStates();
+      });
+    }));
   }finally{
     caStateBusy=false;
     if(caStateQueued){ caStateQueued=false; caRefreshStates(); }
