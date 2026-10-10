@@ -1639,10 +1639,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
       <button type="button" data-ctf="1d" onclick="try{window.setCoinTF&&window.setCoinTF('1d')}catch(e){}">1D</button>
       <button type="button" data-ctf="1w" onclick="try{window.setCoinTF&&window.setCoinTF('1w')}catch(e){}">1W</button>
     </div>
-    <div id="ca-sig-tabs" style="display:flex;gap:8px;margin:0 0 10px">
-      <button type="button" data-sig="on" style="padding:8px 16px;border-radius:999px;border:0;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">On</button>
-      <button type="button" data-sig="close" style="padding:8px 16px;border-radius:999px;border:0;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">Close</button>
-    </div>
+    <div id="ca-sig-tabs" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px"></div>
+    <div id="ca-state-list" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px"></div>
     <div id="coin-entry-box" style="margin:0 0 14px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c)"><div style="color:#8491a1;font-size:12px">Load CA → CA signal (WATCH / EARLY / STRONG / STRETCHED / OFF)</div></div>
     <div class="price-now"><div><div class="big" id="coin-spot">—</div><div class="meta" id="coin-spot-meta">—</div></div><div class="meta" id="coin-bias" style="font-weight:800;text-align:right">—</div></div>
     <div class="coin-stats">
@@ -1651,7 +1649,6 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
       <div class="st"><div class="lab">VOLUME</div><div class="val" id="coin-vol">—</div></div>
       <div class="st"><div class="lab">CVD</div><div class="val" id="coin-cvd">—</div></div>
     </div>
-    <div id="coin-embed" style="margin:8px 0 14px"></div>
     <div class="head" style="padding:16px 0 6px"><div><h2 style="font-size:15px">MACD chart</h2></div></div>
     <div id="coin-macd-tv"></div>
     <div class="head" style="padding:16px 0 6px"><div><h2 style="font-size:15px">S / R pivots</h2></div></div>
@@ -1672,7 +1669,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261010-ca1"></script>
+<script src="overview-app.js?v=20261010-ca2"></script>
 <script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20261004-hd1d"></script>

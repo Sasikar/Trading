@@ -2825,6 +2825,110 @@ document.addEventListener('click', function(ev){
   }catch(e){ console.warn(e); }
 });
 
+const CA_STATE_TABS=[['WATCH','Watch'],['EARLY','Early'],['STRONG CONFIRMED','Strong'],['STRETCHED','Stretched'],['OFF','Off']];
+let caStatePick='EARLY';
+let caStateBusy=false;
+let caStateQueued=false;
+let caStateTimer=0;
+const caStateCache={};
+function caScheduleStates(){
+  clearTimeout(caStateTimer);
+  caStateTimer=setTimeout(function(){ caRefreshStates(); }, 300);
+}
+function caEnsureStateList(){
+  const bar=$('ca-sig-tabs');
+  if(!bar) return null;
+  const emb=$('coin-embed');
+  if(emb){ emb.innerHTML=''; emb.style.display='none'; }
+  bar.style.display='flex';
+  bar.style.flexWrap='wrap';
+  bar.style.gap='6px';
+  let list=$('ca-state-list');
+  if(!list){
+    list=document.createElement('div');
+    list.id='ca-state-list';
+    bar.insertAdjacentElement('afterend', list);
+  }
+  list.style.display='flex';
+  list.style.flexWrap='wrap';
+  list.style.gap='8px';
+  list.style.margin='0 0 14px';
+  return list;
+}
+function paintCaStates(){
+  const bar=$('ca-sig-tabs');
+  const list=caEnsureStateList();
+  if(!bar||!list) return;
+  const arr=coinRecentsLoadLocal();
+  const buckets={};
+  CA_STATE_TABS.forEach(function(s){ buckets[s[0]]=[]; });
+  let pending=0;
+  arr.forEach(function(e){
+    const hit=caStateCache[coinRecentKey(e)+'|'+coinTF];
+    if(!hit || !hit.state){ pending++; return; }
+    const bucket=buckets[hit.state]||buckets.WATCH;
+    bucket.push(Object.assign({}, e, {state:hit.state}));
+  });
+  bar.innerHTML=CA_STATE_TABS.map(function(s){
+    const n=(buckets[s[0]]||[]).length;
+    const on=caStatePick===s[0];
+    return '<button type="button" data-st="'+s[0]+'" style="padding:8px 12px;border-radius:999px;border:0;font-weight:800;cursor:pointer;background:'+(on?'#1a9b6c':'#121a24')+';color:'+(on?'#fff':'#c5d0dc')+'">'+s[1]+(n?' '+n:'')+'</button>';
+  }).join('');
+  bar.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){
+      caStatePick=b.getAttribute('data-st')||'EARLY';
+      paintCaStates();
+    });
+  });
+  const rows=buckets[caStatePick]||[];
+  if(!arr.length) list.innerHTML='<div style="color:#8491a1;font-size:12px;font-weight:700">No saved coins yet.</div>';
+  else if(pending && !rows.length) list.innerHTML='<div style="color:#8491a1;font-size:12px;font-weight:700">Checking coins… '+pending+' left</div>';
+  else if(!rows.length) list.innerHTML='<div style="color:#8491a1;font-size:12px;font-weight:700">No coins here.</div>';
+  else list.innerHTML=rows.map(function(e){
+    const chain=(e.chain==='solana'||e.chain==='sol')?'SOL':'ETH';
+    return '<button type="button" data-ca="'+String(e.ca).replace(/"/g,'')+'" data-chain="'+String(e.chain||'')+'" style="padding:8px 12px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:800;cursor:pointer">'+String(e.name||'Coin')+' <span style="color:#8491a1;font-size:10px">'+chain+'</span></button>';
+  }).join('');
+  list.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){
+      const chain=b.getAttribute('data-chain')||'eth';
+      if($('coin-chain')) $('coin-chain').value=(chain==='sol'||chain==='solana')?'solana':'eth';
+      if($('coin-ca')) $('coin-ca').value=b.getAttribute('data-ca')||'';
+      try{ loadCoin(); }catch(e){}
+    });
+  });
+}
+async function caRefreshStates(){
+  const panel=$('coin-panel');
+  if(!panel || panel.style.display==='none') return;
+  if(caStateBusy){ caStateQueued=true; return; }
+  caStateBusy=true;
+  try{
+    const arr=coinRecentsLoadLocal();
+    paintCaStates();
+    for(let i=0;i<arr.length;i++){
+      const e=arr[i];
+      const k=coinRecentKey(e)+'|'+coinTF;
+      const hit=caStateCache[k];
+      if(hit && hit.state && Date.now()-hit.t<10*60*1000) continue;
+      try{
+        const chain=(e.chain==='sol'||e.chain==='solana')?'solana':'eth';
+        const pool=(e.poolAddress&&e.poolNetwork)
+          ? {address:e.poolAddress, network:e.poolNetwork, base:e.base||e.name, name:e.name, liq:e.poolLiq}
+          : await coinResolvePool(chain, e.ca);
+        const kl=await coinFetchOHLCV(pool.network, pool.address, coinTF);
+        const gate=coinEntryGate(kl, coinTF);
+        caStateCache[k]={state:gate.state||'WATCH', t:Date.now()};
+      }catch(err){
+        caStateCache[k]={state:'', t:Date.now()-9*60*1000};
+      }
+      if(panel.style.display==='none') return;
+      paintCaStates();
+    }
+  }finally{
+    caStateBusy=false;
+    if(caStateQueued){ caStateQueued=false; caRefreshStates(); }
+  }
+}
 function showCoin(on, opts){
   const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel'),af=$('antifomo-panel'),bo=$('breakouts-panel');
   if(panels){panels.classList.add('hidden');panels.style.display='none';}
@@ -2836,7 +2940,7 @@ function showCoin(on, opts){
   if(af){af.style.display='none';af.classList.remove('on');}
   if(on && bo){bo.style.display='none';bo.classList.remove('on');}
   if(cp){
-    if(on){ cp.classList.add('on'); cp.style.display='block'; if(!(opts&&opts.del)) caDelView='coins'; try{wireCoinUI();}catch(e){} try{coinRecentsRender();}catch(e){} }
+    if(on){ cp.classList.add('on'); cp.style.display='block'; if(!(opts&&opts.del)) caDelView='coins'; try{wireCoinUI();}catch(e){} try{coinRecentsRender();}catch(e){} try{caScheduleStates();}catch(e){} }
     else { cp.classList.remove('on'); cp.style.display='none'; }
   }
 }
@@ -3377,11 +3481,6 @@ function coinRenderEntry(gate){
   const isStretch = st==='STRETCHED';
   const isOff = st==='OFF';
   const col = open ? '#62e3a0' : '#ff6f7c';
-  document.querySelectorAll('#ca-sig-tabs button').forEach(function(b){
-    const on = b.getAttribute('data-sig') === (open ? 'on' : 'close');
-    b.style.background = on ? (open ? '#1a9b6c' : '#ff6f7c') : '#121a24';
-    b.style.color = on ? '#fff' : '#c5d0dc';
-  });
   const entry = gate.entry
     ? (gate.bigSize ? 'ON · BIG '+(gate.sizePct||85)+'%' : 'ON · '+(gate.sizePct||30)+'%')
     : 'CLOSE · 0%';
@@ -3446,7 +3545,7 @@ function coinRenderEntry(gate){
   el.innerHTML =
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">'+
       '<div><div style="font-size:10px;letter-spacing:.08em;color:#8491a1;font-weight:800">CA SIGNAL · '+(d.tf||coinTF||'').toUpperCase()+'</div>'+
-      '<div style="font-size:22px;font-weight:900;color:'+col+';margin-top:4px">'+word+'</div></div>'+
+      '<div style="font-size:22px;font-weight:900;color:'+col+';margin-top:4px">'+(st==='STRONG CONFIRMED'?'STRONG':st)+'</div></div>'+
       '<div style="text-align:right"><div style="font-size:10px;color:#8491a1;font-weight:800">NEW SIZE</div>'+
       '<div style="font-size:16px;font-weight:900;color:'+(gate.entry?'#62e3a0':'#8491a1')+'">'+entry+'</div>'+
       (gate.bigSize?'<div style="font-size:10px;color:#62e3a0;font-weight:800">BIG SIZE OK</div>':'')+
@@ -4270,6 +4369,7 @@ function coinRecentsRender(){
   }
   bind(box);
   bind(delBox);
+  try{ if(caDelView!=='del') caScheduleStates(); }catch(e){}
 }
 window.coinRecentsRender=coinRecentsRender;
 window.coinRecentsLoadLocal=coinRecentsLoadLocal;
@@ -4466,8 +4566,8 @@ async function loadCoin(){
     }
     if($('coin-vol') && coinPool.vol24){ $('coin-vol').textContent='$'+fmt(coinPool.vol24,0)+' 24h'; $('coin-vol').style.color='#e6c878'; }
 
-    // Always show Dex embed chart (works even when GT OHLCV rate-limited)
-    paintCoinEmbed();
+    // Dex embed removed — state tabs are the CA view.
+    if($('coin-embed')) $('coin-embed').innerHTML='';
     if($('coin-source'))$('coin-source').textContent='LIVE · Dex pair';
     try{ await loadCoinTF(); }
     catch(e){ if($('coin-meta'))$('coin-meta').textContent=(coinPool.name||'')+' · price OK · indicators pending: '+(e&&e.message||e); }
@@ -4505,7 +4605,7 @@ function clearCoin(){
 }
 window.clearCoin=clearCoin;
 window.loadCoin=loadCoin; window.loadCoinTF=loadCoinTF;
-window.setCoinTF=function(tf){coinTF=tf||'4h';document.querySelectorAll('#coin-tf button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-ctf')===coinTF);});if($('coin-tf-name'))$('coin-tf-name').textContent=coinTF.toUpperCase();if(coinPool)loadCoinTF();};
+window.setCoinTF=function(tf){coinTF=tf||'4h';document.querySelectorAll('#coin-tf button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-ctf')===coinTF);});if($('coin-tf-name'))$('coin-tf-name').textContent=coinTF.toUpperCase();try{caScheduleStates();}catch(e){}if(coinPool)loadCoinTF();};
 function wireCoinUI(){
   try{coinRecentsRender();}catch(e){}
   try{ if(!window._caRecentsPulled){ window._caRecentsPulled=true; coinRecentsSync(true); } }catch(e){}
@@ -4522,9 +4622,7 @@ function wireCoinUI(){
       b.classList.add('on');
       coinTF = b.getAttribute('data-ctf')||'4h';
       if($('coin-tf-name')) $('coin-tf-name').textContent = coinTF.toUpperCase();
-      if(coinPool && coinPool.address){
-        paintCoinEmbed();
-      }
+      try{ caScheduleStates(); }catch(e){}
       if(coinPool && coinPool.address){
         loadCoinTF();
       } else {
