@@ -639,6 +639,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="decision">Decision Check</button>
   <button type="button" class="tab" data-tf="emotion">Emotional<span class="tab-sub">Checks</span></button>
   <button type="button" class="tab" data-tf="coinstats" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showCoinstats&&window.showCoinstats(true);}catch(e){}">Coinstats</button>
+  <button type="button" class="tab" data-tf="solchain" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showSolchain&&window.showSolchain(true);}catch(e){}">Solchain</button>
   <button type="button" class="tab" data-tf="fomo" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntry&&window.showFomoEntry(true);}catch(e){}">Fomo Entry</button>
   <button type="button" class="tab" data-tf="fx" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoExperiences&&window.showFomoExperiences(true);}catch(e){}">Fomo Experiences</button>
   <button type="button" class="tab" data-tf="fd" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFavDips&&window.showFavDips(true);}catch(e){}">Fav Dip</button>
@@ -1411,6 +1412,12 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <div class="card">
     <div id="cs-board"></div>
   </div>
+<div id="solchain-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Solchain</h2><p>Wallet total. Refresh any time.</p></div><span class="source">LIVE</span></div>
+  <div class="card"><div id="sc-board"></div></div>
+</section>
+</div>
 </section>
 </div>
 <div id="gmgn-panel" class="trend-panel" style="display:none">
@@ -1670,7 +1677,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261011-ma1"></script>
+<script src="overview-app.js?v=20261011-sc1"></script>
 <script src="breakout-tab.js?v=20260918-al2"></script>
 <script src="hunter-tab.js?v=20260916-h18"></script>
 <script src="holders-tab.js?v=20261004-hd1d"></script>
@@ -1699,6 +1706,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <script src="fomo-experiences-tab.js?v=20260927-fx8"></script>
 <script src="fav-dips-tab.js?v=20260928-banner"></script>
 <script src="coinstats-tab.js?v=20260930-cs14"></script>
+<script src="solchain-tab.js?v=20261011-sc1"></script>
 <script src="gmgn-tab.js?v=20260923-pf1"></script>
 <script src="wallets-tab.js?v=20260923-pf1"></script>
 <script src="pumpfun-tab.js?v=20260923-pf2"></script>
