@@ -38,6 +38,7 @@
     if (n >= 1) return n.toFixed(2);
     return n.toFixed(4);
   }
+  function short(address) { return String(address || "").slice(0, 4) + "…" + String(address || "").slice(-4); }
   function signed(n) {
     if (!isFinite(n)) return "—";
     return (n > 0 ? "+" : n < 0 ? "-" : "") + money(Math.abs(n)).replace(/^\$/, "$");
