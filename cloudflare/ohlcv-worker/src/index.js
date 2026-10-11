@@ -373,7 +373,7 @@ export class OhlcvEngine {
             if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address) || out.some((item) => item.address === address)) return;
             out.push({ address, at: Number(row && row.at) || Date.now() });
           });
-          return out.slice(0, 80);
+          return out;
         };
         if (request.method === 'POST') {
           const body = await request.json().catch(() => ({}));
