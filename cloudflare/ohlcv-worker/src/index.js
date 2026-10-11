@@ -365,6 +365,26 @@ export class OhlcvEngine {
           return new Response(JSON.stringify({ ok: false, error: error }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
         }
       }
+      if (path === '/solchain-wallets' || path === '/api/solchain-wallets') {
+        const clean = (list) => {
+          const out = [];
+          (Array.isArray(list) ? list : []).forEach((row) => {
+            const address = String((row && row.address) || '').trim();
+            if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address) || out.some((item) => item.address === address)) return;
+            out.push({ address, at: Number(row && row.at) || Date.now() });
+          });
+          return out.slice(0, 80);
+        };
+        if (request.method === 'POST') {
+          const body = await request.json().catch(() => ({}));
+          const wallets = clean(body.wallets);
+          this.store.setMeta('solchain_wallets', JSON.stringify(wallets));
+          return new Response(JSON.stringify({ ok: true, wallets }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+        let wallets = [];
+        try { wallets = clean(JSON.parse(this.store.getMeta('solchain_wallets') || '[]')); } catch (e) { wallets = []; }
+        return new Response(JSON.stringify({ ok: true, wallets }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      }
       if (path === '/coinstats-wallets' || path === '/api/coinstats-wallets') {
         if (request.method === 'POST') {
           const body = await request.json().catch(() => ({}));

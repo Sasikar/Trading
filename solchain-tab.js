@@ -1,10 +1,17 @@
 (function () {
   if (window.__solchainTab) return;
   window.__solchainTab = 1;
-  var KEY = "solchain_addr_v1";
+  var LIST = "solchain_wallets_v1";
+  var OLD = "solchain_addr_v1";
+  var SNAP = "solchain_snap_v1";
+  var API = "https://trading-ohlcv.sasipudi.workers.dev";
   var SOL = "So11111111111111111111111111111111111111112";
+  var wallets = [];
+  var selected = "";
+  var asking = "";
   var seq = 0;
   var last = null;
+  var draft = "";
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -31,11 +38,64 @@
     return n.toFixed(4);
   }
   function short(address) { return address.slice(0, 4) + "…" + address.slice(-4); }
-  function saved() {
-    try { return localStorage.getItem(KEY) || ""; } catch (e) { return ""; }
+  function readList() {
+    var rows = [];
+    try { rows = JSON.parse(localStorage.getItem(LIST) || "[]") || []; } catch (e) { rows = []; }
+    if (!Array.isArray(rows)) rows = [];
+    try {
+      var old = localStorage.getItem(OLD) || "";
+      if (valid(old) && !rows.some(function (row) { return row.address === old; })) rows.push({ address: old, at: Date.now() });
+      localStorage.removeItem(OLD);
+    } catch (e) {}
+    var out = [];
+    rows.forEach(function (row) {
+      var address = String((row && row.address) || "").trim();
+      if (!valid(address) || out.some(function (item) { return item.address === address; })) return;
+      out.push({ address: address, at: Number(row && row.at) || Date.now() });
+    });
+    return out;
   }
-  function save(address) {
-    try { localStorage.setItem(KEY, address); } catch (e) {}
+  function writeList() {
+    try { localStorage.setItem(LIST, JSON.stringify(wallets)); } catch (e) {}
+  }
+  function snaps() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(SNAP) || "{}");
+      return raw && typeof raw === "object" ? raw : {};
+    } catch (e) { return {}; }
+  }
+  function saveSnap(address, total) {
+    var all = snaps();
+    all[address] = { total: total, at: Date.now() };
+    try { localStorage.setItem(SNAP, JSON.stringify(all)); } catch (e) {}
+  }
+  function persist() {
+    fetch(API + "/solchain-wallets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ wallets: wallets })
+    }).catch(function () {});
+  }
+  function merge(remote) {
+    (remote || []).forEach(function (row) {
+      var address = String((row && row.address) || "").trim();
+      if (!valid(address) || wallets.some(function (item) { return item.address === address; })) return;
+      wallets.push({ address: address, at: Number(row.at) || Date.now() });
+    });
+    writeList();
+  }
+  function pull() {
+    fetch(API + "/solchain-wallets", { cache: "no-store" })
+      .then(function (res) { return res.json(); })
+      .then(function (body) {
+        var before = wallets.map(function (row) { return row.address; }).join();
+        merge(body && body.wallets);
+        if (!selected && wallets.length) selected = wallets[0].address;
+        if (wallets.map(function (row) { return row.address; }).join() !== before) persist();
+        paint();
+        if (selected && (!last || last.address !== selected)) load(selected);
+      })
+      .catch(function () {});
   }
   function hideOthers() {
     document.querySelectorAll(".trend-panel").forEach(function (p) {
@@ -62,8 +122,11 @@
     hideOthers();
     p.style.display = "block";
     p.classList.add("on");
+    wallets = readList();
+    if (!selected && wallets.length) selected = wallets[0].address;
     paint();
-    if (saved() && !last) load();
+    pull();
+    if (selected && !last) load(selected);
   }
   window.showSolchain = show;
 
@@ -95,16 +158,38 @@
     });
     return out;
   }
-  async function load() {
-    var box = $("sc-addr");
-    var address = String((box && box.value) || saved() || "").trim();
-    if (box) box.value = address;
+  function add(address) {
+    address = String(address || "").trim();
     if (!valid(address)) {
-      last = { error: "Paste a Solana wallet address." };
+      last = { address: selected, error: "Paste a Solana wallet address.", rows: last && last.rows, total: last && last.total, at: last && last.at, skipped: last && last.skipped };
       paint();
       return;
     }
-    save(address);
+    if (!wallets.some(function (row) { return row.address === address; })) {
+      wallets.push({ address: address, at: Date.now() });
+      writeList();
+      persist();
+    }
+    draft = "";
+    selected = address;
+    load(address);
+  }
+  function remove(address) {
+    wallets = wallets.filter(function (row) { return row.address !== address; });
+    writeList();
+    persist();
+    asking = "";
+    if (selected === address) {
+      selected = wallets.length ? wallets[0].address : "";
+      last = null;
+      if (selected) load(selected);
+    }
+    paint();
+  }
+  async function load(address) {
+    address = address || selected;
+    if (!valid(address)) return;
+    selected = address;
     var id = ++seq;
     last = { loading: true, address: address };
     paint();
@@ -138,6 +223,7 @@
       var sym = await names(priced.slice(0, 30).map(function (row) { return row.mint; }).filter(function (mint) { return mint !== SOL; }));
       if (id !== seq) return;
       priced.forEach(function (row) { if (sym[row.mint]) row.symbol = sym[row.mint]; });
+      saveSnap(address, total);
       last = { address: address, total: total, rows: priced, skipped: skipped, at: Date.now() };
     } catch (e) {
       if (id !== seq) return;
@@ -149,33 +235,73 @@
   function paint() {
     var root = $("sc-board");
     if (!root) return;
-    var address = saved();
-    var total = last && isFinite(last.total) ? money(last.total) : "—";
-    var note = "Paste a wallet. Refresh as many times as you want.";
-    if (last && last.loading) note = "Reading wallet…";
-    else if (last && last.error) note = last.error;
-    else if (last && last.at) {
-      var when = new Date(last.at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
-      note = "Updated " + when + (last.skipped ? " · " + last.skipped + " tokens had no price" : "");
-    }
-    var rows = (last && last.rows ? last.rows : []).slice(0, 20).map(function (row) {
-      var label = row.symbol || short(row.mint);
-      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #1c2633">' +
-        '<div style="flex:1;min-width:0;font-weight:800">' + esc(label) + '</div>' +
-        '<div style="color:#8b93a7;font-size:12px">' + qty(row.amount) + '</div>' +
-        '<b>' + money(row.value) + '</b></div>';
+    var known = snaps();
+    var list = wallets.map(function (row) {
+      var on = row.address === selected;
+      var snap = known[row.address];
+      var worth = snap && isFinite(snap.total) ? money(snap.total) : "—";
+      return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px solid ' + (on ? "#3dbe7a" : "#2a3142") + ';background:' + (on ? "#102018" : "#10161d") + '">' +
+        '<button type="button" data-open="' + esc(row.address) + '" style="flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#f4f7fb;font-weight:800;padding:0">' +
+        short(row.address) + '</button><b style="font-size:13px">' + worth + '</b>' +
+        '<button type="button" data-ask="' + esc(row.address) + '" aria-label="Delete" style="border:0;background:transparent;color:#ff8a7a;font-weight:900;font-size:18px;padding:0 4px">×</button></div>';
     }).join("");
-    var more = last && last.rows && last.rows.length > 20 ? '<div style="color:#8b93a7;font-size:12px;padding-top:8px">+' + (last.rows.length - 20) + ' more</div>' : "";
-    var link = address && valid(address) ? '<a href="https://solscan.io/account/' + esc(address) + '" target="_blank" rel="noopener" style="color:#7eb6ff;font-size:12px;font-weight:800">Solscan</a>' : "";
+    var ask = "";
+    if (asking) {
+      ask = '<div style="margin-top:10px;padding:12px;border-radius:12px;background:#2a1518;color:#ffb4ae">Delete ' + esc(short(asking)) + '?' +
+        '<div style="display:flex;gap:8px;margin-top:8px">' +
+        '<button type="button" data-yes="' + esc(asking) + '" style="border:0;border-radius:999px;padding:8px 12px;background:#ff5d6c;color:#fff;font-weight:900">Delete</button>' +
+        '<button type="button" data-no="1" style="border:0;border-radius:999px;padding:8px 12px;background:#1c2430;color:#f4f7fb;font-weight:900">Keep</button></div></div>';
+    }
+    var total = last && last.address === selected && isFinite(last.total) ? money(last.total) : "—";
+    var note = wallets.length ? "Tap a wallet. Refresh any time." : "Add a wallet. It stays until you delete it.";
+    if (last && last.address === selected && last.loading) note = "Reading wallet…";
+    else if (last && last.address === selected && last.error) note = last.error;
+    else if (last && last.address === selected && last.at) {
+      note = "Updated " + new Date(last.at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) + (last.skipped ? " · " + last.skipped + " tokens had no price" : "");
+    }
+    var rows = (last && last.address === selected && last.rows ? last.rows : []).slice(0, 20).map(function (row) {
+      return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #1c2633">' +
+        '<div style="flex:1;min-width:0;font-weight:800">' + esc(row.symbol || short(row.mint)) + '</div>' +
+        '<div style="color:#8b93a7;font-size:12px">' + qty(row.amount) + '</div><b>' + money(row.value) + '</b></div>';
+    }).join("");
+    var more = last && last.address === selected && last.rows && last.rows.length > 20 ? '<div style="color:#8b93a7;font-size:12px;padding-top:8px">+' + (last.rows.length - 20) + ' more</div>' : "";
+    var link = valid(selected) ? '<a href="https://solscan.io/account/' + esc(selected) + '" target="_blank" rel="noopener" style="color:#7eb6ff;font-size:12px;font-weight:800">Solscan</a>' : "";
     root.innerHTML =
       '<form id="sc-form" style="display:flex;gap:8px">' +
-      '<input id="sc-addr" value="' + esc(address) + '" placeholder="Solana wallet" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;padding:12px 14px;border-radius:12px;border:1px solid #2a3142;background:#0c1016;color:#f4f7fb;font-weight:700">' +
-      '<button type="submit" style="border:0;border-radius:12px;padding:0 14px;background:#e6c878;color:#1a1406;font-weight:900">Refresh</button></form>' +
-      '<div style="margin-top:18px;font-size:34px;font-weight:900;letter-spacing:-.03em">' + total + '</div>' +
+      '<input id="sc-addr" value="' + esc(draft) + '" placeholder="Add Solana wallet" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;padding:12px 14px;border-radius:12px;border:1px solid #2a3142;background:#0c1016;color:#f4f7fb;font-weight:700">' +
+      '<button type="submit" style="border:0;border-radius:12px;padding:0 14px;background:#e6c878;color:#1a1406;font-weight:900">Add</button></form>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">' + (list || '<div style="color:#8b93a7;font-size:13px">No wallets yet.</div>') + '</div>' +
+      ask +
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:16px">' +
+      '<div style="font-size:34px;font-weight:900;letter-spacing:-.03em">' + total + '</div>' +
+      (selected ? '<button type="button" id="sc-refresh" style="border:0;border-radius:999px;padding:8px 12px;background:#143d2a;color:#3dbe7a;font-weight:900">Refresh</button>' : "") +
+      '</div>' +
       '<div style="margin-top:6px;color:#8b93a7;font-size:13px">' + esc(note) + '</div>' +
       (link ? '<div style="margin-top:8px">' + link + '</div>' : "") +
       rows + more;
     var form = $("sc-form");
-    if (form) form.addEventListener("submit", function (e) { e.preventDefault(); load(); });
+    var box = $("sc-addr");
+    if (box) box.addEventListener("input", function () { draft = box.value; });
+    if (form) form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      add(box && box.value);
+    });
+    var refresh = $("sc-refresh");
+    if (refresh) refresh.addEventListener("click", function () { load(selected); });
+    root.querySelectorAll("[data-open]").forEach(function (btn) {
+      btn.addEventListener("click", function () { load(btn.getAttribute("data-open")); });
+    });
+    root.querySelectorAll("[data-ask]").forEach(function (btn) {
+      btn.addEventListener("click", function () { asking = btn.getAttribute("data-ask"); paint(); });
+    });
+    root.querySelectorAll("[data-yes]").forEach(function (btn) {
+      btn.addEventListener("click", function () { remove(btn.getAttribute("data-yes")); });
+    });
+    root.querySelectorAll("[data-no]").forEach(function (btn) {
+      btn.addEventListener("click", function () { asking = ""; paint(); });
+    });
   }
+
+  wallets = readList();
+  if (wallets.length) selected = wallets[0].address;
 })();
