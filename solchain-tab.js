@@ -38,7 +38,29 @@
     if (n >= 1) return n.toFixed(2);
     return n.toFixed(4);
   }
-  function short(address) { return address.slice(0, 4) + "…" + address.slice(-4); }
+  function signed(n) {
+    if (!isFinite(n)) return "—";
+    return (n > 0 ? "+" : n < 0 ? "-" : "") + money(Math.abs(n)).replace(/^\$/, "$");
+  }
+  function pct(n) {
+    if (!isFinite(n)) return "";
+    return (n > 0 ? "+" : "") + n.toFixed(2) + "%";
+  }
+  async function pnlMap(address) {
+    var out = {};
+    try {
+      var r = await fetch("https://datapi.jup.ag/v1/pnl?addresses=" + address + "&includeClosed=false", { cache: "no-store" });
+      if (!r.ok) return out;
+      var body = await r.json();
+      var bag = (body && body[address]) || {};
+      Object.keys(bag).forEach(function (mint) {
+        var pnl = bag[mint] && bag[mint].pnl;
+        if (!pnl) return;
+        out[mint] = { usd: Number(pnl.totalPnl), pct: Number(pnl.totalPnlPercentage) };
+      });
+    } catch (e) {}
+    return out;
+  }
   function readList() {
     var rows = [];
     try { rows = JSON.parse(localStorage.getItem(LIST) || "[]") || []; } catch (e) { rows = []; }
@@ -222,14 +244,26 @@
         rows.forEach(function (row) { amount += Number(row && row.uiAmount) || 0; });
         if (amount > 0) held.push({ mint: mint, symbol: "", amount: amount });
       });
-      var px = await prices(held.map(function (row) { return row.mint; }));
+      var pxPromise = prices(held.map(function (row) { return row.mint; }));
+      var pnlPromise = pnlMap(address);
+      var px = await pxPromise;
+      var pnls = await pnlPromise;
       if (id !== seq) return;
       var priced = [];
       var skipped = 0;
       held.forEach(function (row) {
         var price = px[row.mint];
         if (!(price > 0)) { skipped++; return; }
-        priced.push({ mint: row.mint, symbol: row.symbol, amount: row.amount, price: price, value: row.amount * price });
+        var hit = pnls[row.mint];
+        priced.push({
+          mint: row.mint,
+          symbol: row.symbol,
+          amount: row.amount,
+          price: price,
+          value: row.amount * price,
+          pnl: hit && isFinite(hit.usd) ? hit.usd : null,
+          pnlPct: hit && isFinite(hit.pct) ? hit.pct : null
+        });
       });
       priced.sort(function (a, b) { return b.value - a.value; });
       var total = priced.reduce(function (sum, row) { return sum + row.value; }, 0);
@@ -283,9 +317,13 @@
       note = "Updated " + new Date(last.at).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) + (last.skipped ? " · " + last.skipped + " tokens had no price" : "");
     }
     var rows = (last && last.address === selected && last.rows ? last.rows : []).slice(0, 20).map(function (row) {
+      var up = row.pnl > 0;
+      var down = row.pnl < 0;
+      var color = up ? "#3dbe7a" : down ? "#ff8a7a" : "#8b93a7";
+      var pnl = isFinite(row.pnl) ? '<div style="color:' + color + ';font-size:12px;font-weight:800;text-align:right">' + signed(row.pnl) + (isFinite(row.pnlPct) ? " · " + pct(row.pnlPct) : "") + '</div>' : '<div style="color:#8b93a7;font-size:12px;text-align:right">—</div>';
       return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #1c2633">' +
-        '<div style="flex:1;min-width:0;font-weight:800">' + esc(row.symbol || short(row.mint)) + '</div>' +
-        '<div style="color:#8b93a7;font-size:12px">' + qty(row.amount) + '</div><b>' + money(row.value) + '</b></div>';
+        '<div style="flex:1;min-width:0"><div style="font-weight:800">' + esc(row.symbol || short(row.mint)) + '</div><div style="color:#8b93a7;font-size:12px">' + qty(row.amount) + '</div></div>' +
+        '<div><b style="display:block;text-align:right">' + money(row.value) + '</b>' + pnl + '</div></div>';
     }).join("");
     var more = last && last.address === selected && last.rows && last.rows.length > 20 ? '<div style="color:#8b93a7;font-size:12px;padding-top:8px">+' + (last.rows.length - 20) + ' more</div>' : "";
     var link = valid(selected) ? '<a href="https://solscan.io/account/' + esc(selected) + '" target="_blank" rel="noopener" style="color:#7eb6ff;font-size:12px;font-weight:800">Solscan</a>' : "";
