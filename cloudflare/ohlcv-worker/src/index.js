@@ -371,7 +371,8 @@ export class OhlcvEngine {
           (Array.isArray(list) ? list : []).forEach((row) => {
             const address = String((row && row.address) || '').trim();
             if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address) || out.some((item) => item.address === address)) return;
-            out.push({ address, at: Number(row && row.at) || Date.now() });
+            const name = String((row && row.name) || '').trim().slice(0, 40);
+            out.push({ address, name, at: Number(row && row.at) || Date.now() });
           });
           return out;
         };

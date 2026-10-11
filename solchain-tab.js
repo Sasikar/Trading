@@ -9,6 +9,7 @@
   var wallets = [];
   var selected = "";
   var asking = "";
+  var renaming = "";
   var seq = 0;
   var last = null;
   var draft = "";
@@ -51,7 +52,7 @@
     rows.forEach(function (row) {
       var address = String((row && row.address) || "").trim();
       if (!valid(address) || out.some(function (item) { return item.address === address; })) return;
-      out.push({ address: address, at: Number(row && row.at) || Date.now() });
+      out.push({ address: address, name: String((row && row.name) || "").trim().slice(0, 40), at: Number(row && row.at) || Date.now() });
     });
     return out;
   }
@@ -79,8 +80,11 @@
   function merge(remote) {
     (remote || []).forEach(function (row) {
       var address = String((row && row.address) || "").trim();
-      if (!valid(address) || wallets.some(function (item) { return item.address === address; })) return;
-      wallets.push({ address: address, at: Number(row.at) || Date.now() });
+      var name = String((row && row.name) || "").trim().slice(0, 40);
+      if (!valid(address)) return;
+      var hit = wallets.filter(function (item) { return item.address === address; })[0];
+      if (!hit) wallets.push({ address: address, name: name, at: Number(row.at) || Date.now() });
+      else if (!hit.name && name) hit.name = name;
     });
     writeList();
   }
@@ -166,13 +170,22 @@
       return;
     }
     if (!wallets.some(function (row) { return row.address === address; })) {
-      wallets.push({ address: address, at: Date.now() });
+      wallets.push({ address: address, name: "", at: Date.now() });
       writeList();
       persist();
     }
     draft = "";
     selected = address;
     load(address);
+  }
+  function rename(address, name) {
+    var row = wallets.filter(function (item) { return item.address === address; })[0];
+    if (!row) return;
+    row.name = String(name || "").trim().slice(0, 40);
+    renaming = "";
+    writeList();
+    persist();
+    paint();
   }
   function remove(address) {
     wallets = wallets.filter(function (row) { return row.address !== address; });
@@ -240,14 +253,24 @@
       var on = row.address === selected;
       var snap = known[row.address];
       var worth = snap && isFinite(snap.total) ? money(snap.total) : "—";
+      var title = row.name || short(row.address);
+      var main = renaming === row.address
+        ? '<form data-rename-form="' + esc(row.address) + '" style="flex:1;display:flex;gap:6px;min-width:0">' +
+          '<input data-name value="' + esc(row.name) + '" placeholder="Your name" maxlength="40" style="flex:1;min-width:0;padding:8px 10px;border-radius:10px;border:1px solid #2a3142;background:#0c1016;color:#f4f7fb;font-weight:700">' +
+          '<button type="submit" style="border:0;border-radius:10px;padding:0 10px;background:#e6c878;color:#1a1406;font-weight:900">Save</button></form>'
+        : '<button type="button" data-open="' + esc(row.address) + '" style="flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#f4f7fb;padding:0">' +
+          '<div style="font-weight:800">' + esc(title) + '</div>' +
+          (row.name ? '<div style="font-size:11px;color:#8b93a7;font-weight:600">' + esc(short(row.address)) + '</div>' : '') +
+          '</button><button type="button" data-edit="' + esc(row.address) + '" aria-label="Rename" style="border:0;background:transparent;color:#c5d0dc;font-size:16px;padding:0 4px">✎</button>';
       return '<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px solid ' + (on ? "#3dbe7a" : "#2a3142") + ';background:' + (on ? "#102018" : "#10161d") + '">' +
-        '<button type="button" data-open="' + esc(row.address) + '" style="flex:1;min-width:0;text-align:left;border:0;background:transparent;color:#f4f7fb;font-weight:800;padding:0">' +
-        short(row.address) + '</button><b style="font-size:13px">' + worth + '</b>' +
+        main + '<b style="font-size:13px">' + worth + '</b>' +
         '<button type="button" data-ask="' + esc(row.address) + '" aria-label="Delete" style="border:0;background:transparent;color:#ff8a7a;font-weight:900;font-size:18px;padding:0 4px">×</button></div>';
     }).join("");
     var ask = "";
     if (asking) {
-      ask = '<div style="margin-top:10px;padding:12px;border-radius:12px;background:#2a1518;color:#ffb4ae">Delete ' + esc(short(asking)) + '?' +
+      var asked = wallets.filter(function (row) { return row.address === asking; })[0];
+      var askedName = asked && asked.name ? asked.name : short(asking);
+      ask = '<div style="margin-top:10px;padding:12px;border-radius:12px;background:#2a1518;color:#ffb4ae">Delete ' + esc(askedName) + '?' +
         '<div style="display:flex;gap:8px;margin-top:8px">' +
         '<button type="button" data-yes="' + esc(asking) + '" style="border:0;border-radius:999px;padding:8px 12px;background:#ff5d6c;color:#fff;font-weight:900">Delete</button>' +
         '<button type="button" data-no="1" style="border:0;border-radius:999px;padding:8px 12px;background:#1c2430;color:#f4f7fb;font-weight:900">Keep</button></div></div>';
@@ -291,6 +314,18 @@
     root.querySelectorAll("[data-open]").forEach(function (btn) {
       btn.addEventListener("click", function () { load(btn.getAttribute("data-open")); });
     });
+    root.querySelectorAll("[data-edit]").forEach(function (btn) {
+      btn.addEventListener("click", function () { renaming = btn.getAttribute("data-edit"); paint(); });
+    });
+    root.querySelectorAll("[data-rename-form]").forEach(function (form) {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var input = form.querySelector("[data-name]");
+        rename(form.getAttribute("data-rename-form"), input && input.value);
+      });
+    });
+    var nameBox = root.querySelector("[data-name]");
+    if (nameBox) { nameBox.focus(); nameBox.select(); }
     root.querySelectorAll("[data-ask]").forEach(function (btn) {
       btn.addEventListener("click", function () { asking = btn.getAttribute("data-ask"); paint(); });
     });
