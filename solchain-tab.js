@@ -222,6 +222,36 @@
     }
     paint();
   }
+  function timedFetch(url, ms) {
+    var ctrl = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, ms);
+    return fetch(url, { cache: "no-store", signal: ctrl ? ctrl.signal : undefined }).finally(function () { clearTimeout(timer); });
+  }
+  async function fromDatapi(address) {
+    var r = await timedFetch("https://datapi.jup.ag/v1/pnl?addresses=" + address + "&includeClosed=false", 25000);
+    if (!r.ok) throw new Error("Wallet feed " + r.status + ". Tap Refresh again.");
+    var body = await r.json();
+    var bag = (body && body[address]) || {};
+    var priced = [];
+    Object.keys(bag).forEach(function (mint) {
+      var row = bag[mint] || {};
+      var bal = row.balance || {};
+      var value = Number(bal.balanceValue);
+      var amount = Number(bal.balance);
+      if (!(value > 0)) return;
+      var pnl = row.pnl || null;
+      priced.push({
+        mint: mint,
+        symbol: mint === SOL ? "SOL" : "",
+        amount: isFinite(amount) ? amount : 0,
+        price: Number(row.price && row.price.usdPrice) || 0,
+        value: value,
+        pnl: pnl && isFinite(Number(pnl.totalPnl)) ? Number(pnl.totalPnl) : null,
+        pnlPct: pnl && isFinite(Number(pnl.totalPnlPercentage)) ? Number(pnl.totalPnlPercentage) : null
+      });
+    });
+    return priced;
+  }
   async function load(address) {
     address = address || selected;
     if (!valid(address)) return;
@@ -230,52 +260,20 @@
     last = { loading: true, address: address };
     paint();
     try {
-      var r = await fetch("https://lite-api.jup.ag/ultra/v1/holdings/" + address, { cache: "no-store" });
-      if (!r.ok) throw new Error("Wallet feed " + r.status + ". Tap Refresh again.");
-      var bag = await r.json();
+      var priced = await fromDatapi(address);
       if (id !== seq) return;
-      var held = [];
-      var solAmt = Number(bag && bag.uiAmount) || 0;
-      if (solAmt > 0) held.push({ mint: SOL, symbol: "SOL", amount: solAmt });
-      var tokens = (bag && bag.tokens) || {};
-      Object.keys(tokens).forEach(function (mint) {
-        var rows = tokens[mint];
-        if (!Array.isArray(rows)) return;
-        var amount = 0;
-        rows.forEach(function (row) { amount += Number(row && row.uiAmount) || 0; });
-        if (amount > 0) held.push({ mint: mint, symbol: "", amount: amount });
-      });
-      var pxPromise = prices(held.map(function (row) { return row.mint; }));
-      var pnlPromise = pnlMap(address);
-      var px = await pxPromise;
-      var pnls = await pnlPromise;
-      if (id !== seq) return;
-      var priced = [];
-      var skipped = 0;
-      held.forEach(function (row) {
-        var price = px[row.mint];
-        if (!(price > 0)) { skipped++; return; }
-        var hit = pnls[row.mint];
-        priced.push({
-          mint: row.mint,
-          symbol: row.symbol,
-          amount: row.amount,
-          price: price,
-          value: row.amount * price,
-          pnl: hit && isFinite(hit.usd) ? hit.usd : null,
-          pnlPct: hit && isFinite(hit.pct) ? hit.pct : null
-        });
-      });
+      if (!priced.length) throw new Error("No priced coins in that wallet. Tap Refresh again.");
       priced.sort(function (a, b) { return b.value - a.value; });
       var total = priced.reduce(function (sum, row) { return sum + row.value; }, 0);
       var sym = await names(priced.slice(0, 30).map(function (row) { return row.mint; }).filter(function (mint) { return mint !== SOL; }));
       if (id !== seq) return;
       priced.forEach(function (row) { if (sym[row.mint]) row.symbol = sym[row.mint]; });
       saveSnap(address, total);
-      last = { address: address, total: total, rows: priced, skipped: skipped, at: Date.now() };
+      last = { address: address, total: total, rows: priced, skipped: 0, at: Date.now() };
     } catch (e) {
       if (id !== seq) return;
-      last = { address: address, error: String(e && e.message ? e.message : e) };
+      var msg = e && e.name === "AbortError" ? "That wallet took too long. Tap Refresh." : String(e && e.message ? e.message : e);
+      last = { address: address, error: msg };
     }
     paint();
   }
