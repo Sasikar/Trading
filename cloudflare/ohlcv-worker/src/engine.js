@@ -5194,10 +5194,8 @@ export class Engine {
         const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
         const pts = crossed * step;
         const text = [
-          'BTC ' + (steps > 0 ? 'UP' : 'DOWN'),
-          pts + ' pts' + (crossed > 1 ? ' (' + crossed + ' x ' + step + ')' : ''),
+          'BTC ' + (steps > 0 ? 'UP' : 'DOWN') + ' ' + pts + ' pts ' + usd(price) + (crossed > 1 ? ' (' + crossed + ' x ' + step + ')' : ''),
           'From ' + usd(from),
-          'Now ' + usd(price),
           'Next up ' + usd(state.anchor + step),
           'Next down ' + usd(state.anchor - step)
         ].join('\n');
