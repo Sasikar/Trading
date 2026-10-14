@@ -5207,6 +5207,143 @@ export class Engine {
     return this.btcView(state, error);
   }
 
+  memeList() {
+    return [{ id: 'CATE', name: 'CATE', ca: 'Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump' }];
+  }
+  memeState() {
+    let saved = {};
+    try { saved = JSON.parse(this.store.getMeta('meme_points') || '{}') || {}; } catch (e) { saved = {}; }
+    let points = Math.round(Number(saved.points));
+    if (!isFinite(points) || points < 1) points = 2;
+    if (points > 20) points = 20;
+    const coins = saved.coins && typeof saved.coins === 'object' ? saved.coins : {};
+    return { points, on: saved.on !== false, coins };
+  }
+  saveMeme(state) {
+    this.store.setMeta('meme_points', JSON.stringify(state));
+  }
+  memeUsd(n) {
+    const v = Math.round(Number(n) * 1e6) / 1e6;
+    return '$' + v.toFixed(5);
+  }
+  memeTicks(n) {
+    return Math.round(Number(n) * 1e6);
+  }
+  async memePrice(ca) {
+    const r = await fetch('https://api.dexscreener.com/tokens/v1/solana/' + ca);
+    if (!r.ok) throw new Error('CATE price ' + r.status);
+    const body = await r.json();
+    const rows = Array.isArray(body) ? body : [];
+    let best = 0;
+    let price = 0;
+    rows.forEach((pair) => {
+      const liq = Number(pair && pair.liquidity && pair.liquidity.usd) || 0;
+      const px = Number(pair && pair.priceUsd);
+      if (px > 0 && liq >= best) { best = liq; price = px; }
+    });
+    if (!(price > 0)) throw new Error('CATE price missing');
+    return price;
+  }
+  async checkMemePoints(patch) {
+    const POINT = 1000;
+    let state = this.memeState();
+    if (patch && patch.points != null) {
+      let points = Math.round(Number(patch.points));
+      if (!isFinite(points) || points < 1) points = 1;
+      if (points > 20) points = 20;
+      if (points !== state.points) state.coins = {};
+      state.points = points;
+    }
+    if (patch && typeof patch.on === 'boolean' && patch.on !== state.on) {
+      state.on = patch.on;
+      state.coins = {};
+    }
+    const spec = this.memeList()[0];
+    let error = '';
+    let price = 0;
+    try { price = await this.memePrice(spec.ca); } catch (e) { error = String(e && e.message ? e.message : e).slice(0, 140); }
+    const fresh = this.memeState();
+    if (!(patch && patch.points != null)) state.points = fresh.points;
+    if (!(patch && typeof patch.on === 'boolean')) state.on = fresh.on;
+    if (!patch) state.coins = fresh.coins;
+    const bag = (state.coins && state.coins[spec.id]) || {};
+    const row = {
+      anchor: this.memeTicks(bag.anchor),
+      lastDir: bag.lastDir === 'down' ? 'down' : (bag.lastDir === 'up' ? 'up' : ''),
+      lastMove: Number(bag.lastMove) || 0,
+      lastAlertAt: Number(bag.lastAlertAt) || 0
+    };
+    if (!(price > 0)) {
+      this.saveMeme(state);
+      return this.memeView(state, error || 'CATE price missing', 0);
+    }
+    const nowPx = this.memeTicks(price);
+    if (!row.anchor) row.anchor = nowPx;
+    const stepTicks = state.points * POINT;
+    const steps = Math.trunc((nowPx - row.anchor) / stepTicks);
+    if (state.on && steps !== 0) {
+      const from = row.anchor;
+      const crossed = Math.abs(steps);
+      row.anchor = from + steps * stepTicks;
+      row.lastDir = steps > 0 ? 'up' : 'down';
+      row.lastMove = steps * state.points;
+      row.lastAlertAt = Date.now();
+      state.coins[spec.id] = {
+        anchor: row.anchor / 1e6,
+        lastPrice: price,
+        lastAt: Date.now(),
+        lastDir: row.lastDir,
+        lastMove: row.lastMove,
+        lastAlertAt: row.lastAlertAt
+      };
+      this.saveMeme(state);
+      const token = this.telegramToken();
+      const chat = this.telegramChatId();
+      if (token && chat) {
+        const pts = crossed * state.points;
+        const text = [
+          spec.name + ' ' + (steps > 0 ? 'UP' : 'DOWN') + ' ' + pts + ' pts ' + this.memeUsd(price) + (crossed > 1 ? ' (' + crossed + ' x ' + state.points + ')' : ''),
+          'From ' + this.memeUsd(from / 1e6),
+          'Next up ' + this.memeUsd((row.anchor + stepTicks) / 1e6),
+          'Next down ' + this.memeUsd((row.anchor - stepTicks) / 1e6)
+        ].join('\n');
+        try { await sendTelegram(token, chat, text); } catch (e) {}
+      }
+    } else {
+      state.coins[spec.id] = {
+        anchor: row.anchor / 1e6,
+        lastPrice: price,
+        lastAt: Date.now(),
+        lastDir: row.lastDir,
+        lastMove: row.lastMove,
+        lastAlertAt: row.lastAlertAt
+      };
+      this.saveMeme(state);
+    }
+    return this.memeView(state, error, price);
+  }
+  memeView(state, error, price) {
+    const spec = this.memeList()[0];
+    const bag = (state.coins && state.coins[spec.id]) || {};
+    const anchor = Number(bag.anchor) || 0;
+    const step = state.points * 0.001;
+    return {
+      ok: !error,
+      error: error || '',
+      points: state.points,
+      on: state.on,
+      id: spec.id,
+      name: spec.name,
+      price: Number(bag.lastPrice) || price || 0,
+      anchor,
+      up: anchor ? anchor + step : 0,
+      down: anchor ? Math.max(0, anchor - step) : 0,
+      lastDir: bag.lastDir || '',
+      lastMove: Number(bag.lastMove) || 0,
+      lastAlertAt: Number(bag.lastAlertAt) || 0
+    };
+  }
+
   async tick(mode) {
     const now = Date.now();
     if (this.busy) return { skipped: true };

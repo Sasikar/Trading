@@ -212,8 +212,13 @@ export class OhlcvEngine {
       try { if (this.engine) this.engine.lastErr = String(e && e.message ? e.message : e); } catch (e2) {}
     }
     try { this.boot(); await this.engine.checkBtcPoints(); } catch (e4) {}
+    try { this.boot(); await this.engine.checkMemePoints(); } catch (e6) {}
     let wait = AUTO_EVERY_MS || 300000;
-    try { if (this.engine && this.engine.btcState().on) wait = 20000; } catch (e5) {}
+    try {
+      const btcOn = this.engine && this.engine.btcState().on;
+      const memeOn = this.engine && this.engine.memeState().on;
+      if (btcOn || memeOn) wait = 20000;
+    } catch (e5) {}
     if (ranTick && wait > 20000) wait = AUTO_EVERY_MS || 300000;
     try { await this.ctx.storage.setAlarm(Date.now() + wait); } catch (e3) {}
   }
@@ -403,6 +408,15 @@ export class OhlcvEngine {
         const patch = request.method === 'POST' ? await request.json().catch(() => ({})) : null;
         try {
           const data = await this.engine.checkBtcPoints(patch);
+          return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+      }
+      if (path === '/memes' || path === '/api/memes') {
+        const patch = request.method === 'POST' ? await request.json().catch(() => ({})) : null;
+        try {
+          const data = await this.engine.checkMemePoints(patch);
           return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
         } catch (e) {
           return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
