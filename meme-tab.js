@@ -95,11 +95,13 @@
       if (timer) { clearInterval(timer); timer = 0; }
       return;
     }
+    document.body.classList.remove("md-on", "wh-on", "cal-on", "sl-on");
     hideOthers();
-    p.style.display = "block";
+    p.style.setProperty("display", "block", "important");
     p.classList.add("on");
     paint();
     pull();
+    if (p.scrollIntoView) p.scrollIntoView({ block: "start" });
     if (timer) clearInterval(timer);
     timer = setInterval(function () { if (open) pull(); }, 15000);
   }
@@ -107,7 +109,8 @@
   var tabs = $("tf-tabs");
   if (tabs) tabs.addEventListener("click", function (ev) {
     var b = ev.target && ev.target.closest && ev.target.closest("[data-tf]");
-    if (!b || b.getAttribute("data-tf") === "memes") return;
-    show(false);
+    if (!b) return;
+    if (b.getAttribute("data-tf") === "memes") show(true);
+    else show(false);
   }, true);
 })();
