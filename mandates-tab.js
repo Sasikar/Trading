@@ -195,7 +195,7 @@
     }
     root.innerHTML =
       '<div class="md-total"><b>' + money(total) + '</b></div>' +
-      '<form id="md-add" class="md-form"><input id="md-text" data-field="text" maxlength="80" placeholder="Name" value="' + esc(draftText) + '" aria-label="Text"><span class="md-hy">-</span><input id="md-amt" data-field="amt" placeholder="Amount" inputmode="decimal" value="' + esc(draftAmt) + '" aria-label="Amount"><button type="submit">Add</button></form>' +
+      '<form id="md-add" class="md-form"><input id="md-text" data-field="text" maxlength="80" placeholder="Name" value="' + esc(draftText) + '" aria-label="Text"><span class="md-hy">-</span><input id="md-amt" data-field="amt" placeholder="1.25L" inputmode="text" value="' + esc(draftAmt) + '" aria-label="Amount"><button type="submit">Add</button></form>' +
       '<p id="md-status"></p>' + ask +
       '<ul class="md-list">' + body + '</ul>';
   }
