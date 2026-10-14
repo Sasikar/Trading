@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-14T07:23:15.376Z",
+  "updated": "2026-10-14T07:24:26.984Z",
   "items": [
     {
       "id": "mv1rqi2n016k",
@@ -12,6 +12,12 @@
       "text": "Banks Interest",
       "amount": 80000,
       "t": 1791560371345
+    },
+    {
+      "id": "mv7sa1cg56k3",
+      "text": "Gamble Bag",
+      "amount": 100000,
+      "t": 1791962623312
     },
     {
       "id": "mv40rmhjgciq",
@@ -45,9 +51,9 @@
     },
     {
       "id": "mv7s8x515rip",
-      "text": "Parabolic Star ⭐⭐⭐ Bag(3)",
+      "text": "Parabolic Star ⭐⭐⭐ Bag(3 1L each))",
       "amount": 300000,
-      "t": 1791962594534
+      "t": 1791962665545
     },
     {
       "id": "mv14xuvyyw5j",
