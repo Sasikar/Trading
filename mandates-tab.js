@@ -195,14 +195,39 @@
     }
     root.innerHTML =
       '<div class="md-total"><b>' + money(total) + '</b></div>' +
-      '<form id="md-add" class="md-form"><input id="md-text" data-field="text" maxlength="80" placeholder="Text" value="' + esc(draftText) + '" aria-label="Text"><span class="md-hy">-</span><input id="md-amt" data-field="amt" placeholder="2L" value="' + esc(draftAmt) + '" aria-label="Amount"><button type="submit">Add</button></form>' +
+      '<form id="md-add" class="md-form"><input id="md-text" data-field="text" maxlength="80" placeholder="Name" value="' + esc(draftText) + '" aria-label="Text"><span class="md-hy">-</span><input id="md-amt" data-field="amt" placeholder="Amount" inputmode="decimal" value="' + esc(draftAmt) + '" aria-label="Amount"><button type="submit">Add</button></form>' +
       '<p id="md-status"></p>' + ask +
       '<ul class="md-list">' + body + '</ul>';
   }
-  function add(textRaw, amtRaw) {
+  function splitEntry(textRaw, amtRaw) {
     var text = keep(textRaw);
     var amount = num(amtRaw);
-    if (!text || amount == null || text.toLowerCase() === 'tax') return;
+    if (amount == null && text) {
+      var lead = text.match(/^(-?\d+(?:\.\d+)?)\s*([kKlL])\b\s+(.+)$/);
+      var trail = text.match(/^(.+?)[\s\-]+(-?\d+(?:\.\d+)?)\s*([kKlL])$/);
+      if (lead && keep(lead[3])) {
+        amount = num(lead[1] + lead[2]);
+        text = keep(lead[3]);
+      } else if (trail && keep(trail[1])) {
+        amount = num(trail[2] + trail[3]);
+        text = keep(trail[1]);
+      }
+    }
+    return { text: text, amount: amount };
+  }
+  var adding = false;
+  function add(textRaw, amtRaw) {
+    if (adding) return;
+    adding = true;
+    setTimeout(function () { adding = false; }, 500);
+    var parsed = splitEntry(textRaw, amtRaw);
+    var text = parsed.text;
+    var amount = parsed.amount;
+    if (!text || amount == null || text.toLowerCase() === 'tax') {
+      paint();
+      setStatus(text.toLowerCase() === 'tax' ? 'Tax is already there' : 'Type a name and an amount like 1.25L');
+      return;
+    }
     items.unshift({ id: nid(), text: text, amount: amount, t: Date.now() });
     sortItems();
     var textBox = $('md-text');
@@ -262,12 +287,18 @@
   if (!document.getElementById('md-style')) {
     var css = document.createElement('style');
     css.id = 'md-style';
-    css.textContent = '#md-panel .head p,#md-panel .source{display:none!important}#md-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#md-panel,#md-app{max-width:100%;overflow-x:hidden}.md-total{border-radius:18px;padding:16px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.md-total b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.md-form{display:flex;flex-wrap:nowrap;gap:6px;align-items:center}.md-form input{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:800 14px/1.2 Inter,system-ui,sans-serif}.md-form input[data-field=amt]{flex:0 0 72px}.md-hy{flex:0 0 auto;color:#8b95a5;font-weight:800}.md-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.md-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}#md-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.md-list{list-style:none;margin:8px 0 0;padding:0}.md-row{display:flex;align-items:center;gap:6px;padding:12px 0;border-bottom:1px solid #1c2733}.md-name{flex:1;min-width:0;font-weight:800;word-break:break-word}.md-row b{flex:0 0 auto;font-size:15px}.md-lock b{color:#e6c878}.md-acts{display:flex;gap:4px;margin-left:auto}.md-pen,.md-x{border:0;border-radius:999px;height:28px;cursor:pointer;font-weight:800}.md-pen{padding:0 8px;background:#243044;color:#f4f7fb;font-size:12px}.md-x{width:28px;background:#2a1a22;color:#ff8b98;font-size:18px}.md-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.md-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.md-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.md-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.md-on main>section.section,body.md-on main>.trend-panel:not(#md-panel),body.md-on main>.struct-trend-panel,body.md-on main>.macro-panel,body.md-on #tf-panels{display:none!important}body.md-on #md-panel{display:block!important}';
+    css.textContent = '#md-panel .head p,#md-panel .source{display:none!important}#md-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}#md-panel,#md-app{max-width:100%;overflow-x:hidden}.md-total{border-radius:18px;padding:16px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.md-total b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.md-form{display:flex;flex-wrap:nowrap;gap:6px;align-items:center}.md-form input{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:800 14px/1.2 Inter,system-ui,sans-serif}.md-form input[data-field=amt]{flex:0 0 92px}.md-form input::placeholder{color:#6d7888;font-weight:600}.md-hy{flex:0 0 auto;color:#8b95a5;font-weight:800}.md-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.md-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}#md-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.md-list{list-style:none;margin:8px 0 0;padding:0}.md-row{display:flex;align-items:center;gap:6px;padding:12px 0;border-bottom:1px solid #1c2733}.md-name{flex:1;min-width:0;font-weight:800;word-break:break-word}.md-row b{flex:0 0 auto;font-size:15px}.md-lock b{color:#e6c878}.md-acts{display:flex;gap:4px;margin-left:auto}.md-pen,.md-x{border:0;border-radius:999px;height:28px;cursor:pointer;font-weight:800}.md-pen{padding:0 8px;background:#243044;color:#f4f7fb;font-size:12px}.md-x{width:28px;background:#2a1a22;color:#ff8b98;font-size:18px}.md-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.md-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.md-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.md-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.md-on main>section.section,body.md-on main>.trend-panel:not(#md-panel),body.md-on main>.struct-trend-panel,body.md-on main>.macro-panel,body.md-on #tf-panels{display:none!important}body.md-on #md-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
   var root = $('md-app');
   if (root) {
+    root.addEventListener('pointerdown', function (ev) {
+      var btn = ev.target && ev.target.closest && ev.target.closest('#md-add button');
+      if (!btn) return;
+      ev.preventDefault();
+      add(($('md-text') || {}).value, ($('md-amt') || {}).value);
+    });
     root.addEventListener('submit', function (ev) {
       var form = ev.target;
       if (!form) return;
