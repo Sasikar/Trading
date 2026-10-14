@@ -199,11 +199,23 @@ export class OhlcvEngine {
     if (!next || next <= now + 2000) await this.ctx.storage.setAlarm(now + (AUTO_EVERY_MS || 300000));
   }
   async alarm() {
-    try { this.boot(); await this.engine.tick('auto'); } catch (e) {
+    let ranTick = false;
+    try {
+      this.boot();
+      const last = +(this.store.getMeta('last_poll') || 0);
+      const every = AUTO_EVERY_MS || 300000;
+      if (!last || Date.now() - last >= every - 5000) {
+        ranTick = true;
+        await this.engine.tick('auto');
+      }
+    } catch (e) {
       try { if (this.engine) this.engine.lastErr = String(e && e.message ? e.message : e); } catch (e2) {}
     }
     try { this.boot(); await this.engine.checkBtcPoints(); } catch (e4) {}
-    try { await this.ctx.storage.setAlarm(Date.now() + (AUTO_EVERY_MS || 300000)); } catch (e3) {}
+    let wait = AUTO_EVERY_MS || 300000;
+    try { if (this.engine && this.engine.btcState().on) wait = 20000; } catch (e5) {}
+    if (ranTick && wait > 20000) wait = AUTO_EVERY_MS || 300000;
+    try { await this.ctx.storage.setAlarm(Date.now() + wait); } catch (e3) {}
   }
   leadersNow() {
     let leaders = [];

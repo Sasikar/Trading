@@ -5164,6 +5164,13 @@ export class Engine {
     let error = '';
     let price = 0;
     try { price = await this.btcPrice(); } catch (e) { error = String(e && e.message ? e.message : e).slice(0, 140); }
+    const fresh = this.btcState();
+    if (!(patch && patch.step != null)) state.step = fresh.step;
+    if (!(patch && typeof patch.on === 'boolean')) state.on = fresh.on;
+    if (!patch) state.anchor = fresh.anchor;
+    state.lastDir = fresh.lastDir;
+    state.lastMove = fresh.lastMove;
+    state.lastAlertAt = fresh.lastAlertAt;
     if (!(price > 0)) {
       this.saveBtc(state);
       return this.btcView(state, error || 'BTC price missing');
@@ -5171,26 +5178,28 @@ export class Engine {
     state.lastPrice = price;
     state.lastAt = Date.now();
     if (!state.anchor) state.anchor = price;
-    const move = price - state.anchor;
-    if (state.on && Math.abs(move) >= state.step) {
+    const step = state.step;
+    const steps = Math.trunc((price - state.anchor) / step);
+    if (state.on && steps !== 0) {
       const from = state.anchor;
-      state.anchor = price;
-      state.lastDir = move > 0 ? 'up' : 'down';
-      state.lastMove = move;
+      const crossed = Math.abs(steps);
+      state.anchor = from + steps * step;
+      state.lastDir = steps > 0 ? 'up' : 'down';
+      state.lastMove = steps * step;
       state.lastAlertAt = Date.now();
       this.saveBtc(state);
       const token = this.telegramToken();
       const chat = this.telegramChatId();
       if (token && chat) {
         const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
-        const sign = move > 0 ? '+' : '';
+        const pts = crossed * step;
         const text = [
-          'BTC ' + (move > 0 ? 'UP' : 'DOWN'),
-          'Price ' + usd(price),
-          sign + Math.round(move) + ' pts from the last alert at ' + usd(from),
-          'Step ' + state.step + ' pts, both ways',
-          'Next up ' + usd(price + state.step),
-          'Next down ' + usd(price - state.step)
+          'BTC ' + (steps > 0 ? 'UP' : 'DOWN'),
+          pts + ' pts' + (crossed > 1 ? ' (' + crossed + ' x ' + step + ')' : ''),
+          'From ' + usd(from),
+          'Now ' + usd(price),
+          'Next up ' + usd(state.anchor + step),
+          'Next down ' + usd(state.anchor - step)
         ].join('\n');
         try { await sendTelegram(token, chat, text); } catch (e) {}
       }
