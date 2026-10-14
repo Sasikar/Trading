@@ -202,6 +202,7 @@ export class OhlcvEngine {
     try { this.boot(); await this.engine.tick('auto'); } catch (e) {
       try { if (this.engine) this.engine.lastErr = String(e && e.message ? e.message : e); } catch (e2) {}
     }
+    try { this.boot(); await this.engine.checkBtcPoints(); } catch (e4) {}
     try { await this.ctx.storage.setAlarm(Date.now() + (AUTO_EVERY_MS || 300000)); } catch (e3) {}
   }
   leadersNow() {
@@ -385,6 +386,15 @@ export class OhlcvEngine {
         let wallets = [];
         try { wallets = clean(JSON.parse(this.store.getMeta('solchain_wallets') || '[]')); } catch (e) { wallets = []; }
         return new Response(JSON.stringify({ ok: true, wallets }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      }
+      if (path === '/btc' || path === '/api/btc') {
+        const patch = request.method === 'POST' ? await request.json().catch(() => ({})) : null;
+        try {
+          const data = await this.engine.checkBtcPoints(patch);
+          return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
       }
       if (path === '/coinstats-wallets' || path === '/api/coinstats-wallets') {
         if (request.method === 'POST') {

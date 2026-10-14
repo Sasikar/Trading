@@ -5094,6 +5094,112 @@ export class Engine {
     return { hits: top.length, grow: grow.length, calls, discover: doDiscover, seeded: uniq.length, matched: hits.length, miss };
   }
 
+  btcState() {
+    let saved = {};
+    try { saved = JSON.parse(this.store.getMeta('btc_points') || '{}') || {}; } catch (e) { saved = {}; }
+    let step = Math.round(Number(saved.step) / 100) * 100;
+    if (!isFinite(step) || step < 100) step = 200;
+    if (step > 5000) step = 5000;
+    return {
+      step,
+      on: saved.on !== false,
+      anchor: Number(saved.anchor) || 0,
+      lastPrice: Number(saved.lastPrice) || 0,
+      lastAt: Number(saved.lastAt) || 0,
+      lastDir: saved.lastDir === 'down' ? 'down' : (saved.lastDir === 'up' ? 'up' : ''),
+      lastMove: Number(saved.lastMove) || 0,
+      lastAlertAt: Number(saved.lastAlertAt) || 0
+    };
+  }
+  saveBtc(state) {
+    this.store.setMeta('btc_points', JSON.stringify(state));
+  }
+  btcView(state, error) {
+    const price = state.lastPrice || 0;
+    const anchor = state.anchor || 0;
+    return {
+      ok: !error,
+      error: error || '',
+      price,
+      step: state.step,
+      on: state.on,
+      anchor,
+      up: anchor ? anchor + state.step : 0,
+      down: anchor ? Math.max(0, anchor - state.step) : 0,
+      lastDir: state.lastDir,
+      lastMove: state.lastMove,
+      lastAlertAt: state.lastAlertAt,
+      lastAt: state.lastAt
+    };
+  }
+  async btcPrice() {
+    try {
+      const r = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot', { headers: { accept: 'application/json' } });
+      if (r.ok) {
+        const body = await r.json();
+        const n = Number(body && body.data && body.data.amount);
+        if (n > 0) return n;
+      }
+    } catch (e) {}
+    const r2 = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+    if (!r2.ok) throw new Error('BTC price ' + r2.status);
+    const body2 = await r2.json();
+    const n2 = Number(body2 && body2.price);
+    if (!(n2 > 0)) throw new Error('BTC price missing');
+    return n2;
+  }
+  async checkBtcPoints(patch) {
+    const state = this.btcState();
+    if (patch && patch.step != null) {
+      let step = Math.round(Number(patch.step) / 100) * 100;
+      if (!isFinite(step) || step < 100) step = 100;
+      if (step > 5000) step = 5000;
+      if (step !== state.step) state.anchor = 0;
+      state.step = step;
+    }
+    if (patch && typeof patch.on === 'boolean' && patch.on !== state.on) {
+      state.on = patch.on;
+      state.anchor = 0;
+    }
+    let error = '';
+    let price = 0;
+    try { price = await this.btcPrice(); } catch (e) { error = String(e && e.message ? e.message : e).slice(0, 140); }
+    if (!(price > 0)) {
+      this.saveBtc(state);
+      return this.btcView(state, error || 'BTC price missing');
+    }
+    state.lastPrice = price;
+    state.lastAt = Date.now();
+    if (!state.anchor) state.anchor = price;
+    const move = price - state.anchor;
+    if (state.on && Math.abs(move) >= state.step) {
+      const from = state.anchor;
+      state.anchor = price;
+      state.lastDir = move > 0 ? 'up' : 'down';
+      state.lastMove = move;
+      state.lastAlertAt = Date.now();
+      this.saveBtc(state);
+      const token = this.telegramToken();
+      const chat = this.telegramChatId();
+      if (token && chat) {
+        const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
+        const sign = move > 0 ? '+' : '';
+        const text = [
+          'BTC ' + (move > 0 ? 'UP' : 'DOWN'),
+          'Price ' + usd(price),
+          sign + Math.round(move) + ' pts from the last alert at ' + usd(from),
+          'Step ' + state.step + ' pts, both ways',
+          'Next up ' + usd(price + state.step),
+          'Next down ' + usd(price - state.step)
+        ].join('\n');
+        try { await sendTelegram(token, chat, text); } catch (e) {}
+      }
+    } else {
+      this.saveBtc(state);
+    }
+    return this.btcView(state, error);
+  }
+
   async tick(mode) {
     const now = Date.now();
     if (this.busy) return { skipped: true };
