@@ -54,7 +54,9 @@
       '<div style="flex:1;padding:12px;border-radius:14px;background:#102018"><div style="color:#8b93a7;font-size:11px;font-weight:800">UP</div><b style="color:#3dbe7a">' + usd(v.up) + "</b></div>" +
       '<div style="flex:1;padding:12px;border-radius:14px;background:#2a1518"><div style="color:#8b93a7;font-size:11px;font-weight:800">DOWN</div><b style="color:#ff8a7a">' + usd(v.down) + "</b></div></div>" +
       moved +
-      '<button type="button" id="btc-toggle" style="margin-top:16px;width:100%;border:0;border-radius:14px;padding:14px;font-weight:900;background:' + (on ? "#143d2a" : "#2a1518") + ";color:" + (on ? "#3dbe7a" : "#ff8a7a") + '">' + (on ? "Alerts on" : "Alerts off") + "</button>";
+      '<div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
+      '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On" : "Off") + "</div></div>" +
+      '<button type="button" id="btc-toggle" class="al-sw" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Alerts"><span class="al-knob"></span></button></div>';
     var bar = $("btc-step");
     var label = $("btc-step-label");
     if (bar) {
