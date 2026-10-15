@@ -194,19 +194,44 @@ export class OhlcvEngine {
     }
   }
   async ensureAlarm() {
+    this.boot();
     const next = await this.ctx.storage.getAlarm();
     const now = Date.now();
-    if (!next || next <= now + 2000) await this.ctx.storage.setAlarm(now + (AUTO_EVERY_MS || 300000));
+    if (!next || next > now + 1500) await this.ctx.storage.setAlarm(now + 1000);
+    try { await this.openBtcFeed(); } catch (e) {}
   }
   async alarm() {
     try { this.boot(); } catch (e) {}
-    try { await this.engine.checkBtcPoints(); } catch (e4) {}
+    try { await this.openBtcFeed(); } catch (e1) {}
+    const btcLive = this.btcFeed && this.btcFeed.readyState === 1;
+    if (!btcLive) {
+      try { await this.engine.checkBtcPoints(); } catch (e4) {}
+    }
     try { await this.engine.checkMemePoints(); } catch (e6) {}
     let wait = AUTO_EVERY_MS || 300000;
     try {
-      if (this.engine && (this.engine.btcState().on || this.engine.memeState().on)) wait = 20000;
+      if (this.engine && (this.engine.btcState().on || this.engine.memeState().on)) wait = 1000;
     } catch (e5) {}
     try { await this.ctx.storage.setAlarm(Date.now() + wait); } catch (e3) {}
+  }
+  async openBtcFeed() {
+    if (this.btcFeed && this.btcFeed.readyState === 1) return;
+    const resp = await fetch('https://ws-feed.exchange.coinbase.com', { headers: { Upgrade: 'websocket' } });
+    const ws = resp && resp.webSocket;
+    if (!ws) return;
+    ws.accept();
+    this.btcFeed = ws;
+    const self = this;
+    ws.addEventListener('message', (ev) => {
+      let msg = null;
+      try { msg = JSON.parse(typeof ev.data === 'string' ? ev.data : ''); } catch (e) { return; }
+      const px = Number(msg && msg.price);
+      if (!(msg && msg.type === 'ticker' && px > 0)) return;
+      self.ctx.waitUntil(self.engine.checkBtcPoints(null, px).catch(() => {}));
+    });
+    ws.addEventListener('close', () => { if (self.btcFeed === ws) self.btcFeed = null; });
+    ws.addEventListener('error', () => { try { ws.close(); } catch (e) {} });
+    ws.send(JSON.stringify({ type: 'subscribe', product_ids: ['BTC-USD'], channels: ['ticker'] }));
   }
   leadersNow() {
     let leaders = [];

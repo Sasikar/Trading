@@ -5148,7 +5148,13 @@ export class Engine {
     if (!(n2 > 0)) throw new Error('BTC price missing');
     return n2;
   }
-  async checkBtcPoints(patch) {
+  async checkBtcPoints(patch, livePrice) {
+    if (this._btcRun) return this.btcView(this.btcState(), '');
+    this._btcRun = true;
+    try { return await this._btcPoints(patch, livePrice); }
+    finally { this._btcRun = false; }
+  }
+  async _btcPoints(patch, livePrice) {
     const state = this.btcState();
     if (patch && patch.step != null) {
       let step = Math.round(Number(patch.step) / 100) * 100;
@@ -5162,8 +5168,10 @@ export class Engine {
       state.anchor = 0;
     }
     let error = '';
-    let price = 0;
-    try { price = await this.btcPrice(); } catch (e) { error = String(e && e.message ? e.message : e).slice(0, 140); }
+    let price = Number(livePrice) || 0;
+    if (!(price > 0)) {
+      try { price = await this.btcPrice(); } catch (e) { error = String(e && e.message ? e.message : e).slice(0, 140); }
+    }
     const fresh = this.btcState();
     if (!(patch && patch.step != null)) state.step = fresh.step;
     if (!(patch && typeof patch.on === 'boolean')) state.on = fresh.on;
@@ -5189,6 +5197,11 @@ export class Engine {
       while (left > 0) {
         const from = state.anchor;
         const level = from + dir * step;
+        state.anchor = level;
+        state.lastDir = dir > 0 ? 'up' : 'down';
+        state.lastMove = dir * step;
+        state.lastAlertAt = Date.now();
+        this.saveBtc(state);
         if (token && chat) {
           const text = [
             'BTC ' + (dir > 0 ? 'UP' : 'DOWN') + ' ' + step + ' pts ' + usd(level),
@@ -5196,13 +5209,13 @@ export class Engine {
             'Next up ' + usd(level + step),
             'Next down ' + usd(level - step)
           ].join('\n');
-          try { await sendTelegram(token, chat, text); } catch (e) { break; }
+          try { await sendTelegram(token, chat, text); }
+          catch (e) {
+            state.anchor = from;
+            this.saveBtc(state);
+            break;
+          }
         }
-        state.anchor = level;
-        state.lastDir = dir > 0 ? 'up' : 'down';
-        state.lastMove = dir * step;
-        state.lastAlertAt = Date.now();
-        this.saveBtc(state);
         left -= 1;
       }
     } else {
@@ -5248,7 +5261,13 @@ export class Engine {
     if (!(price > 0)) throw new Error('CATE price missing');
     return price;
   }
-  async checkMemePoints(patch) {
+  async checkMemePoints(patch, livePrice) {
+    if (this._memeRun) return this.memeView(this.memeState(), '', 0);
+    this._memeRun = true;
+    try { return await this._memePoints(patch, livePrice); }
+    finally { this._memeRun = false; }
+  }
+  async _memePoints(patch, livePrice) {
     const POINT = 1000;
     let state = this.memeState();
     if (patch && patch.points != null) {
@@ -5264,8 +5283,10 @@ export class Engine {
     }
     const spec = this.memeList()[0];
     let error = '';
-    let price = 0;
-    try { price = await this.memePrice(spec.ca); } catch (e) { error = String(e && e.message ? e.message : e).slice(0, 140); }
+    let price = Number(livePrice) || 0;
+    if (!(price > 0)) {
+      try { price = await this.memePrice(spec.ca); } catch (e) { error = String(e && e.message ? e.message : e).slice(0, 140); }
+    }
     const fresh = this.memeState();
     if (!(patch && patch.points != null)) state.points = fresh.points;
     if (!(patch && typeof patch.on === 'boolean')) state.on = fresh.on;
@@ -5296,15 +5317,6 @@ export class Engine {
       while (left > 0) {
         const from = row.anchor;
         const level = from + dir * stepTicks;
-        if (token && chat) {
-          const text = [
-            spec.name + ' ' + (dir > 0 ? 'UP' : 'DOWN') + ' ' + state.points + ' pts ' + this.memeUsd(level / 1e6),
-            'From ' + this.memeUsd(from / 1e6),
-            'Next up ' + this.memeUsd((level + stepTicks) / 1e6),
-            'Next down ' + this.memeUsd((level - stepTicks) / 1e6)
-          ].join('\n');
-          try { await sendTelegram(token, chat, text); } catch (e) { break; }
-        }
         row.anchor = level;
         row.lastDir = dir > 0 ? 'up' : 'down';
         row.lastMove = dir * state.points;
@@ -5319,6 +5331,21 @@ export class Engine {
           stepped: 1
         };
         this.saveMeme(state);
+        if (token && chat) {
+          const text = [
+            spec.name + ' ' + (dir > 0 ? 'UP' : 'DOWN') + ' ' + state.points + ' pts ' + this.memeUsd(level / 1e6),
+            'From ' + this.memeUsd(from / 1e6),
+            'Next up ' + this.memeUsd((level + stepTicks) / 1e6),
+            'Next down ' + this.memeUsd((level - stepTicks) / 1e6)
+          ].join('\n');
+          try { await sendTelegram(token, chat, text); }
+          catch (e) {
+            row.anchor = from;
+            state.coins[spec.id].anchor = from / 1e6;
+            this.saveMeme(state);
+            break;
+          }
+        }
         left -= 1;
       }
     } else {
