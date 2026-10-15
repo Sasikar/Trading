@@ -5283,6 +5283,9 @@ export class Engine {
     }
     const nowPx = this.memeTicks(price);
     if (!row.anchor) row.anchor = nowPx;
+    if (!bag.stepped && Math.abs(row.lastMove) > state.points && bag.anchor) {
+      row.anchor = this.memeTicks(Number(bag.anchor) - row.lastMove * 0.001);
+    }
     const stepTicks = state.points * POINT;
     const steps = Math.trunc((nowPx - row.anchor) / stepTicks);
     if (state.on && steps !== 0) {
@@ -5312,7 +5315,8 @@ export class Engine {
           lastAt: Date.now(),
           lastDir: row.lastDir,
           lastMove: row.lastMove,
-          lastAlertAt: row.lastAlertAt
+          lastAlertAt: row.lastAlertAt,
+          stepped: 1
         };
         this.saveMeme(state);
         left -= 1;
@@ -5324,7 +5328,8 @@ export class Engine {
         lastAt: Date.now(),
         lastDir: row.lastDir,
         lastMove: row.lastMove,
-        lastAlertAt: row.lastAlertAt
+        lastAlertAt: row.lastAlertAt,
+        stepped: 1
       };
       this.saveMeme(state);
     }

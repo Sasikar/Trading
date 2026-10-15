@@ -207,16 +207,6 @@ export class OhlcvEngine {
       if (this.engine && (this.engine.btcState().on || this.engine.memeState().on)) wait = 20000;
     } catch (e5) {}
     try { await this.ctx.storage.setAlarm(Date.now() + wait); } catch (e3) {}
-    try {
-      const last = +(this.store.getMeta('last_poll') || 0);
-      const every = AUTO_EVERY_MS || 300000;
-      if (!last || Date.now() - last >= every - 5000) {
-        this.store.setMeta('last_poll', String(Date.now()));
-        await this.engine.tick('auto');
-      }
-    } catch (e) {
-      try { if (this.engine) this.engine.lastErr = String(e && e.message ? e.message : e); } catch (e2) {}
-    }
   }
   leadersNow() {
     let leaders = [];
@@ -1111,6 +1101,12 @@ export default {
   },
   async scheduled(event, env, ctx) {
     const stubId = env.ENGINE.get(env.ENGINE.idFromName('main'));
+    if (event && event.cron === '* * * * *') {
+      ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/btc')));
+      ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/memes')));
+      return;
+    }
+    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/run')));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/status')));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/helius?sync=1')));
     ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/oldcoins?scan=1')));
