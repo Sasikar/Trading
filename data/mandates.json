@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-14T07:24:32.904Z",
+  "updated": "2026-10-15T04:17:39.228Z",
   "items": [
     {
       "id": "mv1rqi2n016k",
@@ -26,12 +26,6 @@
       "t": 1791735016087
     },
     {
-      "id": "mv7s4imnu2da",
-      "text": "CoinDcx alts",
-      "amount": 125000,
-      "t": 1791962365775
-    },
-    {
       "id": "mv14rvmeh22j",
       "text": "Surya School",
       "amount": 150000,
@@ -54,6 +48,12 @@
       "text": "Parabolic Star ⭐⭐⭐ Bag(3 1L each)",
       "amount": 300000,
       "t": 1791962671995
+    },
+    {
+      "id": "mv7s4imnu2da",
+      "text": "CoinDcx alts",
+      "amount": 400000,
+      "t": 1792037858347
     },
     {
       "id": "mv14xuvyyw5j",
