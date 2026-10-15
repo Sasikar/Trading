@@ -4,16 +4,21 @@
   var TOMB = 'cal_rows_tomb_v1';
   var NKEY = 'cal_notes_v1';
   var NTOMB = 'cal_notes_tomb_v1';
+  var SKEY = 'cal_sales_v1';
+  var STOMB = 'cal_sales_tomb_v1';
   var PATH = 'data/cal.json';
   var GH = 'https://api.github.com/repos/Sasikar/Trading/contents/' + PATH;
   var RATE = 0.32;
   var rows = [];
   var notes = [];
+  var sales = [];
   var view = 'pay';
   var editing = '';
   var asking = '';
   var nedit = '';
   var nask = '';
+  var sedit = '';
+  var sask = '';
   var syncing = false;
 
   function $(id) { return document.getElementById(id); }
@@ -88,10 +93,13 @@
     if (!Array.isArray(rows)) rows = [];
     try { notes = JSON.parse(localStorage.getItem(NKEY) || '[]') || []; } catch (e) { notes = []; }
     if (!Array.isArray(notes)) notes = [];
+    try { sales = JSON.parse(localStorage.getItem(SKEY) || '[]') || []; } catch (e) { sales = []; }
+    if (!Array.isArray(sales)) sales = [];
   }
   function saveLocal() {
     try { localStorage.setItem(KEY, JSON.stringify(rows)); } catch (e) {}
     try { localStorage.setItem(NKEY, JSON.stringify(notes)); } catch (e) {}
+    try { localStorage.setItem(SKEY, JSON.stringify(sales)); } catch (e) {}
     try { window.dispatchEvent(new Event('cal-sync')); } catch (e) {}
   }
   function noteTombs() {
@@ -143,6 +151,32 @@
     notes = Object.keys(map).map(function (k) { return map[k]; });
     notes.sort(function (a, b) { return (b.t || 0) - (a.t || 0); });
   }
+  function saleTombs() {
+    try {
+      var o = JSON.parse(localStorage.getItem(STOMB) || '{}');
+      return o && typeof o === 'object' ? o : {};
+    } catch (e) { return {}; }
+  }
+  function markSaleTomb(id, on) {
+    var map = saleTombs();
+    if (on) map[id] = Date.now();
+    else delete map[id];
+    try { localStorage.setItem(STOMB, JSON.stringify(map)); } catch (e) {}
+  }
+  function mergeSales(remote) {
+    var dead = saleTombs();
+    var map = {};
+    sales.concat(remote || []).forEach(function (it) {
+      if (!it || !it.id || dead[it.id]) return;
+      var volume = num(it.volume);
+      var date = String(it.date || '');
+      if (volume == null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+      var row = { id: String(it.id), date: date, volume: volume, t: it.t || 0 };
+      var prev = map[row.id];
+      if (!prev || row.t >= prev.t) map[row.id] = row;
+    });
+    sales = Object.keys(map).map(function (k) { return map[k]; });
+  }
   function decodePack(gj) {
     var text = decodeURIComponent(escape(atob(String(gj.content || '').replace(/\s/g, ''))));
     var data = JSON.parse(text);
@@ -159,6 +193,7 @@
           var pj = await pub.json();
           merge(pj.rows || []);
           mergeNotes(pj.notes || []);
+          mergeSales(pj.sales || []);
           saveLocal();
           paint();
         }
@@ -177,6 +212,7 @@
           var pack = decodePack(gj);
           merge(pack.rows || []);
           mergeNotes(pack.notes || []);
+          mergeSales(pack.sales || []);
           saveLocal();
           paint();
         } catch (e) {}
@@ -186,7 +222,7 @@
       }
       var body = {
         message: 'Cal rows',
-        content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), rows: rows, notes: notes }, null, 2)))),
+        content: btoa(unescape(encodeURIComponent(JSON.stringify({ updated: new Date().toISOString(), rows: rows, notes: notes, sales: sales }, null, 2)))),
         branch: 'master'
       };
       if (sha) body.sha = sha;
@@ -209,7 +245,7 @@
     });
   }
   function switchHtml() {
-    return '<div class="cal-switch"><button type="button" data-act="tab" data-tab="pay"' + (view === 'pay' ? ' class="on"' : '') + '>Cal</button><button type="button" data-act="tab" data-tab="notes"' + (view === 'notes' ? ' class="on"' : '') + '>Notes</button></div>';
+    return '<div class="cal-switch"><button type="button" data-act="tab" data-tab="pay"' + (view === 'pay' ? ' class="on"' : '') + '>Cal</button><button type="button" data-act="tab" data-tab="notes"' + (view === 'notes' ? ' class="on"' : '') + '>Notes</button><button type="button" data-act="tab" data-tab="sales"' + (view === 'sales' ? ' class="on"' : '') + '>Total Sale Volume</button></div>';
   }
   function paintNotes() {
     var root = $('cal-app');
@@ -236,6 +272,7 @@
   }
   function paint() {
     if (view === 'notes') { paintNotes(); return; }
+    if (view === 'sales') { paintSales(); return; }
     var root = $('cal-app');
     if (!root) return;
     var list = ordered();
@@ -359,6 +396,77 @@
     paint();
     persist();
   }
+  function orderedSales() {
+    return sales.slice().sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      return (a.t || 0) - (b.t || 0);
+    });
+  }
+  function paintSales() {
+    var root = $('cal-app');
+    if (!root) return;
+    var list = orderedSales();
+    var sum = 0;
+    list.forEach(function (row) { sum = Math.round((sum + (row.volume || 0)) * 100) / 100; });
+    var draftDate = today();
+    var draftVol = '';
+    var oldDate = $('cal-sale-date');
+    var oldVol = $('cal-sale-vol');
+    if (oldDate && oldDate.value) draftDate = oldDate.value;
+    if (oldVol) draftVol = oldVol.value;
+    var body = list.slice().reverse().map(function (row) {
+      if (sedit === row.id) {
+        return '<li class="cal-item"><form class="cal-sale-form" data-id="' + esc(row.id) + '"><label class="cal-date"><span>' + esc(shortDate(row.date)) + '</span><input type="date" value="' + esc(row.date) + '" aria-label="Date"></label><input data-field="volume" inputmode="text" autocapitalize="off" spellcheck="false" value="' + esc(money(row.volume)) + '" placeholder="2L" aria-label="Volume"><button type="submit">Save</button><button type="button" data-act="cancel">×</button></form></li>';
+      }
+      return '<li class="cal-item"><div class="cal-sale-line"><b>' + esc(shortDate(row.date)) + '</b><span>' + money(row.volume) + '</span><span class="cal-acts"><button type="button" class="cal-pen" data-act="edit" data-id="' + esc(row.id) + '" aria-label="Edit">Edit</button><button type="button" class="cal-x" data-act="ask" data-id="' + esc(row.id) + '" aria-label="Delete">×</button></span></div></li>';
+    }).join('');
+    var ask = '';
+    if (sask) {
+      var hit = null;
+      sales.forEach(function (row) { if (row.id === sask) hit = row; });
+      if (hit) ask = '<div class="cal-ask">Delete ' + esc(shortDate(hit.date)) + ' · ' + money(hit.volume) + '?<button type="button" data-act="yes" data-id="' + esc(hit.id) + '">Delete</button><button type="button" data-act="no">Keep</button></div>';
+    }
+    root.innerHTML = switchHtml() +
+      '<div class="cal-remain"><b>' + money(sum) + '</b></div>' +
+      '<form id="cal-sale-add" class="cal-sale-form"><label class="cal-date"><span>' + esc(shortDate(draftDate)) + '</span><input id="cal-sale-date" type="date" value="' + esc(draftDate) + '" aria-label="Date"></label><input id="cal-sale-vol" data-field="volume" inputmode="text" autocapitalize="off" spellcheck="false" placeholder="2L" value="' + esc(draftVol) + '" aria-label="Volume"><button type="submit">Add</button></form>' +
+      '<p id="cal-status"></p>' + ask +
+      (list.length ? '<div class="cal-sale-head"><span>Date</span><span>Volume</span><span></span></div><ul class="cal-list">' + body + '</ul>' : '');
+  }
+  function addSale(date, volumeRaw) {
+    var volume = num(volumeRaw);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || volume == null) return;
+    sales.push({ id: nid(), date: date, volume: volume, t: Date.now() });
+    var box = $('cal-sale-vol');
+    if (box) box.value = '';
+    saveLocal();
+    paint();
+    var again = $('cal-sale-vol');
+    if (again) again.focus();
+    persist();
+  }
+  function saveSale(id, date, volumeRaw) {
+    var volume = num(volumeRaw);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || volume == null) return;
+    sales.forEach(function (row) {
+      if (row.id !== id) return;
+      row.date = date;
+      row.volume = volume;
+      row.t = Date.now();
+    });
+    sedit = '';
+    saveLocal();
+    paint();
+    persist();
+  }
+  function removeSale(id) {
+    markSaleTomb(id, true);
+    sales = sales.filter(function (row) { return row.id !== id; });
+    sask = '';
+    sedit = '';
+    saveLocal();
+    paint();
+    persist();
+  }
   function solo(on) {
     document.body.classList.toggle('cal-on', !!on);
   }
@@ -385,7 +493,7 @@
   if (!document.getElementById('cal-style')) {
     var css = document.createElement('style');
     css.id = 'cal-style';
-    css.textContent = '#cal-panel .head p,#cal-panel .source{display:none!important}#cal-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.cal-remain{border-radius:18px;padding:16px 16px 14px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.cal-remain b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.cal-switch{display:flex;gap:8px;margin:0 0 12px}.cal-switch button{border:0;border-radius:999px;padding:8px 14px;background:#1a222e;color:#c5d0dc;font-weight:800;cursor:pointer}.cal-switch button.on{background:#1f8a4d;color:#fff}.cal-note-form{display:flex;gap:6px;align-items:center}.cal-note-form input,.cal-note-edit textarea{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:700 15px/1.35 Inter,system-ui,sans-serif}.cal-note-edit{display:flex;gap:6px;align-items:flex-start;width:100%}.cal-note-edit textarea{min-height:72px;resize:vertical}.cal-note-edit button,.cal-note-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.cal-note-edit button[data-act=cancel]{background:#2a1a22;color:#ff8b98}.cal-notes{list-style:none;margin:8px 0 0;padding:0}.cal-note{display:flex;gap:8px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #1c2733}.cal-note p{flex:1;min-width:0;margin:0;white-space:pre-wrap;word-break:break-word;font-weight:700}.cal-form{display:flex;flex-wrap:nowrap;gap:4px;align-items:center}.cal-form input{flex:1 1 0;width:auto;min-width:0;box-sizing:border-box;padding:8px 6px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:800 13px/1.2 Inter,system-ui,sans-serif;color-scheme:dark}.cal-date{position:relative;flex:0 0 58px;height:34px}.cal-date span{display:flex;align-items:center;justify-content:center;height:34px;border-radius:10px;background:#141c27;color:#f4f7fb;font-size:12px;font-weight:800}.cal-date input{position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0}.cal-form input[readonly]{background:#0d141c;color:#e6c878}.cal-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;font-size:13px;cursor:pointer}.cal-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}#cal-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}#cal-panel,#cal-app{max-width:100%;overflow-x:hidden}.cal-head,.cal-line{display:grid;grid-template-columns:52px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 64px;gap:4px;align-items:center}.cal-head{margin-top:14px;color:#8b95a5;font-size:11px;font-weight:800;text-transform:uppercase}.cal-list{list-style:none;margin:0;padding:0}.cal-line{padding:12px 0;border-bottom:1px solid #1c2733;font-weight:800;font-size:14px}.cal-line span,.cal-line b{min-width:0;overflow:hidden;text-overflow:ellipsis}.cal-acts{display:flex;gap:4px;justify-content:flex-end}.cal-pen,.cal-x{border:0;border-radius:999px;height:28px;cursor:pointer;font-weight:800}.cal-pen{padding:0 8px;background:#243044;color:#f4f7fb;font-size:12px}.cal-x{width:28px;background:#2a1a22;color:#ff8b98;font-size:18px}.cal-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.cal-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.cal-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.cal-ask button[data-act=no]{background:#243044;color:#f4f7fb}.cal-empty{margin:14px 0 0;color:#8b95a5;font-weight:700}body.cal-on main>section.section,body.cal-on main>.trend-panel:not(#cal-panel),body.cal-on main>.struct-trend-panel,body.cal-on main>.macro-panel,body.cal-on #tf-panels{display:none!important}body.cal-on #cal-panel{display:block!important}';
+    css.textContent = '#cal-panel .head p,#cal-panel .source{display:none!important}#cal-panel .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.cal-remain{border-radius:18px;padding:16px 16px 14px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.cal-remain b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.cal-switch{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.cal-switch button{border:0;border-radius:999px;padding:8px 14px;background:#1a222e;color:#c5d0dc;font-weight:800;cursor:pointer}.cal-sale-form{display:flex;flex-wrap:nowrap;gap:4px;align-items:center}.cal-sale-form input{flex:1 1 0;width:auto;min-width:0;box-sizing:border-box;padding:8px 6px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:800 13px/1.2 Inter,system-ui,sans-serif;color-scheme:dark}.cal-sale-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;font-size:13px;cursor:pointer}.cal-sale-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}.cal-sale-head,.cal-sale-line{display:grid;grid-template-columns:70px minmax(0,1fr) 64px;gap:4px;align-items:center}.cal-sale-head{margin-top:14px;color:#8b95a5;font-size:11px;font-weight:800;text-transform:uppercase}.cal-sale-line{padding:12px 0;border-bottom:1px solid #1c2733;font-weight:800;font-size:14px}.cal-sale-line span,.cal-sale-line b{min-width:0;overflow:hidden;text-overflow:ellipsis}.cal-switch button.on{background:#1f8a4d;color:#fff}.cal-note-form{display:flex;gap:6px;align-items:center}.cal-note-form input,.cal-note-edit textarea{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:700 15px/1.35 Inter,system-ui,sans-serif}.cal-note-edit{display:flex;gap:6px;align-items:flex-start;width:100%}.cal-note-edit textarea{min-height:72px;resize:vertical}.cal-note-edit button,.cal-note-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.cal-note-edit button[data-act=cancel]{background:#2a1a22;color:#ff8b98}.cal-notes{list-style:none;margin:8px 0 0;padding:0}.cal-note{display:flex;gap:8px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #1c2733}.cal-note p{flex:1;min-width:0;margin:0;white-space:pre-wrap;word-break:break-word;font-weight:700}.cal-form{display:flex;flex-wrap:nowrap;gap:4px;align-items:center}.cal-form input{flex:1 1 0;width:auto;min-width:0;box-sizing:border-box;padding:8px 6px;border:0;border-radius:10px;background:#141c27;color:#f4f7fb;font:800 13px/1.2 Inter,system-ui,sans-serif;color-scheme:dark}.cal-date{position:relative;flex:0 0 58px;height:34px}.cal-date span{display:flex;align-items:center;justify-content:center;height:34px;border-radius:10px;background:#141c27;color:#f4f7fb;font-size:12px;font-weight:800}.cal-date input{position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0}.cal-form input[readonly]{background:#0d141c;color:#e6c878}.cal-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;font-size:13px;cursor:pointer}.cal-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}#cal-status{min-height:18px;margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}#cal-panel,#cal-app{max-width:100%;overflow-x:hidden}.cal-head,.cal-line{display:grid;grid-template-columns:52px minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 64px;gap:4px;align-items:center}.cal-head{margin-top:14px;color:#8b95a5;font-size:11px;font-weight:800;text-transform:uppercase}.cal-list{list-style:none;margin:0;padding:0}.cal-line{padding:12px 0;border-bottom:1px solid #1c2733;font-weight:800;font-size:14px}.cal-line span,.cal-line b{min-width:0;overflow:hidden;text-overflow:ellipsis}.cal-acts{display:flex;gap:4px;justify-content:flex-end}.cal-pen,.cal-x{border:0;border-radius:999px;height:28px;cursor:pointer;font-weight:800}.cal-pen{padding:0 8px;background:#243044;color:#f4f7fb;font-size:12px}.cal-x{width:28px;background:#2a1a22;color:#ff8b98;font-size:18px}.cal-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.cal-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.cal-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.cal-ask button[data-act=no]{background:#243044;color:#f4f7fb}.cal-empty{margin:14px 0 0;color:#8b95a5;font-weight:700}body.cal-on main>section.section,body.cal-on main>.trend-panel:not(#cal-panel),body.cal-on main>.struct-trend-panel,body.cal-on main>.macro-panel,body.cal-on #tf-panels{display:none!important}body.cal-on #cal-panel{display:block!important}';
     document.head.appendChild(css);
   }
   loadLocal();
@@ -401,6 +509,16 @@
       }
       if (form.id === 'cal-note-add') {
         addNote(($('cal-note') || {}).value);
+        return;
+      }
+      if (form.id === 'cal-sale-add') {
+        addSale(($('cal-sale-date') || {}).value, ($('cal-sale-vol') || {}).value);
+        return;
+      }
+      if (form.classList && form.classList.contains('cal-sale-form')) {
+        var vol = form.querySelector('[data-field="volume"]');
+        var sdate = form.querySelector('input[type="date"]');
+        saveSale(form.getAttribute('data-id'), sdate && sdate.value, vol && vol.value);
         return;
       }
       if (form.classList && form.classList.contains('cal-note-edit')) {
@@ -435,13 +553,21 @@
       if (!btn) return;
       var act = btn.getAttribute('data-act');
       var id = btn.getAttribute('data-id') || '';
-      if (act === 'tab') { view = btn.getAttribute('data-tab') || 'pay'; editing = ''; asking = ''; nedit = ''; nask = ''; paint(); return; }
+      if (act === 'tab') { view = btn.getAttribute('data-tab') || 'pay'; editing = ''; asking = ''; nedit = ''; nask = ''; sedit = ''; sask = ''; paint(); return; }
       if (view === 'notes') {
         if (act === 'edit') { nedit = id; nask = ''; paint(); }
         if (act === 'cancel') { nedit = ''; paint(); }
         if (act === 'ask') { nask = id; nedit = ''; paint(); }
         if (act === 'no') { nask = ''; paint(); }
         if (act === 'yes') removeNote(id);
+        return;
+      }
+      if (view === 'sales') {
+        if (act === 'edit') { sedit = id; sask = ''; paint(); }
+        if (act === 'cancel') { sedit = ''; paint(); }
+        if (act === 'ask') { sask = id; sedit = ''; paint(); }
+        if (act === 'no') { sask = ''; paint(); }
+        if (act === 'yes') removeSale(id);
         return;
       }
       if (act === 'edit') { editing = id; asking = ''; paint(); }
@@ -463,6 +589,7 @@
     if (!data) return;
     merge(data.rows || []);
     mergeNotes(data.notes || []);
+    mergeSales(data.sales || []);
     saveLocal();
     if (document.body.classList.contains('cal-on')) paint();
   }).catch(function () {});
