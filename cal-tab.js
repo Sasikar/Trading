@@ -61,7 +61,8 @@
     var sign = n < 0 ? '-' : '';
     var a = Math.abs(n);
     var unit = '';
-    if (a >= 100000) { a = a / 100000; unit = 'L'; }
+    if (a >= 10000000) { a = a / 10000000; unit = 'Cr'; }
+    else if (a >= 100000) { a = a / 100000; unit = 'L'; }
     else if (a >= 1000) { a = a / 1000; unit = 'K'; }
     var s = (Math.round(a * 100) / 100).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
     return sign + s + unit;
@@ -79,13 +80,14 @@
   function num(raw) {
     var s = String(raw == null ? '' : raw).replace(/,/g, '').trim();
     if (!s) return null;
-    var m = s.match(/^(-?\d+(?:\.\d+)?)\s*([kKlL])?$/);
+    var m = s.match(/^(-?\d+(?:\.\d+)?)\s*(crore|cr|k|l)?$/i);
     if (!m) return null;
     var n = Number(m[1]);
     if (!isFinite(n)) return null;
     var unit = (m[2] || '').toLowerCase();
     if (unit === 'k') n = n * 1000;
     if (unit === 'l') n = n * 100000;
+    if (unit === 'cr' || unit === 'crore') n = n * 10000000;
     return Math.round(n * 100) / 100;
   }
   function loadLocal() {
@@ -428,13 +430,19 @@
     }
     root.innerHTML = switchHtml() +
       '<div class="cal-remain"><b>' + money(sum) + '</b></div>' +
-      '<form id="cal-sale-add" class="cal-sale-form"><label class="cal-date"><span>' + esc(shortDate(draftDate)) + '</span><input id="cal-sale-date" type="date" value="' + esc(draftDate) + '" aria-label="Date"></label><input id="cal-sale-vol" data-field="volume" inputmode="text" autocapitalize="off" spellcheck="false" placeholder="2L" value="' + esc(draftVol) + '" aria-label="Volume"><button type="submit">Add</button></form>' +
+      '<form id="cal-sale-add" class="cal-sale-form"><label class="cal-date"><span>' + esc(shortDate(draftDate)) + '</span><input id="cal-sale-date" type="date" value="' + esc(draftDate) + '" aria-label="Date"></label><input id="cal-sale-vol" data-field="volume" inputmode="text" autocapitalize="off" spellcheck="false" placeholder="1Cr" value="' + esc(draftVol) + '" aria-label="Volume"><button type="button" id="cal-sale-go" data-act="add-sale">Add</button></form>' +
       '<p id="cal-status"></p>' + ask +
       (list.length ? '<div class="cal-sale-head"><span>Date</span><span>Volume</span><span></span></div><ul class="cal-list">' + body + '</ul>' : '');
   }
+  var saleStamp = 0;
   function addSale(date, volumeRaw) {
     var volume = num(volumeRaw);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || volume == null) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || volume == null) {
+      setStatus('Type 2L or 1Cr');
+      return;
+    }
+    if (Date.now() - saleStamp < 600) return;
+    saleStamp = Date.now();
     sales.push({ id: nid(), date: date, volume: volume, t: Date.now() });
     var box = $('cal-sale-vol');
     if (box) box.value = '';
@@ -548,6 +556,12 @@
       var span = box.parentNode && box.parentNode.querySelector('span');
       if (span) span.textContent = shortDate(box.value);
     });
+    root.addEventListener('pointerdown', function (ev) {
+      var btn = ev.target && ev.target.closest && ev.target.closest('#cal-sale-go');
+      if (!btn) return;
+      ev.preventDefault();
+      addSale(($('cal-sale-date') || {}).value || today(), ($('cal-sale-vol') || {}).value);
+    });
     root.addEventListener('click', function (ev) {
       var btn = ev.target && ev.target.closest && ev.target.closest('[data-act]');
       if (!btn) return;
@@ -563,6 +577,7 @@
         return;
       }
       if (view === 'sales') {
+        if (act === 'add-sale') { addSale(($('cal-sale-date') || {}).value || today(), ($('cal-sale-vol') || {}).value); return; }
         if (act === 'edit') { sedit = id; sask = ''; paint(); }
         if (act === 'cancel') { sedit = ''; paint(); }
         if (act === 'ask') { sask = id; sedit = ''; paint(); }
