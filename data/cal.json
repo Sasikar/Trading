@@ -1,21 +1,19 @@
 {
-  "updated": "2026-10-14T05:30:02.322Z",
+  "updated": "2026-10-15T05:34:53.499Z",
   "rows": [
     {
       "id": "mv136qgd5jxu",
       "date": "2026-10-09",
       "profit": 409000,
       "gave": 65000,
-      "t": 1791557729874,
-      "tax": 130880
+      "t": 1791557729874
     },
     {
       "id": "mv7o7tm3o0j4",
       "date": "2026-10-14",
       "profit": 50000,
       "gave": 0,
-      "t": 1791955801515,
-      "tax": 16000
+      "t": 1791955801515
     }
   ],
   "notes": [
@@ -28,6 +26,14 @@
       "id": "mv13cu2r8erg",
       "text": "So paid profit is just 6500 according to Jupiter but in Koinly it's 48000 may be market issue, coorect it",
       "t": 1791557966403
+    }
+  ],
+  "sales": [
+    {
+      "id": "mv93twgkus8e",
+      "date": "2026-10-15",
+      "volume": 12500000,
+      "t": 1792042492052
     }
   ]
 }
