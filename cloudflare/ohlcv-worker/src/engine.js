@@ -5286,32 +5286,36 @@ export class Engine {
     const stepTicks = state.points * POINT;
     const steps = Math.trunc((nowPx - row.anchor) / stepTicks);
     if (state.on && steps !== 0) {
-      const from = row.anchor;
-      const crossed = Math.abs(steps);
-      row.anchor = from + steps * stepTicks;
-      row.lastDir = steps > 0 ? 'up' : 'down';
-      row.lastMove = steps * state.points;
-      row.lastAlertAt = Date.now();
-      state.coins[spec.id] = {
-        anchor: row.anchor / 1e6,
-        lastPrice: price,
-        lastAt: Date.now(),
-        lastDir: row.lastDir,
-        lastMove: row.lastMove,
-        lastAlertAt: row.lastAlertAt
-      };
-      this.saveMeme(state);
+      const dir = steps > 0 ? 1 : -1;
+      let left = Math.min(Math.abs(steps), 4);
       const token = this.telegramToken();
       const chat = this.telegramChatId();
-      if (token && chat) {
-        const pts = crossed * state.points;
-        const text = [
-          spec.name + ' ' + (steps > 0 ? 'UP' : 'DOWN') + ' ' + pts + ' pts ' + this.memeUsd(price) + (crossed > 1 ? ' (' + crossed + ' x ' + state.points + ')' : ''),
-          'From ' + this.memeUsd(from / 1e6),
-          'Next up ' + this.memeUsd((row.anchor + stepTicks) / 1e6),
-          'Next down ' + this.memeUsd((row.anchor - stepTicks) / 1e6)
-        ].join('\n');
-        try { await sendTelegram(token, chat, text); } catch (e) {}
+      while (left > 0) {
+        const from = row.anchor;
+        const level = from + dir * stepTicks;
+        if (token && chat) {
+          const text = [
+            spec.name + ' ' + (dir > 0 ? 'UP' : 'DOWN') + ' ' + state.points + ' pts ' + this.memeUsd(level / 1e6),
+            'From ' + this.memeUsd(from / 1e6),
+            'Next up ' + this.memeUsd((level + stepTicks) / 1e6),
+            'Next down ' + this.memeUsd((level - stepTicks) / 1e6)
+          ].join('\n');
+          try { await sendTelegram(token, chat, text); } catch (e) { break; }
+        }
+        row.anchor = level;
+        row.lastDir = dir > 0 ? 'up' : 'down';
+        row.lastMove = dir * state.points;
+        row.lastAlertAt = Date.now();
+        state.coins[spec.id] = {
+          anchor: row.anchor / 1e6,
+          lastPrice: price,
+          lastAt: Date.now(),
+          lastDir: row.lastDir,
+          lastMove: row.lastMove,
+          lastAlertAt: row.lastAlertAt
+        };
+        this.saveMeme(state);
+        left -= 1;
       }
     } else {
       state.coins[spec.id] = {
