@@ -199,28 +199,24 @@ export class OhlcvEngine {
     if (!next || next <= now + 2000) await this.ctx.storage.setAlarm(now + (AUTO_EVERY_MS || 300000));
   }
   async alarm() {
-    let ranTick = false;
+    try { this.boot(); } catch (e) {}
+    try { await this.engine.checkBtcPoints(); } catch (e4) {}
+    try { await this.engine.checkMemePoints(); } catch (e6) {}
+    let wait = AUTO_EVERY_MS || 300000;
     try {
-      this.boot();
+      if (this.engine && (this.engine.btcState().on || this.engine.memeState().on)) wait = 20000;
+    } catch (e5) {}
+    try { await this.ctx.storage.setAlarm(Date.now() + wait); } catch (e3) {}
+    try {
       const last = +(this.store.getMeta('last_poll') || 0);
       const every = AUTO_EVERY_MS || 300000;
       if (!last || Date.now() - last >= every - 5000) {
-        ranTick = true;
+        this.store.setMeta('last_poll', String(Date.now()));
         await this.engine.tick('auto');
       }
     } catch (e) {
       try { if (this.engine) this.engine.lastErr = String(e && e.message ? e.message : e); } catch (e2) {}
     }
-    try { this.boot(); await this.engine.checkBtcPoints(); } catch (e4) {}
-    try { this.boot(); await this.engine.checkMemePoints(); } catch (e6) {}
-    let wait = AUTO_EVERY_MS || 300000;
-    try {
-      const btcOn = this.engine && this.engine.btcState().on;
-      const memeOn = this.engine && this.engine.memeState().on;
-      if (btcOn || memeOn) wait = 20000;
-    } catch (e5) {}
-    if (ranTick && wait > 20000) wait = AUTO_EVERY_MS || 300000;
-    try { await this.ctx.storage.setAlarm(Date.now() + wait); } catch (e3) {}
   }
   leadersNow() {
     let leaders = [];

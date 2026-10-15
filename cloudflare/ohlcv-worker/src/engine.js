@@ -5181,25 +5181,29 @@ export class Engine {
     const step = state.step;
     const steps = Math.trunc((price - state.anchor) / step);
     if (state.on && steps !== 0) {
-      const from = state.anchor;
-      const crossed = Math.abs(steps);
-      state.anchor = from + steps * step;
-      state.lastDir = steps > 0 ? 'up' : 'down';
-      state.lastMove = steps * step;
-      state.lastAlertAt = Date.now();
-      this.saveBtc(state);
+      const dir = steps > 0 ? 1 : -1;
+      let left = Math.min(Math.abs(steps), 4);
       const token = this.telegramToken();
       const chat = this.telegramChatId();
-      if (token && chat) {
-        const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
-        const pts = crossed * step;
-        const text = [
-          'BTC ' + (steps > 0 ? 'UP' : 'DOWN') + ' ' + pts + ' pts ' + usd(price) + (crossed > 1 ? ' (' + crossed + ' x ' + step + ')' : ''),
-          'From ' + usd(from),
-          'Next up ' + usd(state.anchor + step),
-          'Next down ' + usd(state.anchor - step)
-        ].join('\n');
-        try { await sendTelegram(token, chat, text); } catch (e) {}
+      const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
+      while (left > 0) {
+        const from = state.anchor;
+        const level = from + dir * step;
+        if (token && chat) {
+          const text = [
+            'BTC ' + (dir > 0 ? 'UP' : 'DOWN') + ' ' + step + ' pts ' + usd(level),
+            'From ' + usd(from),
+            'Next up ' + usd(level + step),
+            'Next down ' + usd(level - step)
+          ].join('\n');
+          try { await sendTelegram(token, chat, text); } catch (e) { break; }
+        }
+        state.anchor = level;
+        state.lastDir = dir > 0 ? 'up' : 'down';
+        state.lastMove = dir * step;
+        state.lastAlertAt = Date.now();
+        this.saveBtc(state);
+        left -= 1;
       }
     } else {
       this.saveBtc(state);
