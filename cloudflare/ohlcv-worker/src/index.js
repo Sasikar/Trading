@@ -311,6 +311,22 @@ export class OhlcvEngine {
     if (path === '/health' || path === '/api/health') {
       return new Response(JSON.stringify({ ok: true, engine: 'ohlcv', ts: new Date().toISOString() }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
+    const koinlyCsv = {
+      '/koinly/CATE-real-59817074-USDT.csv': 'Date,Rate\n2026-09-15 23:02:12,0.062460\n2026-09-16 07:34:33,0.062460\n2026-09-16 10:19:42,0.062460\n2026-09-16 10:23:46,0.062460\n2026-09-16 11:41:02,0.062460\n2026-09-16 11:41:42,0.069332\n',
+      '/koinly/PAID-real-60806380-USDT.csv': 'Date,Rate\n2026-09-16 11:41:42,0.009828\n2026-09-16 13:50:49,0.009828\n2026-09-16 15:01:04,0.009828\n'
+    };
+    if (koinlyCsv[path]) {
+      const name = path.slice(path.lastIndexOf('/') + 1);
+      return new Response(koinlyCsv[path], {
+        status: 200,
+        headers: {
+          ...CORS,
+          'content-type': 'text/csv; charset=utf-8',
+          'content-disposition': 'attachment; filename="' + name + '"',
+          'cache-control': 'no-store'
+        }
+      });
+    }
     if (path === '/nasdaq' || path === '/api/nasdaq') {
       try {
         const q = await nasdaqLive();
