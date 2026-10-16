@@ -312,6 +312,7 @@ export class OhlcvEngine {
       return new Response(JSON.stringify({ ok: true, engine: 'ohlcv', ts: new Date().toISOString() }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
     const koinlyCsv = {
+      '/koinly/CATE-fix-INR.csv': 'Date,Rate\n2026-09-15 23:02:12,5.9861\n2026-09-16 07:34:33,5.9894\n2026-09-16 10:19:42,5.9894\n2026-09-16 10:23:46,5.9894\n2026-09-16 11:41:02,5.9894\n2026-09-16 11:41:42,6.6264\n2026-10-14 13:33:47,6.0259\n',
       '/koinly/CATE-fix-USDT.csv': 'Date,Rate\n2026-09-15 23:02:12,0.06246033\n2026-09-16 11:41:42,0.06910283\n2026-10-14 13:33:47,0.06346599\n',
       '/koinly/PAID-fix-USDT.csv': 'Date,Rate\n2026-09-16 11:41:42,0.00981792\n',
       '/koinly/CATE-real-59817074-USDT.csv': 'Date,Rate\n2026-09-15 23:02:12,0.062460\n2026-09-16 07:34:33,0.062460\n2026-09-16 10:19:42,0.062460\n2026-09-16 10:23:46,0.062460\n2026-09-16 11:41:02,0.062460\n2026-09-16 11:41:42,0.069332\n',
@@ -974,6 +975,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
     const koinlyCsv = {
+      '/koinly/CATE-fix-INR.csv': 'Date,Rate\n2026-09-15 23:02:12,5.9861\n2026-09-16 07:34:33,5.9894\n2026-09-16 10:19:42,5.9894\n2026-09-16 10:23:46,5.9894\n2026-09-16 11:41:02,5.9894\n2026-09-16 11:41:42,6.6264\n2026-10-14 13:33:47,6.0259\n',
       '/koinly/CATE-fix-USDT.csv': 'Date,Rate\n2026-09-15 23:02:12,0.06246033\n2026-09-16 11:41:42,0.06910283\n2026-10-14 13:33:47,0.06346599\n',
       '/koinly/PAID-fix-USDT.csv': 'Date,Rate\n2026-09-16 11:41:42,0.00981792\n',
       '/koinly/CATE-real-59817074-USDT.csv': 'Date,Rate\n2026-09-15 23:02:12,0.062460\n2026-09-16 07:34:33,0.062460\n2026-09-16 10:19:42,0.062460\n2026-09-16 10:23:46,0.062460\n2026-09-16 11:41:02,0.062460\n2026-09-16 11:41:42,0.069332\n',
