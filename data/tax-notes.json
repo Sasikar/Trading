@@ -1,7 +1,11 @@
 {
-  "updated": "2026-10-16T10:57:04.830Z",
-  "count": 2,
+  "updated": "2026-10-16T11:34:37.162Z",
+  "count": 3,
   "notes": [
+    {
+      "text": "Koinly has problem with having more than 2 decimals after cent so better export excel with INR from Solchain analysis.",
+      "t": 1792150476358
+    },
     {
       "text": "Description: In Koinly, under Transactions for the selected Wallet 1, the most important step is to filter out spam transactions first, then apply the Missing Price filter to identify transactions that need price data.\n\nImportant Points:\n\n* Select Wallet 1 in the Transactions section.\n\n* Filter out spam: Set the filter value to  The Contract function contains RouteV2 apply it to exclude spam transactions.\n\n* Apply Missing Price filter to identify transactions with missing price information.\n\n* Review the filtered transactions and address the missing prices as required.\nDelete\n\n***\"Click here option in Koinly to Force Sync for Custom Prices****",
       "t": 1792148224140
