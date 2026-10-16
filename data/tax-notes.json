@@ -1,7 +1,11 @@
 {
-  "updated": "2026-10-16T10:56:20.690Z",
-  "count": 1,
+  "updated": "2026-10-16T10:57:04.830Z",
+  "count": 2,
   "notes": [
+    {
+      "text": "Description: In Koinly, under Transactions for the selected Wallet 1, the most important step is to filter out spam transactions first, then apply the Missing Price filter to identify transactions that need price data.\n\nImportant Points:\n\n* Select Wallet 1 in the Transactions section.\n\n* Filter out spam: Set the filter value to  The Contract function contains RouteV2 apply it to exclude spam transactions.\n\n* Apply Missing Price filter to identify transactions with missing price information.\n\n* Review the filtered transactions and address the missing prices as required.\nDelete\n\n***\"Click here option in Koinly to Force Sync for Custom Prices****",
+      "t": 1792148224140
+    },
     {
       "text": "For Coins Like Cate, we don't see listed under Coingeko or CMC so koinly ll fail to get coin buy price so it ll give warning below saying No market price found and entire price shown as taxable. So go to settings in konily upload custom prices CSV and force it to calculate, after uploading there is link to force else it ll not work..get txn report from solscan using grok give to clade to give price rate CSV and upload that's it",
       "t": 1789290799379
