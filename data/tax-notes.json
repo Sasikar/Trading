@@ -1,7 +1,11 @@
 {
-  "updated": "2026-10-16T12:04:07.756Z",
-  "count": 2,
+  "updated": "2026-10-16T12:04:14.226Z",
+  "count": 3,
   "notes": [
+    {
+      "text": "Description: In Koinly, under Transactions, find every real swap that has no price. RouteV2 alone misses Swap2, SwapTob, BuyExactQuoteIn and Fill.\n\nFilters:\n* Warning: Missing prices\n* Contract function has any value\n* Contract function does not contain MintTo\n\nPrices:\n* Enter the custom price in INR, not USD. USD keeps only 2 decimals, so 0.0635 becomes $0.06.\n* After the import, open Settings, then Custom prices, and tap the blue \"here\" to force-update existing transactions. A wallet sync does not apply the price.",
+      "t": 1792152253523
+    },
     {
       "text": "Koinly has problem with having more than 2 decimals after cent so better export excel with INR from Solchain analysis.",
       "t": 1792150476358
