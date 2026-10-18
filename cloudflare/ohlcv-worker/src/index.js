@@ -194,25 +194,14 @@ export class OhlcvEngine {
     }
   }
   async ensureAlarm() {
-    this.boot();
-    const next = await this.ctx.storage.getAlarm();
-    const now = Date.now();
-    if (!next || next > now + 1500) await this.ctx.storage.setAlarm(now + 1000);
-    try { await this.openBtcFeed(); } catch (e) {}
+    if (this._alarmCut) return;
+    this._alarmCut = true;
+    try { await this.ctx.storage.deleteAlarm(); } catch (e) {}
+    try { if (this.btcFeed) { this.btcFeed.close(); this.btcFeed = null; } } catch (e2) {}
   }
   async alarm() {
-    try { this.boot(); } catch (e) {}
-    try { await this.openBtcFeed(); } catch (e1) {}
-    const btcLive = this.btcFeed && this.btcFeed.readyState === 1;
-    if (!btcLive) {
-      try { await this.engine.checkBtcPoints(); } catch (e4) {}
-    }
-    try { await this.engine.checkMemePoints(); } catch (e6) {}
-    let wait = AUTO_EVERY_MS || 300000;
-    try {
-      if (this.engine && (this.engine.btcState().on || this.engine.memeState().on)) wait = 1000;
-    } catch (e5) {}
-    try { await this.ctx.storage.setAlarm(Date.now() + wait); } catch (e3) {}
+    try { await this.ctx.storage.deleteAlarm(); } catch (e) {}
+    try { if (this.btcFeed) { this.btcFeed.close(); this.btcFeed = null; } } catch (e2) {}
   }
   async openBtcFeed() {
     if (this.btcFeed && this.btcFeed.readyState === 1) return;
@@ -248,11 +237,7 @@ export class OhlcvEngine {
       try { n = (JSON.parse(this.store.getMeta(HELIUS_BUYS_KEY) || '[]') || []).length; } catch (e) {}
       const wantSync = url.searchParams.get('sync') === '1';
       let sync = { skipped: !wantSync };
-      if (wantSync) {
-        const id = this.store.getMeta(HELIUS_HOOK_ID_KEY) || '';
-        sync = await syncHeliusWebhook(this.env, this.leadersNow(), id);
-        if (sync.webhookId) this.store.setMeta(HELIUS_HOOK_ID_KEY, sync.webhookId);
-      }
+      if (wantSync) sync = { skipped: true, paused: true };
       return new Response(JSON.stringify({
         ok: true,
         path: '/helius',
@@ -264,6 +249,7 @@ export class OhlcvEngine {
     if (request.method !== 'POST') {
       return new Response(JSON.stringify({ ok: false, error: 'POST only' }), { status: 405, headers: { ...CORS, 'content-type': 'application/json' } });
     }
+    return new Response(JSON.stringify({ ok: true, ingested: 0, paused: true }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     let body = null;
     try { body = await request.json(); } catch (e) {
       return new Response(JSON.stringify({ ok: true, ingested: 0 }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
@@ -352,8 +338,7 @@ export class OhlcvEngine {
       if (path === '/tier-hist' || path === '/api/tier-hist') {
         const url = new URL(request.url);
         if (url.searchParams.get('tick') === '1') {
-          const r = await tierDailyTick(this.env, this.store);
-          return new Response(JSON.stringify(r), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+          return new Response(JSON.stringify({ ok: true, paused: true }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
         }
         const body = await request.json();
         const history = applySnapshot(this.store, body);
@@ -438,18 +423,42 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, wallets }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
       }
       if (path === '/btc' || path === '/api/btc') {
-        const patch = request.method === 'POST' ? await request.json().catch(() => ({})) : null;
         try {
-          const data = await this.engine.checkBtcPoints(patch);
+          if (request.method === 'POST') {
+            const patch = await request.json().catch(() => ({}));
+            const saved = this.engine.btcState();
+            if (patch && patch.step != null) {
+              let step = Math.round(Number(patch.step) / 100) * 100;
+              if (!isFinite(step) || step < 100) step = 200;
+              if (step > 5000) step = 5000;
+              saved.step = step;
+            }
+            if (patch && patch.on != null) saved.on = false;
+            this.engine.saveBtc(saved);
+          }
+          const data = this.engine.btcView(this.engine.btcState(), '');
+          data.paused = true;
           return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
         } catch (e) {
           return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
         }
       }
       if (path === '/memes' || path === '/api/memes') {
-        const patch = request.method === 'POST' ? await request.json().catch(() => ({})) : null;
         try {
-          const data = await this.engine.checkMemePoints(patch);
+          if (request.method === 'POST') {
+            const patch = await request.json().catch(() => ({}));
+            const saved = this.engine.memeState();
+            if (patch && patch.points != null) {
+              let points = Math.round(Number(patch.points));
+              if (!isFinite(points) || points < 1) points = 2;
+              if (points > 20) points = 20;
+              saved.points = points;
+            }
+            if (patch && patch.on != null) saved.on = false;
+            this.engine.saveMeme(saved);
+          }
+          const data = this.engine.memeView(this.engine.memeState(), '', 0);
+          data.paused = true;
           return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
         } catch (e) {
           return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
@@ -480,8 +489,7 @@ export class OhlcvEngine {
       if (path === '/coinstats-sells' || path === '/api/coinstats-sells') {
         const url = new URL(request.url);
         if (url.searchParams.get('tick') === '1') {
-          const row = await tickSells(this.env, this.store);
-          return new Response(JSON.stringify(row), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+          return new Response(JSON.stringify({ ok: true, paused: true }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
         }
         const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
         const mint = String(body.mint || url.searchParams.get('mint') || '').trim();
@@ -496,8 +504,7 @@ export class OhlcvEngine {
       if (path === '/oldcoins' || path === '/api/oldcoins') {
         const want = new URL(request.url).searchParams.get('scan') === '1';
         if (want) {
-          const r = await scanOldTick(this.env, this.store, this.leadersNow());
-          return new Response(JSON.stringify(r), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+          return new Response(JSON.stringify({ ok: true, paused: true, coins: readOldCoins(this.store) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
         }
         return new Response(JSON.stringify({ ok: true, coins: readOldCoins(this.store), at: +this.store.getMeta(OLD_SCAN_AT_KEY) || 0 }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
@@ -1168,19 +1175,8 @@ export default {
     }
     return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
   },
-  async scheduled(event, env, ctx) {
-    const stubId = env.ENGINE.get(env.ENGINE.idFromName('main'));
-    if (event && event.cron === '* * * * *') {
-      ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/btc')));
-      ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/memes')));
-      return;
-    }
-    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/run')));
-    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/status')));
-    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/helius?sync=1')));
-    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/oldcoins?scan=1')));
-    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/tier-hist?tick=1')));
-    ctx.waitUntil(stubId.fetch(new Request('https://ohlcv.local/coinstats-sells?tick=1')));
+  async scheduled() {
+    return;
   }
 };
 

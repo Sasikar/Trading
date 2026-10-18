@@ -19,9 +19,6 @@
       "new_sqlite_classes": ["OhlcvEngine"]
     }
   ],
-  "triggers": {
-    "crons": ["* * * * *", "*/5 * * * *"]
-  },
   "ai": {
     "binding": "AI"
   },

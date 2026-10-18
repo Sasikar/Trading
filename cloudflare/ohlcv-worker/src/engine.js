@@ -5819,10 +5819,7 @@ export async function handleApi(engine, request) {
     }
   }
   if ((path === '/run' || path === '/api/run') && (method === 'POST' || method === 'GET')) {
-    const tf = (url.searchParams.get('tf') || '').toLowerCase();
-    const mode = tf === '1m' ? '1m' : 'auto';
-    const out = await engine.tick(mode);
-    return json({ ok: true, mode, ...out, status: engine.status() });
+    return json({ ok: true, paused: true, mode: 'off' });
   }
   if ((path === '/backfill' || path === '/api/backfill') && method === 'POST') {
     let body = {};
@@ -5957,13 +5954,7 @@ export async function handleApi(engine, request) {
     const ca = url.searchParams.get('ca') || '';
     const tf = (url.searchParams.get('tf') || '15m').toLowerCase();
     const n = Math.min(800, Math.max(5, +(url.searchParams.get('n') || 50)));
-    if (tf === '1m' && ca) {
-      try {
-        engine.setFocus(ca);
-        await engine.tick('1m');
-      } catch (e) {}
-    }
-    return json({ ca, tf, bars: engine.store.bars(ca, tf, n) });
+    return json({ ca, tf, paused: true, bars: engine.store.bars(ca, tf, n) });
   }
   return json({ error: 'not found', path }, 404);
 }
