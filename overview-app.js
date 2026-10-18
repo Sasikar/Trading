@@ -66,7 +66,7 @@ async function loadMarket(){
     let snap=null;
     const bases=[];
     try{ if(window.BREAKOUT_API) bases.push(String(window.BREAKOUT_API).replace(/\/+$/,'')); }catch(e){}
-    bases.push('https://trading-ohlcv.sasipudi.workers.dev');
+    /* free tier: do not hit the worker for NASDAQ */
     for(const b of bases){
       const live=await jget(b+'/nasdaq');
       if(live&&live.price!=null&&!live.error){ snap=live; break; }
@@ -591,9 +591,7 @@ function trendFromCloses(closes){if(closes.length<200)return{dir:'NEUTRAL',detai
 function colorDir(dir){return dir==='BULLISH'?'#62e3a0':dir==='BEARISH'?'#ff6f7c':'#e6c878';}
 function macdMomentum(closes,times){const pack=calcMACDSeries(closes,times);const h=pack.lastHist,m=pack.lastMacd,s=pack.lastSig,ph=pack.prevHist;let dir='FADING';if(m!=null&&s!=null&&h!=null){if(m>s&&h>0)dir='BULLISH';else if(m<s&&h<0)dir='BEARISH';}const fresh=ph!=null&&h!=null&&((ph<0&&h>=0)||(ph>=0&&h<0));const f=v=>(v==null?'—':((v>=0?'+':'')+Number(v).toFixed(0)));return{dir,label:dir+(fresh?' (fresh cross)':''),detail:'HIST '+f(h)+' · LINE '+f(m)+' · SIG '+f(s)};}
 async function fetchBtcBook(){
-  const base=(function(){try{if(window.BREAKOUT_API)return String(window.BREAKOUT_API).replace(/\/+$/,'');}catch(e){}return 'https://trading-ohlcv.sasipudi.workers.dev';})();
   const tries=[
-    {u:base+'/orderbook', kind:'worker'},
     {u:'https://www.okx.com/api/v5/market/books?instId=BTC-USDT-SWAP&sz=400', kind:'okx'},
     {u:'https://api.gateio.ws/api/v4/spot/order_book?currency_pair=BTC_USDT&limit=50', kind:'gate'},
     {u:'https://data-api.binance.vision/api/v3/depth?symbol=BTCUSDT&limit=100', kind:'binance'}
@@ -6186,7 +6184,7 @@ else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'){const panel
 else{showMemeGate(false);showTrend(false);showStruct(false);showMacro(false);showSignal(false);const panels=$('tf-panels');if(panels){panels.classList.remove('hidden');panels.style.display='';}await loadTF(at);}
 }tick();setInterval(()=>loadMarket(),60000);
 window.addEventListener('pageshow',()=>loadMarket());
-document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') loadMarket(); });setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='memegate')loadMemeGate();else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'||at==='coinstats'||at==='emotion'||at==='keywords'||at==='gnotes'||at==='whale'||at==='cal'||at==='mandates'||at==='btc'||at==='memes')return;else loadTF(currentTF);},60000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') loadMarket(); });setInterval(()=>{const act=document.querySelector('#tf-tabs .tab.active');const at=act&&act.getAttribute('data-tf');if(at==='trend')loadTrend();else if(at==='struct')loadStructural();else if(at==='macro')loadMacro();else if(at==='memegate')loadMemeGate();else if(at==='fd'||at==='fomo'||at==='fx'||at==='fe'||at==='alerts'||at==='coinstats'||at==='emotion'||at==='keywords'||at==='gnotes'||at==='whale'||at==='cal'||at==='mandates'||at==='btc'||at==='memes')return;else return;},60000);
 
 function initTabReorder(){
   const bar=document.getElementById('tf-tabs');

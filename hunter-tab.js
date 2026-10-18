@@ -298,7 +298,7 @@
             body: JSON.stringify({ ca: ca, tool: tool })
           });
         } catch (e) {}
-        load(true);
+        return;
       };
     });
     document.querySelectorAll('.hu-save').forEach(function (b) {
@@ -455,7 +455,7 @@
       timer = setInterval(function () {
         const onp = $('hunter-panel');
         if (!onp || onp.style.display === 'none') return;
-        load(true);
+        return;
       }, 20000);
     } else {
       const chip = $('hu-band-now');

@@ -283,7 +283,7 @@
     }).catch(function () {});
   }
   checkDipAlerts();
-  setInterval(checkDipAlerts, 5 * 60 * 1000);
+  /* free tier: dip scan off */
 
   var search = $("fd-search");
   if (search && !search.dataset.bound) {

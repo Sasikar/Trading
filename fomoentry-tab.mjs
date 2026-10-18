@@ -859,11 +859,9 @@ import { advancePaper, alertKey, buildFomoEntry, takeState } from "./fomoentry-e
   }
 
   function boot() {
-    preload();
     if (timer) clearInterval(timer);
-    timer = setInterval(function () {
-      if (!scanning && ca) load();
-    }, 45000);
+    timer = null;
+    scanNote("Live scan is off. Saved coins and entry checks still save. Use MemeAssist for setups.");
   }
 
   var tabs = $("tf-tabs");

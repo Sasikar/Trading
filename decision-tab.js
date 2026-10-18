@@ -292,7 +292,7 @@
       timer = setInterval(function () {
         const onp = $('decision-panel');
         if (!onp || onp.style.display === 'none') return;
-        load();
+        return;
       }, 60000);
     } else {
       if (p) {

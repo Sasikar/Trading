@@ -159,7 +159,7 @@
       timer = setInterval(function () {
         const onp = $('wallets-panel');
         if (!onp || onp.style.display === 'none') return;
-        load(false);
+        return;
       }, 60000);
     } else {
       if (p) {

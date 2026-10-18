@@ -607,6 +607,7 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
   setInterval(function () {
+    return;
     var panel = $("coinstats-panel");
     if (!panel || panel.style.display === "none") return;
     var hour = localHour();

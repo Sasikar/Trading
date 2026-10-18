@@ -104,7 +104,7 @@
     paint();
     pull();
     if (timer) clearInterval(timer);
-    timer = setInterval(function () { if (open) pull(); }, 15000);
+    /* free tier: no 15s worker poll */
   }
   window.showBtc = show;
   var tabs = $("tf-tabs");

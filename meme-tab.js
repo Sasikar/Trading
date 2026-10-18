@@ -103,7 +103,7 @@
     pull();
     if (p.scrollIntoView) p.scrollIntoView({ block: "start" });
     if (timer) clearInterval(timer);
-    timer = setInterval(function () { if (open) pull(); }, 15000);
+    /* free tier: no 15s worker poll */
   }
   window.showMemes = show;
   var tabs = $("tf-tabs");

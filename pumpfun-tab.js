@@ -261,7 +261,7 @@
       timer = setInterval(function () {
         const onp = $('pumpfun-panel');
         if (!onp || onp.style.display === 'none') return;
-        load();
+        return;
       }, 25000);
     } else if (p) {
       p.style.display = 'none';

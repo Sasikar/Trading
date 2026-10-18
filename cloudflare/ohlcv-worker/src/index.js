@@ -981,6 +981,15 @@ export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
+    const scanOff = {
+      '/tiers': 1, '/api/tiers': 1,
+      '/bundle': 1, '/api/bundle': 1,
+      '/flows': 1, '/api/flows': 1,
+      '/whale-holders': 1
+    };
+    if (scanOff[path]) {
+      return new Response(JSON.stringify({ ok: true, paused: true, free: true }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+    }
     const koinlyCsv = {
       '/koinly/CATE-fix-INR.csv': 'Date,Rate\n2026-09-15 23:02:12,5.9861\n2026-09-16 07:34:33,5.9894\n2026-09-16 10:19:42,5.9894\n2026-09-16 10:23:46,5.9894\n2026-09-16 11:41:02,5.9894\n2026-09-16 11:41:42,6.6264\n2026-10-14 13:33:47,6.0259\n',
       '/koinly/CATE-fix-USDT.csv': 'Date,Rate\n2026-09-15 23:02:12,0.06246033\n2026-09-16 11:41:42,0.06910283\n2026-10-14 13:33:47,0.06346599\n',
@@ -1172,6 +1181,24 @@ export default {
       } catch (e) {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180), raw: e && e.raw ? String(e.raw).slice(0, 700) : '' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
+    }
+    if (path === '/health' || path === '/api/health' || path === '/status' || path === '/api/status') {
+      return new Response(JSON.stringify({ ok: true, engine: 'ohlcv', paused: true, ts: new Date().toISOString() }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+    }
+    const keepDo = {
+      '/solchain-wallets': 1, '/api/solchain-wallets': 1,
+      '/tier-notes': 1, '/api/tier-notes': 1,
+      '/fomo-entry': 1, '/api/fomo-entry': 1,
+      '/fomo-experiences': 1, '/api/fomo-experiences': 1,
+      '/fav-dips': 1, '/api/fav-dips': 1,
+      '/coinstats-wallets': 1, '/api/coinstats-wallets': 1,
+      '/strategy': 1, '/api/strategy': 1,
+      '/alerts': 1, '/api/alerts': 1,
+      '/hunter/save': 1, '/api/hunter/save': 1,
+      '/hunter/verify': 1, '/api/hunter/verify': 1
+    };
+    if (!keepDo[path]) {
+      return new Response(JSON.stringify({ ok: true, paused: true, free: true }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
     }
     return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
   },

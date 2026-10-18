@@ -217,7 +217,7 @@
       timer = setInterval(function () {
         const onp = $('wowdip-panel');
         if (!onp || onp.style.display === 'none') return;
-        load();
+        return;
       }, 60000);
     } else {
       if (p) {

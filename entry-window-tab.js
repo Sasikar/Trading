@@ -549,7 +549,7 @@
       timer = setInterval(function () {
         const onp = $('entrywindow-panel');
         if (!onp || onp.style.display === 'none') return;
-        load();
+        return;
       }, 20000);
     } else {
       if (p) {

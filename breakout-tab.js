@@ -637,7 +637,7 @@
       const j = await api('/alerts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: mode }) });
       paintAlertBar(Object.assign({}, j, { alertWatch: j.alertWatch }));
       await loadStatus();
-      scanBreakoutMemes(true);
+      return;
     } catch (e) {
       alert(e.message || e);
     }
@@ -808,7 +808,7 @@
     liveTimer = setInterval(function () {
       const on = document.getElementById('breakouts-panel');
       if (!on || on.style.display === 'none') return;
-      scanBreakoutMemes(true);
+      return;
     }, LIVE_MS);
   }
   function stopLive() {
