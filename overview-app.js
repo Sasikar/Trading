@@ -6235,6 +6235,22 @@ function initTabReorder(){
       var pin=map.memeassist||map.antifomo||map.coinstats;
       if(pin) pin.insertAdjacentElement('afterend', map.solchain);
     }
+    (function(){
+      var ids=['soulscanner','cabalhunter','rugradar','memeassist'];
+      var nodes=ids.map(function(id){return map[id];}).filter(Boolean);
+      if(!nodes.length) return;
+      var first=null;
+      [].slice.call(bar.querySelectorAll('.tab')).forEach(function(el){
+        if(!first && ids.indexOf(el.getAttribute('data-tf'))>=0) first=el;
+      });
+      if(!first) return;
+      var prev=nodes[0];
+      if(nodes[0]!==first) first.insertAdjacentElement('beforebegin', nodes[0]);
+      for(var i=1;i<nodes.length;i++){
+        prev.insertAdjacentElement('afterend', nodes[i]);
+        prev=nodes[i];
+      }
+    })();
     const b=document.getElementById('tab-arrange');
     if(b) bar.appendChild(b);
   }
