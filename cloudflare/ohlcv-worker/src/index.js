@@ -977,6 +977,36 @@ async function readHealthTips(env, body) {
   return { items, titleOnly: !!(source && source.titleOnly) };
 }
 
+let pricePingAt = {};
+
+async function sendPricePing(env, body) {
+  const token = env && env.TELEGRAM_BOT_TOKEN;
+  const chat = env && env.TELEGRAM_CHAT_ID;
+  if (!token || !chat) return { ok: false, error: 'Telegram bot is not set on the worker.' };
+  const kind = body && body.kind === 'btc' ? 'btc' : 'meme';
+  const dir = body && body.dir === 'down' ? 'down' : 'up';
+  const name = String((body && (body.name || body.symbol)) || (kind === 'btc' ? 'BTC' : 'coin')).replace(/\s+/g, ' ').trim().slice(0, 24);
+  const price = String((body && body.price) || '').replace(/\s+/g, ' ').trim().slice(0, 32);
+  const detail = String((body && body.detail) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const mint = String((body && body.mint) || '').trim();
+  if (kind === 'meme' && !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return { ok: false, error: 'Bad coin.' };
+  const key = kind + '|' + (kind === 'btc' ? 'btc' : mint);
+  const now = Date.now();
+  if (now - (pricePingAt[key] || 0) < 60000) return { ok: true, skipped: true };
+  pricePingAt[key] = now;
+  const lines = [name + ' ' + dir, price];
+  if (detail) lines.push(detail);
+  if (kind === 'meme') lines.push('https://dexscreener.com/solana/' + mint);
+  const res = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: chat, text: lines.join('\n'), disable_web_page_preview: true })
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok || !j.ok) return { ok: false, error: String(j.description || 'telegram failed').slice(0, 160) };
+  return { ok: true, sent: true };
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -1184,6 +1214,15 @@ export default {
     }
     if (path === '/health' || path === '/api/health' || path === '/status' || path === '/api/status') {
       return new Response(JSON.stringify({ ok: true, engine: 'ohlcv', paused: true, ts: new Date().toISOString() }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+    }
+    if (path === '/price-ping' && request.method === 'POST') {
+      try {
+        const body = await request.json().catch(() => ({}));
+        const out = await sendPricePing(env, body);
+        return new Response(JSON.stringify(out), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      } catch (e) {
+        return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 160) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+      }
     }
     const keepDo = {
       '/solchain-wallets': 1, '/api/solchain-wallets': 1,

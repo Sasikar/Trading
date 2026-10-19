@@ -73,7 +73,7 @@
     var moved = state.lastAlertAt ? '<div style="margin-top:8px;color:#8b93a7;font-size:12px">Last alert ' + esc(state.lastDir === "down" ? "down" : "up") + " " + pts(state.lastMove) + " pts</div>" : "";
     root.innerHTML =
       '<div style="font-size:40px;font-weight:900;letter-spacing:-.04em">' + usd(state.price) + "</div>" +
-      '<div style="margin-top:4px;color:#8b93a7;font-size:13px">' + (state.error ? esc(state.error) : "Coinbase price in this browser. Cloudflare is not used. The alert rings while this site is open.") + "</div>" +
+      '<div style="margin-top:4px;color:#8b93a7;font-size:13px">' + (state.error ? esc(state.error) : "Coinbase price in this browser. A cross goes to your Telegram bot. Cloudflare storage is not used.") + "</div>" +
       '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:baseline"><b id="btc-step-label">Every ' + (state.step || 200) + ' points</b><span style="color:#8b93a7;font-size:12px">steps of 100</span></div>' +
       '<input id="btc-step" type="range" min="100" max="3000" step="100" value="' + (state.step || 200) + '" style="width:100%;margin-top:8px;accent-color:#e6c878">' +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
@@ -113,6 +113,16 @@
     try {
       if (window.Notification && Notification.permission === "granted") new Notification(title, { body: body });
     } catch (e) {}
+    fetch("https://trading-ohlcv.sasipudi.workers.dev/price-ping", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "btc", name: "BTC", dir: dir, price: body, detail: pts(move) + " pts" })
+    }).then(function (r) { return r.json(); }).then(function (out) {
+      if (out && out.ok === false && out.error) {
+        state.error = out.error;
+        if (open) paint();
+      }
+    }).catch(function () {});
   }
   function check(price) {
     if (!(price > 0)) return;

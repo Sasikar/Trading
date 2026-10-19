@@ -91,7 +91,7 @@
       '<form id="meme-add" style="display:flex;gap:8px">' +
       '<input id="meme-ca" placeholder="Paste contract. New coin goes on top." autocomplete="off" style="flex:1;min-width:0;border:1px solid #2a3140;background:#0e131a;color:#fff;border-radius:12px;padding:12px;font-size:14px">' +
       '<button type="submit" style="border:0;border-radius:12px;padding:12px 14px;font-weight:900;background:#e6c878;color:#1a1408">Add</button></form>' +
-      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "DexScreener price in this browser. Saved on this phone. Cloudflare is not used.") + "</div>" +
+      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "DexScreener price in this browser. A cross goes to your Telegram bot. Saved on this phone.") + "</div>" +
       '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:baseline"><b id="meme-step-label">Every ' + (state.pct || 10) + "%</b><span style=\"color:#8b93a7;font-size:12px\">from the last alert</span></div>" +
       '<input id="meme-step" type="range" min="5" max="50" step="5" value="' + (state.pct || 10) + '" style="width:100%;margin-top:8px;accent-color:#e6c878">' +
       '<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
@@ -136,11 +136,21 @@
   function ask() {
     try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
   }
-  function ping(symbol, dir, price) {
+  function ping(symbol, dir, price, mint) {
     var title = symbol + " " + dir + " " + (state.pct || 10) + "%";
     try {
       if (window.Notification && Notification.permission === "granted") new Notification(title, { body: px(price) });
     } catch (e) {}
+    fetch("https://trading-ohlcv.sasipudi.workers.dev/price-ping", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "meme", name: symbol, dir: dir, price: px(price), detail: (state.pct || 10) + "%", mint: mint })
+    }).then(function (r) { return r.json(); }).then(function (out) {
+      if (out && out.ok === false && out.error) {
+        state.error = out.error;
+        if (open) paint();
+      }
+    }).catch(function () {});
   }
   function bestPair(list, mint) {
     var rows = (list || []).filter(function (p) { return p && p.baseToken && p.baseToken.address === mint; });
@@ -206,7 +216,7 @@
           var pct = state.pct || 10;
           var move = (price - c.anchor) / c.anchor * 100;
           if (state.on !== false && Math.abs(move) >= pct) {
-            ping(c.symbol || "COIN", move > 0 ? "up" : "down", price);
+            ping(c.symbol || "COIN", move > 0 ? "up" : "down", price, c.mint);
             c.anchor = price;
           }
         });
