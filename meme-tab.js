@@ -39,13 +39,16 @@
       var s = JSON.parse(localStorage.getItem(KEY) || "{}");
       if (!s || typeof s !== "object") return;
       if (typeof s.on === "boolean") state.on = s.on;
-      if (s.pct) state.pct = s.pct;
-      if (Array.isArray(s.coins)) state.coins = s.coins.filter(function (c) { return c && mintOk(c.mint); }).slice(0, 20);
+      var fallback = s.pct || 10;
+      if (Array.isArray(s.coins)) state.coins = s.coins.filter(function (c) { return c && mintOk(c.mint); }).slice(0, 20).map(function (c) {
+        c.pct = coinPct(c.pct || fallback);
+        return c;
+      });
     } catch (e) {}
   }
   function write() {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ on: state.on, pct: state.pct, coins: state.coins }));
+      localStorage.setItem(KEY, JSON.stringify({ on: state.on, coins: state.coins }));
     } catch (e) {}
   }
   function hideOthers() {
@@ -62,11 +65,15 @@
       el.classList.remove("on");
     });
   }
-  function band(anchor) {
-    var pct = state.pct || 10;
-    var up = anchor * (1 + pct / 100);
-    var down = anchor * (1 - pct / 100);
-    return { up: up, down: down };
+  function coinPct(n) {
+    n = Math.round(Number(n));
+    if (!isFinite(n) || n < 1) return 10;
+    if (n > 100) return 100;
+    return n;
+  }
+  function band(anchor, pct) {
+    pct = coinPct(pct);
+    return { up: anchor * (1 + pct / 100), down: anchor * (1 - pct / 100) };
   }
   function paint() {
     var root = $("memes-board");
@@ -75,7 +82,8 @@
     var rows = state.coins.map(function (c) {
       var q = quotes[c.mint] || {};
       var price = Number(q.price) || 0;
-      var b = c.anchor > 0 ? band(c.anchor) : { up: 0, down: 0 };
+      var pct = coinPct(c.pct);
+      var b = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
       return '<div style="padding:12px 0;border-top:1px solid #243041">' +
         '<div style="display:flex;align-items:center;gap:8px">' +
         '<div style="flex:1;min-width:0"><b>' + esc(c.symbol || "COIN") + "</b>" +
@@ -83,6 +91,9 @@
         '<div style="text-align:right"><div style="font-weight:900">' + px(price) + "</div>" +
         '<div style="color:#8b93a7;font-size:11px">' + esc(mc(q.mc)) + "</div></div>" +
         '<button type="button" data-drop="' + esc(c.mint) + '" aria-label="Remove" style="border:0;background:#2a1518;color:#ff8a7a;border-radius:10px;padding:8px 10px;font-weight:900">×</button></div>' +
+        '<label style="display:flex;align-items:center;gap:8px;margin-top:8px;color:#8b93a7;font-size:12px">Every' +
+        '<input data-pct="' + esc(c.mint) + '" type="number" min="1" max="100" step="1" value="' + pct + '" style="width:72px;border:1px solid #2a3140;background:#0e131a;color:#fff;border-radius:10px;padding:8px;font-weight:900">' +
+        '% from the last alert</label>' +
         '<div style="display:flex;gap:8px;margin-top:8px">' +
         '<div style="flex:1;padding:8px;border-radius:12px;background:#102018;font-size:12px"><span style="color:#8b93a7">UP </span><b style="color:#3dbe7a">' + px(b.up) + "</b></div>" +
         '<div style="flex:1;padding:8px;border-radius:12px;background:#2a1518;font-size:12px"><span style="color:#8b93a7">DOWN </span><b style="color:#ff8a7a">' + px(b.down) + "</b></div></div></div>";
@@ -91,9 +102,7 @@
       '<form id="meme-add" style="display:flex;gap:8px">' +
       '<input id="meme-ca" placeholder="Paste contract. New coin goes on top." autocomplete="off" style="flex:1;min-width:0;border:1px solid #2a3140;background:#0e131a;color:#fff;border-radius:12px;padding:12px;font-size:14px">' +
       '<button type="submit" style="border:0;border-radius:12px;padding:12px 14px;font-weight:900;background:#e6c878;color:#1a1408">Add</button></form>' +
-      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "DexScreener price in this browser. A cross goes to your Telegram bot. Saved on this phone.") + "</div>" +
-      '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:baseline"><b id="meme-step-label">Every ' + (state.pct || 10) + "%</b><span style=\"color:#8b93a7;font-size:12px\">from the last alert</span></div>" +
-      '<input id="meme-step" type="range" min="5" max="50" step="5" value="' + (state.pct || 10) + '" style="width:100%;margin-top:8px;accent-color:#e6c878">' +
+      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "DexScreener price in this browser. Each coin has its own percent. A cross goes to your Telegram bot.") + "</div>" +
       '<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
       '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On · every 30s" : "Off") + "</div></div>" +
       '<button type="button" id="meme-toggle" class="al-sw" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Alerts"><span class="al-knob"></span></button></div>' +
@@ -104,18 +113,6 @@
       var input = $("meme-ca");
       addCoin(input ? input.value : "");
     });
-    var bar = $("meme-step");
-    var label = $("meme-step-label");
-    if (bar) {
-      bar.addEventListener("input", function () {
-        if (label) label.textContent = "Every " + bar.value + "%";
-      });
-      bar.addEventListener("change", function () {
-        state.pct = Number(bar.value) || 10;
-        write();
-        paint();
-      });
-    }
     var btn = $("meme-toggle");
     if (btn) btn.addEventListener("click", function () {
       state.on = !(state.on !== false);
@@ -123,6 +120,16 @@
       write();
       arm();
       paint();
+    });
+    root.querySelectorAll("[data-pct]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var mint = input.getAttribute("data-pct");
+        state.coins.forEach(function (c) {
+          if (c.mint === mint) c.pct = coinPct(input.value);
+        });
+        write();
+        paint();
+      });
     });
     root.querySelectorAll("[data-drop]").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -136,15 +143,15 @@
   function ask() {
     try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
   }
-  function ping(symbol, dir, price, mint) {
-    var title = symbol + " " + dir + " " + (state.pct || 10) + "%";
+  function ping(symbol, dir, price, mint, pct) {
+    var title = symbol + " " + dir + " " + coinPct(pct) + "%";
     try {
       if (window.Notification && Notification.permission === "granted") new Notification(title, { body: px(price) });
     } catch (e) {}
     fetch("https://trading-ohlcv.sasipudi.workers.dev/price-ping", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "meme", name: symbol, dir: dir, price: px(price), detail: (state.pct || 10) + "%", mint: mint })
+      body: JSON.stringify({ kind: "meme", name: symbol, dir: dir, price: px(price), detail: coinPct(pct) + "%", mint: mint })
     }).then(function (r) { return r.json(); }).then(function (out) {
       if (out && out.ok === false && out.error) {
         state.error = out.error;
@@ -185,7 +192,9 @@
       var mint = pair.baseToken.address;
       var price = Number(pair.priceUsd) || 0;
       quotes[mint] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
-      var coin = { mint: mint, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price };
+      var prev = null;
+      state.coins.forEach(function (c) { if (c.mint === mint) prev = c; });
+      var coin = { mint: mint, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinPct(prev && prev.pct) };
       state.coins = [coin].concat(state.coins.filter(function (c) { return c.mint !== mint; })).slice(0, 20);
       state.error = "";
       write();
@@ -213,10 +222,10 @@
           if (!(price > 0)) return;
           quotes[c.mint] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
           if (!(c.anchor > 0)) c.anchor = price;
-          var pct = state.pct || 10;
+          var pct = coinPct(c.pct);
           var move = (price - c.anchor) / c.anchor * 100;
           if (state.on !== false && Math.abs(move) >= pct) {
-            ping(c.symbol || "COIN", move > 0 ? "up" : "down", price, c.mint);
+            ping(c.symbol || "COIN", move > 0 ? "up" : "down", price, c.mint, pct);
             c.anchor = price;
           }
         });
