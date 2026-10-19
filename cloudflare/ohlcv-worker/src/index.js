@@ -294,6 +294,18 @@ export class OhlcvEngine {
   }
   async fetch(request) {
     const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
+    if (path === '/tg-creds') {
+      const read = (k) => {
+        try {
+          for (const row of this.ctx.storage.sql.exec('SELECT v FROM meta WHERE k = ?', k)) return String(row.v || '');
+        } catch (e) {}
+        return '';
+      };
+      return new Response(JSON.stringify({
+        token: String((this.env && this.env.TELEGRAM_BOT_TOKEN) || read('telegram_bot_token') || '').trim(),
+        chat: String((this.env && this.env.TELEGRAM_CHAT_ID) || read('telegram_chat_id') || '').trim()
+      }), { headers: { 'content-type': 'application/json' } });
+    }
     if (path === '/health' || path === '/api/health') {
       return new Response(JSON.stringify({ ok: true, engine: 'ohlcv', ts: new Date().toISOString() }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
     }
@@ -978,10 +990,25 @@ async function readHealthTips(env, body) {
 }
 
 let pricePingAt = {};
+let tgCache = { at: 0, token: '', chat: '' };
+
+async function loadTelegram(env) {
+  const envToken = env && env.TELEGRAM_BOT_TOKEN;
+  const envChat = env && env.TELEGRAM_CHAT_ID;
+  if (envToken && envChat) return { token: String(envToken).trim(), chat: String(envChat).trim() };
+  if (tgCache.token && tgCache.chat && Date.now() - tgCache.at < 6 * 3600e3) return tgCache;
+  const res = await env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(new Request('https://ohlcv.local/tg-creds'));
+  const j = await res.json().catch(() => ({}));
+  const token = String(j && j.token || '').trim();
+  const chat = String(j && j.chat || '').trim();
+  if (token && chat) tgCache = { at: Date.now(), token, chat };
+  return { token, chat };
+}
 
 async function sendPricePing(env, body) {
-  const token = env && env.TELEGRAM_BOT_TOKEN;
-  const chat = env && env.TELEGRAM_CHAT_ID;
+  const creds = await loadTelegram(env);
+  const token = creds.token;
+  const chat = creds.chat;
   if (!token || !chat) return { ok: false, error: 'Telegram bot is not set on the worker.' };
   const kind = body && body.kind === 'btc' ? 'btc' : 'meme';
   const dir = body && body.dir === 'down' ? 'down' : 'up';
