@@ -2,7 +2,7 @@
   if (window.__memePoints) return;
   window.__memePoints = 1;
   var KEY = "trading_meme_alerts_v1";
-  var state = { on: true, pct: 10, coins: [], error: "" };
+  var state = { on: true, pct: 10, coins: [], imported: false, error: "" };
   var quotes = {};
   var open = false;
   var timer = 0;
@@ -39,6 +39,7 @@
       var s = JSON.parse(localStorage.getItem(KEY) || "{}");
       if (!s || typeof s !== "object") return;
       if (typeof s.on === "boolean") state.on = s.on;
+      if (s.imported) state.imported = true;
       var fallback = s.pct || 10;
       if (Array.isArray(s.coins)) state.coins = s.coins.filter(function (c) { return c && mintOk(c.mint); }).slice(0, 20).map(function (c) {
         c.pct = coinPct(c.pct || fallback);
@@ -48,7 +49,7 @@
   }
   function write() {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ on: state.on, coins: state.coins }));
+      localStorage.setItem(KEY, JSON.stringify({ on: state.on, imported: state.imported, coins: state.coins }));
     } catch (e) {}
   }
   function hideOthers() {
@@ -211,10 +212,16 @@
     if (pulling || !state.coins.length || document.visibilityState === "hidden") return;
     if (state.on === false && !open) return;
     pulling = true;
-    var mints = state.coins.map(function (c) { return c.mint; }).join(",");
-    fetch("https://api.dexscreener.com/tokens/v1/solana/" + mints, { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      .then(function (list) {
+    var lists = [];
+    var mints = state.coins.map(function (c) { return c.mint; });
+    for (var i = 0; i < mints.length; i += 30) lists.push(mints.slice(i, i + 30));
+    Promise.all(lists.map(function (part) {
+      return fetch("https://api.dexscreener.com/tokens/v1/solana/" + part.join(","), { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (list) { return Array.isArray(list) ? list : []; })
+        .catch(function () { return []; });
+    })).then(function (groups) {
+        var list = [].concat.apply([], groups);
         state.coins.forEach(function (c) {
           var pair = bestPair(list, c.mint);
           if (!pair) return;
@@ -236,6 +243,35 @@
       .catch(function () { state.error = "DexScreener did not answer."; if (open) paint(); })
       .then(function () { pulling = false; });
   }
+  function loadExisting() {
+    if (state.imported) return;
+    function take(rows) {
+      var tomb = {};
+      try { tomb = JSON.parse(localStorage.getItem("ca_recents_tomb_v1") || "{}"); } catch (e) {}
+      var have = {};
+      state.coins.forEach(function (c) { have[c.mint] = 1; });
+      var add = [];
+      (rows || []).forEach(function (row) {
+        var mint = String((row && (row.ca || row.mint)) || "").trim();
+        var chain = String((row && row.chain) || "solana");
+        if (chain !== "solana" || !mintOk(mint) || have[mint]) return;
+        if (tomb["solana|" + mint.toLowerCase()]) return;
+        have[mint] = 1;
+        add.push({ mint: mint, symbol: (row.base || row.name || "COIN"), name: row.name || "", anchor: 0, pct: 10 });
+      });
+      state.imported = true;
+      if (add.length) state.coins = state.coins.concat(add).slice(0, 40);
+      write();
+      if (open) paint();
+      pull();
+    }
+    var local = [];
+    try { local = JSON.parse(localStorage.getItem("ca_recents_v1") || "[]"); } catch (e) {}
+    if (local.length) { take(local); return; }
+    fetch("data/ca-recents.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (body) {
+      take((body && body.items) || []);
+    }).catch(function () {});
+  }
   function arm() {
     if (timer) clearInterval(timer);
     timer = 0;
@@ -256,11 +292,13 @@
     p.style.setProperty("display", "block", "important");
     p.classList.add("on");
     paint();
-    pull();
+    loadExisting();
+    if (state.coins.length) pull();
     if (p.scrollIntoView) p.scrollIntoView({ block: "start" });
   }
   window.showMemes = show;
   read();
+  loadExisting();
   arm();
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") pull();
