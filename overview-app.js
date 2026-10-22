@@ -61,26 +61,28 @@ async function loadMarket(){
     if($('market-source')) $('market-source').textContent=src||'OFFLINE';
   }catch(e){console.warn('btc/eth',e);}
 
-  // NASDAQ — live quote, static snapshot only if the feed misses
+  // NASDAQ — live from CNBC in the browser. Static file only if that misses.
   try{
     let snap=null;
-    const bases=[];
-    try{ if(window.BREAKOUT_API) bases.push(String(window.BREAKOUT_API).replace(/\/+$/,'')); }catch(e){}
-    /* free tier: do not hit the worker for NASDAQ */
-    for(const b of bases){
-      const live=await jget(b+'/nasdaq');
-      if(live&&live.price!=null&&!live.error){ snap=live; break; }
-    }
+    let liveOk=false;
+    try{
+      const cj=await jget('https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=.IXIC&requestMethod=itv&noCache=1&output=json&_='+Date.now());
+      const q=cj&&cj.FormattedQuoteResult&&cj.FormattedQuoteResult.FormattedQuote&&cj.FormattedQuoteResult.FormattedQuote[0];
+      const price=q&&+String(q.last||'').replace(/,/g,'');
+      if(price){
+        const pct=q.change_pct!=null?+String(q.change_pct).replace(/%/g,''):null;
+        snap={price:price, pct:isFinite(pct)?pct:null, updated:Date.now(), live:true};
+        liveOk=true;
+      }
+    }catch(e){}
     if(!snap){
-      try{ snap=await jget('./nasdaq.json'); }catch(e){ try{snap=await jget('/nasdaq.json');}catch(e2){} }
+      try{ snap=await jget('./nasdaq.json?_='+Date.now()); }catch(e){ try{snap=await jget('/nasdaq.json?_='+Date.now());}catch(e2){} }
     }
     if(snap&&snap.price!=null){
       const pct=snap.pct!=null?+snap.pct:(snap.change_pct!=null?+snap.change_pct:null);
       set('ndx-price', money(+snap.price));
-      if(pct!=null) set('ndx-change', (pct>=0?'+':'')+(+pct).toFixed(2)+'%', pct>=0?'#62e3a0':'#ff6f7c');
-      const age=snap.updated?Math.max(0, Date.now()-Number(snap.updated)):null;
-      const ageTxt=age==null?'':(age<3600000?(age/60000).toFixed(0)+'m':(age/3600000).toFixed(1)+'h');
-      if($('ndx-src')) $('ndx-src').textContent='SNAPSHOT'+(ageTxt?' · '+ageTxt:'');
+      if(pct!=null&&isFinite(pct)) set('ndx-change', (pct>=0?'+':'')+(+pct).toFixed(2)+'%', pct>=0?'#62e3a0':'#ff6f7c');
+      if($('ndx-src')) $('ndx-src').textContent=liveOk?'LIVE':'SNAPSHOT';
       any=true;
     } else {
       set('ndx-price','—');
