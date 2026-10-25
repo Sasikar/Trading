@@ -2,7 +2,8 @@
   if (window.__experienceEntry) return;
   window.__experienceEntry = 1;
   var KEY = "trading_experience_entry_v1";
-  var state = { total: "", count: "", log: [] };
+  var state = { total: "", count: "", log: [], noTrade: [] };
+  var view = new Date();
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -18,6 +19,7 @@
     if (!state || typeof state !== "object") state = { total: "", count: "", log: [] };
     if (!state.total && state.cap) state.total = state.cap;
     if (!Array.isArray(state.log)) state.log = [];
+    if (!Array.isArray(state.noTrade)) state.noTrade = [];
   }
   function write() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
@@ -117,7 +119,7 @@
       '<button type="button" id="ee-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406">Add entry</button>' +
       '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:#9aa6b6">This week: ' + week.length + (capN != null ? " / " + capN : "") + " entries" +
       (sumPct == null ? "" : " · " + sumPct + "% of total") + "</div>" +
-      rows + "</article>";
+      rows + "</article>" + calendarHtml();
     $("ee-save").onclick = function () {
       state.total = $("ee-total").value.trim();
       state.count = $("ee-count").value.trim();
@@ -149,6 +151,46 @@
         paint();
       };
     });
+    var prev = $("ee-prev");
+    var next = $("ee-next");
+    if (prev) prev.onclick = function () { view.setMonth(view.getMonth() - 1); paint(); };
+    if (next) next.onclick = function () { view.setMonth(view.getMonth() + 1); paint(); };
+    root.querySelectorAll("[data-day]").forEach(function (btn) {
+      btn.onclick = function () {
+        var day = btn.getAttribute("data-day");
+        var i = state.noTrade.indexOf(day);
+        if (i >= 0) state.noTrade.splice(i, 1);
+        else state.noTrade.push(day);
+        write();
+        paint();
+      };
+    });
+  }
+  function calendarHtml() {
+    var y = view.getFullYear();
+    var m = view.getMonth();
+    var first = new Date(y, m, 1);
+    var pad = (first.getDay() + 6) % 7;
+    var days = new Date(y, m + 1, 0).getDate();
+    var marked = {};
+    state.noTrade.forEach(function (d) { marked[d] = 1; });
+    var heads = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(function (n) {
+      return '<div style="text-align:center;color:#8b93a7;font-size:11px;font-weight:800">' + n + "</div>";
+    }).join("");
+    var cells = "";
+    for (var i = 0; i < pad; i++) cells += "<div></div>";
+    for (var d = 1; d <= days; d++) {
+      var key = y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+      var on = !!marked[key];
+      var now = key === today();
+      cells += '<button type="button" data-day="' + key + '" style="border:' + (now ? "1px solid #e6c878" : "0") + ';border-radius:10px;min-height:44px;padding:4px 0;font-weight:800;background:' + (on ? "#e6c878" : "#243140") + ';color:' + (on ? "#1a1406" : "#f4f7fb") + '">' + d + (on ? '<div style="font-size:8px;font-weight:800">No trade</div>' : "") + "</button>";
+    }
+    var title = first.toLocaleString(undefined, { month: "long", year: "numeric" });
+    var todayOn = state.noTrade.indexOf(today()) >= 0;
+    return '<article style="margin:0 0 14px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><button type="button" id="ee-prev" style="border:0;border-radius:10px;padding:8px 12px;background:#e6c878;color:#1a1406;font-weight:800">‹</button><b>' + esc(title) + '</b><button type="button" id="ee-next" style="border:0;border-radius:10px;padding:8px 12px;background:#e6c878;color:#1a1406;font-weight:800">›</button></div>' +
+      '<div style="margin-top:8px;color:#c5d0dc;font-size:13px">Tap a day to mark No trade. Tap again to clear.' + (todayOn ? " Today is a no-trade day." : "") + "</div>" +
+      '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px">' + heads + cells + "</div></article>";
   }
   function show(on) {
     var p = $("experience-panel");
