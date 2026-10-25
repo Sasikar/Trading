@@ -1,7 +1,13 @@
 (()=>{if(document.getElementById('site-nav'))return;
+if(!document.querySelector('link[rel="manifest"]')){
+  var man=document.createElement('link');
+  man.rel='manifest';
+  man.href='manifest.webmanifest';
+  document.head.appendChild(man);
+}
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{});
-  if(window.caches)caches.keys().then(ks=>ks.forEach(k=>caches.delete(k))).catch(()=>{});
+  var base=location.pathname.replace(/[^/]*$/, '');
+  navigator.serviceWorker.register(base+'sw.js').catch(function(){});
 }
 const primary=[['Overview','index.html',true],['Health','health.html?v=20261004-hl31',true],['My rules','banned.html?v=20261009-bn2',true],['Pulse','pulse.html',true],['Entry Window','index.html?tab=entrywindow',true],['Hunter','index.html?tab=hunter',true],['Holders','index.html?tab=holders',true],['Anti-FOMO','index.html?tab=antifomo',true],['Position','index.html?tab=position',true],['WOW DIP','index.html?tab=wowdip',true],['OMG','index.html?tab=omg',true],['Pitfalls','index.html?tab=pitfalls',true],['Strategy','index.html?tab=strategy',true],['Decision Check','index.html?tab=decision',true],['GMGN','index.html?tab=gmgn',true],['Pumpfun','index.html?tab=pumpfun',true],['Wallet tracker','index.html?tab=wallets',true],['Markets','watchlist.html',false],['Memes','memes.html',false],['MemeGate','index.html?tab=memegate',true],['Portfolio','portfolio.html',false],['Catalysts','market-catalysts.html',false],['Process','pre-entry-checklist.html',false],['Scanner','scanner.html',false],['Tax','tax-qa.html',false],['Goals','goals.html',false]];
 const current=(location.pathname.split('/').pop()||'index.html').toLowerCase();
