@@ -70,8 +70,8 @@
     try { window.showMarkets && window.showMarkets(false); } catch (e) {}
   }
   function field(label, id, value, type) {
-    return '<label style="display:block;margin-top:10px;color:#8b93a7;font-size:12px;font-weight:700">' + label +
-      '<input id="' + id + '" type="' + (type || "text") + '" value="' + esc(value) + '" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:16px;font-weight:800">' +
+    return '<label style="display:block;margin-top:10px;color:#c5d0dc;font-size:12px;font-weight:700">' + label +
+      '<input id="' + id + '" type="' + (type || "text") + '" value="' + esc(value) + '" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:1px solid #5c6b80;border-radius:12px;background:#243140;color:#fff;font-size:16px;font-weight:800;color-scheme:dark">' +
       "</label>";
   }
   function paint() {
@@ -92,10 +92,12 @@
       if (over) flags.push("over trade");
       if (overSize) flags.push("over size");
       var when = row.date || "";
-      return '<article data-id="' + row.t + '" style="margin-top:10px;padding:12px;border-radius:14px;background:' + (bad ? "#2a1416" : "#0b1016") + ';border:1px solid ' + (bad ? "#ff6b6b" : "#243041") + '">' +
-        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="color:' + (bad ? "#ff8a7a" : "#7dffb3") + '">#' + (i + 1) + "</b><span style=\"color:#8b93a7;font-size:12px\">" + esc(when) + (flags.length ? " · " + flags.join(" · ") : "") + "</span></div>" +
+      var coin = row.coin || "";
+      return '<article data-id="' + row.t + '" style="margin-top:10px;padding:12px;border-radius:14px;background:' + (bad ? "#2a1416" : "#1a2430") + ';border:1px solid ' + (bad ? "#ff6b6b" : "#3d4f66") + '">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="color:' + (bad ? "#ff8a7a" : "#7dffb3") + '">#' + (i + 1) + " " + esc(coin) + "</b><span style=\"color:#c5d0dc;font-size:12px\">" + esc(when) + (flags.length ? " · " + flags.join(" · ") : "") + "</span></div>" +
         '<div style="margin-top:8px;font-size:18px;font-weight:900;color:' + (bad ? "#ff8a7a" : "#fff") + '">' + money(amount) + "</div>" +
-        '<div style="margin-top:4px;font-size:14px;color:#9aa6b6">' + (pct == null ? "Set a total amount" : pct + "% of total") + (row.setup ? " · setup valid" : "") + "</div>" +
+        (row.notes ? '<div style="margin-top:6px;font-size:14px;color:#d7dee8;line-height:1.4">' + esc(row.notes) + "</div>" : "") +
+        '<div style="margin-top:4px;font-size:14px;color:#c5d0dc">' + (pct == null ? "Set a total amount" : pct + "% of total") + (row.setup ? " · setup valid" : "") + "</div>" +
         '<button type="button" data-drop="' + row.t + '" style="margin-top:8px;border:0;background:transparent;color:#ff8a7a;font-weight:800;padding:0">Remove</button></article>';
     }).join("");
     var sumPct = total ? Math.round(sum / total * 1000) / 10 : null;
@@ -104,14 +106,15 @@
       "<b>Total, then each buy</b>" +
       field("Total amount", "ee-total", state.total || "", "number") +
       field("Fixed entries per week", "ee-count", state.count || "", "number") +
-      '<button type="button" id="ee-save" style="margin-top:12px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#f4f7fb;color:#111">Save</button>' +
-      '<div style="margin-top:16px;font-size:13px;font-weight:800">New</div>' +
-      '<select id="ee-kind" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:16px;font-weight:800"><option>New</option></select>' +
-      field("Date", "ee-date", today(), "date") +
+      '<button type="button" id="ee-save" style="margin-top:12px;border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406">Save</button>' +
+      '<div style="margin-top:16px;font-size:13px;font-weight:800;color:#fff">New</div>' +
+      '<select id="ee-kind" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #5c6b80;border-radius:12px;background:#243140;color:#fff;font-size:16px;font-weight:800;color-scheme:dark"><option>New</option></select>' +
+      field("Coin", "ee-coin", "", "text") +
       field("Amount USD", "ee-amount", "", "number") +
-      '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;color:#d7dee8;font-size:14px;font-weight:800"><input id="ee-setup" type="checkbox" style="width:18px;height:18px"> Setup valid</label>' +
-      '<div style="margin-top:4px;color:#8b93a7;font-size:12px">On: even 100% is not over size. Off: over 30% is over size.</div>' +
-      '<button type="button" id="ee-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#1c2430;color:#e8eef6">Add entry</button>' +
+      '<label style="display:block;margin-top:10px;color:#c5d0dc;font-size:12px;font-weight:700">Notes<textarea id="ee-notes" rows="3" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:1px solid #5c6b80;border-radius:12px;background:#243140;color:#fff;font-size:15px;font-weight:700;color-scheme:dark"></textarea></label>' +
+      '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;color:#f4f7fb;font-size:14px;font-weight:800"><input id="ee-setup" type="checkbox" style="width:18px;height:18px;accent-color:#62e3a0"> Setup valid</label>' +
+      '<div style="margin-top:4px;color:#c5d0dc;font-size:12px">On: even 100% is not over size. Off: over 30% is over size.</div>' +
+      '<button type="button" id="ee-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406">Add entry</button>' +
       '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:#9aa6b6">This week: ' + week.length + (capN != null ? " / " + capN : "") + " entries" +
       (sumPct == null ? "" : " · " + sumPct + "% of total") + "</div>" +
       rows + "</article>";
@@ -123,11 +126,14 @@
     };
     $("ee-add").onclick = function () {
       var amount = $("ee-amount").value.trim();
-      if (num(amount) == null) return;
+      var coin = $("ee-coin").value.trim();
+      if (!coin || num(amount) == null) return;
       state.log.unshift({
         t: Date.now(),
         kind: $("ee-kind").value || "New",
-        date: $("ee-date").value || today(),
+        date: today(),
+        coin: coin,
+        notes: $("ee-notes").value.trim(),
         amount: amount,
         setup: !!($("ee-setup") && $("ee-setup").checked)
       });
