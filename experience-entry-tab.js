@@ -83,16 +83,14 @@
     var sum = 0;
     var rows = week.map(function (row, i) {
       var amount = num(row.amount != null ? row.amount : row.risk);
-      var target = num(row.target);
       if (amount != null) sum += amount;
       var pct = total && amount != null ? Math.round(amount / total * 1000) / 10 : null;
       var over = capN != null && i + 1 > capN;
       var when = row.date || "";
       return '<article data-id="' + row.t + '" style="margin-top:10px;padding:12px;border-radius:14px;background:' + (over ? "#2a1416" : "#0b1016") + ';border:1px solid ' + (over ? "#ff6b6b" : "#243041") + '">' +
         '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="color:' + (over ? "#ff8a7a" : "#7dffb3") + '">#' + (i + 1) + "</b><span style=\"color:#8b93a7;font-size:12px\">" + esc(when) + (over ? " · over trade" : "") + "</span></div>" +
-        '<div style="margin-top:8px;font-size:14px">Target ' + money(target) + "</div>" +
-        '<div style="margin-top:4px;font-size:14px">Amount ' + money(amount) + "</div>" +
-        '<div style="margin-top:6px;font-size:18px;font-weight:900;color:' + (over ? "#ff8a7a" : "#fff") + '">' + (pct == null ? "Set a total amount" : pct + "% of total") + "</div>" +
+        '<div style="margin-top:8px;font-size:18px;font-weight:900;color:' + (over ? "#ff8a7a" : "#fff") + '">' + money(amount) + "</div>" +
+        '<div style="margin-top:4px;font-size:14px;color:#9aa6b6">' + (pct == null ? "Set a total amount" : pct + "% of total") + "</div>" +
         '<button type="button" data-drop="' + row.t + '" style="margin-top:8px;border:0;background:transparent;color:#ff8a7a;font-weight:800;padding:0">Remove</button></article>';
     }).join("");
     var sumPct = total ? Math.round(sum / total * 1000) / 10 : null;
@@ -105,8 +103,7 @@
       '<div style="margin-top:16px;font-size:13px;font-weight:800">New</div>' +
       '<select id="ee-kind" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:16px;font-weight:800"><option>New</option></select>' +
       field("Date", "ee-date", today(), "date") +
-      field("Target USD", "ee-target", "", "number") +
-      field("Amount", "ee-amount", "", "number") +
+      field("Amount USD", "ee-amount", "", "number") +
       '<button type="button" id="ee-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#1c2430;color:#e8eef6">Add entry</button>' +
       '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:#9aa6b6">This week: ' + week.length + (capN != null ? " / " + capN : "") + " entries" +
       (sumPct == null ? "" : " · " + sumPct + "% of total") + "</div>" +
@@ -119,13 +116,11 @@
     };
     $("ee-add").onclick = function () {
       var amount = $("ee-amount").value.trim();
-      var target = $("ee-target").value.trim();
       if (num(amount) == null) return;
       state.log.unshift({
         t: Date.now(),
         kind: $("ee-kind").value || "New",
         date: $("ee-date").value || today(),
-        target: target,
         amount: amount
       });
       state.log = state.log.slice(0, 80);
