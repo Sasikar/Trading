@@ -60,7 +60,7 @@
       '<span style="display:block;margin-top:4px;font-weight:500">' + hint + "</span></label>";
   }
   function paint() {
-    var root = $("experience-board");
+    var root = $("experience-tools");
     if (!root) return;
     var week = thisWeek();
     var usedN = week.length;
