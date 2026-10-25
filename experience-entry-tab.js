@@ -67,21 +67,25 @@
     var usedRisk = week.reduce(function (s, row) { return s + (num(row.risk) || 0); }, 0);
     var capN = num(state.count);
     var capRisk = num(state.cap);
+    var parts = week.map(function (row) { return String(num(row.risk) || 0); });
     var countHit = capN != null && usedN >= capN;
     var riskHit = capRisk != null && usedRisk >= capRisk;
     root.innerHTML =
       '<article style="margin:14px 0;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041">' +
       "<b>Your ceilings</b>" +
-      field("Risk per trade", "ee-risk", state.risk, "The fixed amount you can lose on one entry.") +
-      field("Entries per week", "ee-count", state.count, "New entries, not adds.") +
-      field("Capital at risk per week", "ee-cap", state.cap, "Sum of the risk on this week’s entries.") +
+      field("Entries per week", "ee-count", state.count, "How many new trades this week. Every logged trade counts.") +
+      field("Capital at risk per week", "ee-cap", state.cap, "The sum of each trade’s risk. Not one number for the whole week.") +
       '<button type="button" id="ee-save" style="margin-top:12px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#f4f7fb;color:#111">Save ceilings</button>' +
-      '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:' + ((countHit || riskHit) ? "#ff8a7a" : "#9aa6b6") + '">This week: ' + usedN + (capN != null ? " / " + capN : "") + " entries · risk " + (usedRisk ? usedRisk : 0) + (capRisk != null ? " / " + capRisk : "") + ((countHit || riskHit) ? ". Ceiling hit. No new entry." : "") + "</div></article>" +
+      '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:' + ((countHit || riskHit) ? "#ff8a7a" : "#9aa6b6") + '">This week: ' + usedN + (capN != null ? " / " + capN : "") + " trades" +
+      (parts.length ? "<br>Risk: " + parts.join(" + ") + " = " + usedRisk : "<br>Risk: 0") +
+      (capRisk != null ? " / " + capRisk : "") +
+      ((countHit || riskHit) ? "<br>Ceiling hit. No new entry." : "") + "</div></article>" +
       '<article style="margin:0 0 14px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041">' +
-      "<b>Log an entry</b>" +
+      "<b>Log a trade</b>" +
       '<input id="ee-coin" placeholder="Coin" style="display:block;width:100%;box-sizing:border-box;margin-top:10px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:16px">' +
+      '<input id="ee-risk-now" placeholder="This trade’s risk" inputmode="decimal" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:16px;font-weight:800">' +
       '<input id="ee-why" placeholder="Setup: weekly support hold, or breakout retest" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:14px">' +
-      '<button type="button" id="ee-add" style="margin-top:10px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#1c2430;color:#e8eef6">Log it</button>' +
+      '<button type="button" id="ee-add" style="margin-top:10px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#1c2430;color:#e8eef6">Add this trade</button>' +
       '<div id="ee-log" style="margin-top:12px"></div></article>';
     var log = $("ee-log");
     log.innerHTML = state.log.slice(0, 30).map(function (row) {
@@ -91,7 +95,6 @@
         '<div style="color:#8b93a7;font-size:12px;margin-top:4px">' + esc(stamp) + " · " + esc(row.why || "no setup written") + "</div></div>";
     }).join("") || '<div style="color:#8b93a7;font-size:13px">No entries logged.</div>';
     $("ee-save").onclick = function () {
-      state.risk = $("ee-risk").value.trim();
       state.count = $("ee-count").value.trim();
       state.cap = $("ee-cap").value.trim();
       write();
@@ -99,8 +102,9 @@
     };
     $("ee-add").onclick = function () {
       var coin = $("ee-coin").value.trim();
-      if (!coin) return;
-      state.log.unshift({ t: Date.now(), coin: coin, risk: state.risk, why: $("ee-why").value.trim() });
+      var risk = $("ee-risk-now").value.trim();
+      if (!coin || num(risk) == null) return;
+      state.log.unshift({ t: Date.now(), coin: coin, risk: risk, why: $("ee-why").value.trim() });
       state.log = state.log.slice(0, 80);
       write();
       paint();
