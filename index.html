@@ -1,16 +1,5 @@
 <!doctype html>
 <html lang="en"><head>
-<script>
-(function(){
-  var html=null;
-  try{ html=sessionStorage.getItem('trading-refresh-html'); }catch(e){}
-  if(!html || html.indexOf('id="tf-tabs"')<0) return;
-  try{ sessionStorage.removeItem('trading-refresh-html'); }catch(e){}
-  document.open();
-  document.write(html);
-  document.close();
-})();
-</script>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
@@ -1454,7 +1443,19 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <div id="experience-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head"><div><h2>Experience Entry</h2><p>Seven rules before a new entry.</p></div><span class="source">RULES</span></div>
-  <div class="card"><div id="experience-board"></div></div>
+  <div class="card">
+    <div id="experience-rules">
+      <div style="margin-bottom:12px;color:#8b93a7;font-size:13px;line-height:1.45">Seven rules before a new entry. Saved on this phone only.</div>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 1</div><b style="display:block;margin-top:4px;font-size:17px">Position sizing</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Fixed risk per trade. The amount you can lose is the same every time. A coin you like does not get a bigger risk.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 2</div><b style="display:block;margin-top:4px;font-size:17px">Trade count limit</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">A ceiling on entries per week. When the count is hit, no new coin until next week.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 3</div><b style="display:block;margin-top:4px;font-size:17px">Risk cap</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">A ceiling on total capital at risk per week. Open risk plus a new entry stays under that number.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 4</div><b style="display:block;margin-top:4px;font-size:17px">Start small</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">The first buy is 25–33% of the planned size. Add the rest only if the setup is still there. This takes the edge off FOMO.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 5</div><b style="display:block;margin-top:4px;font-size:17px">Wait for setup</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">On that coin, one of these must show. A weekly close holding support. Or a breakout retest of weekly resistance. No setup, no entry.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 6</div><b style="display:block;margin-top:4px;font-size:17px">Journal</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Every entry gets logged. Coin, risk, and why the setup was there.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 7</div><b style="display:block;margin-top:4px;font-size:17px">Dry powder</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Do you have dry powder for next week, next month, next year, and the next biggest opportunity? If the answer is no, this entry is too big.</p></article>
+    </div>
+    <div id="experience-board"></div>
+  </div>
 </section>
 </div>
 
@@ -1749,10 +1750,10 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <script src="btc-tab.js?v=20261019-tg1"></script>
 <script src="meme-tab.js?v=20261019-coins1"></script>
 <script src="markets-tab.js?v=20261021-ms1"></script>
-<script src="experience-entry-tab.js?v=20261025-ee2"></script>
+<script src="experience-entry-tab.js?v=20261025-ee3"></script>
 <script src="gmgn-tab.js?v=20261018-free1"></script>
 <script src="wallets-tab.js?v=20261018-free1"></script>
 <script src="pumpfun-tab.js?v=20261018-free1"></script>
 <script src="whale-tab.js?v=20261002-wh4"></script>
-<script src="site-nav.js?v=20261010-al4"></script>
+<script src="site-nav.js?v=20261025-ee3"></script>
 </body></html>

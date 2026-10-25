@@ -69,23 +69,7 @@
     var capRisk = num(state.cap);
     var countHit = capN != null && usedN >= capN;
     var riskHit = capRisk != null && usedRisk >= capRisk;
-    var rules = [
-      ["Position sizing", "Fixed risk per trade. The amount you can lose is the same every time. A coin you like does not get a bigger risk."],
-      ["Trade count limit", "A ceiling on entries per week. When the count is hit, no new coin until next week."],
-      ["Risk cap", "A ceiling on total capital at risk per week. Open risk plus a new entry stays under that number."],
-      ["Start small", "The first buy is 25–33% of the planned size. Add the rest only if the setup is still there. This takes the edge off FOMO."],
-      ["Wait for setup", "On that coin, one of these must show. A weekly close holding support. Or a breakout retest of weekly resistance. No setup, no entry."],
-      ["Journal", "Every entry gets logged. Coin, risk, and why the setup was there."],
-      ["Dry powder", "Do you have dry powder for next week, next month, next year, and the next biggest opportunity? If the answer is no, this entry is too big."]
-    ];
     root.innerHTML =
-      '<div style="margin-bottom:12px;color:#8b93a7;font-size:13px;line-height:1.45">Seven rules before a new entry. Saved on this phone only.</div>' +
-      rules.map(function (r, i) {
-        return '<article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041">' +
-          '<div style="color:#7dffb3;font-size:12px;font-weight:800">Rule ' + (i + 1) + "</div>" +
-          '<b style="display:block;margin-top:4px;font-size:17px">' + r[0] + "</b>" +
-          '<p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">' + r[1] + "</p></article>";
-      }).join("") +
       '<article style="margin:14px 0;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041">' +
       "<b>Your ceilings</b>" +
       field("Risk per trade", "ee-risk", state.risk, "The fixed amount you can lose on one entry.") +
