@@ -70,16 +70,23 @@
     var parts = week.map(function (row) { return String(num(row.risk) || 0); });
     var countHit = capN != null && usedN >= capN;
     var riskHit = capRisk != null && usedRisk >= capRisk;
+    var rows = week.map(function (row) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #243041"><span>' + esc(row.coin && row.coin !== "Risk" ? row.coin + " · " : "") + esc(String(num(row.risk) || 0)) + '</span><button type="button" data-drop="' + row.t + '" style="border:0;background:transparent;color:#ff8a7a;font-weight:800">Remove</button></div>';
+    }).join("");
     root.innerHTML =
       '<article style="margin:14px 0;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041">' +
       "<b>Your ceilings</b>" +
-      field("Entries per week", "ee-count", state.count, "How many new trades this week. Every logged trade counts.") +
-      field("Capital at risk per week", "ee-cap", state.cap, "The sum of each trade’s risk. Not one number for the whole week.") +
-      '<button type="button" id="ee-save" style="margin-top:12px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#f4f7fb;color:#111">Save ceilings</button>' +
+      field("Max trades this week", "ee-count", state.count, "The limit. Not a trade. Raise this if you want more than one.") +
+      field("Max risk this week", "ee-cap", state.cap, "The week’s risk must stay under this.") +
+      '<button type="button" id="ee-save" style="margin-top:12px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#f4f7fb;color:#111">Save limits</button>' +
+      '<div style="margin-top:14px;font-size:13px;font-weight:800">Add each trade’s risk</div>' +
+      '<input id="ee-many" placeholder="500, 800, 200" inputmode="decimal" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:16px;font-weight:800">' +
+      '<button type="button" id="ee-add-risk" style="margin-top:8px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#1c2430;color:#e8eef6">Add to this week</button>' +
+      rows +
       '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:' + ((countHit || riskHit) ? "#ff8a7a" : "#9aa6b6") + '">This week: ' + usedN + (capN != null ? " / " + capN : "") + " trades" +
-      (parts.length ? "<br>Risk: " + parts.join(" + ") + " = " + usedRisk : "<br>Risk: 0") +
+      (parts.length ? "<br>" + parts.join(" + ") + " = " + usedRisk : "<br>0") +
       (capRisk != null ? " / " + capRisk : "") +
-      ((countHit || riskHit) ? "<br>Ceiling hit. No new entry." : "") + "</div></article>" +
+      ((countHit || riskHit) ? "<br>Over the limit." : "") + "</div></article>" +
       '<article style="margin:0 0 14px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041">' +
       "<b>Log a trade</b>" +
       '<input id="ee-coin" placeholder="Coin" style="display:block;width:100%;box-sizing:border-box;margin-top:10px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:16px">' +
@@ -88,12 +95,33 @@
       '<button type="button" id="ee-add" style="margin-top:10px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#1c2430;color:#e8eef6">Add this trade</button>' +
       '<div id="ee-log" style="margin-top:12px"></div></article>';
     var log = $("ee-log");
-    log.innerHTML = state.log.slice(0, 30).map(function (row) {
+    log.innerHTML = state.log.filter(function (row) { return row.coin && row.coin !== "Risk"; }).slice(0, 30).map(function (row) {
       var when = new Date(row.t);
       var stamp = when.toLocaleDateString(undefined, { month: "short", day: "numeric" });
       return '<div style="padding:10px 0;border-top:1px solid #243041"><b>' + esc(row.coin) + "</b> · " + esc(row.risk || "—") +
         '<div style="color:#8b93a7;font-size:12px;margin-top:4px">' + esc(stamp) + " · " + esc(row.why || "no setup written") + "</div></div>";
     }).join("") || '<div style="color:#8b93a7;font-size:13px">No entries logged.</div>';
+    root.querySelectorAll("[data-drop]").forEach(function (btn) {
+      btn.onclick = function () {
+        var t = Number(btn.getAttribute("data-drop"));
+        state.log = state.log.filter(function (row) { return row.t !== t; });
+        write();
+        paint();
+      };
+    });
+    $("ee-add-risk").onclick = function () {
+      var bits = String($("ee-many").value || "").split(/[^0-9.]+/).filter(Boolean);
+      var added = 0;
+      bits.forEach(function (bit) {
+        if (num(bit) == null) return;
+        state.log.unshift({ t: Date.now() + added, coin: "Risk", risk: bit, why: "" });
+        added += 1;
+      });
+      if (!added) return;
+      state.log = state.log.slice(0, 80);
+      write();
+      paint();
+    };
     $("ee-save").onclick = function () {
       state.count = $("ee-count").value.trim();
       state.cap = $("ee-cap").value.trim();
