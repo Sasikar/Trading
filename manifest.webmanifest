@@ -2,15 +2,14 @@
   "name": "TRADING",
   "short_name": "Trading",
   "description": "Personal trading dashboard.",
-  "id": "/Trading/",
-  "start_url": "/Trading/index.html",
+  "id": "/Trading/?v=chart",
+  "start_url": "/Trading/index.html?v=chart",
   "scope": "/Trading/",
   "display": "standalone",
   "background_color": "#070a0f",
   "theme_color": "#070a0f",
   "icons": [
-    {"src": "icon-192.png?v=chart", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "icon-512.png?v=chart", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "icon-512.png?v=chart", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {"src": "icon-chart-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-chart-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
   ]
 }
