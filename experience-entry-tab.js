@@ -114,8 +114,8 @@
       field("Coin", "ee-coin", "", "text") +
       field("Amount USD", "ee-amount", "", "number") +
       '<label style="display:block;margin-top:10px;color:#c5d0dc;font-size:12px;font-weight:700">Notes<textarea id="ee-notes" rows="3" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:1px solid #5c6b80;border-radius:12px;background:#243140;color:#fff;font-size:15px;font-weight:700;color-scheme:dark"></textarea></label>' +
-      '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;color:#f4f7fb;font-size:14px;font-weight:800"><input id="ee-setup" type="checkbox" style="width:18px;height:18px;accent-color:#62e3a0"> Setup valid</label>' +
-      '<div style="margin-top:4px;color:#c5d0dc;font-size:12px">On: even 100% is not over size. Off: over 30% is over size.</div>' +
+      '<label style="display:flex;align-items:center;gap:12px;margin-top:16px;color:#7dffb3;font-size:20px;font-weight:800;line-height:1.3"><input id="ee-setup" type="checkbox" style="width:32px;height:32px;accent-color:#62e3a0"> Setup valid (Weekly Support)</label>' +
+      '<div style="margin-top:6px;color:#7dffb3;font-size:16px;font-weight:700;line-height:1.4">On: even 100% is not over size. Off: over 30% is over size.</div>' +
       '<button type="button" id="ee-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406">Add entry</button>' +
       '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:#9aa6b6">This week: ' + week.length + (capN != null ? " / " + capN : "") + " entries" +
       (sumPct == null ? "" : " · " + sumPct + "% of total") + "</div>" +
