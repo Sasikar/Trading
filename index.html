@@ -650,6 +650,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="btc" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showBtc&&window.showBtc(true);}catch(e){}">BTC</button>
   <button type="button" class="tab" data-tf="memes" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMemes&&window.showMemes(true);}catch(e){}">Memes</button>
   <button type="button" class="tab" data-tf="markets" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMarkets&&window.showMarkets(true);}catch(e){}">Markets</button>
+  <button type="button" class="tab" data-tf="experience" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showExperience&&window.showExperience(true);}catch(e){}">Experience Entry</button>
   
   
   <button type="button" class="tab" data-tf="fomo" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntry&&window.showFomoEntry(true);}catch(e){}">Fomo Entry</button>
@@ -1450,6 +1451,12 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <div class="card"><div id="markets-board"></div></div>
 </section>
 </div>
+<div id="experience-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Experience Entry</h2><p>Six rules before a new entry.</p></div><span class="source">RULES</span></div>
+  <div class="card"><div id="experience-board"></div></div>
+</section>
+</div>
 
 
 <div id="gmgn-panel" class="trend-panel" style="display:none">
@@ -1709,7 +1716,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261022-ndx1"></script>
+<script src="overview-app.js?v=20261025-ee1"></script>
 <script src="breakout-tab.js?v=20261018-free1"></script>
 <script src="hunter-tab.js?v=20261018-free1"></script>
 <script src="holders-tab.js?v=20261018-free1"></script>
@@ -1742,6 +1749,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <script src="btc-tab.js?v=20261019-tg1"></script>
 <script src="meme-tab.js?v=20261019-coins1"></script>
 <script src="markets-tab.js?v=20261021-ms1"></script>
+<script src="experience-entry-tab.js?v=20261025-ee1"></script>
 <script src="gmgn-tab.js?v=20261018-free1"></script>
 <script src="wallets-tab.js?v=20261018-free1"></script>
 <script src="pumpfun-tab.js?v=20261018-free1"></script>
