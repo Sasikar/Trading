@@ -86,11 +86,16 @@
       if (amount != null) sum += amount;
       var pct = total && amount != null ? Math.round(amount / total * 1000) / 10 : null;
       var over = capN != null && i + 1 > capN;
+      var overSize = !row.setup && pct != null && pct > 30;
+      var bad = over || overSize;
+      var flags = [];
+      if (over) flags.push("over trade");
+      if (overSize) flags.push("over size");
       var when = row.date || "";
-      return '<article data-id="' + row.t + '" style="margin-top:10px;padding:12px;border-radius:14px;background:' + (over ? "#2a1416" : "#0b1016") + ';border:1px solid ' + (over ? "#ff6b6b" : "#243041") + '">' +
-        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="color:' + (over ? "#ff8a7a" : "#7dffb3") + '">#' + (i + 1) + "</b><span style=\"color:#8b93a7;font-size:12px\">" + esc(when) + (over ? " · over trade" : "") + "</span></div>" +
-        '<div style="margin-top:8px;font-size:18px;font-weight:900;color:' + (over ? "#ff8a7a" : "#fff") + '">' + money(amount) + "</div>" +
-        '<div style="margin-top:4px;font-size:14px;color:#9aa6b6">' + (pct == null ? "Set a total amount" : pct + "% of total") + "</div>" +
+      return '<article data-id="' + row.t + '" style="margin-top:10px;padding:12px;border-radius:14px;background:' + (bad ? "#2a1416" : "#0b1016") + ';border:1px solid ' + (bad ? "#ff6b6b" : "#243041") + '">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="color:' + (bad ? "#ff8a7a" : "#7dffb3") + '">#' + (i + 1) + "</b><span style=\"color:#8b93a7;font-size:12px\">" + esc(when) + (flags.length ? " · " + flags.join(" · ") : "") + "</span></div>" +
+        '<div style="margin-top:8px;font-size:18px;font-weight:900;color:' + (bad ? "#ff8a7a" : "#fff") + '">' + money(amount) + "</div>" +
+        '<div style="margin-top:4px;font-size:14px;color:#9aa6b6">' + (pct == null ? "Set a total amount" : pct + "% of total") + (row.setup ? " · setup valid" : "") + "</div>" +
         '<button type="button" data-drop="' + row.t + '" style="margin-top:8px;border:0;background:transparent;color:#ff8a7a;font-weight:800;padding:0">Remove</button></article>';
     }).join("");
     var sumPct = total ? Math.round(sum / total * 1000) / 10 : null;
@@ -104,6 +109,8 @@
       '<select id="ee-kind" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:0;border-radius:12px;background:#0b1016;color:#fff;font-size:16px;font-weight:800"><option>New</option></select>' +
       field("Date", "ee-date", today(), "date") +
       field("Amount USD", "ee-amount", "", "number") +
+      '<label style="display:flex;align-items:center;gap:8px;margin-top:12px;color:#d7dee8;font-size:14px;font-weight:800"><input id="ee-setup" type="checkbox" style="width:18px;height:18px"> Setup valid</label>' +
+      '<div style="margin-top:4px;color:#8b93a7;font-size:12px">On: even 100% is not over size. Off: over 30% is over size.</div>' +
       '<button type="button" id="ee-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#1c2430;color:#e8eef6">Add entry</button>' +
       '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:#9aa6b6">This week: ' + week.length + (capN != null ? " / " + capN : "") + " entries" +
       (sumPct == null ? "" : " · " + sumPct + "% of total") + "</div>" +
@@ -121,7 +128,8 @@
         t: Date.now(),
         kind: $("ee-kind").value || "New",
         date: $("ee-date").value || today(),
-        amount: amount
+        amount: amount,
+        setup: !!($("ee-setup") && $("ee-setup").checked)
       });
       state.log = state.log.slice(0, 80);
       write();
