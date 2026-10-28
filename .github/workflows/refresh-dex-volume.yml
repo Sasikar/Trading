@@ -1,0 +1,27 @@
+name: Refresh DEX volume
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/refresh-dex-volume.yml'
+      - 'scripts/refresh_dex_volume.py'
+permissions:
+  contents: write
+concurrency:
+  group: refresh-dex-volume
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch DefiLlama DEX volume
+        run: python scripts/refresh_dex_volume.py
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dex-volume.json
+          if git diff --cached --quiet; then echo "No DEX volume changes."; else git commit -m "Refresh DEX volume"; git pull --rebase; git push; fi
