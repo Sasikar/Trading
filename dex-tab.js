@@ -208,6 +208,7 @@
       }
       hzLines.forEach(function (ln) { strokeLevel(valueToY(ln.value), money(ln.value), ln.id === hzSel); });
       if (ghost != null) strokeLevel(ghost, money(yToValue(ghost)), true);
+      popup = null;
       if (!picked) return;
       var line1 = dayLabel(picked[0]);
       var line2 = money(picked[1]);
@@ -231,10 +232,19 @@
       ctx.fill();
       ctx.fillStyle = "#e6c878";
       ctx.fillText(line2, tx + 24, ty + 38);
+      popup = { x: tx, y: ty, w: tw, h: th };
     }
+    var popup = null;
     function pick(ev) {
       var rect = canvas.getBoundingClientRect();
       var x = ev.clientX - rect.left;
+      var y = ev.clientY - rect.top;
+      if (popup && x >= popup.x && x <= popup.x + popup.w && y >= popup.y && y <= popup.y + popup.h) return;
+      if (pickedTs) {
+        pickedTs = null;
+        frame();
+        return;
+      }
       var n = Math.max(1, Math.round(daysShown));
       var i = Math.round(offset) + Math.min(n - 1, Math.max(0, Math.floor(x / width * n)));
       if (!rows[i]) return;
@@ -343,6 +353,7 @@
       saveLines();
       frame();
     };
+    canvas._redraw = frame;
     frame();
   }
   function load() {
@@ -369,6 +380,16 @@
     if (p.scrollIntoView) p.scrollIntoView({ block: "start" });
   }
   window.showDex = show;
+  if (!window.__dexPopDismiss) {
+    window.__dexPopDismiss = function (ev) {
+      if (!pickedTs) return;
+      var c = $("dex-canvas");
+      if (c && ev.target === c) return;
+      pickedTs = null;
+      if (c && c._redraw) c._redraw();
+    };
+    document.addEventListener("pointerdown", window.__dexPopDismiss, true);
+  }
   var tabs = $("tf-tabs");
   if (tabs) tabs.addEventListener("click", function (ev) {
     var b = ev.target && ev.target.closest && ev.target.closest("[data-tf]");
