@@ -84,10 +84,8 @@
       '<div style="display:flex;justify-content:space-between;gap:12px;margin-top:12px;color:#c5d0dc;font-size:14px"><span>30d</span><b style="color:#fff">' + money(data.total30d) + "</b></div>" +
       '<div style="display:flex;justify-content:space-between;gap:12px;margin-top:6px;color:#c5d0dc;font-size:14px"><span>Weekly change</span><b style="color:' + chgColor + '">' + pct(data.change7d) + "</b></div>" +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">' + ranges + "</div>" +
-      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">Swipe the chart sideways. The page still scrolls up and down.</div>' +
-      '<div id="dex-read" style="margin-top:8px;font-weight:800;color:#e6c878"> </div>' +
-      '<div id="dex-scroll" style="margin-top:8px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x pan-y;border-radius:14px;background:#0b1016;border:1px solid #243041">' +
-      '<div id="dex-spacer" style="position:relative;height:230px"><canvas id="dex-canvas" style="position:sticky;left:0;top:0;height:230px"></canvas></div></div>' +
+      '<div id="dex-scroll" style="margin-top:12px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x pan-y;border-radius:14px;background:#0b1016;border:1px solid #243041">' +
+      '<div id="dex-spacer" style="position:relative;height:250px"><canvas id="dex-canvas" style="position:sticky;left:0;top:0;height:250px"></canvas></div></div>' +
       '<div style="margin-top:16px;font-weight:800">Top DEXes, 24h</div>' + rows;
     root.querySelectorAll("[data-range]").forEach(function (btn) {
       btn.onclick = function () {
@@ -97,19 +95,20 @@
     });
     draw();
   }
+  var pickedTs = null;
   function draw() {
     var scroller = $("dex-scroll");
     var spacer = $("dex-spacer");
     var canvas = $("dex-canvas");
-    var read = $("dex-read");
     if (!scroller || !canvas || !data) return;
     var rows = slice();
-    var bar = 8;
+    var bar = 14;
+    var height = 250;
     var width = scroller.clientWidth || 320;
     spacer.style.width = Math.max(width, rows.length * bar) + "px";
     var dpr = window.devicePixelRatio || 1;
     canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(230 * dpr);
+    canvas.height = Math.floor(height * dpr);
     canvas.style.width = width + "px";
     var ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -120,17 +119,67 @@
       var max = 0;
       view.forEach(function (row) { if (row[1] > max) max = row[1]; });
       if (!max) max = 1;
-      ctx.clearRect(0, 0, width, 230);
+      ctx.clearRect(0, 0, width, height);
+      var picked = null;
+      var pickedX = 0;
+      var pickedTop = 0;
       view.forEach(function (row, i) {
-        var h = Math.max(2, (row[1] / max) * 188);
-        ctx.fillStyle = "#3d8bfd";
-        ctx.fillRect(i * bar, 210 - h, Math.max(1, bar - 2), h);
+        var h = Math.max(2, (row[1] / max) * 200);
+        var on = row[0] === pickedTs;
+        ctx.fillStyle = on ? "#e6c878" : "#3d8bfd";
+        ctx.fillRect(i * bar + 2, 228 - h, Math.max(2, bar - 4), h);
+        if (on) {
+          picked = row;
+          pickedX = i * bar + bar / 2;
+          pickedTop = 228 - h;
+        }
       });
-      var mid = view[Math.min(view.length - 1, Math.floor(count / 2))];
-      if (read && mid) read.textContent = dayLabel(mid[0]) + " · " + money(mid[1]);
+      if (!picked) return;
+      var line1 = dayLabel(picked[0]);
+      var line2 = money(picked[1]);
+      ctx.font = "700 13px sans-serif";
+      var tw = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width) + 22;
+      var th = 46;
+      var tx = Math.max(6, Math.min(width - tw - 6, pickedX - tw / 2));
+      var ty = Math.max(6, pickedTop - th - 8);
+      ctx.fillStyle = "#1c2430";
+      ctx.strokeStyle = "#3d4f66";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(tx, ty, tw, th, 10);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#f4f7fb";
+      ctx.fillText(line1, tx + 10, ty + 18);
+      ctx.fillStyle = "#3d8bfd";
+      ctx.beginPath();
+      ctx.arc(tx + 14, ty + 33, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#e6c878";
+      ctx.fillText(line2, tx + 24, ty + 38);
     }
+    function pick(ev) {
+      var rect = canvas.getBoundingClientRect();
+      var x = ev.clientX - rect.left;
+      var start = Math.max(0, Math.floor(scroller.scrollLeft / bar));
+      var i = start + Math.floor(x / bar);
+      if (!rows[i]) return;
+      pickedTs = rows[i][0];
+      frame();
+    }
+    var down = null;
+    canvas.onpointerdown = function (ev) { down = { x: ev.clientX, y: ev.clientY }; };
+    canvas.onpointerup = function (ev) {
+      if (!down) return;
+      var moved = Math.abs(ev.clientX - down.x) > 8 || Math.abs(ev.clientY - down.y) > 8;
+      down = null;
+      if (!moved) pick(ev);
+    };
     scroller.onscroll = frame;
-    scroller.scrollLeft = spacer.scrollWidth;
+    if (!canvas.dataset.ready) {
+      canvas.dataset.ready = "1";
+      scroller.scrollLeft = spacer.scrollWidth;
+    }
     frame();
   }
   function load() {
