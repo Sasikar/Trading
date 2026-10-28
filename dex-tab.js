@@ -2,8 +2,9 @@
   if (window.__dexVolume) return;
   window.__dexVolume = 1;
   var data = null;
-  var range = "90D";
   var loading = false;
+  var viewDays = 90;
+  var viewOffset = null;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -32,14 +33,6 @@
   function dayLabel(ts) {
     var d = new Date(ts * 1000);
     return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-  }
-  function slice() {
-    var chart = (data && data.chart) || [];
-    if (range === "All") return chart;
-    var days = range === "30D" ? 30 : range === "1Y" ? 365 : 90;
-    var cut = Math.floor(Date.now() / 1000) - days * 86400;
-    var out = chart.filter(function (row) { return row[0] >= cut; });
-    return out.length ? out : chart.slice(-days);
   }
   function hideOthers() {
     document.body.classList.remove("md-on", "wh-on", "cal-on", "sl-on");
@@ -70,10 +63,6 @@
     var chg = Number(data.change7d);
     var chgColor = chg < 0 ? "#ff8a7a" : "#7dffb3";
     var when = data.updated ? new Date(data.updated).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
-    var ranges = ["30D", "90D", "1Y", "All"].map(function (id) {
-      var on = id === range;
-      return '<button type="button" data-range="' + id + '" style="border:0;border-radius:999px;padding:8px 12px;font-weight:800;background:' + (on ? "#e6c878" : "#243140") + ';color:' + (on ? "#1a1406" : "#f4f7fb") + '">' + id + "</button>";
-    }).join("");
     var rows = (data.protocols || []).map(function (row, i) {
       var c = Number(row.change1d);
       return '<div style="display:flex;justify-content:space-between;gap:8px;padding:10px 0;border-top:1px solid #243041"><div><b>' + (i + 1) + ". " + esc(row.name) + '</b><div style="color:#8b93a7;font-size:12px;margin-top:2px">' + esc(row.chain || "") + '</div></div><div style="text-align:right"><b>' + money(row.volume24h) + '</b><div style="font-size:12px;font-weight:800;color:' + (c < 0 ? "#ff8a7a" : "#7dffb3") + '">' + pct(c) + "</div></div></div>";
@@ -83,23 +72,16 @@
       '<div style="margin-top:6px;font-size:34px;font-weight:900;letter-spacing:-.03em">' + money(data.total24h) + "</div>" +
       '<div style="display:flex;justify-content:space-between;gap:12px;margin-top:12px;color:#c5d0dc;font-size:14px"><span>30d</span><b style="color:#fff">' + money(data.total30d) + "</b></div>" +
       '<div style="display:flex;justify-content:space-between;gap:12px;margin-top:6px;color:#c5d0dc;font-size:14px"><span>Weekly change</span><b style="color:' + chgColor + '">' + pct(data.change7d) + "</b></div>" +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">' + ranges + "</div>" +
-      '<canvas id="dex-canvas" style="display:block;width:100%;height:250px;margin-top:12px;border-radius:14px;background:#0b1016;border:1px solid #243041;touch-action:pan-y"></canvas>' +
+      '<div style="margin-top:8px;color:#c5d0dc;font-size:13px">Two fingers shrink or stretch the chart, from 90 days out to every year. One finger moves it.</div>' +
+      '<canvas id="dex-canvas" style="display:block;width:100%;height:250px;margin-top:12px;border-radius:14px;background:#0b1016;border:1px solid #243041;touch-action:none"></canvas>' +
       '<div style="margin-top:16px;font-weight:800">Top DEXes, 24h</div>' + rows;
-    root.querySelectorAll("[data-range]").forEach(function (btn) {
-      btn.onclick = function () {
-        range = btn.getAttribute("data-range");
-        paint();
-      };
-    });
     draw();
   }
   var pickedTs = null;
   function draw() {
     var canvas = $("dex-canvas");
     if (!canvas || !data) return;
-    var rows = slice();
-    var bar = 16;
+    var rows = data.chart || [];
     var height = 250;
     var width = canvas.clientWidth || 320;
     var dpr = window.devicePixelRatio || 1;
@@ -107,33 +89,68 @@
     canvas.height = Math.floor(height * dpr);
     var ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var count = Math.max(1, Math.floor(width / bar));
-    var offset = Math.max(0, rows.length - count);
-    function frame() {
-      var maxStart = Math.max(0, rows.length - count);
+    var daysShown = viewDays;
+    var offset = viewOffset == null ? rows.length - daysShown : viewOffset;
+    function clamp() {
+      daysShown = Math.max(21, Math.min(rows.length || 21, daysShown));
+      var maxStart = Math.max(0, rows.length - daysShown);
       if (offset < 0) offset = 0;
       if (offset > maxStart) offset = maxStart;
-      var view = rows.slice(offset, offset + count);
+      viewDays = daysShown;
+      viewOffset = offset;
+    }
+    function frame() {
+      clamp();
+      var n = Math.max(1, Math.round(daysShown));
+      var start = Math.round(offset);
       var max = 0;
-      view.forEach(function (row) { if (row[1] > max) max = row[1]; });
+      var step = Math.max(1, Math.floor(n / width));
+      for (var i = 0; i < n; i += step) {
+        var row = rows[start + i];
+        if (row && row[1] > max) max = row[1];
+      }
       if (!max) max = 1;
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = "#0b1016";
       ctx.fillRect(0, 0, width, height);
+      var bar = width / n;
       var picked = null;
       var pickedX = 0;
       var pickedTop = 0;
-      view.forEach(function (row, i) {
-        var h = Math.max(2, (row[1] / max) * 200);
-        var on = row[0] === pickedTs;
-        ctx.fillStyle = on ? "#e6c878" : "#3d8bfd";
-        ctx.fillRect(i * bar + 3, 228 - h, Math.max(3, bar - 6), h);
-        if (on) {
-          picked = row;
-          pickedX = i * bar + bar / 2;
-          pickedTop = 228 - h;
+      if (bar >= 2) {
+        for (var j = 0; j < n; j++) {
+          var item = rows[start + j];
+          if (!item) continue;
+          var h = Math.max(2, (item[1] / max) * 188);
+          var on = item[0] === pickedTs;
+          ctx.fillStyle = on ? "#e6c878" : "#3d8bfd";
+          ctx.fillRect(j * bar, 228 - h, Math.max(1, bar - 1), h);
+          if (on) { picked = item; pickedX = j * bar + bar / 2; pickedTop = 228 - h; }
         }
-      });
+      } else {
+        var cols = Math.max(1, Math.floor(width));
+        for (var x = 0; x < cols; x++) {
+          var from = Math.floor(x / cols * n);
+          var to = Math.floor((x + 1) / cols * n);
+          var peak = 0;
+          var peakRow = null;
+          for (var k = from; k < to; k++) {
+            var cell = rows[start + k];
+            if (cell && cell[1] >= peak) { peak = cell[1]; peakRow = cell; }
+          }
+          var bh = Math.max(2, (peak / max) * 188);
+          ctx.fillStyle = peakRow && peakRow[0] === pickedTs ? "#e6c878" : "#3d8bfd";
+          ctx.fillRect(x, 228 - bh, 1, bh);
+          if (peakRow && peakRow[0] === pickedTs) { picked = peakRow; pickedX = x; pickedTop = 228 - bh; }
+        }
+      }
+      var first = rows[start];
+      var last = rows[Math.min(rows.length - 1, start + n - 1)];
+      if (first && last) {
+        ctx.font = "700 12px sans-serif";
+        ctx.fillStyle = "#c5d0dc";
+        ctx.fillText(dayLabel(first[0]) + "  –  " + dayLabel(last[0]), 8, 18);
+      }
       if (!picked) return;
       var line1 = dayLabel(picked[0]);
       var line2 = money(picked[1]);
@@ -141,7 +158,7 @@
       var tw = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width) + 22;
       var th = 46;
       var tx = Math.max(6, Math.min(width - tw - 6, pickedX - tw / 2));
-      var ty = Math.max(6, pickedTop - th - 8);
+      var ty = Math.max(24, pickedTop - th - 8);
       ctx.fillStyle = "#1c2430";
       ctx.strokeStyle = "#3d4f66";
       ctx.lineWidth = 1;
@@ -161,33 +178,57 @@
     function pick(ev) {
       var rect = canvas.getBoundingClientRect();
       var x = ev.clientX - rect.left;
-      var i = offset + Math.floor(x / bar);
+      var n = Math.max(1, Math.round(daysShown));
+      var i = Math.round(offset) + Math.min(n - 1, Math.max(0, Math.floor(x / width * n)));
       if (!rows[i]) return;
       pickedTs = rows[i][0];
       frame();
     }
+    var pts = {};
+    var pinch = null;
     var drag = null;
+    canvas.addEventListener("touchmove", function (ev) {
+      if (ev.touches.length >= 2) ev.preventDefault();
+    }, { passive: false });
     canvas.onpointerdown = function (ev) {
-      drag = { x: ev.clientX, y: ev.clientY, offset: offset, id: ev.pointerId, locked: false };
+      pts[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+      try { canvas.setPointerCapture(ev.pointerId); } catch (e) {}
+      var ids = Object.keys(pts);
+      if (ids.length >= 2) {
+        var a = pts[ids[0]], b = pts[ids[1]];
+        pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, days: daysShown, center: offset + daysShown / 2 };
+        drag = null;
+      } else {
+        drag = { x: ev.clientX, offset: offset, id: ev.pointerId, moved: false };
+      }
     };
     canvas.onpointermove = function (ev) {
-      if (!drag || ev.pointerId !== drag.id) return;
-      var dx = ev.clientX - drag.x;
-      var dy = ev.clientY - drag.y;
-      if (!drag.locked) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-        if (Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
-        drag.locked = true;
-        try { canvas.setPointerCapture(ev.pointerId); } catch (e) {}
+      if (!pts[ev.pointerId]) return;
+      pts[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+      var ids = Object.keys(pts);
+      if (ids.length >= 2) {
+        var a = pts[ids[0]], b = pts[ids[1]];
+        var dist = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+        if (!pinch) pinch = { dist: dist, days: daysShown, center: offset + daysShown / 2 };
+        var center = pinch.center;
+        daysShown = pinch.days * (pinch.dist / dist);
+        offset = center - daysShown / 2;
+        frame();
+        return;
       }
-      offset = drag.offset - Math.round(dx / bar);
+      if (!drag || String(ev.pointerId) !== String(drag.id)) return;
+      var dx = ev.clientX - drag.x;
+      if (Math.abs(dx) > 6) drag.moved = true;
+      offset = drag.offset - dx / width * daysShown;
       frame();
     };
     canvas.onpointerup = canvas.onpointercancel = function (ev) {
-      if (!drag || ev.pointerId !== drag.id) return;
-      var locked = drag.locked;
-      drag = null;
-      if (!locked) pick(ev);
+      var moved = drag && String(ev.pointerId) === String(drag.id) && drag.moved;
+      var wasPinch = !!pinch;
+      delete pts[ev.pointerId];
+      if (Object.keys(pts).length < 2) pinch = null;
+      if (drag && String(ev.pointerId) === String(drag.id)) drag = null;
+      if (!moved && !wasPinch && Object.keys(pts).length === 0) pick(ev);
     };
     frame();
   }
