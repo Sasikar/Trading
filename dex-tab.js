@@ -84,8 +84,7 @@
       '<div style="display:flex;justify-content:space-between;gap:12px;margin-top:12px;color:#c5d0dc;font-size:14px"><span>30d</span><b style="color:#fff">' + money(data.total30d) + "</b></div>" +
       '<div style="display:flex;justify-content:space-between;gap:12px;margin-top:6px;color:#c5d0dc;font-size:14px"><span>Weekly change</span><b style="color:' + chgColor + '">' + pct(data.change7d) + "</b></div>" +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">' + ranges + "</div>" +
-      '<div id="dex-scroll" style="margin-top:12px;overflow-x:auto;overflow-y:hidden;touch-action:pan-x pan-y;border-radius:14px;background:#0b1016;border:1px solid #243041">' +
-      '<div id="dex-spacer" style="position:relative;height:250px"><canvas id="dex-canvas" style="position:sticky;left:0;top:0;height:250px"></canvas></div></div>' +
+      '<canvas id="dex-canvas" style="display:block;width:100%;height:250px;margin-top:12px;border-radius:14px;background:#0b1016;border:1px solid #243041;touch-action:pan-y"></canvas>' +
       '<div style="margin-top:16px;font-weight:800">Top DEXes, 24h</div>' + rows;
     root.querySelectorAll("[data-range]").forEach(function (btn) {
       btn.onclick = function () {
@@ -97,29 +96,30 @@
   }
   var pickedTs = null;
   function draw() {
-    var scroller = $("dex-scroll");
-    var spacer = $("dex-spacer");
     var canvas = $("dex-canvas");
-    if (!scroller || !canvas || !data) return;
+    if (!canvas || !data) return;
     var rows = slice();
-    var bar = 14;
+    var bar = 16;
     var height = 250;
-    var width = scroller.clientWidth || 320;
-    spacer.style.width = Math.max(width, rows.length * bar) + "px";
+    var width = canvas.clientWidth || 320;
     var dpr = window.devicePixelRatio || 1;
     canvas.width = Math.floor(width * dpr);
     canvas.height = Math.floor(height * dpr);
-    canvas.style.width = width + "px";
     var ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var count = Math.max(1, Math.floor(width / bar));
+    var offset = Math.max(0, rows.length - count);
     function frame() {
-      var start = Math.max(0, Math.floor(scroller.scrollLeft / bar));
-      var count = Math.ceil(width / bar) + 1;
-      var view = rows.slice(start, start + count);
+      var maxStart = Math.max(0, rows.length - count);
+      if (offset < 0) offset = 0;
+      if (offset > maxStart) offset = maxStart;
+      var view = rows.slice(offset, offset + count);
       var max = 0;
       view.forEach(function (row) { if (row[1] > max) max = row[1]; });
       if (!max) max = 1;
       ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#0b1016";
+      ctx.fillRect(0, 0, width, height);
       var picked = null;
       var pickedX = 0;
       var pickedTop = 0;
@@ -127,7 +127,7 @@
         var h = Math.max(2, (row[1] / max) * 200);
         var on = row[0] === pickedTs;
         ctx.fillStyle = on ? "#e6c878" : "#3d8bfd";
-        ctx.fillRect(i * bar + 2, 228 - h, Math.max(2, bar - 4), h);
+        ctx.fillRect(i * bar + 3, 228 - h, Math.max(3, bar - 6), h);
         if (on) {
           picked = row;
           pickedX = i * bar + bar / 2;
@@ -161,25 +161,34 @@
     function pick(ev) {
       var rect = canvas.getBoundingClientRect();
       var x = ev.clientX - rect.left;
-      var start = Math.max(0, Math.floor(scroller.scrollLeft / bar));
-      var i = start + Math.floor(x / bar);
+      var i = offset + Math.floor(x / bar);
       if (!rows[i]) return;
       pickedTs = rows[i][0];
       frame();
     }
-    var down = null;
-    canvas.onpointerdown = function (ev) { down = { x: ev.clientX, y: ev.clientY }; };
-    canvas.onpointerup = function (ev) {
-      if (!down) return;
-      var moved = Math.abs(ev.clientX - down.x) > 8 || Math.abs(ev.clientY - down.y) > 8;
-      down = null;
-      if (!moved) pick(ev);
+    var drag = null;
+    canvas.onpointerdown = function (ev) {
+      drag = { x: ev.clientX, y: ev.clientY, offset: offset, id: ev.pointerId, locked: false };
     };
-    scroller.onscroll = frame;
-    if (!canvas.dataset.ready) {
-      canvas.dataset.ready = "1";
-      scroller.scrollLeft = spacer.scrollWidth;
-    }
+    canvas.onpointermove = function (ev) {
+      if (!drag || ev.pointerId !== drag.id) return;
+      var dx = ev.clientX - drag.x;
+      var dy = ev.clientY - drag.y;
+      if (!drag.locked) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
+        drag.locked = true;
+        try { canvas.setPointerCapture(ev.pointerId); } catch (e) {}
+      }
+      offset = drag.offset - Math.round(dx / bar);
+      frame();
+    };
+    canvas.onpointerup = canvas.onpointercancel = function (ev) {
+      if (!drag || ev.pointerId !== drag.id) return;
+      var locked = drag.locked;
+      drag = null;
+      if (!locked) pick(ev);
+    };
     frame();
   }
   function load() {
