@@ -5,6 +5,17 @@
   var loading = false;
   var viewDays = 90;
   var viewOffset = null;
+  var hzLines = [];
+  var hzSel = null;
+  var hzSeq = 1;
+  try {
+    hzLines = JSON.parse(localStorage.getItem("trading_dex_hz_v1") || "[]") || [];
+  } catch (e) { hzLines = []; }
+  if (!Array.isArray(hzLines)) hzLines = [];
+  hzLines.forEach(function (ln) { if (ln.id >= hzSeq) hzSeq = ln.id + 1; });
+  function saveLines() {
+    try { localStorage.setItem("trading_dex_hz_v1", JSON.stringify(hzLines)); } catch (e) {}
+  }
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -72,7 +83,10 @@
       '<div style="margin-top:6px;font-size:34px;font-weight:900;letter-spacing:-.03em">' + money(data.total24h) + "</div>" +
       '<div style="display:flex;justify-content:space-between;gap:12px;margin-top:12px;color:#c5d0dc;font-size:14px"><span>30d</span><b style="color:#fff">' + money(data.total30d) + "</b></div>" +
       '<div style="display:flex;justify-content:space-between;gap:12px;margin-top:6px;color:#c5d0dc;font-size:14px"><span>Weekly change</span><b style="color:' + chgColor + '">' + pct(data.change7d) + "</b></div>" +
-      '<div style="margin-top:8px;color:#c5d0dc;font-size:13px">Two fingers shrink or stretch the chart, from 90 days out to every year. One finger moves it.</div>' +
+      '<div style="margin-top:8px;color:#c5d0dc;font-size:13px">Drag New line onto the chart. Drag a line up or down. Two fingers still shrink the chart.</div>' +
+      '<div style="display:flex;gap:8px;margin-top:10px">' +
+      '<button type="button" id="dex-new-line" style="border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#e6c878;color:#1a1406;touch-action:none">New line</button>' +
+      '<button type="button" id="dex-del-line" style="border:0;border-radius:999px;padding:10px 14px;font-weight:800;background:#3a1c1c;color:#ff8a7a">Delete</button></div>' +
       '<canvas id="dex-canvas" style="display:block;width:100%;height:250px;margin-top:12px;border-radius:14px;background:#0b1016;border:1px solid #243041;touch-action:none"></canvas>' +
       '<div style="margin-top:16px;font-weight:800">Top DEXes, 24h</div>' + rows;
     draw();
@@ -91,6 +105,32 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     var daysShown = viewDays;
     var offset = viewOffset == null ? rows.length - daysShown : viewOffset;
+    var scaleMax = 1;
+    var ghost = null;
+    function yToValue(y) {
+      var t = (228 - y) / 188;
+      if (t < 0) t = 0;
+      if (t > 1) t = 1;
+      return t * scaleMax;
+    }
+    function valueToY(v) {
+      var t = scaleMax ? v / scaleMax : 0;
+      if (t < 0) t = 0;
+      if (t > 1) t = 1;
+      return 228 - t * 188;
+    }
+    function lineAt(y) {
+      var best = null;
+      var bestD = 22;
+      hzLines.forEach(function (ln) {
+        var d = Math.abs(valueToY(ln.value) - y);
+        if (d <= bestD) { best = ln; bestD = d; }
+      });
+      return best;
+    }
+    function canvasY(ev) {
+      return ev.clientY - canvas.getBoundingClientRect().top;
+    }
     function clamp() {
       daysShown = Math.max(21, Math.min(rows.length || 21, daysShown));
       var maxStart = Math.max(0, rows.length - daysShown);
@@ -110,6 +150,7 @@
         if (row && row[1] > max) max = row[1];
       }
       if (!max) max = 1;
+      scaleMax = max;
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = "#0b1016";
       ctx.fillRect(0, 0, width, height);
@@ -151,6 +192,22 @@
         ctx.fillStyle = "#c5d0dc";
         ctx.fillText(dayLabel(first[0]) + "  –  " + dayLabel(last[0]), 8, 18);
       }
+      function strokeLevel(y, label, on) {
+        ctx.strokeStyle = on ? "#e6c878" : "rgba(244,247,251,.85)";
+        ctx.lineWidth = on ? 2 : 1;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+        ctx.font = "700 13px sans-serif";
+        var lw = ctx.measureText(label).width + 14;
+        ctx.fillStyle = on ? "#e6c878" : "#1c2430";
+        ctx.fillRect(8, Math.max(22, y - 18), lw, 18);
+        ctx.fillStyle = on ? "#1a1406" : "#fff";
+        ctx.fillText(label, 14, Math.max(22, y - 18) + 13);
+      }
+      hzLines.forEach(function (ln) { strokeLevel(valueToY(ln.value), money(ln.value), ln.id === hzSel); });
+      if (ghost != null) strokeLevel(ghost, money(yToValue(ghost)), true);
       if (!picked) return;
       var line1 = dayLabel(picked[0]);
       var line2 = money(picked[1]);
@@ -187,6 +244,7 @@
     var pts = {};
     var pinch = null;
     var drag = null;
+    var lineDrag = null;
     canvas.addEventListener("touchmove", function (ev) {
       if (ev.touches.length >= 2) ev.preventDefault();
     }, { passive: false });
@@ -198,8 +256,17 @@
         var a = pts[ids[0]], b = pts[ids[1]];
         pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, days: daysShown, center: offset + daysShown / 2 };
         drag = null;
+        lineDrag = null;
       } else {
-        drag = { x: ev.clientX, offset: offset, id: ev.pointerId, moved: false };
+        var hit = lineAt(canvasY(ev));
+        if (hit) {
+          hzSel = hit.id;
+          lineDrag = { id: hit.id, pointerId: ev.pointerId, moved: false };
+          drag = null;
+          frame();
+        } else {
+          drag = { x: ev.clientX, offset: offset, id: ev.pointerId, moved: false };
+        }
       }
     };
     canvas.onpointermove = function (ev) {
@@ -216,6 +283,14 @@
         frame();
         return;
       }
+      if (lineDrag && String(ev.pointerId) === String(lineDrag.pointerId)) {
+        lineDrag.moved = true;
+        hzLines.forEach(function (ln) {
+          if (ln.id === lineDrag.id) ln.value = yToValue(canvasY(ev));
+        });
+        frame();
+        return;
+      }
       if (!drag || String(ev.pointerId) !== String(drag.id)) return;
       var dx = ev.clientX - drag.x;
       if (Math.abs(dx) > 6) drag.moved = true;
@@ -223,12 +298,50 @@
       frame();
     };
     canvas.onpointerup = canvas.onpointercancel = function (ev) {
+      var movedLine = lineDrag && String(ev.pointerId) === String(lineDrag.pointerId);
       var moved = drag && String(ev.pointerId) === String(drag.id) && drag.moved;
       var wasPinch = !!pinch;
       delete pts[ev.pointerId];
       if (Object.keys(pts).length < 2) pinch = null;
+      if (movedLine) { saveLines(); lineDrag = null; frame(); return; }
       if (drag && String(ev.pointerId) === String(drag.id)) drag = null;
       if (!moved && !wasPinch && Object.keys(pts).length === 0) pick(ev);
+    };
+    var add = $("dex-new-line");
+    var del = $("dex-del-line");
+    if (add) {
+      var placing = null;
+      add.onpointerdown = function (ev) {
+        ev.preventDefault();
+        placing = { id: ev.pointerId };
+        ghost = null;
+        try { add.setPointerCapture(ev.pointerId); } catch (e) {}
+      };
+      add.onpointermove = function (ev) {
+        if (!placing || ev.pointerId !== placing.id) return;
+        var y = canvasY(ev);
+        ghost = y >= 24 && y <= 236 ? y : null;
+        frame();
+      };
+      add.onpointerup = add.onpointercancel = function (ev) {
+        if (!placing || ev.pointerId !== placing.id) return;
+        var y = ghost != null ? ghost : 228 - 94;
+        var ln = { id: hzSeq++, value: yToValue(y) };
+        hzLines.push(ln);
+        hzSel = ln.id;
+        saveLines();
+        placing = null;
+        ghost = null;
+        frame();
+      };
+    }
+    if (del) del.onclick = function () {
+      if (!hzLines.length) return;
+      if (hzSel == null) hzLines.pop();
+      else hzLines = hzLines.filter(function (ln) { return ln.id !== hzSel; });
+      hzSel = hzLines.length ? hzLines[hzLines.length - 1].id : null;
+      saveLines();
+      frame();
     };
     frame();
   }
