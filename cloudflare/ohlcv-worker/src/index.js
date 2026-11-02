@@ -436,20 +436,8 @@ export class OhlcvEngine {
       }
       if (path === '/btc' || path === '/api/btc') {
         try {
-          if (request.method === 'POST') {
-            const patch = await request.json().catch(() => ({}));
-            const saved = this.engine.btcState();
-            if (patch && patch.step != null) {
-              let step = Math.round(Number(patch.step) / 100) * 100;
-              if (!isFinite(step) || step < 100) step = 200;
-              if (step > 5000) step = 5000;
-              saved.step = step;
-            }
-            if (patch && patch.on != null) saved.on = false;
-            this.engine.saveBtc(saved);
-          }
-          const data = this.engine.btcView(this.engine.btcState(), '');
-          data.paused = true;
+          const patch = request.method === 'POST' ? await request.json().catch(() => ({})) : null;
+          const data = await this.engine.checkBtcPoints(patch);
           return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
         } catch (e) {
           return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
@@ -1251,6 +1239,9 @@ export default {
         return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 160) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
     }
+    if (path === '/btc' || path === '/api/btc') {
+      return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
+    }
     const keepDo = {
       '/solchain-wallets': 1, '/api/solchain-wallets': 1,
       '/tier-notes': 1, '/api/tier-notes': 1,
@@ -1268,8 +1259,9 @@ export default {
     }
     return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
   },
-  async scheduled() {
-    return;
+  async scheduled(_event, env, ctx) {
+    const stub = env.ENGINE.get(env.ENGINE.idFromName('main'));
+    ctx.waitUntil(stub.fetch('https://ohlcv.local/btc').catch(() => {}));
   }
 };
 

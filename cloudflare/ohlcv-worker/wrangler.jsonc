@@ -26,5 +26,8 @@
     "WATCHLIST_URL": "https://sasikar.github.io/Trading/data/ca-recents.json",
     "NTFY_TOPIC": "MyTradingMemeBreakout44",
     "TELEGRAM_BOT_USERNAME": "MyTradingBreakoutBot"
+  },
+  "triggers": {
+    "crons": ["*/2 * * * *"]
   }
 }

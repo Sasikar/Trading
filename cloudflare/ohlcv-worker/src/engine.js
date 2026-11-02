@@ -5108,7 +5108,8 @@ export class Engine {
       lastAt: Number(saved.lastAt) || 0,
       lastDir: saved.lastDir === 'down' ? 'down' : (saved.lastDir === 'up' ? 'up' : ''),
       lastMove: Number(saved.lastMove) || 0,
-      lastAlertAt: Number(saved.lastAlertAt) || 0
+      lastAlertAt: Number(saved.lastAlertAt) || 0,
+      live: saved.live === true
     };
   }
   saveBtc(state) {
@@ -5179,18 +5180,25 @@ export class Engine {
     state.lastDir = fresh.lastDir;
     state.lastMove = fresh.lastMove;
     state.lastAlertAt = fresh.lastAlertAt;
+    if (!fresh.live && !(patch && typeof patch.on === 'boolean')) state.on = true;
+    state.live = true;
     if (!(price > 0)) {
       this.saveBtc(state);
       return this.btcView(state, error || 'BTC price missing');
     }
     state.lastPrice = price;
     state.lastAt = Date.now();
-    if (!state.anchor) state.anchor = price;
+    const quiet = !fresh.lastAt || Date.now() - fresh.lastAt > 3 * 60 * 60 * 1000;
+    if (!state.anchor || quiet) {
+      state.anchor = price;
+      this.saveBtc(state);
+      return this.btcView(state, error);
+    }
     const step = state.step;
     const steps = Math.trunc((price - state.anchor) / step);
     if (state.on && steps !== 0) {
       const dir = steps > 0 ? 1 : -1;
-      let left = Math.min(Math.abs(steps), 4);
+      let left = Math.min(Math.abs(steps), 12);
       const token = this.telegramToken();
       const chat = this.telegramChatId();
       const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
