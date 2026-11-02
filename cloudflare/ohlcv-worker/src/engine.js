@@ -5227,6 +5227,121 @@ export class Engine {
     return this.btcView(state, error);
   }
 
+  memeWatchState() {
+    let saved = {};
+    try { saved = JSON.parse(this.store.getMeta('meme_watch_v1') || '{}') || {}; } catch (e) { saved = {}; }
+    const coins = saved.coins && typeof saved.coins === 'object' ? saved.coins : {};
+    return { on: saved.on !== false, coins };
+  }
+  saveMemeWatch(state) {
+    this.store.setMeta('meme_watch_v1', JSON.stringify(state));
+  }
+  memeAlertPx(n) {
+    const v = Number(n);
+    if (!(v > 0)) return '—';
+    if (v >= 1) return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    if (v >= 0.01) return '$' + v.toFixed(4);
+    return '$' + v.toPrecision(4);
+  }
+  async memeWatchPrices(mints) {
+    const out = {};
+    for (let i = 0; i < mints.length; i += 30) {
+      const part = mints.slice(i, i + 30);
+      let rows = [];
+      try {
+        const r = await fetch('https://api.dexscreener.com/tokens/v1/solana/' + part.join(','));
+        if (r.ok) {
+          const body = await r.json();
+          rows = Array.isArray(body) ? body : [];
+        }
+      } catch (e) {}
+      rows.forEach((pair) => {
+        const mint = pair && pair.baseToken && pair.baseToken.address;
+        const px = Number(pair && pair.priceUsd);
+        if (!mint || !(px > 0)) return;
+        const liq = Number(pair.liquidity && pair.liquidity.usd) || 0;
+        const prev = out[mint];
+        if (!prev || liq >= prev.liq) out[mint] = { price: px, liq, symbol: pair.baseToken.symbol || '' };
+      });
+    }
+    return out;
+  }
+  async checkMemeWatch(patch) {
+    const state = this.memeWatchState();
+    if (patch && typeof patch.on === 'boolean') state.on = patch.on;
+    if (patch && Array.isArray(patch.coins)) {
+      const next = {};
+      patch.coins.slice(0, 20).forEach((row) => {
+        const mint = String(row && row.mint || '').trim();
+        if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return;
+        const prev = state.coins[mint] || {};
+        let pct = Math.round(Number(row.pct));
+        if (!isFinite(pct) || pct < 1) pct = 10;
+        if (pct > 100) pct = 100;
+        const phone = Number(row.anchor);
+        next[mint] = {
+          symbol: String(row.symbol || prev.symbol || 'COIN').slice(0, 24),
+          pct,
+          anchor: Number(prev.anchor) > 0 ? Number(prev.anchor) : (phone > 0 ? phone : 0)
+        };
+      });
+      state.coins = next;
+    }
+    const mints = Object.keys(state.coins);
+    const quotes = mints.length ? await this.memeWatchPrices(mints) : {};
+    const token = this.telegramToken();
+    const chat = this.telegramChatId();
+    for (const mint of mints) {
+      const coin = state.coins[mint];
+      const quote = quotes[mint];
+      if (!quote) continue;
+      if (quote.symbol) coin.symbol = String(quote.symbol).slice(0, 24);
+      coin.price = quote.price;
+      if (!(coin.anchor > 0)) {
+        coin.anchor = quote.price;
+        continue;
+      }
+      if (state.on === false) continue;
+      const pct = coin.pct || 10;
+      const upF = 1 + pct / 100;
+      const downF = 1 - pct / 100;
+      let guard = 0;
+      const send = async (dir, level) => {
+        if (token && chat) {
+          const text = (dir === 'down' ? '🔴 ' : '🟢 ') + String(coin.symbol || 'COIN').toUpperCase() + (dir === 'down' ? ' DOWN ↓ ' : ' UP ↑ ') + this.memeAlertPx(level);
+          await sendTelegram(token, chat, text);
+        }
+        coin.anchor = level;
+        this.saveMemeWatch(state);
+      };
+      try {
+        if (downF > 0 && quote.price <= coin.anchor * downF) {
+          while (quote.price <= coin.anchor * downF && guard < 8) {
+            await send('down', coin.anchor * downF);
+            guard += 1;
+          }
+        } else if (quote.price >= coin.anchor * upF) {
+          while (quote.price >= coin.anchor * upF && guard < 8) {
+            await send('up', coin.anchor * upF);
+            guard += 1;
+          }
+        }
+      } catch (e) {}
+    }
+    this.saveMemeWatch(state);
+    return {
+      ok: true,
+      on: state.on,
+      coins: mints.map((mint) => ({
+        mint,
+        symbol: state.coins[mint].symbol,
+        pct: state.coins[mint].pct,
+        anchor: state.coins[mint].anchor || 0,
+        price: state.coins[mint].price || 0
+      }))
+    };
+  }
+
   memeList() {
     return [{ id: 'CATE', name: 'CATE', ca: 'Ai66LHZG9MCzg1WKdawwqduVAXpNDUuV8M3uyq5ppump' }];
   }

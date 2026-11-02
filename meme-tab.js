@@ -103,9 +103,9 @@
       '<form id="meme-add" style="display:flex;gap:8px">' +
       '<input id="meme-ca" placeholder="Paste contract. New coin goes on top." autocomplete="off" style="flex:1;min-width:0;border:1px solid #2a3140;background:#0e131a;color:#fff;border-radius:12px;padding:12px;font-size:14px">' +
       '<button type="submit" style="border:0;border-radius:12px;padding:12px 14px;font-weight:900;background:#e6c878;color:#1a1408">Add</button></form>' +
-      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "DexScreener price in this browser. Each coin has its own percent. A cross goes to your Telegram bot.") + "</div>" +
+      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "Watched on the server every 2 minutes, even if this phone sleeps. Each coin alerts on every one of its percent steps.") + "</div>" +
       '<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
-      '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On · every 30s" : "Off") + "</div></div>" +
+      '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On · phone can sleep" : "Off") + "</div></div>" +
       '<button type="button" id="meme-toggle" class="al-sw" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Alerts"><span class="al-knob"></span></button></div>' +
       (rows || '<div style="margin-top:14px;color:#8b93a7;font-size:13px">No coins yet.</div>');
     var form = $("meme-add");
@@ -117,10 +117,9 @@
     var btn = $("meme-toggle");
     if (btn) btn.addEventListener("click", function () {
       state.on = !(state.on !== false);
-      if (state.on) ask();
       write();
       arm();
-      paint();
+      sync();
     });
     root.querySelectorAll("[data-pct]").forEach(function (input) {
       input.addEventListener("change", function () {
@@ -129,7 +128,7 @@
           if (c.mint === mint) c.pct = coinPct(input.value);
         });
         write();
-        paint();
+        sync();
       });
     });
     root.querySelectorAll("[data-drop]").forEach(function (b) {
@@ -137,28 +136,47 @@
         var mint = b.getAttribute("data-drop");
         state.coins = state.coins.filter(function (c) { return c.mint !== mint; });
         write();
-        paint();
+        sync();
       });
     });
   }
-  function ask() {
-    try { if (window.Notification && Notification.permission === "default") Notification.requestPermission(); } catch (e) {}
+  var WATCH = "https://trading-ohlcv.sasipudi.workers.dev/meme-watch";
+  function applyWatch(view) {
+    if (!view || !Array.isArray(view.coins)) {
+      if (view && view.error) state.error = view.error;
+      return;
+    }
+    var by = {};
+    view.coins.forEach(function (row) { if (row && row.mint) by[row.mint] = row; });
+    state.coins.forEach(function (c) {
+      var row = by[c.mint];
+      if (!row) return;
+      if (row.anchor > 0) c.anchor = row.anchor;
+      if (row.price > 0) {
+        quotes[c.mint] = quotes[c.mint] || {};
+        quotes[c.mint].price = row.price;
+      }
+    });
+    state.error = "";
+    write();
   }
-  function ping(symbol, dir, price, mint, pct) {
-    var title = symbol + " " + dir + " " + coinPct(pct) + "%";
-    try {
-      if (window.Notification && Notification.permission === "granted") new Notification(title, { body: px(price) });
-    } catch (e) {}
-    fetch("https://trading-ohlcv.sasipudi.workers.dev/price-ping", {
+  function sync() {
+    fetch(WATCH, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "meme", name: symbol, dir: dir, price: px(price), detail: coinPct(pct) + "%", mint: mint })
-    }).then(function (r) { return r.json(); }).then(function (out) {
-      if (out && out.ok === false && out.error) {
-        state.error = out.error;
-        if (open) paint();
-      }
-    }).catch(function () {});
+      body: JSON.stringify({
+        on: state.on !== false,
+        coins: state.coins.map(function (c) {
+          return { mint: c.mint, symbol: c.symbol || "COIN", pct: coinPct(c.pct), anchor: Number(c.anchor) || 0 };
+        })
+      })
+    }).then(function (r) { return r.json(); }).then(function (view) {
+      applyWatch(view);
+      if (open) paint();
+    }).catch(function () {
+      state.error = "Server did not take the meme list";
+      if (open) paint();
+    });
   }
   function bestPair(list, mint) {
     var rows = (list || []).filter(function (p) { return p && p.baseToken && p.baseToken.address === mint; });
@@ -199,6 +217,7 @@
       state.coins = [coin].concat(state.coins.filter(function (c) { return c.mint !== mint; })).slice(0, 20);
       state.error = "";
       write();
+      sync();
     }).catch(function () {
       state.error = "DexScreener did not answer.";
     }).then(function () {
@@ -209,8 +228,7 @@
     });
   }
   function pull() {
-    if (pulling || !state.coins.length || document.visibilityState === "hidden") return;
-    if (state.on === false && !open) return;
+    if (pulling || !state.coins.length) return;
     pulling = true;
     var lists = [];
     var mints = state.coins.map(function (c) { return c.mint; });
@@ -229,14 +247,7 @@
           if (!(price > 0)) return;
           quotes[c.mint] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
           if (!(c.anchor > 0)) c.anchor = price;
-          var pct = coinPct(c.pct);
-          var move = (price - c.anchor) / c.anchor * 100;
-          if (state.on !== false && Math.abs(move) >= pct) {
-            ping(c.symbol || "COIN", move > 0 ? "up" : "down", price, c.mint, pct);
-            c.anchor = price;
-          }
         });
-        state.error = "";
         write();
         if (open) paint();
       })
@@ -262,6 +273,7 @@
       state.imported = true;
       if (add.length) state.coins = state.coins.concat(add).slice(0, 40);
       write();
+      sync();
       if (open) paint();
       pull();
     }
@@ -300,6 +312,7 @@
   read();
   loadExisting();
   arm();
+  sync();
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") pull();
   });

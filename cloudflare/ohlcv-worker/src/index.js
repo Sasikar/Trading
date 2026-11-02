@@ -455,6 +455,15 @@ export class OhlcvEngine {
           return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
         }
       }
+      if (path === '/meme-watch' || path === '/api/meme-watch') {
+        try {
+          const patch = request.method === 'POST' ? await request.json().catch(() => ({})) : null;
+          const data = await this.engine.checkMemeWatch(patch);
+          return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+        } catch (e) {
+          return new Response(JSON.stringify({ ok: false, error: String(e && e.message ? e.message : e).slice(0, 180) }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+        }
+      }
       if (path === '/memes' || path === '/api/memes') {
         try {
           if (request.method === 'POST') {
@@ -1255,6 +1264,9 @@ export default {
     if (path === '/btc' || path === '/api/btc') {
       return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
     }
+    if (path === '/meme-watch' || path === '/api/meme-watch') {
+      return env.ENGINE.get(env.ENGINE.idFromName('main')).fetch(stub(request));
+    }
     const keepDo = {
       '/solchain-wallets': 1, '/api/solchain-wallets': 1,
       '/tier-notes': 1, '/api/tier-notes': 1,
@@ -1275,6 +1287,7 @@ export default {
   async scheduled(_event, env, ctx) {
     const stub = env.ENGINE.get(env.ENGINE.idFromName('main'));
     ctx.waitUntil(stub.fetch('https://ohlcv.local/btc').catch(() => {}));
+    ctx.waitUntil(stub.fetch('https://ohlcv.local/meme-watch').catch(() => {}));
   }
 };
 
