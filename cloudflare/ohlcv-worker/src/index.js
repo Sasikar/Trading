@@ -1021,13 +1021,14 @@ async function sendPricePing(env, body) {
   const now = Date.now();
   if (now - (pricePingAt[key] || 0) < 60000) return { ok: true, skipped: true };
   pricePingAt[key] = now;
-  const lines = [name + ' ' + dir, price];
-  if (detail) lines.push(detail);
-  if (kind === 'meme') lines.push('https://dexscreener.com/solana/' + mint);
+  const mark = dir === 'down' ? '🔴' : '🟢';
+  const arrow = dir === 'down' ? '↓' : '↑';
+  const word = dir === 'down' ? 'DOWN' : 'UP';
+  const text = mark + ' ' + name.toUpperCase() + ' ' + word + ' ' + arrow + ' ' + price;
   const res = await fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chat, text: lines.join('\n'), disable_web_page_preview: true })
+    body: JSON.stringify({ chat_id: chat, text: text, disable_web_page_preview: true })
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || !j.ok) return { ok: false, error: String(j.description || 'telegram failed').slice(0, 160) };

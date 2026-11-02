@@ -5335,12 +5335,7 @@ export class Engine {
         };
         this.saveMeme(state);
         if (token && chat) {
-          const text = [
-            spec.name + ' ' + (dir > 0 ? 'UP' : 'DOWN') + ' ' + state.points + ' pts ' + this.memeUsd(level / 1e6),
-            'From ' + this.memeUsd(from / 1e6),
-            'Next up ' + this.memeUsd((level + stepTicks) / 1e6),
-            'Next down ' + this.memeUsd((level - stepTicks) / 1e6)
-          ].join('\n');
+          const text = (dir > 0 ? '🟢 ' : '🔴 ') + String(spec.name || 'COIN').toUpperCase() + (dir > 0 ? ' UP ↑ ' : ' DOWN ↓ ') + this.memeUsd(level / 1e6);
           try { await sendTelegram(token, chat, text); }
           catch (e) {
             row.anchor = from;
