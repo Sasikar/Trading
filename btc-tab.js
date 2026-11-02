@@ -73,7 +73,7 @@
     var moved = state.lastAlertAt ? '<div style="margin-top:8px;color:#8b93a7;font-size:12px">Last alert ' + esc(state.lastDir === "down" ? "down" : "up") + " " + pts(state.lastMove) + " pts</div>" : "";
     root.innerHTML =
       '<div style="font-size:40px;font-weight:900;letter-spacing:-.04em">' + usd(state.price) + "</div>" +
-      '<div style="margin-top:4px;color:#8b93a7;font-size:13px">' + (state.error ? esc(state.error) : "Coinbase price in this browser. A cross goes to your Telegram bot. Cloudflare storage is not used.") + "</div>" +
+      '<div style="margin-top:4px;color:#8b93a7;font-size:13px">' + (state.error ? esc(state.error) : "Each 200-point level is its own alert. If the phone slept through a run, the missed levels are sent when this page wakes.") + "</div>" +
       '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:baseline"><b id="btc-step-label">Every ' + (state.step || 200) + ' points</b><span style="color:#8b93a7;font-size:12px">steps of 100</span></div>' +
       '<input id="btc-step" type="range" min="100" max="3000" step="100" value="' + (state.step || 200) + '" style="width:100%;margin-top:8px;accent-color:#e6c878">' +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
@@ -134,19 +134,36 @@
       return;
     }
     var step = state.step || 200;
-    var move = price - state.anchor;
-    if (state.on !== false && Math.abs(move) >= step) {
-      state.lastDir = move > 0 ? "up" : "down";
-      state.lastMove = Math.round(move);
-      state.lastAlertAt = Date.now();
-      state.anchor = price;
-      ping(state.lastDir, state.lastMove, price);
+    var steps = Math.trunc((price - state.anchor) / step);
+    if (state.on === false || steps === 0 || state.stepping) {
+      write();
+      return;
     }
-    write();
+    var dir = steps > 0 ? 1 : -1;
+    var left = Math.min(Math.abs(steps), 12);
+    state.stepping = true;
+    function next() {
+      if (left <= 0) {
+        state.stepping = false;
+        write();
+        if (open) paint();
+        return;
+      }
+      var level = state.anchor + dir * step;
+      state.anchor = level;
+      state.lastDir = dir > 0 ? "up" : "down";
+      state.lastMove = dir * step;
+      state.lastAlertAt = Date.now();
+      write();
+      ping(state.lastDir, state.lastMove, level);
+      left -= 1;
+      setTimeout(next, 500);
+    }
+    next();
   }
   function pull() {
-    if (pulling || document.visibilityState === "hidden") return;
-    if (state.on === false && !open) return;
+    if (pulling) return;
+    if (state.on === false && !open && document.visibilityState === "hidden") return;
     pulling = true;
     fetch("https://api.coinbase.com/v2/prices/BTC-USD/spot", { cache: "no-store" })
       .then(function (r) { return r.json(); })
