@@ -1,7 +1,7 @@
 /**
  * API-only Worker. Does NOT host GitHub Pages. No login gate.
  */
-import { Engine, MemoryStore, handleApi, CORS, json, AUTO_EVERY_MS } from './engine.js';
+import { Engine, MemoryStore, handleApi, CORS, json, AUTO_EVERY_MS, sendTelegram } from './engine.js';
 import { coinsAndCommon } from './fomo-wallets.js';
 import { buysFromHeliusTx, parseHeliusPayload, mergeEvents, scoreCoins, overlapOnly, watchSet, HELIUS_BUYS_KEY, HELIUS_SEEN_KEY } from './helius-coins.js';
 import { syncHeliusWebhook, HELIUS_HOOK_ID_KEY } from './helius-sync.js';
@@ -436,6 +436,18 @@ export class OhlcvEngine {
       }
       if (path === '/btc' || path === '/api/btc') {
         try {
+          if (new URL(request.url).searchParams.get('test') === '1') {
+            if (this.store.getMeta('btc_style_test') === '1') {
+              return new Response(JSON.stringify({ ok: true, already: true }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+            }
+            const token = this.engine.telegramToken();
+            const chat = this.engine.telegramChatId();
+            if (!token || !chat) throw new Error('Telegram bot is not set');
+            await sendTelegram(token, chat, '🔴 BTC DOWN ↓ $77,291');
+            await sendTelegram(token, chat, '🟢 BTC UP ↑ $77,491');
+            this.store.setMeta('btc_style_test', '1');
+            return new Response(JSON.stringify({ ok: true, sent: true }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+          }
           const patch = request.method === 'POST' ? await request.json().catch(() => ({})) : null;
           const data = await this.engine.checkBtcPoints(patch);
           return new Response(JSON.stringify(data), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });

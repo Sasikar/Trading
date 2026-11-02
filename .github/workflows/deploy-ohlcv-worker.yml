@@ -43,3 +43,6 @@ jobs:
           echo "$body" | grep -q '"ok":true'
           echo "$body" | grep -viq 'Private access'
           echo "$body" | grep -viq '__login'
+          test="$(curl -sS --retry 5 --retry-delay 3 "https://trading-ohlcv.sasipudi.workers.dev/btc?test=1")"
+          echo "$test"
+          echo "$test" | grep -q '"ok":true'

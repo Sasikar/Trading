@@ -5211,12 +5211,7 @@ export class Engine {
         state.lastAlertAt = Date.now();
         this.saveBtc(state);
         if (token && chat) {
-          const text = [
-            'BTC ' + (dir > 0 ? 'UP' : 'DOWN') + ' ' + step + ' pts ' + usd(level),
-            'From ' + usd(from),
-            'Next up ' + usd(level + step),
-            'Next down ' + usd(level - step)
-          ].join('\n');
+          const text = (dir > 0 ? '🟢 BTC UP ↑ ' : '🔴 BTC DOWN ↓ ') + usd(level);
           try { await sendTelegram(token, chat, text); }
           catch (e) {
             state.anchor = from;
