@@ -18,7 +18,14 @@
       return "&" + "quot;";
     });
   }
-  function mintOk(s) { return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s); }
+  function evmOk(s) { return /^0x[a-fA-F0-9]{40}$/.test(String(s || "")); }
+  function mintOk(s) { return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(String(s || "")); }
+  function coinOk(s) { return mintOk(s) || evmOk(s); }
+  function normMint(s) { return evmOk(s) ? String(s).toLowerCase() : String(s || "").trim(); }
+  function sameMint(a, b) {
+    if (evmOk(a) || evmOk(b)) return String(a || "").toLowerCase() === String(b || "").toLowerCase();
+    return a === b;
+  }
   function px(n) {
     n = Number(n);
     if (!(n > 0)) return "—";
@@ -41,7 +48,9 @@
       if (typeof s.on === "boolean") state.on = s.on;
       if (s.imported) state.imported = true;
       var fallback = s.pct || 10;
-      if (Array.isArray(s.coins)) state.coins = s.coins.filter(function (c) { return c && mintOk(c.mint); }).slice(0, 20).map(function (c) {
+      if (Array.isArray(s.coins)) state.coins = s.coins.filter(function (c) { return c && coinOk(c.mint); }).slice(0, 20).map(function (c) {
+        c.mint = normMint(c.mint);
+        c.chain = evmOk(c.mint) ? "ethereum" : "solana";
         c.pct = coinPct(c.pct || fallback);
         return c;
       });
@@ -87,7 +96,7 @@
       var b = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
       return '<div style="padding:12px 0;border-top:1px solid #243041">' +
         '<div style="display:flex;align-items:center;gap:8px">' +
-        '<div style="flex:1;min-width:0"><b>' + esc(c.symbol || "COIN") + "</b>" +
+        '<div style="flex:1;min-width:0"><b>' + esc(c.symbol || "COIN") + '</b> <span style="color:#8b93a7;font-size:10px">' + (c.chain === "ethereum" ? "ETH" : "SOL") + "</span>" +
         '<div style="color:#8b93a7;font-size:11px;overflow:hidden;text-overflow:ellipsis">' + esc(c.mint) + "</div></div>" +
         '<div style="text-align:right"><div style="font-weight:900">' + px(price) + "</div>" +
         '<div style="color:#8b93a7;font-size:11px">' + esc(mc(q.mc)) + "</div></div>" +
@@ -101,7 +110,7 @@
     }).join("");
     root.innerHTML =
       '<form id="meme-add" style="display:flex;gap:8px">' +
-      '<input id="meme-ca" placeholder="Paste contract. New coin goes on top." autocomplete="off" style="flex:1;min-width:0;border:1px solid #2a3140;background:#0e131a;color:#fff;border-radius:12px;padding:12px;font-size:14px">' +
+      '<input id="meme-ca" placeholder="Paste a Solana or Ethereum contract." autocomplete="off" style="flex:1;min-width:0;border:1px solid #2a3140;background:#0e131a;color:#fff;border-radius:12px;padding:12px;font-size:14px">' +
       '<button type="submit" style="border:0;border-radius:12px;padding:12px 14px;font-weight:900;background:#e6c878;color:#1a1408">Add</button></form>' +
       '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "Watched on the server every 2 minutes, even if this phone sleeps. Each coin alerts on every one of its percent steps.") + "</div>" +
       '<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
@@ -167,7 +176,7 @@
       body: JSON.stringify({
         on: state.on !== false,
         coins: state.coins.map(function (c) {
-          return { mint: c.mint, symbol: c.symbol || "COIN", pct: coinPct(c.pct), anchor: Number(c.anchor) || 0 };
+          return { mint: c.mint, chain: c.chain === "ethereum" ? "ethereum" : "solana", symbol: c.symbol || "COIN", pct: coinPct(c.pct), anchor: Number(c.anchor) || 0 };
         })
       })
     }).then(function (r) { return r.json(); }).then(function (view) {
@@ -179,7 +188,7 @@
     });
   }
   function bestPair(list, mint) {
-    var rows = (list || []).filter(function (p) { return p && p.baseToken && p.baseToken.address === mint; });
+    var rows = (list || []).filter(function (p) { return p && p.baseToken && sameMint(p.baseToken.address, mint); });
     rows.sort(function (a, b) { return (Number(b.liquidity && b.liquidity.usd) || 0) - (Number(a.liquidity && a.liquidity.usd) || 0); });
     return rows[0] || null;
   }
@@ -190,30 +199,35 @@
     state.error = "Looking up…";
     paint();
     var job;
-    if (mintOk(raw)) {
-      job = fetch("https://api.dexscreener.com/tokens/v1/solana/" + encodeURIComponent(raw), { cache: "no-store" })
+    if (coinOk(raw)) {
+      var looked = normMint(raw);
+      var lookChain = evmOk(raw) ? "ethereum" : "solana";
+      job = fetch("https://api.dexscreener.com/tokens/v1/" + lookChain + "/" + encodeURIComponent(looked), { cache: "no-store" })
         .then(function (r) { return r.json(); })
-        .then(function (list) { return bestPair(list, raw); });
+        .then(function (list) { return bestPair(list, looked); });
     } else {
       job = fetch("https://api.dexscreener.com/latest/dex/search?q=" + encodeURIComponent(raw), { cache: "no-store" })
         .then(function (r) { return r.json(); })
         .then(function (body) {
-          var pairs = ((body && body.pairs) || []).filter(function (p) { return p && p.chainId === "solana" && p.baseToken && mintOk(p.baseToken.address); });
+          var pairs = ((body && body.pairs) || []).filter(function (p) {
+            return p && (p.chainId === "solana" || p.chainId === "ethereum") && p.baseToken && coinOk(p.baseToken.address);
+          });
           pairs.sort(function (a, b) { return (Number(b.liquidity && b.liquidity.usd) || 0) - (Number(a.liquidity && a.liquidity.usd) || 0); });
           return pairs[0] || null;
         });
     }
     job.then(function (pair) {
       if (!pair || !pair.baseToken) {
-        state.error = "No Solana pair for that.";
+        state.error = "No Solana or Ethereum pair for that.";
         return;
       }
-      var mint = pair.baseToken.address;
+      var chain = pair.chainId === "ethereum" ? "ethereum" : "solana";
+      var mint = chain === "ethereum" ? String(pair.baseToken.address).toLowerCase() : pair.baseToken.address;
       var price = Number(pair.priceUsd) || 0;
       quotes[mint] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
       var prev = null;
       state.coins.forEach(function (c) { if (c.mint === mint) prev = c; });
-      var coin = { mint: mint, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinPct(prev && prev.pct) };
+      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinPct(prev && prev.pct) };
       state.coins = [coin].concat(state.coins.filter(function (c) { return c.mint !== mint; })).slice(0, 20);
       state.error = "";
       write();
@@ -230,15 +244,22 @@
   function pull() {
     if (pulling || !state.coins.length) return;
     pulling = true;
-    var lists = [];
-    var mints = state.coins.map(function (c) { return c.mint; });
-    for (var i = 0; i < mints.length; i += 30) lists.push(mints.slice(i, i + 30));
-    Promise.all(lists.map(function (part) {
-      return fetch("https://api.dexscreener.com/tokens/v1/solana/" + part.join(","), { cache: "no-store" })
-        .then(function (r) { return r.json(); })
-        .then(function (list) { return Array.isArray(list) ? list : []; })
-        .catch(function () { return []; });
-    })).then(function (groups) {
+    var groups = { solana: [], ethereum: [] };
+    state.coins.forEach(function (c) {
+      var chain = c.chain === "ethereum" || evmOk(c.mint) ? "ethereum" : "solana";
+      groups[chain].push(c.mint);
+    });
+    var jobs = [];
+    ["solana", "ethereum"].forEach(function (chain) {
+      var mints = groups[chain];
+      for (var i = 0; i < mints.length; i += 30) {
+        jobs.push(fetch("https://api.dexscreener.com/tokens/v1/" + chain + "/" + mints.slice(i, i + 30).join(","), { cache: "no-store" })
+          .then(function (r) { return r.json(); })
+          .then(function (list) { return Array.isArray(list) ? list : []; })
+          .catch(function () { return []; }));
+      }
+    });
+    Promise.all(jobs).then(function (groups) {
         var list = [].concat.apply([], groups);
         state.coins.forEach(function (c) {
           var pair = bestPair(list, c.mint);
@@ -263,12 +284,13 @@
       state.coins.forEach(function (c) { have[c.mint] = 1; });
       var add = [];
       (rows || []).forEach(function (row) {
-        var mint = String((row && (row.ca || row.mint)) || "").trim();
-        var chain = String((row && row.chain) || "solana");
-        if (chain !== "solana" || !mintOk(mint) || have[mint]) return;
-        if (tomb["solana|" + mint.toLowerCase()]) return;
+        var mint = normMint(String((row && (row.ca || row.mint)) || "").trim());
+        var chain = evmOk(mint) ? "ethereum" : String((row && row.chain) || "solana");
+        if ((chain !== "solana" && chain !== "ethereum") || !coinOk(mint) || have[mint]) return;
+        if (chain === "solana" && !mintOk(mint)) return;
+        if (tomb[chain + "|" + mint.toLowerCase()]) return;
         have[mint] = 1;
-        add.push({ mint: mint, symbol: (row.base || row.name || "COIN"), name: row.name || "", anchor: 0, pct: 10 });
+        add.push({ mint: mint, chain: chain, symbol: (row.base || row.name || "COIN"), name: row.name || "", anchor: 0, pct: 10 });
       });
       state.imported = true;
       if (add.length) state.coins = state.coins.concat(add).slice(0, 40);

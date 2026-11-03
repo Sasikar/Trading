@@ -5243,26 +5243,35 @@ export class Engine {
     if (v >= 0.01) return '$' + v.toFixed(4);
     return '$' + v.toPrecision(4);
   }
-  async memeWatchPrices(mints) {
+  async memeWatchPrices(coins) {
     const out = {};
-    for (let i = 0; i < mints.length; i += 30) {
-      const part = mints.slice(i, i + 30);
-      let rows = [];
-      try {
-        const r = await fetch('https://api.dexscreener.com/tokens/v1/solana/' + part.join(','));
-        if (r.ok) {
-          const body = await r.json();
-          rows = Array.isArray(body) ? body : [];
-        }
-      } catch (e) {}
-      rows.forEach((pair) => {
-        const mint = pair && pair.baseToken && pair.baseToken.address;
-        const px = Number(pair && pair.priceUsd);
-        if (!mint || !(px > 0)) return;
-        const liq = Number(pair.liquidity && pair.liquidity.usd) || 0;
-        const prev = out[mint];
-        if (!prev || liq >= prev.liq) out[mint] = { price: px, liq, symbol: pair.baseToken.symbol || '' };
-      });
+    const groups = { solana: [], ethereum: [] };
+    Object.keys(coins || {}).forEach((mint) => {
+      const chain = coins[mint] && coins[mint].chain === 'ethereum' || String(mint).indexOf('0x') === 0 ? 'ethereum' : 'solana';
+      groups[chain].push(mint);
+    });
+    for (const chain of ['solana', 'ethereum']) {
+      const mints = groups[chain];
+      for (let i = 0; i < mints.length; i += 30) {
+        const part = mints.slice(i, i + 30);
+        let rows = [];
+        try {
+          const r = await fetch('https://api.dexscreener.com/tokens/v1/' + chain + '/' + part.join(','));
+          if (r.ok) {
+            const body = await r.json();
+            rows = Array.isArray(body) ? body : [];
+          }
+        } catch (e) {}
+        rows.forEach((pair) => {
+          const raw = pair && pair.baseToken && pair.baseToken.address;
+          const px = Number(pair && pair.priceUsd);
+          if (!raw || !(px > 0)) return;
+          const mint = chain === 'ethereum' ? String(raw).toLowerCase() : raw;
+          const liq = Number(pair.liquidity && pair.liquidity.usd) || 0;
+          const prev = out[mint];
+          if (!prev || liq >= prev.liq) out[mint] = { price: px, liq, symbol: pair.baseToken.symbol || '' };
+        });
+      }
     }
     return out;
   }
@@ -5272,8 +5281,12 @@ export class Engine {
     if (patch && Array.isArray(patch.coins)) {
       const next = {};
       patch.coins.slice(0, 20).forEach((row) => {
-        const mint = String(row && row.mint || '').trim();
-        if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(mint)) return;
+        const raw = String(row && row.mint || '').trim();
+        const eth = /^0x[a-fA-F0-9]{40}$/.test(raw);
+        const sol = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(raw);
+        if (!eth && !sol) return;
+        const mint = eth ? raw.toLowerCase() : raw;
+        const chain = eth || row.chain === 'ethereum' ? 'ethereum' : 'solana';
         const prev = state.coins[mint] || {};
         let pct = Math.round(Number(row.pct));
         if (!isFinite(pct) || pct < 1) pct = 10;
@@ -5281,6 +5294,7 @@ export class Engine {
         const phone = Number(row.anchor);
         next[mint] = {
           symbol: String(row.symbol || prev.symbol || 'COIN').slice(0, 24),
+          chain,
           pct,
           anchor: Number(prev.anchor) > 0 ? Number(prev.anchor) : (phone > 0 ? phone : 0)
         };
@@ -5288,7 +5302,7 @@ export class Engine {
       state.coins = next;
     }
     const mints = Object.keys(state.coins);
-    const quotes = mints.length ? await this.memeWatchPrices(mints) : {};
+    const quotes = mints.length ? await this.memeWatchPrices(state.coins) : {};
     const token = this.telegramToken();
     const chat = this.telegramChatId();
     for (const mint of mints) {
