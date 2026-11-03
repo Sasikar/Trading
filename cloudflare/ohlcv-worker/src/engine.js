@@ -5245,12 +5245,14 @@ export class Engine {
   }
   async memeWatchPrices(coins) {
     const out = {};
-    const groups = { solana: [], ethereum: [] };
-    Object.keys(coins || {}).forEach((mint) => {
-      const chain = coins[mint] && coins[mint].chain === 'ethereum' || String(mint).indexOf('0x') === 0 ? 'ethereum' : 'solana';
+    const groups = { solana: [], ethereum: [], robinhood: [] };
+    Object.keys(coins || {}).forEach((key) => {
+      const row = coins[key] || {};
+      const chain = row.chain === 'robinhood' || row.chain === 'ethereum' ? row.chain : 'solana';
+      const mint = row.mint || String(key).split(':').pop();
       groups[chain].push(mint);
     });
-    for (const chain of ['solana', 'ethereum']) {
+    for (const chain of ['solana', 'ethereum', 'robinhood']) {
       const mints = groups[chain];
       for (let i = 0; i < mints.length; i += 30) {
         const part = mints.slice(i, i + 30);
@@ -5266,10 +5268,11 @@ export class Engine {
           const raw = pair && pair.baseToken && pair.baseToken.address;
           const px = Number(pair && pair.priceUsd);
           if (!raw || !(px > 0)) return;
-          const mint = chain === 'ethereum' ? String(raw).toLowerCase() : raw;
+          const mint = chain === 'solana' ? raw : String(raw).toLowerCase();
+          const id = chain + ':' + mint;
           const liq = Number(pair.liquidity && pair.liquidity.usd) || 0;
-          const prev = out[mint];
-          if (!prev || liq >= prev.liq) out[mint] = { price: px, liq, symbol: pair.baseToken.symbol || '' };
+          const prev = out[id];
+          if (!prev || liq >= prev.liq) out[id] = { price: px, liq, symbol: pair.baseToken.symbol || '' };
         });
       }
     }
@@ -5286,13 +5289,18 @@ export class Engine {
         const sol = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(raw);
         if (!eth && !sol) return;
         const mint = eth ? raw.toLowerCase() : raw;
-        const chain = eth || row.chain === 'ethereum' ? 'ethereum' : 'solana';
-        const prev = state.coins[mint] || {};
+        let chain = row.chain === 'robinhood' || row.chain === 'ethereum' || row.chain === 'solana' ? row.chain : '';
+        if (!chain) chain = eth ? 'ethereum' : 'solana';
+        if (chain !== 'solana' && !eth) return;
+        if (chain === 'solana' && !sol) return;
+        const key = chain + ':' + mint;
+        const prev = state.coins[key] || state.coins[mint] || {};
         let pct = Math.round(Number(row.pct));
         if (!isFinite(pct) || pct < 1) pct = 10;
         if (pct > 100) pct = 100;
         const phone = Number(row.anchor);
-        next[mint] = {
+        next[key] = {
+          mint,
           symbol: String(row.symbol || prev.symbol || 'COIN').slice(0, 24),
           chain,
           pct,
@@ -5346,13 +5354,18 @@ export class Engine {
     return {
       ok: true,
       on: state.on,
-      coins: mints.map((mint) => ({
-        mint,
-        symbol: state.coins[mint].symbol,
-        pct: state.coins[mint].pct,
-        anchor: state.coins[mint].anchor || 0,
-        price: state.coins[mint].price || 0
-      }))
+      coins: mints.map((key) => {
+        const row = state.coins[key] || {};
+        const cut = String(key).indexOf(':');
+        return {
+          mint: row.mint || (cut >= 0 ? String(key).slice(cut + 1) : key),
+          chain: row.chain || (cut >= 0 ? String(key).slice(0, cut) : 'solana'),
+          symbol: row.symbol,
+          pct: row.pct,
+          anchor: row.anchor || 0,
+          price: row.price || 0
+        };
+      })
     };
   }
 
