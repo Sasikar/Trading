@@ -47,26 +47,8 @@
     if (n >= 1e3) return "$" + (n / 1e3).toFixed(1) + "K";
     return "$" + Math.round(n);
   }
-  function read() {
-    try {
-      var s = JSON.parse(localStorage.getItem(KEY) || "{}");
-      if (!s || typeof s !== "object") return;
-      if (typeof s.on === "boolean") state.on = s.on;
-      if (s.imported) state.imported = true;
-      var fallback = s.pct || 10;
-      if (Array.isArray(s.coins)) state.coins = s.coins.filter(function (c) { return c && coinOk(c.mint); }).slice(0, 40).map(function (c) {
-        c.mint = normMint(c.mint);
-        c.chain = c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : (evmOk(c.mint) ? "ethereum" : "solana");
-        c.pct = coinPct(c.pct || fallback);
-        return c;
-      });
-    } catch (e) {}
-  }
-  function write() {
-    try {
-      localStorage.setItem(KEY, JSON.stringify({ on: state.on, imported: state.imported, coins: state.coins }));
-    } catch (e) {}
-  }
+  function read() {}
+  function write() {}
   function hideOthers() {
     document.querySelectorAll(".trend-panel").forEach(function (p) {
       if (p.id === "memes-panel") return;
@@ -122,7 +104,7 @@
       '<form id="meme-add" style="display:flex;gap:8px">' +
       '<input id="meme-ca" placeholder="Paste a Solana, Ethereum, or Robinhood contract." autocomplete="off" style="flex:1;min-width:0;color-scheme:dark;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;border-radius:12px;padding:10px;font-size:14px">' +
       '<button type="submit" style="border:0;border-radius:12px;padding:12px 14px;font-weight:900;background:#e6c878;color:#1a1408">Add</button></form>' +
-      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "Watched on the server every 2 minutes, even if this phone sleeps. Each coin alerts on every one of its percent steps.") + "</div>" +
+      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "One list, loaded from the server. Normal and incognito show the same coins, A to Z.") + "</div>" +
       '<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
       '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On · phone can sleep" : "Off") + "</div></div>" +
       '<button type="button" id="meme-toggle" class="al-sw" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Alerts"><span class="al-knob"></span></button></div>' +
@@ -164,40 +146,40 @@
     });
   }
   var WATCH = "https://trading-ohlcv.sasipudi.workers.dev/meme-watch";
+  var listGen = 0;
   function applyWatch(view) {
     if (!view || !Array.isArray(view.coins)) {
       if (view && view.error) state.error = view.error;
       return;
     }
-    var by = {};
-    (view.coins || []).forEach(function (row) { if (row && row.mint) by[qid(row.chain, row.mint)] = row; });
-    Object.keys(by).forEach(function (id) {
-      var row = by[id];
-      var found = null;
-      state.coins.forEach(function (c) { if (qid(c.chain, c.mint) === id) found = c; });
-      if (!found) {
-        state.coins.push({
-          mint: row.mint,
-          chain: row.chain === "robinhood" || row.chain === "ethereum" ? row.chain : "solana",
-          symbol: row.symbol || "COIN",
-          name: "",
-          anchor: Number(row.anchor) || 0,
-          pct: coinPct(row.pct)
-        });
-        return;
-      }
-      if (row.anchor > 0) found.anchor = row.anchor;
-      if (row.symbol) found.symbol = row.symbol;
+    if (typeof view.on === "boolean") state.on = view.on;
+    state.coins = view.coins.filter(function (row) { return row && coinOk(row.mint); }).slice(0, 40).map(function (row) {
+      var chain = row.chain === "robinhood" || row.chain === "ethereum" ? row.chain : "solana";
+      var mint = chain === "solana" ? row.mint : String(row.mint).toLowerCase();
       if (row.price > 0) {
-        quotes[id] = quotes[id] || {};
-        quotes[id].price = row.price;
+        quotes[qid(chain, mint)] = quotes[qid(chain, mint)] || {};
+        quotes[qid(chain, mint)].price = row.price;
       }
+      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinPct(row.pct) };
     });
-    state.coins = state.coins.slice(0, 40);
     state.error = "";
-    write();
+  }
+  function loadServer() {
+    var gen = ++listGen;
+    fetch(WATCH, { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (view) {
+      if (gen !== listGen) return;
+      applyWatch(view);
+      arm();
+      paint();
+      pull();
+    }).catch(function () {
+      if (gen !== listGen) return;
+      state.error = "Server did not load the meme list";
+      paint();
+    });
   }
   function sync(drop) {
+    var gen = ++listGen;
     fetch(WATCH, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -209,9 +191,11 @@
         })
       })
     }).then(function (r) { return r.json(); }).then(function (view) {
+      if (gen !== listGen) return;
       applyWatch(view);
-      if (open) paint();
+      paint();
     }).catch(function () {
+      if (gen !== listGen) return;
       state.error = "Server did not take the meme list";
       if (open) paint();
     });
@@ -314,37 +298,6 @@
       .catch(function () { state.error = "DexScreener did not answer."; if (open) paint(); })
       .then(function () { pulling = false; });
   }
-  function loadExisting() {
-    if (state.imported) return;
-    function take(rows) {
-      var tomb = {};
-      try { tomb = JSON.parse(localStorage.getItem("ca_recents_tomb_v1") || "{}"); } catch (e) {}
-      var have = {};
-      state.coins.forEach(function (c) { have[qid(c.chain, c.mint)] = 1; });
-      var add = [];
-      (rows || []).forEach(function (row) {
-        var mint = normMint(String((row && (row.ca || row.mint)) || "").trim());
-        var chain = evmOk(mint) ? (String((row && row.chain) || "") === "robinhood" ? "robinhood" : "ethereum") : "solana";
-        if (!coinOk(mint) || have[qid(chain, mint)]) return;
-        if (chain === "solana" && !mintOk(mint)) return;
-        if (tomb[chain + "|" + mint.toLowerCase()]) return;
-        have[qid(chain, mint)] = 1;
-        add.push({ mint: mint, chain: chain, symbol: (row.base || row.name || "COIN"), name: row.name || "", anchor: 0, pct: 10 });
-      });
-      state.imported = true;
-      if (add.length) state.coins = state.coins.concat(add).slice(0, 40);
-      write();
-      sync();
-      if (open) paint();
-      pull();
-    }
-    var local = [];
-    try { local = JSON.parse(localStorage.getItem("ca_recents_v1") || "[]"); } catch (e) {}
-    if (local.length) { take(local); return; }
-    fetch("data/ca-recents.json", { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (body) {
-      take((body && body.items) || []);
-    }).catch(function () {});
-  }
   function arm() {
     if (timer) clearInterval(timer);
     timer = 0;
@@ -365,15 +318,11 @@
     p.style.setProperty("display", "block", "important");
     p.classList.add("on");
     paint();
-    loadExisting();
-    if (state.coins.length) pull();
+    loadServer();
     if (p.scrollIntoView) p.scrollIntoView({ block: "start" });
   }
   window.showMemes = show;
-  read();
-  loadExisting();
-  arm();
-  sync();
+  loadServer();
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible") pull();
   });
