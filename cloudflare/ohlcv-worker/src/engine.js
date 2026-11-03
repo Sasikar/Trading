@@ -5149,6 +5149,23 @@ export class Engine {
     if (!(n2 > 0)) throw new Error('BTC price missing');
     return n2;
   }
+  async btcMinutes(sinceMs) {
+    const end = Math.floor(Date.now() / 1000);
+    const span = Math.min(Math.max(Date.now() - (sinceMs || Date.now() - 3 * 60 * 1000), 3 * 60 * 1000), 15 * 60 * 1000);
+    const start = end - Math.ceil(span / 1000);
+    try {
+      const r = await fetch('https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=60&start=' + start + '&end=' + end, { headers: { accept: 'application/json', 'user-agent': 'trading' } });
+      if (r.ok) {
+        const rows = await r.json();
+        if (Array.isArray(rows) && rows.length) {
+          return rows.map((k) => ({ t: Number(k[0]) * 1000, low: Number(k[1]), high: Number(k[2]), open: Number(k[3]), close: Number(k[4]) }))
+            .filter((k) => k.high > 0 && k.low > 0 && k.t > 0)
+            .sort((a, b) => a.t - b.t);
+        }
+      }
+    } catch (e) {}
+    return [];
+  }
   async checkBtcPoints(patch, livePrice) {
     if (this._btcRun) return this.btcView(this.btcState(), '');
     this._btcRun = true;
@@ -5195,14 +5212,18 @@ export class Engine {
       return this.btcView(state, error);
     }
     const step = state.step;
-    const steps = Math.trunc((price - state.anchor) / step);
-    if (state.on && steps !== 0) {
-      const dir = steps > 0 ? 1 : -1;
-      let left = Math.min(Math.abs(steps), 12);
-      const token = this.telegramToken();
-      const chat = this.telegramChatId();
-      const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
-      while (left > 0) {
+    const token = this.telegramToken();
+    const chat = this.telegramChatId();
+    const usd = (n) => '$' + Math.round(n).toLocaleString('en-US');
+    const walkTo = async (mark) => {
+      let guard = 0;
+      while (guard < 12 && state.on) {
+        const up = state.anchor + step;
+        const down = state.anchor - step;
+        let dir = 0;
+        if (mark >= up) dir = 1;
+        else if (mark <= down) dir = -1;
+        else break;
         const from = state.anchor;
         const level = from + dir * step;
         state.anchor = level;
@@ -5216,14 +5237,29 @@ export class Engine {
           catch (e) {
             state.anchor = from;
             this.saveBtc(state);
-            break;
+            return false;
           }
         }
-        left -= 1;
+        guard += 1;
+      }
+      return true;
+    };
+    let candles = [];
+    try { candles = await this.btcMinutes(fresh.lastAt); } catch (e) { candles = []; }
+    let ok = true;
+    if (candles.length) {
+      for (const c of candles) {
+        const marks = c.close < c.open ? [c.high, c.low] : [c.low, c.high];
+        for (const mark of marks) {
+          ok = await walkTo(mark);
+          if (!ok) break;
+        }
+        if (!ok) break;
       }
     } else {
-      this.saveBtc(state);
+      ok = await walkTo(price);
     }
+    if (ok) this.saveBtc(state);
     return this.btcView(state, error);
   }
 
