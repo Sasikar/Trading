@@ -5281,9 +5281,19 @@ export class Engine {
   async checkMemeWatch(patch) {
     const state = this.memeWatchState();
     if (patch && typeof patch.on === 'boolean') state.on = patch.on;
+    if (patch && Array.isArray(patch.drop)) {
+      patch.drop.forEach((row) => {
+        const raw = String(row && row.mint || '').trim();
+        const eth = /^0x[a-fA-F0-9]{40}$/.test(raw);
+        const mint = eth ? raw.toLowerCase() : raw;
+        const chain = row && (row.chain === 'robinhood' || row.chain === 'ethereum' || row.chain === 'solana') ? row.chain : (eth ? 'ethereum' : 'solana');
+        delete state.coins[chain + ':' + mint];
+        delete state.coins[mint];
+      });
+    }
     if (patch && Array.isArray(patch.coins)) {
-      const next = {};
-      patch.coins.slice(0, 20).forEach((row) => {
+      const next = Object.assign({}, state.coins);
+      patch.coins.slice(0, 40).forEach((row) => {
         const raw = String(row && row.mint || '').trim();
         const eth = /^0x[a-fA-F0-9]{40}$/.test(raw);
         const sol = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(raw);
@@ -5299,6 +5309,7 @@ export class Engine {
         if (!isFinite(pct) || pct < 1) pct = 10;
         if (pct > 100) pct = 100;
         const phone = Number(row.anchor);
+        if (key !== mint) delete next[mint];
         next[key] = {
           mint,
           symbol: String(row.symbol || prev.symbol || 'COIN').slice(0, 24),
@@ -5307,6 +5318,8 @@ export class Engine {
           anchor: Number(prev.anchor) > 0 ? Number(prev.anchor) : (phone > 0 ? phone : 0)
         };
       });
+      const keys = Object.keys(next);
+      if (keys.length > 40) keys.slice(40).forEach((key) => { delete next[key]; });
       state.coins = next;
     }
     const mints = Object.keys(state.coins);
