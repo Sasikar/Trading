@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install parser
-        run: python -m pip install --disable-pip-version-check pandas lxml html5lib requests
+        run: python -m pip install --disable-pip-version-check pandas lxml html5lib beautifulsoup4 requests
       - name: Fetch BTC ETF flow history
         continue-on-error: true
         run: python scripts/refresh_etf_flows.py

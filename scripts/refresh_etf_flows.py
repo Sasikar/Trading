@@ -9,16 +9,26 @@ import json
 import os
 import re
 import sys
+import urllib.request
 from datetime import date, datetime, timedelta, timezone
 
 import requests
 
-FARSIDE_URL = "https://farside.co.uk/bitcoin-etf-flow-all-data/"
+FARSIDE_URL = "https://farside.co.uk/btc/"
 MIRROR_URL = "https://r.jina.ai/" + FARSIDE_URL
 OUT_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "etf-flows.json")
 WINDOW_DAYS = 180
-HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; TradingPulse/1.0)"}
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html",
+}
 DATE_RE = re.compile(r"^(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})$")
+ROW_RE = re.compile(
+    r'<td><span class="tabletext">(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})</span></td>(.*?)</tr>',
+    re.S,
+)
+TD_RE = re.compile(r'<td\b[^>]*>(.*?)</td>', re.S)
+NUM_RE = re.compile(r'>\(?([\d,.]+)\)?<')
 
 
 def to_number(raw):
@@ -35,11 +45,32 @@ def to_number(raw):
 
 
 def parse_html_table(html):
+    rows = []
+    for day_raw, rest in ROW_RE.findall(html or ""):
+        try:
+            day = datetime.strptime(day_raw, "%d %b %Y").date()
+        except ValueError:
+            continue
+        cells = []
+        for td in TD_RE.findall(rest):
+            found = NUM_RE.findall(td)
+            if not found:
+                continue
+            raw = found[-1]
+            if "(" in td and ")" in td:
+                raw = "(" + raw + ")"
+            value = to_number(raw)
+            if value is not None:
+                cells.append(value)
+        if not cells:
+            continue
+        rows.append([day.strftime("%Y-%m-%d"), cells[-1]])
+    if rows:
+        return rows
     from io import StringIO
 
     import pandas as pd
 
-    rows = []
     for table in pd.read_html(StringIO(html)):
         cols = [str(c).strip().lower() for c in table.columns]
         if not (any("date" in c for c in cols) and any("total" in c for c in cols)):
@@ -90,10 +121,22 @@ def parse_markdown_table(text):
     return rows
 
 
+def http_text(url, timeout):
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=timeout)
+        if resp.ok and "tabletext" in resp.text:
+            return resp.text
+    except Exception:
+        pass
+    req = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", "replace")
+
+
 def fetch_rows():
     errors = []
     try:
-        html = requests.get(FARSIDE_URL, headers=HEADERS, timeout=45).text
+        html = http_text(FARSIDE_URL, 45)
         rows = parse_html_table(html)
         if rows:
             return rows, "Farside Investors"
@@ -101,12 +144,16 @@ def fetch_rows():
     except Exception as exc:  # noqa: BLE001 - fall through to the mirror
         errors.append(f"direct fetch failed: {exc}")
 
-    resp = requests.get(MIRROR_URL, headers=HEADERS, timeout=90)
-    resp.raise_for_status()
-    rows = parse_markdown_table(resp.text)
-    if not rows:
-        raise SystemExit("Could not parse ETF flows from any source: " + "; ".join(errors))
-    return rows, "Farside Investors"
+    try:
+        resp = requests.get(MIRROR_URL, headers=HEADERS, timeout=90)
+        resp.raise_for_status()
+        rows = parse_markdown_table(resp.text)
+        if rows:
+            return rows, "Farside Investors"
+        errors.append("mirror returned no usable rows")
+    except Exception as exc:  # noqa: BLE001
+        errors.append(f"mirror failed: {exc}")
+    raise SystemExit("Could not parse ETF flows from any source: " + "; ".join(errors))
 
 
 def load_existing():
