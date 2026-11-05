@@ -69,8 +69,13 @@
     if (n > 100) return 100;
     return n;
   }
+  function coinAny(n) {
+    n = Math.round(Number(n));
+    if (!isFinite(n) || n < 1) return 10;
+    return n;
+  }
   function band(anchor, pct) {
-    pct = coinPct(pct);
+    pct = coinAny(pct);
     return { up: anchor * (1 + pct / 100), down: anchor * (1 - pct / 100) };
   }
   function paint() {
@@ -83,7 +88,7 @@
     var rows = shown.map(function (c) {
       var q = quotes[qid(c.chain, c.mint)] || {};
       var price = Number(q.price) || 0;
-      var pct = coinPct(c.pct);
+      var pct = coinAny(c.pct);
       var b = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
       var mint = String(c.mint || "");
       var short = mint.length > 12 ? mint.slice(0, 4) + "…" + mint.slice(-4) : mint;
@@ -95,7 +100,7 @@
         '<button type="button" data-drop="' + esc(qid(c.chain, c.mint)) + '" aria-label="Remove" style="border:0;background:#2a1518;color:#ff8a7a;border-radius:8px;width:26px;height:26px;font-weight:900;color-scheme:dark">×</button></div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
         '<label style="display:flex;align-items:center;gap:4px;color:#8b93a7;font-size:11px;white-space:nowrap">Every' +
-        '<input data-pct="' + esc(qid(c.chain, c.mint)) + '" type="number" min="1" max="100" step="1" value="' + pct + '" style="width:46px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:3px 4px;font-weight:800">' +
+        '<input data-pct="' + esc(qid(c.chain, c.mint)) + '" type="number" min="1" step="1" value="' + pct + '" style="width:64px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:3px 4px;font-weight:800">' +
         "%</label>" +
         '<div style="flex:1;padding:4px 6px;border-radius:8px;background:#102018;font-size:11px;color:#3dbe7a;white-space:nowrap">↑ ' + px(b.up) + "</div>" +
         '<div style="flex:1;padding:4px 6px;border-radius:8px;background:#2a1518;font-size:11px;color:#ff8a7a;white-space:nowrap">↓ ' + px(b.down) + "</div></div></div>";
@@ -140,7 +145,7 @@
         var chain = id.slice(0, id.indexOf(":"));
         var mint = id.slice(id.indexOf(":") + 1);
         state.coins.forEach(function (c) {
-          if (c.mint === mint && (c.chain || "solana") === chain) c.pct = coinPct(input.value);
+          if (c.mint === mint && (c.chain || "solana") === chain) c.pct = coinAny(input.value);
         });
         write();
         sync();
@@ -173,7 +178,7 @@
         quotes[qid(chain, mint)] = quotes[qid(chain, mint)] || {};
         quotes[qid(chain, mint)].price = row.price;
       }
-      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinPct(row.pct) };
+      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinAny(row.pct) };
     });
     state.error = "";
   }
@@ -202,7 +207,7 @@
         applyAll: !!applyAll,
         drop: drop || [],
         coins: state.coins.map(function (c) {
-          return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinPct(c.pct), anchor: Number(c.anchor) || 0 };
+          return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinAny(c.pct), anchor: Number(c.anchor) || 0 };
         })
       })
     }).then(function (r) { return r.json(); }).then(function (view) {
@@ -265,7 +270,7 @@
       quotes[qid(chain, mint)] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
       var prev = null;
       state.coins.forEach(function (c) { if (qid(c.chain, c.mint) === qid(chain, mint)) prev = c; });
-      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinPct(prev ? prev.pct : state.pct) };
+      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinAny(prev ? prev.pct : state.pct) };
       state.coins = [coin].concat(state.coins.filter(function (c) { return qid(c.chain, c.mint) !== qid(chain, mint); })).slice(0, 40);
       state.error = "";
       write();

@@ -5350,7 +5350,6 @@ export class Engine {
         const prev = state.coins[key] || state.coins[mint] || {};
         let pct = Math.round(Number(row.pct));
         if (!isFinite(pct) || pct < 1) pct = 10;
-        if (pct > 100) pct = 100;
         const phone = Number(row.anchor);
         if (key !== mint) delete next[mint];
         next[key] = {
