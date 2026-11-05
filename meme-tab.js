@@ -83,6 +83,8 @@
     if (!root) return;
     var on = state.on !== false;
     var shown = state.coins.slice().sort(function (a, b) {
+      var d = coinAny(b.pct) - coinAny(a.pct);
+      if (d) return d;
       return String(a.symbol || "").localeCompare(String(b.symbol || ""), undefined, { sensitivity: "base" });
     });
     var rows = shown.map(function (c) {
@@ -109,7 +111,7 @@
       '<form id="meme-add" style="display:flex;gap:8px">' +
       '<input id="meme-ca" placeholder="Paste a Solana, Ethereum, or Robinhood contract." autocomplete="off" style="flex:1;min-width:0;color-scheme:dark;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;border-radius:12px;padding:10px;font-size:14px">' +
       '<button type="submit" style="border:0;border-radius:12px;padding:12px 14px;font-weight:900;background:#e6c878;color:#1a1408">Add</button></form>' +
-      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "One list, loaded from the server. Normal and incognito show the same coins, A to Z.") + "</div>" +
+      '<div style="margin-top:8px;color:#8b93a7;font-size:12px">' + (state.error ? esc(state.error) : "One list, loaded from the server. Highest percent first. Same percent stays A to Z.") + "</div>" +
       '<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
       '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On · phone can sleep" : "Off") + "</div></div>" +
       '<button type="button" id="meme-toggle" class="al-sw" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Alerts"><span class="al-knob"></span></button></div>' +
@@ -130,6 +132,7 @@
       state.pct = coinPct(allPct.value);
       state.coins.forEach(function (c) { c.pct = state.pct; });
       write();
+      paint();
       sync(null, true);
     });
     var btn = $("meme-toggle");
@@ -148,6 +151,7 @@
           if (c.mint === mint && (c.chain || "solana") === chain) c.pct = coinAny(input.value);
         });
         write();
+        paint();
         sync();
       });
     });
