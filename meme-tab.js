@@ -106,6 +106,10 @@
         '<div style="flex:1;min-width:0"><b style="color:#f4f7fb;font-size:14px">' + esc(c.symbol || "COIN") + '</b> <span style="color:#8b93a7;font-size:10px">' + chainTag(c) + "</span>" +
         '<div style="color:#6f7a8c;font-size:10px">' + esc(short) + "</div></div>" +
         '<div style="text-align:right;color:#f4f7fb;font-weight:800;font-size:13px">' + px(price) + "</div>" +
+        '<button type="button" data-alert="' + esc(qid(c.chain, c.mint)) + '" aria-label="' + (c.on === false ? "Alert off" : "Alert on") + '" style="border:0;background:transparent;width:18px;height:18px;padding:0;display:flex;align-items:center;justify-content:center">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="' + (c.on === false ? "#5c6778" : "#3dbe7a") + '" d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 0 0-5-5.9V4a1 1 0 1 0-2 0v1.1A6 6 0 0 0 6 11v5l-2 2v1h16v-1z"/>' +
+        (c.on === false ? '<path d="M5 5l14 14" stroke="#ff8a7a" stroke-width="2"/>' : "") +
+        "</svg></button>" +
         '<button type="button" data-drop="' + esc(qid(c.chain, c.mint)) + '" aria-label="Remove" style="border:0;background:#2a1518;color:#ff8a7a;border-radius:8px;width:26px;height:26px;font-weight:900;color-scheme:dark">×</button></div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
         '<label style="display:flex;align-items:center;gap:4px;color:#8b93a7;font-size:11px;white-space:nowrap">Every' +
@@ -173,6 +177,19 @@
         sync();
       });
     });
+    root.querySelectorAll("[data-alert]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var id = String(b.getAttribute("data-alert") || "");
+        var chain = id.slice(0, id.indexOf(":"));
+        var mint = id.slice(id.indexOf(":") + 1);
+        state.coins.forEach(function (c) {
+          if (c.mint === mint && (c.chain || "solana") === chain) c.on = c.on === false;
+        });
+        write();
+        paint();
+        sync();
+      });
+    });
     root.querySelectorAll("[data-drop]").forEach(function (b) {
       b.addEventListener("click", function () {
         var id = String(b.getAttribute("data-drop") || "");
@@ -201,7 +218,7 @@
         quotes[qid(chain, mint)] = quotes[qid(chain, mint)] || {};
         quotes[qid(chain, mint)].price = row.price;
       }
-      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinAny(row.pct) };
+      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinAny(row.pct), on: row.on !== false };
     });
     state.error = "";
   }
@@ -230,7 +247,7 @@
         applyAll: !!applyAll,
         drop: drop || [],
         coins: state.coins.map(function (c) {
-          return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinAny(c.pct), anchor: Number(c.anchor) || 0 };
+          return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinAny(c.pct), anchor: Number(c.anchor) || 0, on: c.on !== false };
         })
       })
     }).then(function (r) { return r.json(); }).then(function (view) {
@@ -293,7 +310,7 @@
       quotes[qid(chain, mint)] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
       var prev = null;
       state.coins.forEach(function (c) { if (qid(c.chain, c.mint) === qid(chain, mint)) prev = c; });
-      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinAny(prev ? prev.pct : state.pct) };
+      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinAny(prev ? prev.pct : state.pct), on: prev ? prev.on !== false : true };
       state.coins = [coin].concat(state.coins.filter(function (c) { return qid(c.chain, c.mint) !== qid(chain, mint); })).slice(0, 40);
       state.error = "";
       write();

@@ -5348,6 +5348,8 @@ export class Engine {
         const prev = state.coins[key] || state.coins[mint] || {};
         let pct = Math.round(Number(row.pct));
         if (!isFinite(pct) || pct < 1) pct = 10;
+        const alertOn = row.on !== false;
+        const wasOn = prev.on !== false;
         const phone = Number(row.anchor);
         if (key !== mint) delete next[mint];
         next[key] = {
@@ -5355,7 +5357,8 @@ export class Engine {
           symbol: String(row.symbol || prev.symbol || 'COIN').slice(0, 24),
           chain,
           pct,
-          anchor: Number(prev.anchor) > 0 ? Number(prev.anchor) : (phone > 0 ? phone : 0)
+          on: alertOn,
+          anchor: alertOn !== wasOn ? 0 : (Number(prev.anchor) > 0 ? Number(prev.anchor) : (phone > 0 ? phone : 0))
         };
       });
       const keys = Object.keys(next);
@@ -5379,7 +5382,7 @@ export class Engine {
         coin.anchor = quote.price;
         continue;
       }
-      if (state.on === false) continue;
+      if (state.on === false || coin.on === false) continue;
       const pct = coin.pct || 10;
       const upF = 1 + pct / 100;
       const downF = 1 - pct / 100;
@@ -5419,6 +5422,7 @@ export class Engine {
           chain: row.chain || (cut >= 0 ? String(key).slice(0, cut) : 'solana'),
           symbol: row.symbol,
           pct: row.pct,
+          on: row.on !== false,
           anchor: row.anchor || 0,
           price: row.price || 0
         };
