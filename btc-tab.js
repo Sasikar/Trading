@@ -73,9 +73,9 @@
     var moved = state.lastAlertAt ? '<div style="margin-top:8px;color:#8b93a7;font-size:12px">Last alert ' + esc(state.lastDir === "down" ? "down" : "up") + " " + pts(state.lastMove) + " pts</div>" : "";
     root.innerHTML =
       '<div style="font-size:40px;font-weight:900;letter-spacing:-.04em">' + usd(state.price) + "</div>" +
-      '<div style="margin-top:4px;color:#8b93a7;font-size:13px">' + (state.error ? esc(state.error) : "Watched on the server every 2 minutes, even if this phone is asleep or on silent. Each 200-point level goes to Telegram.") + "</div>" +
-      '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:baseline"><b id="btc-step-label">Every ' + (state.step || 200) + ' points</b><span style="color:#8b93a7;font-size:12px">steps of 100</span></div>' +
-      '<input id="btc-step" type="range" min="100" max="3000" step="100" value="' + (state.step || 200) + '" style="width:100%;margin-top:8px;accent-color:#e6c878">' +
+      '<div style="margin-top:4px;color:#8b93a7;font-size:13px">' + (state.error ? esc(state.error) : "Watched on the server every 2 minutes, even if this phone is asleep or on silent. Each step goes to Telegram.") + "</div>" +
+      '<label style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:10px"><b id="btc-step-label">Every ' + (state.step || 200) + ' points</b>' +
+      '<input id="btc-step" type="number" min="1" step="1" inputmode="numeric" value="' + (state.step || 200) + '" style="width:110px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:10px;padding:8px 10px;font-weight:800;font-size:16px"></label>' +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
       '<div style="flex:1;padding:12px;border-radius:14px;background:#102018"><div style="color:#8b93a7;font-size:11px;font-weight:800">UP</div><b style="color:#3dbe7a">' + usd(lv.up) + "</b></div>" +
       '<div style="flex:1;padding:12px;border-radius:14px;background:#2a1518"><div style="color:#8b93a7;font-size:11px;font-weight:800">DOWN</div><b style="color:#ff8a7a">' + usd(lv.down) + "</b></div></div>" +
@@ -90,7 +90,11 @@
         if (label) label.textContent = "Every " + bar.value + " points";
       });
       bar.addEventListener("change", function () {
-        state.step = Number(bar.value) || 200;
+        var n = Math.round(Number(bar.value));
+        if (!isFinite(n) || n < 1) n = state.step || 200;
+        state.step = n;
+        bar.value = String(n);
+        if (label) label.textContent = "Every " + n + " points";
         write();
         pushSettings();
       });

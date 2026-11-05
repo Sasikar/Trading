@@ -5097,9 +5097,8 @@ export class Engine {
   btcState() {
     let saved = {};
     try { saved = JSON.parse(this.store.getMeta('btc_points') || '{}') || {}; } catch (e) { saved = {}; }
-    let step = Math.round(Number(saved.step) / 100) * 100;
-    if (!isFinite(step) || step < 100) step = 200;
-    if (step > 5000) step = 5000;
+    let step = Math.round(Number(saved.step));
+    if (!isFinite(step) || step < 1) step = 200;
     return {
       step,
       on: saved.on !== false,
@@ -5175,9 +5174,8 @@ export class Engine {
   async _btcPoints(patch, livePrice) {
     const state = this.btcState();
     if (patch && patch.step != null) {
-      let step = Math.round(Number(patch.step) / 100) * 100;
-      if (!isFinite(step) || step < 100) step = 100;
-      if (step > 5000) step = 5000;
+      let step = Math.round(Number(patch.step));
+      if (!isFinite(step) || step < 1) step = 1;
       if (step !== state.step) state.anchor = 0;
       state.step = step;
     }
