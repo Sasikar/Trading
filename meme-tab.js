@@ -87,6 +87,13 @@
       if (d) return d;
       return String(a.symbol || "").localeCompare(String(b.symbol || ""), undefined, { sensitivity: "base" });
     });
+    var qfind = find.trim().toLowerCase();
+    if (qfind) {
+      shown = shown.filter(function (c) {
+        var blob = (String(c.symbol || "") + " " + String(c.name || "") + " " + String(c.mint || "") + " " + chainTag(c)).toLowerCase();
+        return blob.indexOf(qfind) >= 0;
+      });
+    }
     var rows = shown.map(function (c) {
       var q = quotes[qid(c.chain, c.mint)] || {};
       var price = Number(q.price) || 0;
@@ -120,12 +127,23 @@
       '<span style="display:flex;align-items:center;gap:4px;color:#8b93a7;font-size:12px;white-space:nowrap">Every' +
       '<input id="meme-all-pct" type="number" min="1" max="100" step="1" value="' + coinPct(state.pct) + '" style="width:52px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:6px 4px;font-weight:800">' +
       "%</span></label>" +
-      (rows || '<div style="margin-top:14px;color:#8b93a7;font-size:13px">No coins yet.</div>');
+      '<input id="meme-find" placeholder="Search ticker or contract" autocomplete="off" value="' + esc(find) + '" style="margin-top:8px;width:100%;color-scheme:dark;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;border-radius:12px;padding:10px;font-size:14px">' +
+      (rows || '<div style="margin-top:14px;color:#8b93a7;font-size:13px">' + (state.coins.length ? "No match." : "No coins yet.") + "</div>");
     var form = $("meme-add");
     if (form) form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       var input = $("meme-ca");
       addCoin(input ? input.value : "");
+    });
+    var findBox = $("meme-find");
+    if (findBox) findBox.addEventListener("input", function () {
+      find = findBox.value;
+      var pos = findBox.selectionStart;
+      paint();
+      var again = $("meme-find");
+      if (!again) return;
+      again.focus();
+      try { again.setSelectionRange(pos, pos); } catch (e) {}
     });
     var allPct = $("meme-all-pct");
     if (allPct) allPct.addEventListener("change", function () {
@@ -168,6 +186,7 @@
   }
   var WATCH = "https://trading-ohlcv.sasipudi.workers.dev/meme-watch";
   var listGen = 0;
+  var find = "";
   function applyWatch(view) {
     if (!view || !Array.isArray(view.coins)) {
       if (view && view.error) state.error = view.error;
