@@ -5267,7 +5267,10 @@ export class Engine {
     let saved = {};
     try { saved = JSON.parse(this.store.getMeta('meme_watch_v1') || '{}') || {}; } catch (e) { saved = {}; }
     const coins = saved.coins && typeof saved.coins === 'object' ? saved.coins : {};
-    return { on: saved.on !== false, coins };
+    let pct = Math.round(Number(saved.pct));
+    if (!isFinite(pct) || pct < 1) pct = 10;
+    if (pct > 100) pct = 100;
+    return { on: saved.on !== false, pct, coins };
   }
   saveMemeWatch(state) {
     this.store.setMeta('meme_watch_v1', JSON.stringify(state));
@@ -5317,6 +5320,10 @@ export class Engine {
   async checkMemeWatch(patch) {
     const state = this.memeWatchState();
     if (patch && typeof patch.on === 'boolean') state.on = patch.on;
+    if (patch && patch.pct != null) {
+      let pct = Math.round(Number(patch.pct));
+      if (isFinite(pct) && pct >= 1 && pct <= 100) state.pct = pct;
+    }
     if (patch && Array.isArray(patch.drop)) {
       patch.drop.forEach((row) => {
         const raw = String(row && row.mint || '').trim();
@@ -5357,6 +5364,9 @@ export class Engine {
       const keys = Object.keys(next);
       if (keys.length > 40) keys.slice(40).forEach((key) => { delete next[key]; });
       state.coins = next;
+    }
+    if (patch && patch.applyAll && state.pct) {
+      Object.keys(state.coins).forEach((key) => { state.coins[key].pct = state.pct; });
     }
     const mints = Object.keys(state.coins);
     const quotes = mints.length ? await this.memeWatchPrices(state.coins) : {};
@@ -5403,6 +5413,7 @@ export class Engine {
     return {
       ok: true,
       on: state.on,
+      pct: state.pct || 10,
       coins: mints.map((key) => {
         const row = state.coins[key] || {};
         const cut = String(key).indexOf(':');

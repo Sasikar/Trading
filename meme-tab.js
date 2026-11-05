@@ -108,12 +108,24 @@
       '<div style="margin-top:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
       '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On · phone can sleep" : "Off") + "</div></div>" +
       '<button type="button" id="meme-toggle" class="al-sw" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Alerts"><span class="al-knob"></span></button></div>' +
+      '<label style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:#12161d;border:1px solid #2a3140;color:#f4f7fb">' +
+      '<span><b style="display:block;font-size:14px">All coins</b><span style="display:block;margin-top:2px;color:#8b93a7;font-size:11px">Sets every coin. One coin can still be different.</span></span>' +
+      '<span style="display:flex;align-items:center;gap:4px;color:#8b93a7;font-size:12px;white-space:nowrap">Every' +
+      '<input id="meme-all-pct" type="number" min="1" max="100" step="1" value="' + coinPct(state.pct) + '" style="width:52px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:6px 4px;font-weight:800">' +
+      "%</span></label>" +
       (rows || '<div style="margin-top:14px;color:#8b93a7;font-size:13px">No coins yet.</div>');
     var form = $("meme-add");
     if (form) form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       var input = $("meme-ca");
       addCoin(input ? input.value : "");
+    });
+    var allPct = $("meme-all-pct");
+    if (allPct) allPct.addEventListener("change", function () {
+      state.pct = coinPct(allPct.value);
+      state.coins.forEach(function (c) { c.pct = state.pct; });
+      write();
+      sync(null, true);
     });
     var btn = $("meme-toggle");
     if (btn) btn.addEventListener("click", function () {
@@ -153,6 +165,7 @@
       return;
     }
     if (typeof view.on === "boolean") state.on = view.on;
+    if (view.pct) state.pct = coinPct(view.pct);
     state.coins = view.coins.filter(function (row) { return row && coinOk(row.mint); }).slice(0, 40).map(function (row) {
       var chain = row.chain === "robinhood" || row.chain === "ethereum" ? row.chain : "solana";
       var mint = chain === "solana" ? row.mint : String(row.mint).toLowerCase();
@@ -178,13 +191,15 @@
       paint();
     });
   }
-  function sync(drop) {
+  function sync(drop, applyAll) {
     var gen = ++listGen;
     fetch(WATCH, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         on: state.on !== false,
+        pct: coinPct(state.pct),
+        applyAll: !!applyAll,
         drop: drop || [],
         coins: state.coins.map(function (c) {
           return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinPct(c.pct), anchor: Number(c.anchor) || 0 };
@@ -250,7 +265,7 @@
       quotes[qid(chain, mint)] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
       var prev = null;
       state.coins.forEach(function (c) { if (qid(c.chain, c.mint) === qid(chain, mint)) prev = c; });
-      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinPct(prev && prev.pct) };
+      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinPct(prev ? prev.pct : state.pct) };
       state.coins = [coin].concat(state.coins.filter(function (c) { return qid(c.chain, c.mint) !== qid(chain, mint); })).slice(0, 40);
       state.error = "";
       write();
