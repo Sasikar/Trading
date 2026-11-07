@@ -3,9 +3,10 @@
   var API = "https://trading-ohlcv.sasipudi.workers.dev/life-log";
   var KEY = "life_log_v1";
   var DIET = [["sweet", "Sweet"], ["biryani", "Biryani"], ["carbs", "Carbs"]];
-  var data = { sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} } };
+  var data = { sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} } };
   var cursor = istParts(new Date());
   var dietTab = "sweet";
+  var saviourTab = "";
   var open = "";
   var which = "";
 
@@ -54,6 +55,19 @@
         var bag = saved.diet && saved.diet[row[0]];
         data.diet[row[0]] = bag && typeof bag === "object" ? bag : {};
       });
+      var topics = [];
+      var rawTopics = saved.saviour && Array.isArray(saved.saviour.topics) ? saved.saviour.topics : [];
+      rawTopics.forEach(function (name) {
+        name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 32);
+        if (name && topics.indexOf(name) < 0) topics.push(name);
+      });
+      var logs = {};
+      topics.forEach(function (name) {
+        var bag = saved.saviour && saved.saviour.logs && saved.saviour.logs[name];
+        logs[name] = bag && typeof bag === "object" ? bag : {};
+      });
+      data.saviour = { topics: topics, logs: logs };
+      if (topics.indexOf(saviourTab) < 0) saviourTab = topics[0] || "";
     } catch (e) {}
   }
   function saveLocal() {
@@ -65,6 +79,10 @@
     if (remote.diet) DIET.forEach(function (row) {
       if (remote.diet[row[0]] && typeof remote.diet[row[0]] === "object") data.diet[row[0]] = remote.diet[row[0]];
     });
+    if (remote.saviour && Array.isArray(remote.saviour.topics)) {
+      data.saviour = { topics: remote.saviour.topics.slice(), logs: remote.saviour.logs || {} };
+      if (data.saviour.topics.indexOf(saviourTab) < 0) saviourTab = data.saviour.topics[0] || "";
+    }
     saveLocal();
   }
   function status(id, text) {
@@ -73,7 +91,18 @@
   }
   function bag() {
     if (which === "diet") return data.diet[dietTab] || {};
+    if (which === "saviour") return (data.saviour.logs && data.saviour.logs[saviourTab]) || {};
     return data.sleep;
+  }
+  function panelId() {
+    if (which === "diet") return "diet-cal";
+    if (which === "saviour") return "sv-cal";
+    return "slg-cal";
+  }
+  function statusId() {
+    if (which === "diet") return "diet-status";
+    if (which === "saviour") return "sv-status";
+    return "slg-status";
   }
   function shift(n) {
     var m = cursor.m + n;
@@ -85,7 +114,7 @@
     paint();
   }
   function paint() {
-    var root = which === "diet" ? $("diet-cal") : $("slg-cal");
+    var root = $(panelId());
     if (!root || !which) return;
     var y = cursor.y;
     var m = cursor.m;
@@ -98,7 +127,7 @@
     for (var d = 1; d <= count; d++) {
       var key = keyOf(y, m, d);
       var hit = !!rows[key];
-      var cls = "ll-day" + (hit ? (which === "sleep" ? " wrote" : " hit") : " clean") + (key === today ? " today" : "");
+      var cls = "ll-day" + (hit ? " hit" : " clean") + (key === today ? " today" : "");
       cells += '<button type="button" class="' + cls + '" data-day="' + key + '"><span class="n">' + d + "</span></button>";
     }
     var have = open && rows[open];
@@ -107,7 +136,7 @@
       var fields = which === "sleep"
         ? '<input id="ll-time" type="time" step="60" value="' + esc(have && have.time || "") + '" aria-label="Sleep time">' +
           '<textarea id="ll-note" rows="3" placeholder="Why this time" aria-label="Reason">' + esc(have && have.note || "") + "</textarea>"
-        : '<textarea id="ll-note" rows="4" placeholder="What you had" aria-label="Notes">' + esc(have && have.note || "") + "</textarea>";
+        : '<textarea id="ll-note" rows="4" placeholder="' + (which === "saviour" ? "What happened" : "What you had") + '" aria-label="Notes">' + esc(have && have.note || "") + "</textarea>";
       popup = '<div class="ll-back" data-act="close"></div><div class="ll-pop"><div class="ll-pop-top"><strong>' + dayTitle(open) + "</strong></div>" +
         fields +
         '<div class="ll-row"><button type="button" data-act="close">Close</button>' +
@@ -120,6 +149,13 @@
         return '<button type="button" data-diet="' + row[0] + '"' + (row[0] === dietTab ? ' class="on"' : "") + ">" + row[1] + "</button>";
       }).join("") + "</div>";
     }
+    if (which === "saviour") {
+      tabs = '<form class="ll-add" data-act="add-topic"><input id="sv-topic" placeholder="New topic" maxlength="32" autocomplete="off" style="flex:1;min-width:0;color-scheme:dark;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;border-radius:12px;padding:10px;font-size:14px"><button type="submit">Add</button></form>' +
+        '<div class="ll-tabs">' + data.saviour.topics.map(function (name) {
+          return '<button type="button" data-sav="' + esc(name) + '"' + (name === saviourTab ? ' class="on"' : "") + ">" + esc(name) +
+            (name === saviourTab ? ' <i data-drop-topic="1">×</i>' : "") + "</button>";
+        }).join("") + "</div>";
+    }
     root.innerHTML =
       tabs +
       '<div class="ll-top"><button type="button" class="ll-nav" data-act="prev" aria-label="Previous month">‹</button><h3>' + monthLabel(y, m) + '</h3><button type="button" class="ll-nav" data-act="next" aria-label="Next month">›</button></div>' +
@@ -127,7 +163,7 @@
       '<div class="ll-grid">' + cells + "</div>" + popup;
   }
   function post(body) {
-    var id = which === "diet" ? "diet-status" : "slg-status";
+    var id = statusId();
     status(id, "Saving");
     return fetch(API, {
       method: "POST",
@@ -162,38 +198,79 @@
       post({ section: "sleep", day: day, time: time, note: note });
       return;
     }
+    if (which === "saviour" && !saviourTab) {
+      status("sv-status", "Add a topic first");
+      return;
+    }
     var text = String(note || "").trim();
+    var store = which === "saviour" ? data.saviour.logs[saviourTab] : data.diet[dietTab];
+    var tab = which === "saviour" ? saviourTab : dietTab;
     if (!text) {
-      delete data.diet[dietTab][open];
+      delete store[open];
       saveLocal();
       var blank = open;
       open = "";
       paint();
-      post({ section: "diet", tab: dietTab, day: blank, clear: true });
+      post({ section: which, tab: tab, day: blank, clear: true });
       return;
     }
-    data.diet[dietTab][open] = { note: text, t: Date.now() };
+    store[open] = { note: text, t: Date.now() };
     saveLocal();
     var kept = open;
     open = "";
     paint();
-    post({ section: "diet", tab: dietTab, day: kept, note: text });
+    post({ section: which, tab: tab, day: kept, note: text });
   }
   function clearOpen() {
     if (!open) return;
     if (which === "sleep") delete data.sleep[open];
+    else if (which === "saviour" && data.saviour.logs[saviourTab]) delete data.saviour.logs[saviourTab][open];
     else delete data.diet[dietTab][open];
     saveLocal();
     var day = open;
-    var tab = dietTab;
+    var tab = which === "saviour" ? saviourTab : dietTab;
     var section = which;
     open = "";
     paint();
     post({ section: section, tab: tab, day: day, clear: true });
   }
+  function addTopic(ev) {
+    if (ev) ev.preventDefault();
+    var input = $("sv-topic");
+    var name = String(input && input.value || "").replace(/\s+/g, " ").trim().slice(0, 32);
+    if (!name) return;
+    if (data.saviour.topics.indexOf(name) < 0) data.saviour.topics.push(name);
+    if (!data.saviour.logs[name]) data.saviour.logs[name] = {};
+    saviourTab = name;
+    saveLocal();
+    open = "";
+    paint();
+    post({ section: "saviour", topicAct: "add", topic: name });
+  }
+  function dropTopic(name) {
+    data.saviour.topics = data.saviour.topics.filter(function (item) { return item !== name; });
+    delete data.saviour.logs[name];
+    if (saviourTab === name) saviourTab = data.saviour.topics[0] || "";
+    saveLocal();
+    open = "";
+    paint();
+    post({ section: "saviour", topicAct: "drop", topic: name });
+  }
   function onClick(ev) {
-    var b = ev.target && ev.target.closest && ev.target.closest("[data-act],[data-day],[data-diet]");
+    var b = ev.target && ev.target.closest && ev.target.closest("[data-act],[data-day],[data-diet],[data-sav],[data-drop-topic]");
     if (!b) return;
+    if (b.getAttribute("data-drop-topic")) {
+      ev.preventDefault();
+      dropTopic(saviourTab);
+      return;
+    }
+    var sav = b.getAttribute("data-sav");
+    if (sav) {
+      saviourTab = sav;
+      open = "";
+      paint();
+      return;
+    }
     var diet = b.getAttribute("data-diet");
     if (diet) {
       dietTab = diet;
@@ -202,6 +279,7 @@
       return;
     }
     var act = b.getAttribute("data-act");
+    if (act === "add-topic") { addTopic(ev); return; }
     if (act === "prev") { shift(-1); return; }
     if (act === "next") { shift(1); return; }
     if (act === "close") { open = ""; paint(); return; }
@@ -222,7 +300,7 @@
     }).catch(function () {});
   }
   function hideBoth() {
-    ["sleep-log-panel", "diet-panel"].forEach(function (id) {
+    ["sleep-log-panel", "diet-panel", "saviour-panel"].forEach(function (id) {
       var p = $(id);
       if (!p) return;
       p.style.display = "none";
@@ -241,7 +319,7 @@
     hideBoth();
     which = kind;
     open = "";
-    var p = $(kind === "diet" ? "diet-panel" : "sleep-log-panel");
+    var p = $(which === "diet" ? "diet-panel" : which === "saviour" ? "saviour-panel" : "sleep-log-panel");
     if (!p) return;
     document.body.classList.add("life-on");
     p.style.display = "block";
@@ -253,24 +331,30 @@
   }
   window.showSleepLog = function (on) { show("sleep", on); };
   window.showDiet = function (on) { show("diet", on); };
+  window.showSaviour = function (on) { show("saviour", on); };
 
   if (!document.getElementById("ll-style")) {
     var css = document.createElement("style");
     css.id = "ll-style";
-    css.textContent = ".ll-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}.ll-top h3{margin:0;font-size:24px;font-weight:800}.ll-nav{width:36px;height:36px;border-radius:50%;border:0;background:#1a222e;color:#f4f7fb;font-size:20px;cursor:pointer}.ll-tabs{display:flex;gap:6px;margin:0 0 12px}.ll-tabs button{border:1px solid #2a3140;background:#12161d;color:#c5d0dc;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.ll-tabs button.on{background:#1f8a4d;color:#fff;border-color:#1f8a4d}.ll-week,.ll-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.ll-week{margin-bottom:6px}.ll-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.ll-day{border:0;background:transparent;padding:2px 0;cursor:pointer}.ll-day .n{width:36px;height:36px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}.ll-day.clean .n{background:#1f8a4d;color:#fff}.ll-day.hit .n,.ll-day.wrote .n{background:#e15d6a;color:#fff}.ll-day.today .n{box-shadow:0 0 0 2px #f4f7fb}.ll-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}.ll-pop{position:fixed;left:12px;right:12px;bottom:12px;z-index:41;padding:16px;border-radius:22px;background:#141b24;box-shadow:0 16px 50px rgba(0,0,0,.45)}.ll-pop-top{font-size:18px;margin-bottom:10px}#ll-time,#ll-note{width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3d4a5c;border-radius:12px;background:#0e131a;color:#f4f7fb;font-weight:700;color-scheme:dark}#ll-time{font-size:28px;font-weight:800}#ll-note{font-size:16px;resize:vertical}.ll-row{display:flex;gap:8px;margin-top:12px}.ll-row button{flex:1;padding:14px 8px;border:0;border-radius:12px;font-weight:800;cursor:pointer;background:#1a222e;color:#e8eef6}.ll-row button[data-act=save]{background:#f4f7fb;color:#111}.ll-row button[data-act=clear]{background:#3c1822;color:#ff9aa8}body.life-on main>section.section,body.life-on main>.trend-panel:not(#sleep-log-panel):not(#diet-panel),body.life-on #tf-panels{display:none!important}body.life-on #sleep-log-panel.on,body.life-on #diet-panel.on{display:block!important}";
+    css.textContent = ".ll-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}.ll-top h3{margin:0;font-size:24px;font-weight:800}.ll-nav{width:36px;height:36px;border-radius:50%;border:0;background:#1a222e;color:#f4f7fb;font-size:20px;cursor:pointer}.ll-tabs{display:flex;gap:6px;margin:0 0 12px}.ll-tabs button{border:1px solid #2a3140;background:#12161d;color:#c5d0dc;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.ll-tabs button.on{background:#1f8a4d;color:#fff;border-color:#1f8a4d}.ll-week,.ll-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.ll-week{margin-bottom:6px}.ll-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.ll-day{border:0;background:transparent;padding:2px 0;cursor:pointer}.ll-day .n{width:36px;height:36px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}.ll-day.clean .n{background:#1f8a4d;color:#fff}.ll-day.hit .n,.ll-day.wrote .n{background:#e15d6a;color:#fff}.ll-day.today .n{box-shadow:0 0 0 2px #f4f7fb}.ll-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}.ll-pop{position:fixed;left:12px;right:12px;bottom:12px;z-index:41;padding:16px;border-radius:22px;background:#141b24;box-shadow:0 16px 50px rgba(0,0,0,.45)}.ll-pop-top{font-size:18px;margin-bottom:10px}#ll-time,#ll-note{width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3d4a5c;border-radius:12px;background:#0e131a;color:#f4f7fb;font-weight:700;color-scheme:dark}#ll-time{font-size:28px;font-weight:800}#ll-note{font-size:16px;resize:vertical}.ll-row{display:flex;gap:8px;margin-top:12px}.ll-row button{flex:1;padding:14px 8px;border:0;border-radius:12px;font-weight:800;cursor:pointer;background:#1a222e;color:#e8eef6}.ll-row button[data-act=save]{background:#f4f7fb;color:#111}.ll-row button[data-act=clear]{background:#3c1822;color:#ff9aa8}body.life-on main>section.section,body.life-on main>.trend-panel:not(#sleep-log-panel):not(#diet-panel):not(#saviour-panel),body.life-on #tf-panels{display:none!important}body.life-on #sleep-log-panel.on,body.life-on #diet-panel.on,body.life-on #saviour-panel.on{display:block!important}.ll-add{display:flex;gap:8px;margin:0 0 12px}.ll-add button{border:0;border-radius:12px;padding:10px 14px;font-weight:900;background:#e6c878;color:#1a1408}.ll-tabs{flex-wrap:wrap}.ll-tabs i{font-style:normal;margin-left:6px;color:#ffb4bc}";
     document.head.appendChild(css);
   }
   loadLocal();
-  ["slg-cal", "diet-cal"].forEach(function (id) {
+  ["slg-cal", "diet-cal", "sv-cal"].forEach(function (id) {
     var el = $(id);
-    if (el) el.addEventListener("click", onClick);
+    if (el) {
+      el.addEventListener("click", onClick);
+      el.addEventListener("submit", function (ev) {
+        if (ev.target && ev.target.getAttribute("data-act") === "add-topic") addTopic(ev);
+      });
+    }
   });
   var tabs = $("tf-tabs");
   if (tabs) tabs.addEventListener("click", function (ev) {
     var b = ev.target && ev.target.closest && ev.target.closest("[data-tf]");
     if (!b) return;
     var tf = b.getAttribute("data-tf");
-    if (tf !== "sleeplog" && tf !== "diet") hideBoth();
+    if (tf !== "sleeplog" && tf !== "diet" && tf !== "saviour") hideBoth();
   }, true);
   pull();
 })();
