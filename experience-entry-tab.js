@@ -20,6 +20,7 @@
     if (!state.total && state.cap) state.total = state.cap;
     if (!Array.isArray(state.log)) state.log = [];
     if (!Array.isArray(state.noTrade)) state.noTrade = [];
+    if (!Array.isArray(state.rules)) state.rules = [];
   }
   function write() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
@@ -73,8 +74,67 @@
   }
   function field(label, id, value, type) {
     return '<label style="display:block;margin-top:10px;color:#c5d0dc;font-size:12px;font-weight:700">' + label +
-      '<input id="' + id + '" type="' + (type || "text") + '" value="' + esc(value) + '" placeholder="' + esc(label) + '" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:1px solid #3dbe7a;border-radius:12px;background:#12161d;color:#fff;font-size:16px;font-weight:800;color-scheme:dark">' +
+      '<input id="' + id + '" type="' + (type || "text") + '" value="' + esc(value) + '" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:1px solid #5c6b80;border-radius:12px;background:#243140;color:#fff;font-size:16px;font-weight:800;color-scheme:dark">' +
       "</label>";
+  }
+  function ruleLines(text) {
+    return String(text || "").split(/\n+/).map(function (line) { return line.trim(); }).filter(Boolean);
+  }
+  function paintRules() {
+    var box = $("experience-rules");
+    if (!box) return;
+    var form = $("ee-rule-form");
+    if (!form) {
+      form = document.createElement("article");
+      form.id = "ee-rule-form";
+      form.style.cssText = "margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a";
+      var intro = box.firstElementChild;
+      if (intro && intro.nextSibling) box.insertBefore(form, intro.nextSibling);
+      else box.appendChild(form);
+      form.innerHTML =
+        '<div style="color:#7dffb3;font-size:12px;font-weight:800">New rule</div>' +
+        '<input id="ee-rule-title" value="Title" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:0;border:0;background:transparent;color:#fff;font-size:17px;font-weight:800;color-scheme:dark">' +
+        '<textarea id="ee-rule-body" rows="3" style="display:block;width:100%;box-sizing:border-box;margin-top:10px;padding:0;border:0;background:transparent;color:#fff;font-size:18px;font-weight:800;line-height:1.4;resize:vertical;color-scheme:dark">Write the rule.</textarea>' +
+        '<button type="button" id="ee-rule-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406">Enter</button>';
+      function addRule() {
+        var title = $("ee-rule-title").value.trim();
+        var body = $("ee-rule-body").value.trim();
+        if (!title || title === "Title" || !body || body === "Write the rule.") return;
+        state.rules.push({ t: Date.now(), title: title, body: body });
+        write();
+        $("ee-rule-title").value = "Title";
+        $("ee-rule-body").value = "Write the rule.";
+        paintRules();
+      }
+      $("ee-rule-add").onclick = addRule;
+      $("ee-rule-title").addEventListener("focus", function () { if (this.value === "Title") this.select(); });
+      $("ee-rule-title").addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); addRule(); } });
+      $("ee-rule-body").addEventListener("focus", function () { if (this.value === "Write the rule.") this.select(); });
+    }
+    var list = $("ee-user-rules");
+    if (!list) {
+      list = document.createElement("div");
+      list.id = "ee-user-rules";
+      box.appendChild(list);
+    }
+    list.innerHTML = state.rules.map(function (row, i) {
+      var lines = ruleLines(row.body).map(function (line) {
+        return '<p style="margin:10px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">' + esc(line) + "</p>";
+      }).join("");
+      return '<article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a">' +
+        '<div style="color:#7dffb3;font-size:12px;font-weight:800">Rule ' + (17 + i) + "</div>" +
+        '<b style="display:block;margin-top:4px;font-size:17px">' + esc(row.title) + "</b>" +
+        lines +
+        '<button type="button" data-drop-rule="' + row.t + '" style="margin-top:8px;border:0;background:transparent;color:#ff8a7a;font-weight:800;padding:0">Remove</button></article>';
+    }).join("");
+    list.querySelectorAll("[data-drop-rule]").forEach(function (btn) {
+      btn.onclick = function () {
+        var t = Number(btn.getAttribute("data-drop-rule"));
+        state.rules = state.rules.filter(function (row) { return row.t !== t; });
+        write();
+        paintRules();
+      };
+    });
   }
   function paint() {
     var root = $("experience-tools");
@@ -95,12 +155,11 @@
       if (overSize) flags.push("over size");
       var when = row.date || "";
       var coin = row.coin || "";
-      return '<article data-id="' + row.t + '" style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid ' + (bad ? "#ff6b6b" : "#3dbe7a") + '">' +
-        '<div style="color:#7dffb3;font-size:12px;font-weight:800">Rule ' + (i + 1) + '</div>' +
-        '<b style="display:block;margin-top:4px;font-size:17px;color:' + (bad ? "#ff8a7a" : "#fff") + '">' + esc(coin || "Entry") + "</b>" +
-        '<p style="margin:10px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:' + (bad ? "#ff8a7a" : "#fff") + '">' + money(amount) + "</p>" +
-        (row.notes ? '<p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">' + esc(row.notes) + "</p>" : "") +
-        '<p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">' + (pct == null ? "Set a total amount" : pct + "% of total") + (row.setup ? " · setup valid" : "") + (flags.length ? " · " + flags.join(" · ") : "") + "</p>" +
+      return '<article data-id="' + row.t + '" style="margin-top:10px;padding:12px;border-radius:14px;background:' + (bad ? "#2a1416" : "#1a2430") + ';border:1px solid ' + (bad ? "#ff6b6b" : "#3d4f66") + '">' +
+        '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><b style="color:' + (bad ? "#ff8a7a" : "#7dffb3") + '">#' + (i + 1) + " " + esc(coin) + "</b><span style=\"color:#c5d0dc;font-size:12px\">" + esc(when) + (flags.length ? " · " + flags.join(" · ") : "") + "</span></div>" +
+        '<div style="margin-top:8px;font-size:18px;font-weight:900;color:' + (bad ? "#ff8a7a" : "#fff") + '">' + money(amount) + "</div>" +
+        (row.notes ? '<div style="margin-top:6px;font-size:14px;color:#d7dee8;line-height:1.4">' + esc(row.notes) + "</div>" : "") +
+        '<div style="margin-top:4px;font-size:14px;color:#c5d0dc">' + (pct == null ? "Set a total amount" : pct + "% of total") + (row.setup ? " · setup valid" : "") + "</div>" +
         '<button type="button" data-drop="' + row.t + '" style="margin-top:8px;border:0;background:transparent;color:#ff8a7a;font-weight:800;padding:0">Remove</button></article>';
     }).join("");
     var sumPct = total ? Math.round(sum / total * 1000) / 10 : null;
@@ -110,14 +169,14 @@
       field("Total amount", "ee-total", state.total || "", "number") +
       field("Fixed entries per week", "ee-count", state.count || "", "number") +
       '<button type="button" id="ee-save" style="margin-top:12px;border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406">Save</button>' +
-      '<div style="margin-top:16px;color:#7dffb3;font-size:12px;font-weight:800">New entry</div>' +
-      '<select id="ee-kind" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3dbe7a;border-radius:12px;background:#12161d;color:#fff;font-size:17px;font-weight:800;color-scheme:dark"><option>New</option></select>' +
+      '<div style="margin-top:16px;font-size:13px;font-weight:800;color:#fff">New</div>' +
+      '<select id="ee-kind" style="display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #5c6b80;border-radius:12px;background:#243140;color:#fff;font-size:16px;font-weight:800;color-scheme:dark"><option>New</option></select>' +
       field("Coin", "ee-coin", "", "text") +
       field("Amount USD", "ee-amount", "", "number") +
-      '<label style="display:block;margin-top:10px;color:#c5d0dc;font-size:12px;font-weight:700">Notes<textarea id="ee-notes" rows="3" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:1px solid #3dbe7a;border-radius:12px;background:#12161d;color:#fff;font-size:15px;font-weight:700;color-scheme:dark">Why this setup was there.</textarea></label>' +
+      '<label style="display:block;margin-top:10px;color:#c5d0dc;font-size:12px;font-weight:700">Notes<textarea id="ee-notes" rows="3" style="display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:1px solid #5c6b80;border-radius:12px;background:#243140;color:#fff;font-size:15px;font-weight:700;color-scheme:dark"></textarea></label>' +
       '<label style="display:flex;align-items:center;gap:12px;margin-top:16px;color:#7dffb3;font-size:20px;font-weight:800;line-height:1.3"><input id="ee-setup" type="checkbox" style="width:32px;height:32px;accent-color:#62e3a0"> Setup valid (Weekly Support)</label>' +
       '<div style="margin-top:6px;color:#7dffb3;font-size:16px;font-weight:700;line-height:1.4">On: even 100% is not over size. Off: over 30% is over size.</div>' +
-      '<button type="button" id="ee-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406">Enter</button>' +
+      '<button type="button" id="ee-add" style="margin-top:12px;border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406">Add entry</button>' +
       '<div style="margin-top:12px;font-size:13px;line-height:1.45;color:#9aa6b6">This week: ' + week.length + (capN != null ? " / " + capN : "") + " entries" +
       (sumPct == null ? "" : " · " + sumPct + "% of total") + "</div>" +
       rows + "</article>" + calendarHtml();
@@ -146,13 +205,7 @@
       paint();
     }
     $("ee-add").onclick = addEntry;
-    ["ee-coin", "ee-amount"].forEach(function (id) {
-      var el = $(id);
-      if (!el) return;
-      el.addEventListener("keydown", function (ev) {
-        if (ev.key === "Enter") { ev.preventDefault(); addEntry(); }
-      });
-    });
+    paintRules();
     root.querySelectorAll("[data-drop]").forEach(function (btn) {
       btn.onclick = function () {
         var t = Number(btn.getAttribute("data-drop"));
