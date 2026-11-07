@@ -398,6 +398,46 @@ export class OhlcvEngine {
         const dips = readFavDips(this.store);
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
+      if (path === '/life-log' || path === '/api/life-log') {
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} } });
+        const readLife = () => {
+          let data = blank();
+          try {
+            const saved = JSON.parse(this.store.getMeta('life_log_v1') || '{}') || {};
+            data.sleep = saved.sleep && typeof saved.sleep === 'object' ? saved.sleep : {};
+            ['sweet', 'biryani', 'carbs'].forEach((name) => {
+              const bag = saved.diet && saved.diet[name];
+              data.diet[name] = bag && typeof bag === 'object' ? bag : {};
+            });
+          } catch (e) {}
+          return data;
+        };
+        const cleanNote = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+        const cleanTime = (value) => /^\d{2}:\d{2}$/.test(String(value || '')) ? String(value) : '';
+        if (request.method === 'POST') {
+          const body = await request.json().catch(() => ({}));
+          const day = String(body.day || '');
+          const data = readLife();
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+            return new Response(JSON.stringify({ ok: false, error: 'Pick a date' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+          }
+          if (body.section === 'sleep') {
+            if (body.clear) delete data.sleep[day];
+            else {
+              const time = cleanTime(body.time);
+              if (!time) return new Response(JSON.stringify({ ok: false, error: 'Add a sleep time' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+              data.sleep[day] = { time, note: cleanNote(body.note), t: Date.now() };
+            }
+          } else if (body.section === 'diet' && data.diet[body.tab]) {
+            const note = cleanNote(body.note);
+            if (body.clear || !note) delete data.diet[body.tab][day];
+            else data.diet[body.tab][day] = { note, t: Date.now() };
+          }
+          this.store.setMeta('life_log_v1', JSON.stringify(data));
+          return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+        }
+        return new Response(JSON.stringify({ ok: true, ...readLife() }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
+      }
       if (path === '/fav-supports' || path === '/api/fav-supports') {
         const board = readFavSupports(this.store);
         return new Response(JSON.stringify({ ok: true, ...board }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
@@ -1273,6 +1313,7 @@ export default {
       '/fomo-entry': 1, '/api/fomo-entry': 1,
       '/fomo-experiences': 1, '/api/fomo-experiences': 1,
       '/fav-dips': 1, '/api/fav-dips': 1,
+      '/life-log': 1, '/api/life-log': 1,
       '/coinstats-wallets': 1, '/api/coinstats-wallets': 1,
       '/strategy': 1, '/api/strategy': 1,
       '/alerts': 1, '/api/alerts': 1,
