@@ -2,10 +2,10 @@
 (function () {
   var API = "https://trading-ohlcv.sasipudi.workers.dev/life-log";
   var KEY = "life_log_v1";
-  var DIET = [["sweet", "Sweet"], ["biryani", "Biryani"], ["carbs", "Carbs"]];
+  var DIET = [["biryani", "Biryani"], ["sweet", "Sweets"], ["carbs", "Carbs"]];
   var data = { sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} } };
   var cursor = istParts(new Date());
-  var dietTab = "sweet";
+  var dietTab = "biryani";
   var saviourTab = "";
   var open = "";
   var which = "";
