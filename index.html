@@ -612,6 +612,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="diet" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showDiet&&window.showDiet(true);}catch(e){}">Diet</button>
   <button type="button" class="tab" data-tf="saviour" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showSaviour&&window.showSaviour(true);}catch(e){}">Saviour</button>
   <button type="button" class="tab" data-tf="weight" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showWeight&&window.showWeight(true);}catch(e){}">Weight</button>
+  <button type="button" class="tab" data-tf="water" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showWater&&window.showWater(true);}catch(e){}">Water</button>
   <button type="button" class="tab" data-tf="memegate">MemeGate</button>
   <a class="tab" data-tf="soulscanner" href="https://t.me/soul_scanner_bot" target="_blank" rel="noopener">Soul Scanner</a>
   <a class="tab" data-tf="cabalhunter" href="https://cabal-hunter.com/map" target="_blank" rel="noopener">Cabal Hunter</a>
@@ -1132,6 +1133,12 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <section class="section">
   <div class="head"><div><h2>Weight</h2><p>Log a day. Day, week, and month sit on top.</p></div><span class="source" id="wt-status">READY</span></div>
   <div class="card" style="padding:12px"><div id="wt-board"></div></div>
+</section>
+</div>
+<div id="water-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Water</h2><p>Tap a glass. Today is on top.</p></div><span class="source" id="wa-status">READY</span></div>
+  <div class="card" style="padding:12px"><div id="wa-board"></div></div>
 </section>
 </div>
 <div id="holders-panel" class="trend-panel" style="display:none">
@@ -1784,7 +1791,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261108-wt1"></script>
+<script src="overview-app.js?v=20261108-wa1"></script>
 <script src="breakout-tab.js?v=20261018-free1"></script>
 <script src="hunter-tab.js?v=20261018-free1"></script>
 <script src="holders-tab.js?v=20261018-free1"></script>
@@ -1793,6 +1800,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <script src="sleep-tab.js?v=20260930-sl3"></script>
 <script src="life-log.js?v=20261107-bsc1"></script>
 <script src="weight-tab.js?v=20261108-wt1"></script>
+<script src="water-tab.js?v=20261108-wa1"></script>
 <script src="cal-tab.js?v=20261015-sale2"></script>
 <script src="mandates-tab.js?v=20261014-md6"></script>
 <script src="commentary.js?v=20260924-c3"></script>

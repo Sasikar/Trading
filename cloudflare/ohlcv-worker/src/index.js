@@ -399,7 +399,7 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/life-log' || path === '/api/life-log') {
-        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, weight: { goal: 80, days: {} } });
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} } });
         const cleanTopic = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
         const readLife = () => {
           let data = blank();
@@ -431,6 +431,15 @@ export class OhlcvEngine {
             });
             const goal = Number(saved.weight && saved.weight.goal);
             data.weight = { goal: goal >= 20 && goal <= 400 ? Math.round(goal * 10) / 10 : 80, days };
+            const waterDays = {};
+            const rawWater = saved.water && saved.water.days && typeof saved.water.days === 'object' ? saved.water.days : {};
+            Object.keys(rawWater).forEach((day) => {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+              const ml = Number(rawWater[day] && rawWater[day].ml);
+              if (ml >= 0 && ml <= 20000) waterDays[day] = { ml: Math.round(ml), t: Number(rawWater[day].t) || 0 };
+            });
+            const waterGoal = Number(saved.water && saved.water.goal);
+            data.water = { goal: waterGoal >= 250 && waterGoal <= 8000 ? Math.round(waterGoal) : 3000, days: waterDays };
           } catch (e) {}
           return data;
         };
@@ -463,6 +472,23 @@ export class OhlcvEngine {
                 const kg = Number(body.kg);
                 if (!(kg >= 20 && kg <= 400)) return new Response(JSON.stringify({ ok: false, error: 'Weight looks wrong' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
                 data.weight.days[day] = { kg: Math.round(kg * 10) / 10, t: Date.now() };
+              }
+            }
+          } else if (body.section === 'water') {
+            if (body.goal != null && body.goal !== '') {
+              const waterGoal = Number(body.goal);
+              if (!(waterGoal >= 250 && waterGoal <= 8000)) return new Response(JSON.stringify({ ok: false, error: 'Goal looks wrong' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+              data.water.goal = Math.round(waterGoal);
+            }
+            if (day) {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return new Response(JSON.stringify({ ok: false, error: 'Pick a date' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+              if (body.clear) delete data.water.days[day];
+              else if (body.ml != null && body.ml !== '') {
+                const add = Number(body.ml);
+                if (!(add > 0 && add <= 5000)) return new Response(JSON.stringify({ ok: false, error: 'Amount looks wrong' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+                const prev = data.water.days[day] && data.water.days[day].ml || 0;
+                const ml = Math.min(20000, Math.round(body.set ? add : prev + add));
+                data.water.days[day] = { ml, t: Date.now() };
               }
             }
           } else if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
