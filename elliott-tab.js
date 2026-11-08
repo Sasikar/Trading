@@ -128,7 +128,7 @@
   function paint() {
     var root = $("ew-board");
     if (!root || !rows.length) return;
-    var pct = mode === "4h" ? 0.035 : 0.08;
+    var pct = mode === "4h" ? 0.035 : mode === "1w" ? 0.12 : mode === "1M" ? 0.18 : 0.08;
     var points = zigzag(rows, pct);
     var spot = rows[rows.length - 1].c;
     var pack = wavesOf(points, spot);
@@ -140,9 +140,11 @@
       return '<span style="flex:1;text-align:center;padding:8px 0;border-radius:10px;font-weight:900;background:' + (on ? "#e6c878" : "#121820") + ';color:' + (on ? "#1a1406" : "#9aa6b6") + '">' + n + "</span>";
     }).join("");
     root.innerHTML =
-      '<div style="display:flex;gap:8px;margin-bottom:12px">' +
-      '<button type="button" data-mode="1d" style="border:0;border-radius:999px;padding:8px 14px;font-weight:800;background:' + (mode === "1d" ? "#e6c878" : "#17202b") + ';color:' + (mode === "1d" ? "#1a1406" : "#c5d0dc") + '">Daily</button>' +
-      '<button type="button" data-mode="4h" style="border:0;border-radius:999px;padding:8px 14px;font-weight:800;background:' + (mode === "4h" ? "#e6c878" : "#17202b") + ';color:' + (mode === "4h" ? "#1a1406" : "#c5d0dc") + '">4H</button></div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">' +
+      [["4h", "4H"], ["1d", "Daily"], ["1w", "Weekly"], ["1M", "Monthly"]].map(function (item) {
+        var on = mode === item[0];
+        return '<button type="button" data-mode="' + item[0] + '" style="border:0;border-radius:999px;padding:8px 14px;font-weight:800;background:' + (on ? "#e6c878" : "#17202b") + ';color:' + (on ? "#1a1406" : "#c5d0dc") + '">' + item[1] + "</button>";
+      }).join("") + "</div>" +
       '<div style="font-size:13px;color:#8b93a7;font-weight:800">NOW</div>' +
       '<div style="font-size:40px;font-weight:900;line-height:1.1;color:#e6c878">Wave ' + esc(pack.name) + "</div>" +
       '<div style="margin-top:4px;color:#c5d0dc">' + (pack.up ? "Up count" : "Down count") + " · BTC " + money(spot) + "</div>" +
@@ -151,7 +153,7 @@
       row("Next wave", "Wave " + goal.next, "#3dbe7a") +
       row("Next target", money(goal.price), "#3dbe7a") +
       row("Count fails past", money(bad), "#ff8a7a") +
-      '<div style="margin-top:8px;color:#8b93a7;font-size:12px;line-height:1.45">One reading of the bigger BTC swings. The next target is the usual Fibonacci level for that wave. The count fails if price goes through the level below. Not a promise.</div>';
+      '<div style="margin-top:8px;color:#8b93a7;font-size:12px;line-height:1.45">One reading of the bigger BTC swings. The next target is the usual Fibonacci level for that wave. The count fails if price trades through the red price. Not a promise.</div>';
     root.querySelectorAll("[data-mode]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         mode = btn.getAttribute("data-mode");
@@ -159,7 +161,24 @@
       });
     });
     var st = $("ew-status");
-    if (st) st.textContent = mode === "4h" ? "4H" : "DAILY";
+    if (st) st.textContent = mode === "4h" ? "4H" : mode === "1w" ? "WEEKLY" : mode === "1M" ? "MONTHLY" : "DAILY";
+  }
+  function monthsOf(weeks) {
+    var map = {};
+    var order = [];
+    weeks.forEach(function (c) {
+      var d = new Date(c.t);
+      var key = d.getUTCFullYear() + "-" + d.getUTCMonth();
+      if (!map[key]) {
+        map[key] = { t: c.t, h: c.h, l: c.l, c: c.c };
+        order.push(key);
+      } else {
+        if (c.h > map[key].h) map[key].h = c.h;
+        if (c.l < map[key].l) map[key].l = c.l;
+        map[key].c = c.c;
+      }
+    });
+    return order.map(function (key) { return map[key]; });
   }
   function load() {
     var st = $("ew-status");
@@ -173,11 +192,12 @@
       rows = data.map(function (k) { return { t: +k[0], h: +k[2], l: +k[3], c: +k[4] }; });
       paint();
     }).catch(function () {
-      var iv = mode === "4h" ? 240 : 1440;
+      var iv = mode === "4h" ? 240 : mode === "1d" ? 1440 : 10080;
       fetch("https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=" + iv, { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
         var raw = j && j.result && (j.result.XXBTZUSD || j.result.XBTUSD) || [];
         if (!raw.length) throw new Error("empty");
         rows = raw.map(function (k) { return { t: k[0] * 1000, h: +k[2], l: +k[3], c: +k[4] }; });
+        if (mode === "1M") rows = monthsOf(rows);
         paint();
       }).catch(function () {
         var root = $("ew-board");
