@@ -399,7 +399,7 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/life-log' || path === '/api/life-log') {
-        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} } });
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, weight: { goal: 80, days: {} } });
         const cleanTopic = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
         const readLife = () => {
           let data = blank();
@@ -422,6 +422,15 @@ export class OhlcvEngine {
               logs[topic] = bag && typeof bag === 'object' ? bag : {};
             });
             data.saviour = { topics, logs };
+            const days = {};
+            const rawDays = saved.weight && saved.weight.days && typeof saved.weight.days === 'object' ? saved.weight.days : {};
+            Object.keys(rawDays).forEach((day) => {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+              const kg = Number(rawDays[day] && rawDays[day].kg);
+              if (kg >= 20 && kg <= 400) days[day] = { kg: Math.round(kg * 10) / 10, t: Number(rawDays[day].t) || 0 };
+            });
+            const goal = Number(saved.weight && saved.weight.goal);
+            data.weight = { goal: goal >= 20 && goal <= 400 ? Math.round(goal * 10) / 10 : 80, days };
           } catch (e) {}
           return data;
         };
@@ -440,6 +449,21 @@ export class OhlcvEngine {
             } else if (data.saviour.topics.indexOf(topic) < 0 && data.saviour.topics.length < 40) {
               data.saviour.topics.push(topic);
               data.saviour.logs[topic] = data.saviour.logs[topic] || {};
+            }
+          } else if (body.section === 'weight') {
+            if (body.goal != null && body.goal !== '') {
+              const goal = Number(body.goal);
+              if (!(goal >= 20 && goal <= 400)) return new Response(JSON.stringify({ ok: false, error: 'Goal looks wrong' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+              data.weight.goal = Math.round(goal * 10) / 10;
+            }
+            if (day) {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return new Response(JSON.stringify({ ok: false, error: 'Pick a date' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+              if (body.clear) delete data.weight.days[day];
+              else if (body.kg != null && body.kg !== '') {
+                const kg = Number(body.kg);
+                if (!(kg >= 20 && kg <= 400)) return new Response(JSON.stringify({ ok: false, error: 'Weight looks wrong' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+                data.weight.days[day] = { kg: Math.round(kg * 10) / 10, t: Date.now() };
+              }
             }
           } else if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             return new Response(JSON.stringify({ ok: false, error: 'Pick a date' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
