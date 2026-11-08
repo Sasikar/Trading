@@ -663,6 +663,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="4h">4H</button>
   <button type="button" class="tab" data-tf="1d">1D</button>
   <button type="button" class="tab" data-tf="trend">Trend</button>
+  <button type="button" class="tab" data-tf="elliott" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showElliott&&window.showElliott(true);}catch(e){}">Elliott</button>
   <button type="button" class="tab" data-tf="struct">Struct</button>
   <button type="button" class="tab" data-tf="macro">Macro</button>
   <button type="button" class="tab" data-tf="1w">1W</button>
@@ -1139,6 +1140,12 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <section class="section">
   <div class="head"><div><h2>Water</h2><p>Tap a glass. Today is on top.</p></div><span class="source" id="wa-status">READY</span></div>
   <div class="card" style="padding:12px"><div id="wa-board"></div></div>
+</section>
+</div>
+<div id="elliott-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Elliott Wave</h2><p>BTC swings. The wave you are in, and the next target.</p></div><span class="source" id="ew-status">READY</span></div>
+  <div class="card" style="padding:12px"><div id="ew-board"></div></div>
 </section>
 </div>
 <div id="holders-panel" class="trend-panel" style="display:none">
@@ -1791,8 +1798,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261108-wa1"></script>
-<script src="overview-groups.js?v=20261108-og2"></script>
+<script src="overview-app.js?v=20261108-ew1"></script>
+<script src="overview-groups.js?v=20261108-og3"></script>
 <script src="breakout-tab.js?v=20261018-free1"></script>
 <script src="hunter-tab.js?v=20261018-free1"></script>
 <script src="holders-tab.js?v=20261018-free1"></script>
@@ -1802,6 +1809,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <script src="life-log.js?v=20261107-bsc1"></script>
 <script src="weight-tab.js?v=20261108-wt1"></script>
 <script src="water-tab.js?v=20261108-wa1"></script>
+<script src="elliott-tab.js?v=20261108-ew1"></script>
 <script src="cal-tab.js?v=20261015-sale2"></script>
 <script src="mandates-tab.js?v=20261014-md6"></script>
 <script src="commentary.js?v=20260924-c3"></script>
