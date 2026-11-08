@@ -97,6 +97,7 @@
     var rows = shown.map(function (c) {
       var q = quotes[qid(c.chain, c.mint)] || {};
       var price = Number(q.price) || 0;
+      var cap = mc(q.mc);
       var pct = coinAny(c.pct);
       var b = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
       var mint = String(c.mint || "");
@@ -105,7 +106,8 @@
         '<div style="display:flex;align-items:center;gap:6px">' +
         '<div style="flex:1;min-width:0"><b style="color:#f4f7fb;font-size:14px">' + esc(c.symbol || "COIN") + '</b> <span style="color:#8b93a7;font-size:10px">' + chainTag(c) + "</span>" +
         '<div style="color:#6f7a8c;font-size:10px">' + esc(short) + "</div></div>" +
-        '<div style="text-align:right;color:#f4f7fb;font-weight:800;font-size:13px">' + px(price) + "</div>" +
+        '<div style="text-align:right"><div style="color:#f4f7fb;font-weight:800;font-size:13px">' + px(price) + "</div>" +
+        (cap ? '<div style="color:#9aa6b6;font-size:11px;font-weight:800">' + cap + " MC</div>" : "") + "</div>" +
         '<button type="button" data-alert="' + esc(qid(c.chain, c.mint)) + '" aria-label="' + (c.on === false ? "Alert off" : "Alert on") + '" style="border:0;background:transparent;width:18px;height:18px;padding:0;display:flex;align-items:center;justify-content:center">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path fill="' + (c.on === false ? "#5c6778" : "#3dbe7a") + '" d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 0 0-5-5.9V4a1 1 0 1 0-2 0v1.1A6 6 0 0 0 6 11v5l-2 2v1h16v-1z"/>' +
         (c.on === false ? '<path d="M5 5l14 14" stroke="#ff8a7a" stroke-width="2"/>' : "") +
