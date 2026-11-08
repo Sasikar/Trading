@@ -9,14 +9,6 @@
   };
   var ORDER = { health: 10, trade: 20, scanners: 30, research: 40, time: 50 };
   var LABEL = { health: "Health", trade: "Trade", scanners: "Scanners", research: "Research", time: "Time" };
-  var TODAY = [
-    ["btc", "BTC"],
-    ["memes", "Memes"],
-    ["fe", "FomoEntry"],
-    ["weight", "Weight"],
-    ["water", "Water"],
-    ["sleeplog", "Sleep"]
-  ];
   var filter = "all";
   var q = "";
 
@@ -55,21 +47,9 @@
     var box = document.createElement("div");
     box.id = "og-bar";
     box.innerHTML =
-      '<div id="og-today"></div>' +
       '<input id="og-find" type="search" placeholder="Search tabs" autocomplete="off">' +
       '<div id="og-chips"></div>';
     root.parentNode.insertBefore(box, root);
-    var today = box.querySelector("#og-today");
-    TODAY.forEach(function (item) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = item[1];
-      b.addEventListener("click", function () {
-        var tab = root.querySelector('.tab[data-tf="' + item[0] + '"]');
-        if (tab) tab.click();
-      });
-      today.appendChild(b);
-    });
     var chips = box.querySelector("#og-chips");
     [["all", "All"]].concat(Object.keys(LABEL).map(function (key) { return [key, LABEL[key]]; })).forEach(function (item) {
       var b = document.createElement("button");
@@ -96,7 +76,7 @@
       root.appendChild(label);
     });
     var css = document.createElement("style");
-    css.textContent = "#og-bar{margin:8px 0 0}#og-today,#og-chips{display:flex;flex-wrap:wrap;gap:6px}#og-today{margin-bottom:8px}#og-today button{flex:1 1 30%;border:0;border-radius:14px;padding:12px 8px;background:#121820;color:#f4f7fb;font-weight:900;font-size:14px}#og-find{width:100%;box-sizing:border-box;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;font-size:16px;font-weight:700}#og-chips{margin-bottom:8px}#og-chips button{border:0;border-radius:999px;padding:8px 12px;background:#17202b;color:#c5d0dc;font-weight:800}#og-chips button.on{background:#e6c878;color:#1a1406}#tf-tabs .og-label{flex:1 0 100%;margin:8px 2px 2px;color:#8b93a7;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}body.tab-arranging #tf-tabs .og-label{display:none!important}body.tab-arranging #tf-tabs .tab{order:0!important}";
+    css.textContent = "#og-bar{margin:8px 0 0}#og-chips{display:flex;flex-wrap:wrap;gap:6px}#og-find{width:100%;box-sizing:border-box;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;font-size:16px;font-weight:700}#og-chips{margin-bottom:8px}#og-chips button{border:0;border-radius:999px;padding:8px 12px;background:#17202b;color:#c5d0dc;font-weight:800}#og-chips button.on{background:#e6c878;color:#1a1406}#tf-tabs .og-label{flex:1 0 100%;margin:8px 2px 2px;color:#8b93a7;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}body.tab-arranging #tf-tabs .og-label{display:none!important}body.tab-arranging #tf-tabs .tab{order:0!important}";
     document.head.appendChild(css);
     paint();
     new MutationObserver(paint).observe(document.body, { attributes: true, attributeFilter: ["class"] });
