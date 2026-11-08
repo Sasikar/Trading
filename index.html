@@ -646,6 +646,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="btc" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showBtc&&window.showBtc(true);}catch(e){}">BTC</button>
   <button type="button" class="tab" data-tf="memes" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMemes&&window.showMemes(true);}catch(e){}">Memes</button>
   <button type="button" class="tab" data-tf="markets" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMarkets&&window.showMarkets(true);}catch(e){}">Markets</button>
+  <button type="button" class="tab" data-tf="etflive" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showEtfLive&&window.showEtfLive(true);}catch(e){}">ETF Live</button>
   <button type="button" class="tab" data-tf="dex" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showDex&&window.showDex(true);}catch(e){}">DEX</button>
   <button type="button" class="tab" data-tf="experience" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showExperience&&window.showExperience(true);}catch(e){}">Experience Entry</button>
   
@@ -1475,6 +1476,14 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <div class="card"><div id="markets-board"></div></div>
 </section>
 </div>
+<div id="etf-live-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>ETF Live</h2><p>U.S. spot Bitcoin ETF daily net flows.</p></div><span class="source">FARSIDE</span></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <iframe id="etf-live-frame" title="ETF Live" src="about:blank" style="width:100%;height:calc(100vh - 120px);border:0;background:#000;display:block"></iframe>
+  </div>
+</section>
+</div>
 <div id="dex-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head"><div><h2>DEX volume</h2><p>Same numbers as DefiLlama. Swipe the chart.</p></div><span class="source">DAILY</span></div>
@@ -1768,7 +1777,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261108-coat1"></script>
+<script src="overview-app.js?v=20261108-etf1"></script>
 <script src="breakout-tab.js?v=20261018-free1"></script>
 <script src="hunter-tab.js?v=20261018-free1"></script>
 <script src="holders-tab.js?v=20261018-free1"></script>
@@ -1804,6 +1813,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <script src="markets-tab.js?v=20261021-ms1"></script>
 <script src="dex-tab.js?v=20261028-dx6"></script>
 <script src="experience-entry-tab.js?v=20261108-rule2"></script>
+<script src="etf-live-tab.js?v=20261108-etf1"></script>
 <script src="gmgn-tab.js?v=20261018-free1"></script>
 <script src="wallets-tab.js?v=20261018-free1"></script>
 <script src="pumpfun-tab.js?v=20261018-free1"></script>

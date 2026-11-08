@@ -7,8 +7,10 @@
 .risk-price{font-size:20px;font-weight:900;margin-top:8px}
 .risk-chg{font-size:12px;font-weight:800;margin-top:4px}.risk-bias{margin-top:8px}
 @media(max-width:560px){.risk-strip{grid-template-columns:1fr}}
+html.etf-only #site-nav,html.etf-only #macro-strip-section,html.etf-only #trump-news-panel,html.etf-only #x-front-panel,html.etf-only #market-news-panel{display:none!important}
+html.etf-only body{padding-top:0!important}
 
-</style></head><body><div class="shell">
+</style></head><body><script>if(/[?&]view=etf(?:&|$)/.test(location.search))document.documentElement.classList.add('etf-only');</script><div class="shell">
 
 <section class="section" id="macro-strip-section">
   <div class="head"><div><h2>Macro strip</h2><p>DXY · VIX · US10Y</p></div><span class="source">LIVE / SNAP</span></div>
@@ -41,7 +43,7 @@
         <div class="etf-modal-title">₿ U.S. Spot Bitcoin ETF Flows — Full Expanded View</div>
         <div class="etf-modal-sub" id="modalSub">Complete historical dataset with enlarged dates & high-contrast visualization</div>
       </div>
-      <button class="etf-modal-close" id="modalClose">✕</button>
+      <button class="etf-modal-close" id="modalClose" type="button" style="width:auto;border-radius:999px;padding:0 14px">ETF</button>
     </div>
     <div class="etf-modal-body">
       <div class="etf-modal-summary">
@@ -222,21 +224,32 @@
   }
 
   function openModal(defaultIdx){
+    if(!modalBackdrop.classList.contains('open')){
+      try{ if(!history.state||!history.state.etfModal) history.pushState({etfModal:1},''); }catch(err){}
+    }
     modalBackdrop.classList.add('open');
     if(!currentRows.length)return;
     const idx = (typeof defaultIdx==='number'&&defaultIdx>=0)?defaultIdx:currentRows.length-1;
     updateModalSummary(idx);
   }
 
-  function closeModal(){
+  function closeModal(fromPop){
     modalBackdrop.classList.remove('open');
+    if(!fromPop && history.state && history.state.etfModal){
+      try{ history.back(); }catch(err){}
+    }
   }
 
   function setupInteractions(){
     const chartWrap=document.getElementById('chartWrap');
 
     chartWrap.onclick=(e)=>{
+      if(e.target.closest('a')){ e.preventDefault(); }
+      e.stopPropagation();
       const bar=e.target.closest('.bar');
+      const label=e.target.closest('text');
+      if(modalBackdrop.classList.contains('open')){ closeModal(); return; }
+      if(!bar && !label) return;
       const idx=bar?+bar.dataset.idx:currentRows.length-1;
       openModal(idx);
     };
@@ -265,7 +278,17 @@
       updateModalSummary(activeIndex);
     };
 
+    modalMount.onclick=(e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.target.closest('.bar')||e.target.closest('text')||e.target.closest('svg')) closeModal();
+    };
+
     tableEl.onclick=(e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.target.closest('a')) return;
+      if(modalBackdrop.classList.contains('open')){ closeModal(); return; }
       const target=e.target.closest('.frow');
       if(target){
         const idx=+target.dataset.idx;
@@ -274,9 +297,10 @@
     };
   }
 
-  modalClose.onclick=closeModal;
+  modalClose.onclick=function(){ closeModal(); };
   modalBackdrop.onclick=(e)=>{if(e.target===modalBackdrop)closeModal();};
   window.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+  window.addEventListener('popstate',()=>closeModal(true));
 
   function render(days){
     if(!all.length)return;
