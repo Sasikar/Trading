@@ -399,7 +399,7 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/life-log' || path === '/api/life-log') {
-        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, gym: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} } });
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} } });
         const cleanTopic = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
         const readLife = () => {
           let data = blank();
@@ -430,6 +430,22 @@ export class OhlcvEngine {
               if (note) gym[day] = { note, t: Number(rawGym[day].t) || 0 };
             });
             data.gym = gym;
+            const food = {};
+            const rawFood = saved.food && typeof saved.food === 'object' ? saved.food : {};
+            Object.keys(rawFood).forEach((day) => {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+              const note = String(rawFood[day] && rawFood[day].note || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+              if (note) food[day] = { note, t: Number(rawFood[day].t) || 0 };
+            });
+            data.food = food;
+            const steps = {};
+            const rawSteps = saved.steps && typeof saved.steps === 'object' ? saved.steps : {};
+            Object.keys(rawSteps).forEach((day) => {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+              const n = Number(rawSteps[day] && rawSteps[day].n);
+              if (n >= 0 && n <= 100000) steps[day] = { n: Math.round(n), t: Number(rawSteps[day].t) || 0 };
+            });
+            data.steps = steps;
             const days = {};
             const rawDays = saved.weight && saved.weight.days && typeof saved.weight.days === 'object' ? saved.weight.days : {};
             Object.keys(rawDays).forEach((day) => {
@@ -516,6 +532,17 @@ export class OhlcvEngine {
             const note = cleanNote(body.note);
             if (body.clear || !note) delete data.gym[day];
             else data.gym[day] = { note, t: Date.now() };
+          } else if (body.section === 'food') {
+            const note = cleanNote(body.note);
+            if (body.clear || !note) delete data.food[day];
+            else data.food[day] = { note, t: Date.now() };
+          } else if (body.section === 'steps') {
+            if (body.clear) delete data.steps[day];
+            else {
+              const n = Number(body.n);
+              if (!(n >= 0 && n <= 100000)) return new Response(JSON.stringify({ ok: false, error: 'Add steps' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+              data.steps[day] = { n: Math.round(n), t: Date.now() };
+            }
           } else if (body.section === 'saviour' && data.saviour.logs[body.tab]) {
             const note = cleanNote(body.note);
             if (body.clear || !note) delete data.saviour.logs[body.tab][day];
