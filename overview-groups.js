@@ -1,7 +1,7 @@
 /* Overview only. Search, daily tiles, and groups. Nothing moves to the Health page. */
 (function () {
   var GROUPS = {
-    health: ["sleeplog", "sleep", "diet", "saviour", "weight", "water"],
+    health: ["sleeplog", "diet", "saviour", "weight", "water"],
     trade: ["fe", "fomo", "experience", "entrywindow", "decision", "antifomo", "position", "btc", "memes", "coin", "breakouts", "alerts", "pumpfun", "fd", "emotion", "verdict", "fx"],
     scanners: ["soulscanner", "cabalhunter", "rugradar", "defade", "trenchradar", "trenchcoat", "memeassist"],
     time: ["1h", "4h", "1d", "1w", "1M", "trend", "struct", "macro", "elliott"],
