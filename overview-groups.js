@@ -51,6 +51,30 @@
       '<input id="og-find" type="search" placeholder="Search tabs" autocomplete="off">' +
       '<div id="og-chips"></div>';
     root.parentNode.insertBefore(box, root);
+    var fold = document.createElement("button");
+    fold.id = "og-fold";
+    fold.type = "button";
+    fold.innerHTML = '<span id="og-fold-name">Tabs</span><span class="og-arrow">▾</span>';
+    root.parentNode.insertBefore(fold, box);
+    fold.addEventListener("click", function () {
+      document.body.classList.remove("og-collapsed");
+    });
+    root.addEventListener("click", function (ev) {
+      if (document.body.classList.contains("tab-arranging")) return;
+      var tab = ev.target && ev.target.closest && ev.target.closest(".tab");
+      if (!tab || tab.tagName === "A") return;
+      var name = fold.querySelector("#og-fold-name");
+      if (name) name.textContent = String(tab.textContent || "Tab").replace(/\s+/g, " ").trim();
+      document.body.classList.add("og-collapsed");
+      setTimeout(function () {
+        var open = document.querySelector(".trend-panel.on, .struct-trend-panel.on");
+        if (!open) {
+          var panels = document.getElementById("tf-panels");
+          if (panels && panels.style.display !== "none" && !panels.classList.contains("hidden")) open = panels;
+        }
+        if (open && open.scrollIntoView) open.scrollIntoView({ block: "start" });
+      }, 40);
+    }, true);
     var chips = box.querySelector("#og-chips");
     [["all", "All"]].concat(Object.keys(LABEL).map(function (key) { return [key, LABEL[key]]; })).forEach(function (item) {
       var b = document.createElement("button");
@@ -78,7 +102,7 @@
       root.appendChild(label);
     });
     var css = document.createElement("style");
-    css.textContent = "#og-bar{margin:8px 0 0}#og-chips{display:flex;flex-wrap:wrap;gap:6px}#og-find{width:100%;box-sizing:border-box;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;font-size:16px;font-weight:700}#og-chips{margin-bottom:8px}#og-chips button{border:0;border-radius:999px;padding:8px 12px;background:#17202b;color:#c5d0dc;font-weight:800}#og-chips button.on{background:#e6c878;color:#1a1406}#og-chips button[data-og=health]{background:#14382c;color:#c8ffe2;box-shadow:inset 0 0 0 1px #2f8a62}#og-chips button[data-og=health].on{background:#3dbe7a;color:#062015}#tf-tabs .og-label{flex:1 0 100%;margin:8px 2px 2px;color:#8b93a7;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}#tf-tabs .og-label.og-health{color:#7dffa9;font-size:13px}#tf-tabs .tab.og-health{color:#eafff4;background:#12352c;box-shadow:inset 0 0 0 1px #1f6b52}#tf-tabs .tab.og-health[data-tf=sleeplog]{background:#1a2744;color:#d6e4ff;box-shadow:inset 0 0 0 1px #3d5f99}#tf-tabs .tab.og-health[data-tf=diet]{background:#2a2414;color:#ffe3a3;box-shadow:inset 0 0 0 1px #8a6a2a}#tf-tabs .tab.og-health[data-tf=gym]{background:#2a1c12;color:#ffc9a3;box-shadow:inset 0 0 0 1px #c46a32}#tf-tabs .tab.og-health[data-tf=weight]{background:#2a1a28;color:#ffd0e4;box-shadow:inset 0 0 0 1px #8a4a6a}#tf-tabs .tab.og-health[data-tf=water]{background:#102a38;color:#b7ecff;box-shadow:inset 0 0 0 1px #2a7a9a}#tf-tabs .tab.og-health[data-tf=saviour]{background:#1e2a14;color:#d8f5a2;box-shadow:inset 0 0 0 1px #5a7a28}#tf-tabs .tab.og-health[data-tf=sleep]{background:#241c38;color:#e4d4ff;box-shadow:inset 0 0 0 1px #6a4a9a}#tf-tabs .tab.og-health.active{color:#fff!important;box-shadow:inset 0 0 0 2px #e6c878}body.tab-arranging #tf-tabs .og-label{display:none!important}body.tab-arranging #tf-tabs .tab{order:0!important}";
+    css.textContent = "#og-bar{margin:8px 0 0}#og-chips{display:flex;flex-wrap:wrap;gap:6px}#og-find{width:100%;box-sizing:border-box;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;font-size:16px;font-weight:700}#og-chips{margin-bottom:8px}#og-chips button{border:0;border-radius:999px;padding:8px 12px;background:#17202b;color:#c5d0dc;font-weight:800}#og-chips button.on{background:#e6c878;color:#1a1406}#og-chips button[data-og=health]{background:#14382c;color:#c8ffe2;box-shadow:inset 0 0 0 1px #2f8a62}#og-chips button[data-og=health].on{background:#3dbe7a;color:#062015}#tf-tabs .og-label{flex:1 0 100%;margin:8px 2px 2px;color:#8b93a7;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}#tf-tabs .og-label.og-health{color:#7dffa9;font-size:13px}#tf-tabs .tab.og-health{color:#eafff4;background:#12352c;box-shadow:inset 0 0 0 1px #1f6b52}#tf-tabs .tab.og-health[data-tf=sleeplog]{background:#1a2744;color:#d6e4ff;box-shadow:inset 0 0 0 1px #3d5f99}#tf-tabs .tab.og-health[data-tf=diet]{background:#2a2414;color:#ffe3a3;box-shadow:inset 0 0 0 1px #8a6a2a}#tf-tabs .tab.og-health[data-tf=gym]{background:#2a1c12;color:#ffc9a3;box-shadow:inset 0 0 0 1px #c46a32}#tf-tabs .tab.og-health[data-tf=weight]{background:#2a1a28;color:#ffd0e4;box-shadow:inset 0 0 0 1px #8a4a6a}#tf-tabs .tab.og-health[data-tf=water]{background:#102a38;color:#b7ecff;box-shadow:inset 0 0 0 1px #2a7a9a}#tf-tabs .tab.og-health[data-tf=saviour]{background:#1e2a14;color:#d8f5a2;box-shadow:inset 0 0 0 1px #5a7a28}#tf-tabs .tab.og-health[data-tf=sleep]{background:#241c38;color:#e4d4ff;box-shadow:inset 0 0 0 1px #6a4a9a}#tf-tabs .tab.og-health.active{color:#fff!important;box-shadow:inset 0 0 0 2px #e6c878}body.tab-arranging #tf-tabs .og-label{display:none!important}body.tab-arranging #tf-tabs .tab{order:0!important}#og-fold{display:none;width:100%;margin:8px 0 0;padding:10px 14px;border:1px solid #3d4a5c;border-radius:14px;background:#121820;color:#f4f7fb;font-weight:800;font-size:15px;align-items:center;justify-content:space-between}#og-fold .og-arrow{color:#e6c878;font-size:22px;line-height:1}body.og-collapsed #og-fold{display:flex}body.og-collapsed #og-bar,body.og-collapsed #tf-tabs{display:none!important}";
     document.head.appendChild(css);
     paint();
     new MutationObserver(paint).observe(document.body, { attributes: true, attributeFilter: ["class"] });
