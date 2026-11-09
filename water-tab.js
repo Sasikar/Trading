@@ -99,7 +99,7 @@
       var key = addDays(today, -i);
       var v = mlOf(key);
       if (!v) continue;
-      rows += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid #243041"><span style="color:#c5d0dc">' + (i ? key : "Today") + '</span><b style="color:' + (v >= goal ? "#3dbe7a" : "#f4f7fb") + '">' + fmt(v) + '</b><button type="button" data-clear="' + key + '" style="border:0;background:transparent;color:#ff8a7a;font-weight:800">Clear</button></div>';
+      rows += '<div style="display:grid;grid-template-columns:1fr 88px 64px;align-items:center;padding:8px 0;border-top:1px solid #243041"><span style="color:#c5d0dc">' + (i ? key : "Today") + '</span><b style="justify-self:end;color:' + (v >= goal ? "#3dbe7a" : "#f4f7fb") + '">' + fmt(v) + '</b><button type="button" data-clear="' + key + '" style="justify-self:end;border:0;background:transparent;color:#ff8a7a;font-weight:800">Clear</button></div>';
     }
     root.innerHTML =
       '<div style="font-size:34px;font-weight:900;line-height:1">' + fmt(now) + "</div>" +
