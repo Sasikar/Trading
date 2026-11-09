@@ -399,7 +399,7 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/life-log' || path === '/api/life-log') {
-        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} } });
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, gym: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} } });
         const cleanTopic = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
         const readLife = () => {
           let data = blank();
@@ -422,6 +422,14 @@ export class OhlcvEngine {
               logs[topic] = bag && typeof bag === 'object' ? bag : {};
             });
             data.saviour = { topics, logs };
+            const gym = {};
+            const rawGym = saved.gym && typeof saved.gym === 'object' ? saved.gym : {};
+            Object.keys(rawGym).forEach((day) => {
+              if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+              const note = String(rawGym[day] && rawGym[day].note || '').replace(/\s+/g, ' ').trim().slice(0, 400);
+              if (note) gym[day] = { note, t: Number(rawGym[day].t) || 0 };
+            });
+            data.gym = gym;
             const days = {};
             const rawDays = saved.weight && saved.weight.days && typeof saved.weight.days === 'object' ? saved.weight.days : {};
             Object.keys(rawDays).forEach((day) => {
@@ -504,6 +512,10 @@ export class OhlcvEngine {
             const note = cleanNote(body.note);
             if (body.clear || !note) delete data.diet[body.tab][day];
             else data.diet[body.tab][day] = { note, t: Date.now() };
+          } else if (body.section === 'gym') {
+            const note = cleanNote(body.note);
+            if (body.clear || !note) delete data.gym[day];
+            else data.gym[day] = { note, t: Date.now() };
           } else if (body.section === 'saviour' && data.saviour.logs[body.tab]) {
             const note = cleanNote(body.note);
             if (body.clear || !note) delete data.saviour.logs[body.tab][day];

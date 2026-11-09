@@ -3,7 +3,7 @@
   var API = "https://trading-ohlcv.sasipudi.workers.dev/life-log";
   var KEY = "life_log_v1";
   var DIET = [["biryani", "Biryani"], ["sweet", "Sweets"], ["carbs", "Carbs"]];
-  var data = { sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} } };
+  var data = { sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, gym: {} };
   var cursor = istParts(new Date());
   var dietTab = "biryani";
   var saviourTab = "";
@@ -68,6 +68,7 @@
       });
       data.saviour = { topics: topics, logs: logs };
       if (topics.indexOf(saviourTab) < 0) saviourTab = topics[0] || "";
+      data.gym = saved.gym && typeof saved.gym === "object" ? saved.gym : {};
     } catch (e) {}
   }
   function saveLocal() {
@@ -83,6 +84,7 @@
       data.saviour = { topics: remote.saviour.topics.slice(), logs: remote.saviour.logs || {} };
       if (data.saviour.topics.indexOf(saviourTab) < 0) saviourTab = data.saviour.topics[0] || "";
     }
+    if (remote.gym && typeof remote.gym === "object") data.gym = remote.gym;
     saveLocal();
   }
   function status(id, text) {
@@ -91,16 +93,19 @@
   }
   function bag() {
     if (which === "diet") return data.diet[dietTab] || {};
+    if (which === "gym") return data.gym || {};
     if (which === "saviour") return (data.saviour.logs && data.saviour.logs[saviourTab]) || {};
     return data.sleep;
   }
   function panelId() {
     if (which === "diet") return "diet-cal";
+    if (which === "gym") return "gym-cal";
     if (which === "saviour") return "sv-cal";
     return "slg-cal";
   }
   function statusId() {
     if (which === "diet") return "diet-status";
+    if (which === "gym") return "gym-status";
     if (which === "saviour") return "sv-status";
     return "slg-status";
   }
@@ -136,7 +141,7 @@
       var fields = which === "sleep"
         ? '<input id="ll-time" type="time" step="60" value="' + esc(have && have.time || "") + '" aria-label="Sleep time">' +
           '<textarea id="ll-note" rows="3" placeholder="Why this time" aria-label="Reason">' + esc(have && have.note || "") + "</textarea>"
-        : '<textarea id="ll-note" rows="4" placeholder="' + (which === "saviour" ? "What happened" : "What you had") + '" aria-label="Notes">' + esc(have && have.note || "") + "</textarea>";
+        : '<textarea id="ll-note" rows="4" placeholder="' + (which === "saviour" ? "What happened" : which === "gym" ? "What you did" : "What you had") + '" aria-label="Notes">' + esc(have && have.note || "") + "</textarea>";
       popup = '<div class="ll-back" data-act="close"></div><div class="ll-pop"><div class="ll-pop-top"><strong>' + dayTitle(open) + "</strong></div>" +
         fields +
         '<div class="ll-row"><button type="button" data-act="close">Close</button>' +
@@ -203,7 +208,7 @@
       return;
     }
     var text = String(note || "").trim();
-    var store = which === "saviour" ? data.saviour.logs[saviourTab] : data.diet[dietTab];
+    var store = which === "saviour" ? data.saviour.logs[saviourTab] : which === "gym" ? data.gym : data.diet[dietTab];
     var tab = which === "saviour" ? saviourTab : dietTab;
     if (!text) {
       delete store[open];
@@ -224,6 +229,7 @@
   function clearOpen() {
     if (!open) return;
     if (which === "sleep") delete data.sleep[open];
+    else if (which === "gym") delete data.gym[open];
     else if (which === "saviour" && data.saviour.logs[saviourTab]) delete data.saviour.logs[saviourTab][open];
     else delete data.diet[dietTab][open];
     saveLocal();
@@ -300,7 +306,7 @@
     }).catch(function () {});
   }
   function hideBoth() {
-    ["sleep-log-panel", "diet-panel", "saviour-panel"].forEach(function (id) {
+    ["sleep-log-panel", "diet-panel", "saviour-panel", "gym-panel"].forEach(function (id) {
       var p = $(id);
       if (!p) return;
       p.style.display = "none";
@@ -319,7 +325,7 @@
     hideBoth();
     which = kind;
     open = "";
-    var p = $(which === "diet" ? "diet-panel" : which === "saviour" ? "saviour-panel" : "sleep-log-panel");
+    var p = $(which === "diet" ? "diet-panel" : which === "gym" ? "gym-panel" : which === "saviour" ? "saviour-panel" : "sleep-log-panel");
     if (!p) return;
     document.body.classList.add("life-on");
     p.style.display = "block";
@@ -331,16 +337,17 @@
   }
   window.showSleepLog = function (on) { show("sleep", on); };
   window.showDiet = function (on) { show("diet", on); };
+  window.showGym = function (on) { show("gym", on); };
   window.showSaviour = function (on) { show("saviour", on); };
 
   if (!document.getElementById("ll-style")) {
     var css = document.createElement("style");
     css.id = "ll-style";
-    css.textContent = ".ll-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}.ll-top h3{margin:0;font-size:24px;font-weight:800}.ll-nav{width:36px;height:36px;border-radius:50%;border:0;background:#1a222e;color:#f4f7fb;font-size:20px;cursor:pointer}.ll-tabs{display:flex;gap:6px;margin:0 0 12px}.ll-tabs button{border:1px solid #2a3140;background:#12161d;color:#c5d0dc;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.ll-tabs button.on{background:#1f8a4d;color:#fff;border-color:#1f8a4d}.ll-week,.ll-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.ll-week{margin-bottom:6px}.ll-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.ll-day{border:0;background:transparent;padding:2px 0;cursor:pointer}.ll-day .n{width:36px;height:36px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}.ll-day.clean .n{background:#1f8a4d;color:#fff}.ll-day.hit .n,.ll-day.wrote .n{background:#e15d6a;color:#fff}.ll-day.today .n{box-shadow:0 0 0 2px #f4f7fb}.ll-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}.ll-pop{position:fixed;left:12px;right:12px;bottom:12px;z-index:41;padding:16px;border-radius:22px;background:#141b24;box-shadow:0 16px 50px rgba(0,0,0,.45)}.ll-pop-top{font-size:18px;margin-bottom:10px}#ll-time,#ll-note{width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3d4a5c;border-radius:12px;background:#0e131a;color:#f4f7fb;font-weight:700;color-scheme:dark}#ll-time{font-size:28px;font-weight:800}#ll-note{font-size:16px;resize:vertical}.ll-row{display:flex;gap:8px;margin-top:12px}.ll-row button{flex:1;padding:14px 8px;border:0;border-radius:12px;font-weight:800;cursor:pointer;background:#1a222e;color:#e8eef6}.ll-row button[data-act=save]{background:#f4f7fb;color:#111}.ll-row button[data-act=clear]{background:#3c1822;color:#ff9aa8}body.life-on main>section.section,body.life-on main>.trend-panel:not(#sleep-log-panel):not(#diet-panel):not(#saviour-panel),body.life-on #tf-panels{display:none!important}body.life-on #sleep-log-panel.on,body.life-on #diet-panel.on,body.life-on #saviour-panel.on{display:block!important}.ll-add{display:flex;gap:8px;margin:0 0 12px}.ll-add button{border:0;border-radius:12px;padding:10px 14px;font-weight:900;background:#e6c878;color:#1a1408}.ll-tabs{flex-wrap:wrap}.ll-tabs i{font-style:normal;margin-left:6px;color:#ffb4bc}";
+    css.textContent = ".ll-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}.ll-top h3{margin:0;font-size:24px;font-weight:800}.ll-nav{width:36px;height:36px;border-radius:50%;border:0;background:#1a222e;color:#f4f7fb;font-size:20px;cursor:pointer}.ll-tabs{display:flex;gap:6px;margin:0 0 12px}.ll-tabs button{border:1px solid #2a3140;background:#12161d;color:#c5d0dc;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.ll-tabs button.on{background:#1f8a4d;color:#fff;border-color:#1f8a4d}.ll-week,.ll-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.ll-week{margin-bottom:6px}.ll-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.ll-day{border:0;background:transparent;padding:2px 0;cursor:pointer}.ll-day .n{width:36px;height:36px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}.ll-day.clean .n{background:#1f8a4d;color:#fff}.ll-day.hit .n,.ll-day.wrote .n{background:#e15d6a;color:#fff}.ll-day.today .n{box-shadow:0 0 0 2px #f4f7fb}.ll-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}.ll-pop{position:fixed;left:12px;right:12px;bottom:12px;z-index:41;padding:16px;border-radius:22px;background:#141b24;box-shadow:0 16px 50px rgba(0,0,0,.45)}.ll-pop-top{font-size:18px;margin-bottom:10px}#ll-time,#ll-note{width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3d4a5c;border-radius:12px;background:#0e131a;color:#f4f7fb;font-weight:700;color-scheme:dark}#ll-time{font-size:28px;font-weight:800}#ll-note{font-size:16px;resize:vertical}.ll-row{display:flex;gap:8px;margin-top:12px}.ll-row button{flex:1;padding:14px 8px;border:0;border-radius:12px;font-weight:800;cursor:pointer;background:#1a222e;color:#e8eef6}.ll-row button[data-act=save]{background:#f4f7fb;color:#111}.ll-row button[data-act=clear]{background:#3c1822;color:#ff9aa8}body.life-on main>section.section,body.life-on main>.trend-panel:not(#sleep-log-panel):not(#diet-panel):not(#saviour-panel):not(#gym-panel),body.life-on #tf-panels{display:none!important}body.life-on #sleep-log-panel.on,body.life-on #diet-panel.on,body.life-on #saviour-panel.on,body.life-on #gym-panel.on{display:block!important}.ll-add{display:flex;gap:8px;margin:0 0 12px}.ll-add button{border:0;border-radius:12px;padding:10px 14px;font-weight:900;background:#e6c878;color:#1a1408}.ll-tabs{flex-wrap:wrap}.ll-tabs i{font-style:normal;margin-left:6px;color:#ffb4bc}";
     document.head.appendChild(css);
   }
   loadLocal();
-  ["slg-cal", "diet-cal", "sv-cal"].forEach(function (id) {
+  ["slg-cal", "diet-cal", "sv-cal", "gym-cal"].forEach(function (id) {
     var el = $(id);
     if (el) {
       el.addEventListener("click", onClick);
@@ -354,7 +361,7 @@
     var b = ev.target && ev.target.closest && ev.target.closest("[data-tf]");
     if (!b) return;
     var tf = b.getAttribute("data-tf");
-    if (tf !== "sleeplog" && tf !== "diet" && tf !== "saviour") hideBoth();
+    if (tf !== "sleeplog" && tf !== "diet" && tf !== "gym" && tf !== "saviour") hideBoth();
   }, true);
   pull();
 })();
