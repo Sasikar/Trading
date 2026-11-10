@@ -3,10 +3,11 @@
   var API = "https://trading-ohlcv.sasipudi.workers.dev/life-log";
   var KEY = "life_log_v1";
   var DIET = [["biryani", "Biryani"], ["sweet", "Sweets"], ["carbs", "Carbs"]];
-  var data = { sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, gym: {}, food: {}, steps: {} };
+  var data = { sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, custom: { topics: [], logs: {} } };
   var cursor = istParts(new Date());
   var dietTab = "biryani";
   var saviourTab = "";
+  var customTab = "";
   var open = "";
   var which = "";
 
@@ -71,6 +72,19 @@
       data.gym = saved.gym && typeof saved.gym === "object" ? saved.gym : {};
       data.food = saved.food && typeof saved.food === "object" ? saved.food : {};
       data.steps = saved.steps && typeof saved.steps === "object" ? saved.steps : {};
+      var customTopics = [];
+      var rawCustom = saved.custom && Array.isArray(saved.custom.topics) ? saved.custom.topics : [];
+      rawCustom.forEach(function (name) {
+        name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 32);
+        if (name && customTopics.indexOf(name) < 0) customTopics.push(name);
+      });
+      var customLogs = {};
+      customTopics.forEach(function (name) {
+        var bag = saved.custom && saved.custom.logs && saved.custom.logs[name];
+        customLogs[name] = bag && typeof bag === "object" ? bag : {};
+      });
+      data.custom = { topics: customTopics, logs: customLogs };
+      if (customTopics.indexOf(customTab) < 0) customTab = customTopics[0] || "";
     } catch (e) {}
   }
   function saveLocal() {
@@ -89,6 +103,10 @@
     if (remote.gym && typeof remote.gym === "object") data.gym = remote.gym;
     if (remote.food && typeof remote.food === "object") data.food = remote.food;
     if (remote.steps && typeof remote.steps === "object") data.steps = remote.steps;
+    if (remote.custom && Array.isArray(remote.custom.topics)) {
+      data.custom = { topics: remote.custom.topics.slice(), logs: remote.custom.logs || {} };
+      if (data.custom.topics.indexOf(customTab) < 0) customTab = data.custom.topics[0] || "";
+    }
     saveLocal();
   }
   function status(id, text) {
@@ -100,6 +118,7 @@
     if (which === "gym") return data.gym || {};
     if (which === "food") return data.food || {};
     if (which === "steps") return data.steps || {};
+    if (which === "custom") return (data.custom.logs && data.custom.logs[customTab]) || {};
     if (which === "saviour") return (data.saviour.logs && data.saviour.logs[saviourTab]) || {};
     return data.sleep;
   }
@@ -108,6 +127,7 @@
     if (which === "gym") return "gym-cal";
     if (which === "food") return "food-cal";
     if (which === "steps") return "steps-cal";
+    if (which === "custom") return "mine-cal";
     if (which === "saviour") return "sv-cal";
     return "slg-cal";
   }
@@ -116,6 +136,7 @@
     if (which === "gym") return "gym-status";
     if (which === "food") return "food-status";
     if (which === "steps") return "steps-status";
+    if (which === "custom") return "mine-status";
     if (which === "saviour") return "sv-status";
     return "slg-status";
   }
@@ -158,7 +179,7 @@
           '<textarea id="ll-note" rows="3" placeholder="Why this time" aria-label="Reason">' + esc(have && have.note || "") + "</textarea>"
         : which === "steps"
         ? '<input id="ll-steps" type="number" inputmode="numeric" min="0" max="100000" step="100" placeholder="Steps" value="' + esc(have && have.n != null ? have.n : "") + '" aria-label="Steps">'
-        : '<textarea id="ll-note" rows="4" placeholder="' + (which === "saviour" ? "What happened" : which === "gym" ? "What you did" : which === "food" ? "What you ate" : "What you had") + '" aria-label="Notes">' + esc(have && have.note || "") + "</textarea>";
+        : '<textarea id="ll-note" rows="4" placeholder="' + (which === "custom" ? "Notes" : which === "saviour" ? "What happened" : which === "gym" ? "What you did" : which === "food" ? "What you ate" : "What you had") + '" aria-label="Notes">' + esc(have && have.note || "") + "</textarea>";
       popup = '<div class="ll-back" data-act="close"></div><div class="ll-pop"><div class="ll-pop-top"><strong>' + dayTitle(open) + "</strong></div>" +
         fields +
         '<div class="ll-row"><button type="button" data-act="close">Close</button>' +
@@ -166,6 +187,9 @@
         '<button type="button" data-act="save">Save</button></div></div>';
     }
     var tabs = "";
+    if (which === "custom" && customTab) {
+      tabs = '<div class="ll-mine"><b>' + esc(customTab) + '</b><button type="button" data-act="drop-mine">Remove</button></div>';
+    }
     if (which === "diet") {
       tabs = '<div class="ll-tabs">' + DIET.map(function (row) {
         return '<button type="button" data-diet="' + row[0] + '"' + (row[0] === dietTab ? ' class="on"' : "") + ">" + row[1] + "</button>";
@@ -237,13 +261,17 @@
       post({ section: "steps", day: stepDay, n: steps });
       return;
     }
+    if (which === "custom" && !customTab) {
+      status("mine-status", "Name the tab");
+      return;
+    }
     if (which === "saviour" && !saviourTab) {
       status("sv-status", "Add a topic first");
       return;
     }
     var text = String(note || "").trim();
-    var store = which === "saviour" ? data.saviour.logs[saviourTab] : which === "gym" ? data.gym : which === "food" ? data.food : data.diet[dietTab];
-    var tab = which === "saviour" ? saviourTab : dietTab;
+    var store = which === "saviour" ? data.saviour.logs[saviourTab] : which === "custom" ? data.custom.logs[customTab] : which === "gym" ? data.gym : which === "food" ? data.food : data.diet[dietTab];
+    var tab = which === "saviour" ? saviourTab : which === "custom" ? customTab : dietTab;
     if (!text) {
       delete store[open];
       saveLocal();
@@ -266,11 +294,12 @@
     else if (which === "gym") delete data.gym[open];
     else if (which === "food") delete data.food[open];
     else if (which === "steps") delete data.steps[open];
+    else if (which === "custom" && data.custom.logs[customTab]) delete data.custom.logs[customTab][open];
     else if (which === "saviour" && data.saviour.logs[saviourTab]) delete data.saviour.logs[saviourTab][open];
     else delete data.diet[dietTab][open];
     saveLocal();
     var day = open;
-    var tab = which === "saviour" ? saviourTab : dietTab;
+    var tab = which === "saviour" ? saviourTab : which === "custom" ? customTab : dietTab;
     var section = which;
     open = "";
     paint();
@@ -298,6 +327,62 @@
     paint();
     post({ section: "saviour", topicAct: "drop", topic: name });
   }
+  function renderMine() {
+    var root = $("tf-tabs");
+    if (!root || !data.custom) return;
+    root.querySelectorAll(".tab[data-mine]").forEach(function (el) { el.remove(); });
+    data.custom.topics.forEach(function (name) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "tab";
+      b.setAttribute("data-mine", "1");
+      b.setAttribute("data-tf", "mine:" + name);
+      b.textContent = name;
+      b.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        document.querySelectorAll("#tf-tabs .tab").forEach(function (x) { x.classList.remove("active"); });
+        b.classList.add("active");
+        var panels = $("tf-panels");
+        if (panels) { panels.classList.add("hidden"); panels.style.display = "none"; }
+        customTab = name;
+        show("custom", true);
+      });
+      root.appendChild(b);
+    });
+    if (window.ogPaint) window.ogPaint();
+  }
+  function addMineTab(name) {
+    name = String(name || "").replace(/\s+/g, " ").trim().slice(0, 32);
+    if (!name) return;
+    if (!data.custom.logs) data.custom = { topics: [], logs: {} };
+    if (data.custom.topics.indexOf(name) < 0) {
+      if (data.custom.topics.length >= 24) {
+        status("mine-status", "24 tabs is the limit");
+        return;
+      }
+      data.custom.topics.push(name);
+      data.custom.logs[name] = {};
+    }
+    customTab = name;
+    saveLocal();
+    renderMine();
+    post({ section: "custom", topicAct: "add", topic: name });
+    var btn = null;
+    document.querySelectorAll("#tf-tabs .tab[data-mine]").forEach(function (el) {
+      if (el.textContent === name) btn = el;
+    });
+    if (btn) btn.click();
+  }
+  function dropMine(name) {
+    data.custom.topics = data.custom.topics.filter(function (item) { return item !== name; });
+    delete data.custom.logs[name];
+    if (customTab === name) customTab = "";
+    saveLocal();
+    open = "";
+    hideBoth();
+    renderMine();
+    post({ section: "custom", topicAct: "drop", topic: name });
+  }
   function onClick(ev) {
     var b = ev.target && ev.target.closest && ev.target.closest("[data-act],[data-day],[data-diet],[data-sav],[data-drop-topic]");
     if (!b) return;
@@ -321,7 +406,7 @@
       return;
     }
     var act = b.getAttribute("data-act");
-    if (act === "add-topic") { addTopic(ev); return; }
+    if (act === "drop-mine") { dropMine(customTab); return; }
     if (act === "prev") { shift(-1); return; }
     if (act === "next") { shift(1); return; }
     if (act === "close") { open = ""; paint(); return; }
@@ -338,11 +423,12 @@
     fetch(API, { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (view) {
       if (!view || view.ok === false) return;
       take(view);
+      renderMine();
       if (which) paint();
     }).catch(function () {});
   }
   function hideBoth() {
-    ["sleep-log-panel", "diet-panel", "saviour-panel", "gym-panel", "food-panel", "steps-panel"].forEach(function (id) {
+    ["sleep-log-panel", "diet-panel", "saviour-panel", "gym-panel", "food-panel", "steps-panel", "mine-panel"].forEach(function (id) {
       var p = $(id);
       if (!p) return;
       p.style.display = "none";
@@ -361,7 +447,7 @@
     hideBoth();
     which = kind;
     open = "";
-    var panels = { diet: "diet-panel", gym: "gym-panel", food: "food-panel", steps: "steps-panel", saviour: "saviour-panel", sleep: "sleep-log-panel" };
+    var panels = { diet: "diet-panel", gym: "gym-panel", food: "food-panel", steps: "steps-panel", custom: "mine-panel", saviour: "saviour-panel", sleep: "sleep-log-panel" };
     var p = $(panels[which] || "sleep-log-panel");
     if (!p) return;
     document.body.classList.add("life-on");
@@ -378,15 +464,17 @@
   window.showFood = function (on) { show("food", on); };
   window.showSteps = function (on) { show("steps", on); };
   window.showSaviour = function (on) { show("saviour", on); };
+  window.addMineTab = addMineTab;
 
   if (!document.getElementById("ll-style")) {
     var css = document.createElement("style");
     css.id = "ll-style";
-    css.textContent = ".ll-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}.ll-top h3{margin:0;font-size:24px;font-weight:800}.ll-nav{width:36px;height:36px;border-radius:50%;border:0;background:#1a222e;color:#f4f7fb;font-size:20px;cursor:pointer}.ll-tabs{display:flex;gap:6px;margin:0 0 12px}.ll-tabs button{border:1px solid #2a3140;background:#12161d;color:#c5d0dc;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.ll-tabs button.on{background:#1f8a4d;color:#fff;border-color:#1f8a4d}.ll-week,.ll-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.ll-week{margin-bottom:6px}.ll-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.ll-day{border:0;background:transparent;padding:2px 0;cursor:pointer}.ll-day .n{width:36px;height:36px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}.ll-day.clean .n{background:#1f8a4d;color:#fff}.ll-day.hit .n,.ll-day.wrote .n{background:#e15d6a;color:#fff}.ll-day.today .n{box-shadow:0 0 0 2px #f4f7fb}.ll-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}.ll-pop{position:fixed;left:12px;right:12px;bottom:12px;z-index:41;padding:16px;border-radius:22px;background:#141b24;box-shadow:0 16px 50px rgba(0,0,0,.45)}.ll-pop-top{font-size:18px;margin-bottom:10px}#ll-time,#ll-note{width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3d4a5c;border-radius:12px;background:#0e131a;color:#f4f7fb;font-weight:700;color-scheme:dark}#ll-time{font-size:28px;font-weight:800}#ll-note{font-size:16px;resize:vertical}.ll-row{display:flex;gap:8px;margin-top:12px}.ll-row button{flex:1;padding:14px 8px;border:0;border-radius:12px;font-weight:800;cursor:pointer;background:#1a222e;color:#e8eef6}.ll-row button[data-act=save]{background:#f4f7fb;color:#111}.ll-row button[data-act=clear]{background:#3c1822;color:#ff9aa8}body.life-on main>section.section,.ll-day.hi .n{background:#1f8a4d;color:#fff}.ll-day.mid .n{background:#e6b84d;color:#1a1406}.ll-day.zero .n{background:#3a4150;color:#c5d0dc}.ll-day.none .n{background:#1a222e;color:#6d7688}.ll-key{display:flex;gap:8px;align-items:center;margin-top:12px;color:#9aa6b5;font-size:12px;font-weight:800}.ll-key i{width:12px;height:12px;border-radius:50%;display:inline-block}.ll-key i.hi{background:#1f8a4d}.ll-key i.mid{background:#e6b84d}.ll-key i.zero{background:#3a4150}#ll-steps{width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3d4a5c;border-radius:12px;background:#0e131a;color:#f4f7fb;font-size:28px;font-weight:800;color-scheme:dark}body.life-on main>.trend-panel:not(#sleep-log-panel):not(#diet-panel):not(#saviour-panel):not(#gym-panel):not(#food-panel):not(#steps-panel),body.life-on #tf-panels{display:none!important}body.life-on #sleep-log-panel.on,body.life-on #diet-panel.on,body.life-on #saviour-panel.on,body.life-on #gym-panel.on,body.life-on #food-panel.on,body.life-on #steps-panel.on{display:block!important}.ll-add{display:flex;gap:8px;margin:0 0 12px}.ll-add button{border:0;border-radius:12px;padding:10px 14px;font-weight:900;background:#e6c878;color:#1a1408}.ll-tabs{flex-wrap:wrap}.ll-tabs i{font-style:normal;margin-left:6px;color:#ffb4bc}";
+    css.textContent = ".ll-top{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}.ll-top h3{margin:0;font-size:24px;font-weight:800}.ll-nav{width:36px;height:36px;border-radius:50%;border:0;background:#1a222e;color:#f4f7fb;font-size:20px;cursor:pointer}.ll-tabs{display:flex;gap:6px;margin:0 0 12px}.ll-tabs button{border:1px solid #2a3140;background:#12161d;color:#c5d0dc;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.ll-tabs button.on{background:#1f8a4d;color:#fff;border-color:#1f8a4d}.ll-week,.ll-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px 0}.ll-week{margin-bottom:6px}.ll-week span{text-align:center;color:#8b95a5;font-size:11px;font-weight:800}.ll-day{border:0;background:transparent;padding:2px 0;cursor:pointer}.ll-day .n{width:36px;height:36px;margin:0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}.ll-day.clean .n{background:#1f8a4d;color:#fff}.ll-day.hit .n,.ll-day.wrote .n{background:#e15d6a;color:#fff}.ll-day.today .n{box-shadow:0 0 0 2px #f4f7fb}.ll-back{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40}.ll-pop{position:fixed;left:12px;right:12px;bottom:12px;z-index:41;padding:16px;border-radius:22px;background:#141b24;box-shadow:0 16px 50px rgba(0,0,0,.45)}.ll-pop-top{font-size:18px;margin-bottom:10px}#ll-time,#ll-note{width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3d4a5c;border-radius:12px;background:#0e131a;color:#f4f7fb;font-weight:700;color-scheme:dark}#ll-time{font-size:28px;font-weight:800}#ll-note{font-size:16px;resize:vertical}.ll-row{display:flex;gap:8px;margin-top:12px}.ll-row button{flex:1;padding:14px 8px;border:0;border-radius:12px;font-weight:800;cursor:pointer;background:#1a222e;color:#e8eef6}.ll-row button[data-act=save]{background:#f4f7fb;color:#111}.ll-row button[data-act=clear]{background:#3c1822;color:#ff9aa8}body.life-on main>section.section{display:none!important}.ll-day.hi .n{background:#1f8a4d;color:#fff}.ll-day.mid .n{background:#e6b84d;color:#1a1406}.ll-day.zero .n{background:#3a4150;color:#c5d0dc}.ll-day.none .n{background:#1a222e;color:#6d7688}.ll-key{display:flex;gap:8px;align-items:center;margin-top:12px;color:#9aa6b5;font-size:12px;font-weight:800}.ll-key i{width:12px;height:12px;border-radius:50%;display:inline-block}.ll-key i.hi{background:#1f8a4d}.ll-key i.mid{background:#e6b84d}.ll-key i.zero{background:#3a4150}#ll-steps{width:100%;box-sizing:border-box;margin-top:8px;padding:12px;border:1px solid #3d4a5c;border-radius:12px;background:#0e131a;color:#f4f7fb;font-size:28px;font-weight:800;color-scheme:dark}.ll-mine{display:flex;justify-content:space-between;align-items:center;margin:0 0 12px}.ll-mine button{border:0;background:transparent;color:#ff8a7a;font-weight:800}body.life-on main>.trend-panel:not(#sleep-log-panel):not(#diet-panel):not(#saviour-panel):not(#gym-panel):not(#food-panel):not(#steps-panel):not(#mine-panel),body.life-on #tf-panels{display:none!important}body.life-on #sleep-log-panel.on,body.life-on #diet-panel.on,body.life-on #saviour-panel.on,body.life-on #gym-panel.on,body.life-on #food-panel.on,body.life-on #steps-panel.on,body.life-on #mine-panel.on{display:block!important}.ll-add{display:flex;gap:8px;margin:0 0 12px}.ll-add button{border:0;border-radius:12px;padding:10px 14px;font-weight:900;background:#e6c878;color:#1a1408}.ll-tabs{flex-wrap:wrap}.ll-tabs i{font-style:normal;margin-left:6px;color:#ffb4bc}";
     document.head.appendChild(css);
   }
   loadLocal();
-  ["slg-cal", "diet-cal", "sv-cal", "gym-cal", "food-cal", "steps-cal"].forEach(function (id) {
+  renderMine();
+  ["slg-cal", "diet-cal", "sv-cal", "gym-cal", "food-cal", "steps-cal", "mine-cal"].forEach(function (id) {
     var el = $(id);
     if (el) {
       el.addEventListener("click", onClick);
@@ -400,7 +488,8 @@
     var b = ev.target && ev.target.closest && ev.target.closest("[data-tf]");
     if (!b) return;
     var tf = b.getAttribute("data-tf");
-    if (tf !== "sleeplog" && tf !== "diet" && tf !== "gym" && tf !== "food" && tf !== "steps" && tf !== "saviour") hideBoth();
+    if (tf.indexOf("mine:") === 0 || tf === "sleeplog" || tf === "diet" || tf === "gym" || tf === "food" || tf === "steps" || tf === "saviour") return;
+    hideBoth();
   }, true);
   pull();
 })();

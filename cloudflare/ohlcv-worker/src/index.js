@@ -399,7 +399,7 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/life-log' || path === '/api/life-log') {
-        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} } });
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, custom: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} } });
         const cleanTopic = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
         const readLife = () => {
           let data = blank();
@@ -422,6 +422,18 @@ export class OhlcvEngine {
               logs[topic] = bag && typeof bag === 'object' ? bag : {};
             });
             data.saviour = { topics, logs };
+            const customTopics = [];
+            const rawCustom = saved.custom && Array.isArray(saved.custom.topics) ? saved.custom.topics : [];
+            rawCustom.forEach((name) => {
+              const topic = cleanTopic(name);
+              if (topic && customTopics.indexOf(topic) < 0 && customTopics.length < 24) customTopics.push(topic);
+            });
+            const customLogs = {};
+            customTopics.forEach((topic) => {
+              const bag = saved.custom && saved.custom.logs && saved.custom.logs[topic];
+              customLogs[topic] = bag && typeof bag === 'object' ? bag : {};
+            });
+            data.custom = { topics: customTopics, logs: customLogs };
             const gym = {};
             const rawGym = saved.gym && typeof saved.gym === 'object' ? saved.gym : {};
             Object.keys(rawGym).forEach((day) => {
@@ -482,6 +494,17 @@ export class OhlcvEngine {
             } else if (data.saviour.topics.indexOf(topic) < 0 && data.saviour.topics.length < 40) {
               data.saviour.topics.push(topic);
               data.saviour.logs[topic] = data.saviour.logs[topic] || {};
+            }
+          } else if (body.section === 'custom' && body.topicAct) {
+            const topic = cleanTopic(body.topic);
+            if (!topic) return new Response(JSON.stringify({ ok: false, error: 'Name the tab' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+            if (!data.custom) data.custom = { topics: [], logs: {} };
+            if (body.topicAct === 'drop') {
+              data.custom.topics = data.custom.topics.filter((name) => name !== topic);
+              delete data.custom.logs[topic];
+            } else if (data.custom.topics.indexOf(topic) < 0 && data.custom.topics.length < 24) {
+              data.custom.topics.push(topic);
+              data.custom.logs[topic] = data.custom.logs[topic] || {};
             }
           } else if (body.section === 'weight') {
             if (body.goal != null && body.goal !== '') {
@@ -547,6 +570,10 @@ export class OhlcvEngine {
             const note = cleanNote(body.note);
             if (body.clear || !note) delete data.saviour.logs[body.tab][day];
             else data.saviour.logs[body.tab][day] = { note, t: Date.now() };
+          } else if (body.section === 'custom' && data.custom && data.custom.logs[body.tab]) {
+            const note = cleanNote(body.note);
+            if (body.clear || !note) delete data.custom.logs[body.tab][day];
+            else data.custom.logs[body.tab][day] = { note, t: Date.now() };
           }
           this.store.setMeta('life_log_v1', JSON.stringify(data));
           return new Response(JSON.stringify({ ok: true, ...data }), { status: 200, headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' } });
