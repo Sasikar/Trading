@@ -38,24 +38,14 @@ document.body.insertBefore(nav,document.body.firstChild);
 const fresh=document.getElementById('site-fresh');
 if(fresh) fresh.addEventListener('click', function(){
   fresh.textContent='Refreshing…';
-  var page=(location.pathname.split('/').pop()||'index.html').split('?')[0]||'index.html';
-  if(!/\.html$/i.test(page)) page='index.html';
+  var go=function(){
+    var path=location.pathname||'/';
+    location.replace(path+'?fresh='+Date.now());
+  };
   var clears=[];
   if(navigator.serviceWorker) clears.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));
   if(window.caches) clears.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));
-  Promise.all(clears).catch(function(){}).then(function(){
-    return fetch('https://raw.githubusercontent.com/Sasikar/Trading/master/'+page+'?t='+Date.now(),{cache:'no-store'}).then(function(r){
-      if(!r.ok) throw new Error('raw');
-      return r.text();
-    });
-  }).then(function(html){
-    if(!html || html.length<200) throw new Error('html');
-    document.open();
-    document.write(html);
-    document.close();
-  }).catch(function(){
-    location.replace(page+'?boot='+Date.now());
-  });
+  Promise.all(clears).catch(function(){}).then(go, go);
 });
 if(!document.querySelector('script[src*="wallets-observe"]')){
   const s=document.createElement('script');

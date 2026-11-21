@@ -6,5 +6,5 @@ self.addEventListener('activate', function (e) {
 });
 self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
-  e.respondWith(fetch(e.request));
+  e.respondWith(fetch(e.request, { cache: 'no-store' }));
 });
