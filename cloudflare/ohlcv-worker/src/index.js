@@ -399,7 +399,7 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/life-log' || path === '/api/life-log') {
-        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, custom: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} } });
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, custom: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} }, pressure: { rows: [] } });
         const cleanTopic = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
         const readLife = () => {
           let data = blank();
@@ -476,6 +476,17 @@ export class OhlcvEngine {
             });
             const waterGoal = Number(saved.water && saved.water.goal);
             data.water = { goal: waterGoal >= 250 && waterGoal <= 8000 ? Math.round(waterGoal) : 3000, days: waterDays };
+            const pressure = [];
+            const rawPressure = saved.pressure && Array.isArray(saved.pressure.rows) ? saved.pressure.rows : [];
+            rawPressure.forEach((row) => {
+              if (!row || pressure.length >= 200) return;
+              const id = String(row.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+              const text = String(row.text || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+              const n = Number(row.n);
+              if (!id || !text || !Number.isFinite(n) || n === 0 || Math.abs(n) > 1e13) return;
+              pressure.push({ id, text, n: Math.round(n * 100) / 100, t: Number(row.t) || 0 });
+            });
+            data.pressure = { rows: pressure };
           } catch (e) {}
           return data;
         };
@@ -538,6 +549,30 @@ export class OhlcvEngine {
                 data.water.days[day] = { ml, t: Date.now() };
               }
             }
+          } else if (body.section === 'pressure') {
+            if (!data.pressure) data.pressure = { rows: [] };
+            const act = String(body.act || '');
+            const cleanId = (value) => String(value || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+            const cleanPressureText = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+            const cleanPressureN = (value) => {
+              const n = Number(value);
+              if (!Number.isFinite(n) || n === 0 || Math.abs(n) > 1e13) return null;
+              return Math.round(n * 100) / 100;
+            };
+            if (act !== 'save') {
+              return new Response(JSON.stringify({ ok: false, error: 'Bad row' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+            }
+            const next = [];
+            const incoming = Array.isArray(body.rows) ? body.rows : [];
+            incoming.forEach((row) => {
+              if (next.length >= 200) return;
+              const id = cleanId(row && row.id);
+              const text = cleanPressureText(row && row.text);
+              const n = cleanPressureN(row && row.n);
+              if (!id || !text || n == null || next.some((item) => item.id === id)) return;
+              next.push({ id, text, n, t: Number(row && row.t) || Date.now() });
+            });
+            data.pressure.rows = next;
           } else if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             return new Response(JSON.stringify({ ok: false, error: 'Pick a date' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
           } else if (body.section === 'sleep') {
