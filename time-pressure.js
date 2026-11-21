@@ -16,13 +16,13 @@
   function num(raw) {
     var s = String(raw == null ? "" : raw).replace(/,/g, "").replace(/₹/g, "").trim();
     if (!s) return null;
-    var m = s.match(/^(-?\d+(?:\.\d+)?)\s*(k|l|lac|lakh)?$/i);
+    var m = s.match(/^(-?\d+(?:\.\d+)?)\s*(k|l|lac|lakh)$/i);
     if (!m) return null;
     var n = Number(m[1]);
     if (!isFinite(n) || n === 0) return null;
     var unit = (m[2] || "").toLowerCase();
     if (unit === "k") n *= 1000;
-    if (unit === "l" || unit === "lac" || unit === "lakh") n *= 100000;
+    else n *= 100000;
     if (Math.abs(n) > 1e13) return null;
     return Math.round(n * 100) / 100;
   }
@@ -31,9 +31,9 @@
     if (!isFinite(n)) n = 0;
     var sign = n < 0 ? "-" : "";
     var a = Math.abs(n);
-    var unit = "";
-    if (a >= 100000) { a = a / 100000; unit = "L"; }
-    else if (a >= 1000) { a = a / 1000; unit = "k"; }
+    var unit = a >= 100000 ? "L" : "k";
+    if (unit === "L") a = a / 100000;
+    else a = a / 1000;
     var s = (Math.round(a * 100) / 100).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
     return sign + s + unit;
   }
@@ -103,18 +103,18 @@
         if (editing === row.id) {
           return '<li class="tp-row"><form class="tp-form" data-id="' + esc(row.id) + '"><input data-field="text" value="' + esc(row.text) + '" maxlength="80" aria-label="Name"><span class="tp-hy">-</span><input data-field="amt" value="' + esc(money(row.n)) + '" placeholder="50k or 2L" aria-label="Amount"><button type="submit">Save</button><button type="button" data-act="cancel" aria-label="Cancel">×</button></form></li>';
         }
-        return '<li class="tp-row"><span class="tp-name">' + esc(row.text) + '</span><span class="tp-hy">-</span><b>' + money(row.n) + '</b><span class="tp-acts"><button type="button" class="tp-pen" data-act="edit" data-id="' + esc(row.id) + '">Edit</button><button type="button" class="tp-x" data-act="ask" data-id="' + esc(row.id) + '" aria-label="Delete">×</button></span></li>';
+        return '<li class="tp-row"><span class="tp-name">' + esc(row.text) + '</span><span class="tp-hy">-</span><b>' + money(row.n) + '</b><span class="tp-acts"><button type="button" class="tp-pen" data-act="edit" data-id="' + esc(row.id) + '">Edit</button><button type="button" class="tp-clear" data-act="ask" data-id="' + esc(row.id) + '">Clear</button></span></li>';
       }).join("");
       var ask = "";
       if (asking) {
         var hit = null;
         rows.forEach(function (row) { if (row.id === asking) hit = row; });
-        if (hit) ask = '<div class="tp-ask">Delete ' + esc(hit.text) + '?<button type="button" data-act="yes" data-id="' + esc(hit.id) + '">Delete</button><button type="button" data-act="no">Keep</button></div>';
+        if (hit) ask = '<div class="tp-ask">Clear ' + esc(hit.text) + '?<button type="button" data-act="yes" data-id="' + esc(hit.id) + '">Clear</button><button type="button" data-act="no">Keep</button></div>';
       }
       root.innerHTML =
-        '<div class="tp-total"><b>' + exact(total) + '</b><span>' + money(total) + '</span></div>' +
-        '<form id="' + addId + '" class="tp-form"><input id="' + textId + '" data-field="text" maxlength="80" placeholder="Name" value="' + esc(draftText) + '" aria-label="Name"><span class="tp-hy">-</span><input id="' + amtId + '" data-field="amt" placeholder="50k or 2L" inputmode="text" value="' + esc(draftAmt) + '" aria-label="Amount"><button type="submit">Add</button></form>' +
-        '<p class="tp-hint">k = 1,000 · L = 1 lakh. Top number is the exact total.</p>' +
+        '<div class="tp-total"><b>' + money(total) + '</b></div>' +
+        '<form id="' + addId + '" class="tp-form"><input id="' + textId + '" data-field="text" maxlength="80" placeholder="Name" value="' + esc(draftText) + '" aria-label="Name"><span class="tp-hy">-</span><input id="' + amtId + '" data-field="amt" placeholder="50k or 2L" inputmode="text" value="' + esc(draftAmt) + '" aria-label="Amount"><button type="submit">Add</button><button type="button" data-act="wipe">Clear</button></form>' +
+        '<p class="tp-hint">Always k or L. 50k or 2L. No plain zeros.</p>' +
         '<p id="' + statusId + '" class="tp-status"></p>' + ask +
         '<ul class="tp-list">' + body + "</ul>";
     }
@@ -161,7 +161,7 @@
       var n = num(amtRaw);
       if (!text || n == null) {
         paint();
-        status("Type a name and an amount like 50k or 2L");
+        status("Use k or L, like 50k or 2L");
         return;
       }
       var row = { id: nid(), text: text, n: n, t: Date.now() };
@@ -176,7 +176,7 @@
       var text = keep(textRaw);
       var n = num(amtRaw);
       if (!text || n == null) {
-        status("Type a name and an amount like 50k or 2L");
+        status("Use k or L, like 50k or 2L");
         return;
       }
       rows.forEach(function (row) {
@@ -243,6 +243,16 @@
         if (btn.closest("form") && btn.type === "submit") return;
         var act = btn.getAttribute("data-act");
         var id = btn.getAttribute("data-id") || "";
+        if (act === "wipe") {
+          var nameBox = $(textId);
+          var amtBox = $(amtId);
+          if (nameBox) nameBox.value = "";
+          if (amtBox) amtBox.value = "";
+          paint();
+          var again = $(textId);
+          if (again) again.focus();
+          return;
+        }
         if (act === "edit") { editing = id; asking = ""; paint(); }
         if (act === "cancel") { editing = ""; paint(); }
         if (act === "ask") { asking = id; editing = ""; paint(); }
@@ -262,7 +272,7 @@
   if (!document.getElementById("tp-style")) {
     var css = document.createElement("style");
     css.id = "tp-style";
-    css.textContent = ".tp-book .head p,.tp-book .source{display:none!important}.tp-book .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.tp-book,.tp-app{max-width:100%;overflow-x:hidden}.tp-total{border-radius:18px;padding:16px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.tp-total b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.tp-total span{display:block;margin-top:6px;color:#e6c878;font-size:14px;font-weight:800}.tp-form{display:flex;flex-wrap:nowrap;gap:6px;align-items:center}.tp-form input{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:1px solid #3d4a5c;border-radius:10px;background:#0e131a;color:#f4f7fb;font:800 14px/1.2 Inter,system-ui,sans-serif;color-scheme:dark}.tp-form input[data-field=amt]{flex:0 0 108px}.tp-form input::placeholder{color:#6d7888;font-weight:600}.tp-hy{flex:0 0 auto;color:#8b95a5;font-weight:800}.tp-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.tp-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}.tp-hint,.tp-status{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.tp-status{min-height:18px;margin-top:4px}.tp-list{list-style:none;margin:8px 0 0;padding:0}.tp-row{display:flex;align-items:center;gap:6px;padding:12px 0;border-bottom:1px solid #1c2733}.tp-name{flex:1;min-width:0;font-weight:800;word-break:break-word}.tp-row b{flex:0 0 auto;font-size:15px}.tp-acts{display:flex;gap:4px;margin-left:auto}.tp-pen,.tp-x{border:0;border-radius:999px;height:28px;cursor:pointer;font-weight:800}.tp-pen{padding:0 8px;background:#243044;color:#f4f7fb;font-size:12px}.tp-x{width:28px;background:#2a1a22;color:#ff8b98;font-size:18px}.tp-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.tp-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.tp-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.tp-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.tp-on main>section.section,body.tp-on main>.trend-panel:not(#tp-panel),body.tp-on main>.struct-trend-panel,body.tp-on #tf-panels,body.ml-on main>section.section,body.ml-on main>.trend-panel:not(#ml-panel),body.ml-on main>.struct-trend-panel,body.ml-on #tf-panels{display:none!important}body.tp-on #tp-panel,body.ml-on #ml-panel{display:block!important}";
+    css.textContent = ".tp-book .head p,.tp-book .source{display:none!important}.tp-book .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0!important}.tp-book,.tp-app{max-width:100%;overflow-x:hidden}.tp-total{border-radius:18px;padding:16px;background:#2a2414;color:#f6e7b8;margin-bottom:12px}.tp-total b{display:block;font-size:34px;line-height:1;letter-spacing:-.04em}.tp-total span{display:block;margin-top:6px;color:#e6c878;font-size:14px;font-weight:800}.tp-form{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.tp-form input{flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;border:1px solid #3d4a5c;border-radius:10px;background:#0e131a;color:#f4f7fb;font:800 14px/1.2 Inter,system-ui,sans-serif;color-scheme:dark}.tp-form input[data-field=amt]{flex:0 0 108px}.tp-form input::placeholder{color:#6d7888;font-weight:600}.tp-hy{flex:0 0 auto;color:#8b95a5;font-weight:800}.tp-form button{flex:0 0 auto;border:0;border-radius:10px;padding:8px 10px;background:#e6c878;color:#1a1406;font-weight:900;cursor:pointer}.tp-form button[data-act=wipe],.tp-form button[data-act=cancel]{background:#2a1a22;color:#ff8b98}.tp-hint,.tp-status{margin:8px 0 0;color:#8b95a5;font-size:12px;font-weight:700}.tp-status{min-height:18px;margin-top:4px}.tp-list{list-style:none;margin:8px 0 0;padding:0}.tp-row{display:flex;align-items:center;gap:6px;padding:12px 0;border-bottom:1px solid #1c2733}.tp-name{flex:1;min-width:0;font-weight:800;word-break:break-word}.tp-row b{flex:0 0 auto;font-size:15px}.tp-acts{display:flex;gap:4px;margin-left:auto}.tp-pen,.tp-clear{border:0;border-radius:999px;height:28px;padding:0 8px;cursor:pointer;font-weight:800;font-size:12px}.tp-pen{background:#243044;color:#f4f7fb}.tp-clear{background:#2a1a22;color:#ff8b98}.tp-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font-weight:800}.tp-ask button{border:0;border-radius:999px;padding:8px 12px;font-weight:800;cursor:pointer}.tp-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.tp-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.tp-on main>section.section,body.tp-on main>.trend-panel:not(#tp-panel),body.tp-on main>.struct-trend-panel,body.tp-on #tf-panels,body.ml-on main>section.section,body.ml-on main>.trend-panel:not(#ml-panel),body.ml-on main>.struct-trend-panel,body.ml-on #tf-panels{display:none!important}body.tp-on #tp-panel,body.ml-on #ml-panel{display:block!important}";
     document.head.appendChild(css);
   }
 
