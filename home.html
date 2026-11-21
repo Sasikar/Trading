@@ -1,0 +1,1939 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#070a0f">
+<link rel="manifest" href="manifest.webmanifest?v=chart2">
+<link rel="icon" href="icon-chart-192.png">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>TRADING — Overview</title>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{--bg:#070a0f;--line:#263341;--text:#f4f7fb;--muted:#8491a1;--green:#62e3a0;--red:#ff6f7c;--gold:#e6c878;--blue:#6eb6ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+.shell{width:min(960px,calc(100% - 28px));margin:auto;padding-bottom:40px}
+.section{padding:12px 0}.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+.head h2{font-size:18px;margin:0;font-weight:900}.head p{color:var(--muted);font-size:12px;margin:4px 0 0}
+.source{color:var(--green);font-size:10px;letter-spacing:.1em;font-weight:800}
+.card{border:1px solid var(--line);border-radius:18px;background:#0e151d;overflow:hidden}
+.market-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px}
+@media(max-width:800px){.market-row{grid-template-columns:1fr 1fr}}
+.coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
+.coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
+.change{font-size:11px;font-weight:800;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}
+.tabs{display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:4px;padding:4px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 10px;overflow:visible}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:36px;min-width:auto;border:0;background:transparent;color:#9aa6b5;font:800 12px Inter,system-ui,sans-serif;padding:0 10px;border-radius:10px;cursor:grab;white-space:nowrap;letter-spacing:.02em}
+.tab.dragging{opacity:.6;cursor:grabbing;transform:scale(1.06);background:#1a2734;box-shadow:0 8px 22px #0008;z-index:5;position:relative}
+
+body.tab-arranging{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
+#tf-tabs,#tf-tabs *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important;-webkit-user-drag:none;user-drag:none;-webkit-tap-highlight-color:transparent}
+#tf-tabs ::selection,#tf-tabs *::selection{background:transparent!important;color:inherit}
+.tab-arrange{flex:0 0 auto;height:28px;padding:0 10px;border:1px dashed #3d4d5c;border-radius:8px;background:transparent;color:#8491a1;font:800 10px Inter,system-ui,sans-serif;cursor:pointer;letter-spacing:.04em}
+.tab-arrange.on{background:#e6c878;color:#111;border:1px solid #e6c878}
+.tabs.arranging{box-shadow:inset 0 0 0 1px #3d4d5c;touch-action:none}
+.tabs.arranging,.tabs.arranging *{touch-action:none}
+.tabs.arranging .tab{outline:1px dashed rgba(132,145,161,.45);background:transparent!important;box-shadow:none!important;color:#9aa6b5!important}
+.tabs.arranging .tab.active,.tabs.arranging .tab[data-tf="memegate"].active{background:transparent!important;box-shadow:none!important;color:#c5d0dc!important}
+.tabs.arranging .tab.dragging{background:#1a2734!important;color:#fff!important;outline:1px solid #e6c878}
+
+
+
+.tab .tab-sub{font-size:8px;font-weight:800;letter-spacing:.04em;opacity:.68;margin-left:3px;line-height:1;align-self:center}
+.tab.active{background:rgba(98,227,160,.28)!important;color:#f4f7fb!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.45)}
+#tf-tabs .tab[data-tf="fe"].active{background:transparent!important;color:#9aa6b5!important;box-shadow:none!important}
+.tab[data-tf="memegate"].active{background:rgba(98,227,160,.32)!important;box-shadow:inset 0 0 0 1px rgba(98,227,160,.55)}
+.price-now{padding:14px 16px;border-bottom:1px solid #ffffff0c;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.price-now .big{font-size:24px;font-weight:900}.price-now .meta{font-size:12px;color:var(--muted);margin-top:4px}
+#fib-tv,#macd-tv{width:100%;height:260px;background:#080d13}#macd-tv{height:200px}
+.ladder{padding:6px 0}
+.lvl{display:grid;grid-template-columns:72px 1fr 90px;gap:10px;align-items:center;padding:9px 16px;border-bottom:1px solid #ffffff08;font-size:13px}
+.lvl .tag{font-size:11px;font-weight:900}.lvl.r .tag{color:var(--red)}.lvl.s .tag{color:var(--green)}.lvl.p .tag{color:var(--gold)}.lvl.fib .tag{color:var(--blue)}.lvl.fib-key .tag{color:var(--gold)}
+.lvl .price{font-weight:800}.lvl .dist{font-size:11px;font-weight:700;text-align:right;color:var(--muted)}
+.lvl .bar-wrap{height:4px;background:#0a1016;border-radius:99px;overflow:hidden}.lvl .bar{height:100%;border-radius:99px}
+.lvl.r .bar{background:var(--red)}.lvl.s .bar{background:var(--green)}.lvl.p .bar{background:var(--gold)}.lvl.fib .bar,.lvl.fib-key .bar{background:var(--blue)}
+.note{padding:12px 16px;font-size:12px;color:var(--muted);border-top:1px solid #ffffff0c}
+.tech-strip{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+.tech-card{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
+.tech-card .lab{font-size:11px;font-weight:800;color:#8491a1}.tech-card .val{font-size:22px;font-weight:900;margin-top:6px}.tech-card .sub{font-size:11px;margin-top:4px;color:#8491a1}
+.tag{display:inline-block;margin-top:8px;font-size:10px;font-weight:800;padding:3px 8px;border-radius:99px}
+.tag-bull{background:rgba(98,227,160,.15);color:#62e3a0}.tag-bear{background:rgba(255,111,124,.15);color:#ff6f7c}.tag-neut{background:rgba(230,200,120,.12);color:#e6c878}
+#tf-panels.hidden{display:none!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important}.trend-panel{display:none}.trend-panel.on{display:block!important}
+.trend-badges{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:14px}.trend-badges.row2{padding-top:0}
+.trend-badge{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px;text-align:center}
+.trend-badge .lab{font-size:10px;font-weight:800;color:#8491a1}.trend-badge .val{font-size:15px;font-weight:900;margin-top:8px}
+.score-box{padding:28px 16px;text-align:center;border-top:1px solid #ffffff0c}
+.score-box .big{font-size:22px;font-weight:900}.score-box .sub{font-size:12px;color:#8491a1;margin-top:10px;line-height:1.5;max-width:440px;margin:10px auto 0}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px;border-top:1px solid #ffffff0c}
+.detail-card{background:#080d13;border:1px solid #ffffff0a;border-radius:12px;padding:12px}
+.detail-card .k{font-size:10px;font-weight:800;color:#8491a1}.detail-card .v{font-size:13px;font-weight:800;margin-top:6px}
+.stretch-card{margin-top:12px;border:1px solid rgba(230,160,80,.35);border-radius:18px;background:#12100c;overflow:hidden}
+.stretch-head{padding:16px;border-bottom:1px solid rgba(230,160,80,.15)}
+.stretch-head .title{font-size:11px;font-weight:800;letter-spacing:.1em;color:#e6a050}
+.stretch-head .score{font-size:20px;font-weight:900;margin-top:8px;color:#f0c080}
+.stretch-head .label{font-size:13px;font-weight:800;margin-top:4px;color:#e6a050}
+.stretch-list{padding:8px 0}
+.stretch-row{display:flex;justify-content:space-between;gap:10px;padding:9px 16px;border-bottom:1px solid #ffffff08;font-size:12px}
+.stretch-row .name{color:#c9b8a0;font-weight:700}.stretch-row .pts{font-weight:900}
+.stretch-row.on .pts{color:#e6a050}.stretch-row.off .pts{color:#5a5348}.stretch-row.na .pts{color:#8491a1}
+.stretch-note{padding:12px 16px;font-size:11px;color:#8a7a68;line-height:1.45;border-top:1px solid rgba(230,160,80,.12)}
+
+.stretch-card.dir-bull{border-color:rgba(98,227,160,.45);background:linear-gradient(165deg,#0c1a14 0%,#0a120f 55%,#080d0b 100%)}
+.stretch-card.dir-bull .stretch-head{border-bottom-color:rgba(98,227,160,.2)}
+.stretch-card.dir-bull .title{color:#62e3a0}
+.stretch-card.dir-bull .score{color:#9af0c4}
+.stretch-card.dir-bull .label{color:#62e3a0}
+.stretch-card.dir-bull .stretch-row.on .pts{color:#62e3a0}
+.stretch-card.dir-bear{border-color:rgba(255,111,124,.45);background:linear-gradient(165deg,#1a0c10 0%,#120a0c 55%,#0d0809 100%)}
+.stretch-card.dir-bear .stretch-head{border-bottom-color:rgba(255,111,124,.2)}
+.stretch-card.dir-bear .title{color:#ff8a96}
+.stretch-card.dir-bear .score{color:#ffb0b8}
+.stretch-card.dir-bear .label{color:#ff6f7c}
+.stretch-card.dir-bear .stretch-row.on .pts{color:#ff6f7c}
+.stretch-card.dir-neutral{border-color:rgba(230,160,80,.35);background:linear-gradient(165deg,#16120c 0%,#100e0a 100%)}
+.stretch-card.lvl-high{box-shadow:0 0 0 1px rgba(255,200,80,.15),0 8px 28px rgba(0,0,0,.35)}
+.st-dir{font-size:13px;font-weight:900;letter-spacing:.06em;margin-top:8px}
+.st-dir.bull{color:#62e3a0}.st-dir.bear{color:#ff6f7c}.st-dir.neu{color:#e6c878}
+
+.struct-card{margin-top:12px;border:1px solid #2a3544;border-radius:18px;background:#0c1218;overflow:hidden}
+.struct-head{padding:16px;border-bottom:1px solid #1c2633}
+.struct-head .title{font-size:11px;font-weight:800;letter-spacing:.1em;color:#8aa0b8}
+.struct-status{font-size:22px;font-weight:900;margin-top:10px}
+.struct-status.prot{color:#62e3a0}.struct-status.caut{color:#e6c878}.struct-status.vuln{color:#ff6f7c}.struct-status.unav{color:#8491a1}
+.struct-sub{font-size:12px;color:#8491a1;margin-top:6px;line-height:1.45}
+.struct-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}
+.struct-metric{background:#080d13;border:1px solid #ffffff0a;border-radius:12px;padding:12px}
+.struct-metric .k{font-size:10px;font-weight:800;color:#8491a1}.struct-metric .v{font-size:15px;font-weight:900;margin-top:6px}.struct-metric .h{font-size:11px;color:#8491a1;margin-top:4px}
+.struct-note{padding:12px 16px;font-size:11px;color:#6b7a8c;line-height:1.45;border-top:1px solid #1c2633}
+.hm-card{margin-top:12px;border:1px solid #2a3544;border-radius:18px;background:#0c1218;overflow:hidden}
+.hm-verdict{padding:10px 16px 0;font-size:14px;font-weight:800;line-height:1.35}
+.hm-verdict.sup{color:#62e3a0}.hm-verdict.res{color:#ff6f7c}
+.hm-chart{padding:10px 12px 6px}
+.hm-axis{display:flex;justify-content:space-between;font-size:10px;font-weight:800;color:#8491a1;margin-bottom:6px;letter-spacing:.04em}
+.hm-row{display:grid;grid-template-columns:1fr 64px 1fr;gap:6px;align-items:center;min-height:7px;margin:1px 0}
+.hm-row.mid{background:rgba(230,200,120,.12);border-radius:4px}
+.hm-row.sr-s{box-shadow:inset 0 0 0 2px #62e3a0}
+.hm-row.sr-r{box-shadow:inset 0 0 0 2px #ff6f7c}
+.hm-left,.hm-right{height:6px}
+.hm-bar{height:6px;border-radius:2px;min-width:0}
+.hm-bar.bid{background:#62e3a0;margin-left:auto}
+.hm-bar.ask{background:#ff6f7c}
+.hm-px{font-size:9px;font-weight:800;color:#c5d0dc;text-align:center;white-space:nowrap}
+.hm-px b{color:#e6c878;margin-left:3px}
+.hm-cap{font-size:11px;color:#8491a1;padding:8px 4px 4px;line-height:1.4}
+.hm-card a{color:#6eb6ff;font-weight:700;text-decoration:none}
+.hm-tf{display:flex;gap:6px;margin:10px 0 0;flex-wrap:wrap}
+.hm-tf-btn{padding:6px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font:800 11px Inter,system-ui,sans-serif;cursor:pointer}
+ .hm-tf-btn.on{background:#1a9b6c;color:#fff;border-color:#1a9b6c}
+.hm-keys{font-size:10px;color:#8491a1;margin:0 0 8px;line-height:1.35}
+.hm-keys b{color:#e6c878}
+
+
+
+@media(max-width:560px){#fib-tv{height:220px}#macd-tv{height:180px}.tech-strip,.trend-badges,.detail-grid,.struct-grid{grid-template-columns:1fr}}
+
+.stretch-card.side-up{border-color:rgba(230,160,80,.4);background:linear-gradient(165deg,#16120c 0%,#0e0c09 100%)}
+.stretch-card.side-down{border-color:rgba(120,169,255,.35);background:linear-gradient(165deg,#0c1218 0%,#090d12 100%)}
+.stretch-card.side-mid{border-color:rgba(132,145,161,.3);background:linear-gradient(165deg,#101418 0%,#0a0d10 100%)}
+.stretch-card.lvl-high{box-shadow:0 0 0 1px rgba(230,160,80,.25),0 10px 32px rgba(0,0,0,.4)}
+.stretch-card.lvl-elevated{box-shadow:0 0 0 1px rgba(230,160,80,.12)}
+.st-dir.up{color:#e6a050}.st-dir.down{color:#78a9ff}.st-dir.neu{color:#8491a1}
+.stretch-card .score{color:#f0d9a8}
+.stretch-card .label{color:#c9b8a0;font-size:12px;line-height:1.4}
+.stretch-note{color:#a89880!important}
+
+
+.struct-trend-panel{display:none}.struct-trend-panel.on{display:block!important}
+.st-primary{text-align:center;padding:28px 16px 20px;border:1px solid #263341;border-radius:18px;background:linear-gradient(160deg,#121a22,#0a0e14)}
+.st-primary .st-title{font-size:11px;font-weight:800;letter-spacing:.12em;color:#8491a1}
+.st-primary .st-state{font-size:22px;font-weight:900;margin-top:12px;line-height:1.3}
+.st-primary .st-meta{display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:14px;font-size:11px;font-weight:800;color:#8491a1}
+.st-primary .st-meta b{color:#e8eef6}
+.st-explain{margin-top:14px;padding:14px 16px;border-radius:14px;background:#080d13;border:1px solid #ffffff0a;font-size:13px;line-height:1.55;color:#b8c2ce}
+.st-ev{margin-top:14px;border:1px solid #263341;border-radius:18px;overflow:hidden;background:#101821}
+.st-ev-row{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #ffffff0a;font-size:13px}
+.st-ev-row:last-child{border-bottom:0}
+.st-ev-row .k{color:#8491a1;font-weight:700}
+.st-ev-row .v{font-weight:900;text-align:right}
+.st-weights{margin-top:10px;font-size:10px;color:#66717d;text-align:center}
+
+
+.macro-panel{display:none}.macro-panel.on{display:block!important}
+
+
+.mac-hist-wrap{margin-top:16px}
+.mac-hist-head{margin-bottom:10px}
+.mac-hist-title{font-size:13px;font-weight:900;letter-spacing:.04em;color:#e8eef6}
+.mac-hist-sub{font-size:10px;font-weight:700;color:#8491a1;margin-top:2px}
+.mac-band{display:flex;gap:2px;height:8px;border-radius:6px;overflow:hidden;margin:10px 0 14px;background:#0a0e14}
+.mac-band-cell{flex:1;min-width:2px}
+.mac-hist-year{font-size:11px;font-weight:900;color:#8491a1;margin:12px 0 6px;letter-spacing:.08em}
+.mac-hist-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.mac-hist-cell{border:1px solid #263341;border-radius:10px;padding:8px 4px;background:#101821;cursor:pointer;text-align:center;-webkit-tap-highlight-color:transparent}
+.mac-hist-cell.on{outline:1px solid #62e3a0}
+.mac-hist-mon{font-size:9px;font-weight:800;color:#8491a1}
+.mac-hist-dot{font-size:12px;line-height:1.2;margin-top:2px}
+.mac-hist-short{font-size:9px;line-height:1.15;font-size:10px;font-weight:900;margin-top:2px}
+.mac-hist-detail{margin-top:12px;padding:12px 14px;border-radius:14px;border:1px solid #263341;background:#080d13}
+.mac-hist-detail-placeholder{font-size:12px;color:#66717d}
+.mac-det-title{font-size:12px;font-weight:800;color:#8491a1}
+.mac-det-state{font-size:15px;font-weight:900;margin-top:6px}
+.mac-det-rows{margin-top:10px;display:grid;gap:6px}
+.mac-det-rows div{display:flex;justify-content:space-between;gap:10px;font-size:11px}
+.mac-det-rows span{color:#8491a1;font-weight:700}
+.mac-det-rows b{color:#e8eef6;font-weight:800;text-align:right}
+.mac-det-explain{margin-top:10px;font-size:12px;line-height:1.45;color:#b8c2ce}
+.mac-hist-empty{font-size:12px;color:#66717d;padding:10px 0}
+@media(max-width:380px){.mac-hist-grid{gap:4px}.mac-hist-short{font-size:9px;line-height:1.15;font-size:9px}}
+
+.mac-hist-mom{font-size:9px;font-weight:800;margin-top:3px;letter-spacing:.02em}
+.mac-hist-streak{font-size:11px;font-weight:700;color:#c5d0dc;line-height:1.35;margin:0 0 10px;padding:8px 10px;border-radius:10px;border:1px solid #263341;background:#0c1219}
+.mac-det-mom{font-size:12px;font-weight:800;margin:4px 0 8px}
+.mac-hist-cell{min-height:64px}
+.mac-det-note{font-size:11px;color:#e6c878;margin:4px 0 8px;font-weight:600}
+.mac-hist-short{font-size:8px}
+
+.mac-hist-scores{font-size:8px;font-weight:700;color:#8491a1;margin-top:2px;line-height:1.2}
+.mac-hist-risk{font-size:8px;font-weight:800;margin-top:1px}
+.mac-two-line{font-size:11px;color:#8491a1;margin-top:4px}
+
+
+.ew-sticky{
+  display:none;
+  position:sticky;top:52px;z-index:90;
+  margin:0 0 10px;padding:8px 12px;
+  border:1px solid #2a3644;border-radius:12px;
+  background:rgba(8,13,19,.98);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+#entrywindow-panel.on .ew-sticky{display:block}
+#entrywindow-panel .section > .head{display:none}
+.ew-sticky-tf{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ew-sticky-tf::-webkit-scrollbar{height:0}
+.ew-looking{margin:0 0 10px;font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
+.ew-looking span{font-size:11px;font-weight:700;color:#8491a1;margin-left:6px}
+.ew-states{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ew-st{padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ew-st.on{background:#1a9b6c;color:#fff;border-color:#1a9b6c}
+.ew-st b{font-size:10px;margin-left:4px;opacity:.9}
+.ew-coin-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px}
+.ew-coin-sel{flex:1;min-width:160px;max-width:280px;padding:8px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:800;font-size:13px}
+
+.mac-ref-sticky{
+  position:sticky;top:52px;z-index:45;
+  margin:0 0 12px;padding:10px 12px;
+  border-radius:12px;border:1px solid #2a3644;
+  background:rgba(8,13,19,.94);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.mac-ref-title{font-size:10px;font-weight:900;letter-spacing:.08em;color:#8491a1;margin-bottom:6px}
+.mac-ref-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}
+.mac-ref-lab{font-size:10px;font-weight:800;color:#c5d0dc;min-width:48px}
+.mac-ref-chip{
+  font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;
+  border:1px solid #263341;white-space:nowrap
+}
+.mac-ref-chip.bull{color:#62e3a0;background:#0c2f22;border-color:#1a5c40}
+.mac-ref-chip.neu{color:#9aa3ad;background:#1a1f24;border-color:#2a333c}
+.mac-ref-chip.bear{color:#ff6f7c;background:#2c1014;border-color:#5c1a22}
+.mac-ref-chip.norm{color:#8491a1;background:#141a20;border-color:#263341}
+.mac-ref-chip.exte{color:#e6c878;background:#2a2410;border-color:#5c4a18}
+.mac-ref-chip.para{color:#ffb84d;background:#2a1c08;border-color:#6b4a10}
+.mac-ref-hint{font-size:9px;color:#66717d;margin-top:6px;line-height:1.35}
+
+
+.mac-hist-proj{position:relative}
+.mac-hist-proj-tag{font-size:7px;font-weight:900;letter-spacing:.06em;color:#e6c878;margin-top:1px}
+.mac-hist-year.proj-year{color:#e6c878}
+
+
+.struct-chart-wrap{margin-top:14px;padding:12px 14px;border-radius:14px;border:1px solid #263341;background:#080d13}
+.struct-chart-head{margin-bottom:8px}
+.struct-chart-title{font-size:12px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
+.struct-chart-sub{font-size:11px;font-weight:700;margin-top:4px;line-height:1.35}
+#struct-w1-tv{width:100%;height:280px;background:#080d13}
+.struct-chart-legend{font-size:10px;color:#8491a1;margin-top:8px;line-height:1.4}
+@media(max-width:560px){#struct-w1-tv{height:240px}}
+
+
+.signal-panel{display:none}.signal-panel.on{display:block!important}
+.sig-controls{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;padding:10px 12px;border-radius:12px;border:1px solid #263341;background:#0c1219}
+.sig-controls label{font-size:10px;font-weight:700;color:#8491a1;display:flex;flex-direction:column;gap:4px}
+.sig-controls input,.sig-controls select{font-size:12px;padding:6px 8px;border-radius:8px;border:1px solid #263341;background:#080d13;color:#e8eef6}
+.sig-conds{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.sig-cond{padding:10px 12px;border-radius:12px;border:1px solid #263341;background:#0c1219}
+.sig-cond .k{font-size:10px;font-weight:800;color:#8491a1}
+.sig-cond .v{font-size:13px;font-weight:800;margin-top:4px}
+.sig-cond.on .v{color:#62e3a0}.sig-cond.off .v{color:#66717d}
+.sig-levels{font-size:12px;font-weight:700;color:#c5d0dc;padding:10px 12px;border-radius:12px;border:1px solid #263341;background:#0c1219;margin-bottom:12px;line-height:1.45}
+#sig-tv{width:100%;height:280px;background:#080d13}
+.sig-bt{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.sig-bt .m{padding:10px;border-radius:12px;border:1px solid #263341;background:#0c1219;text-align:center}
+.sig-bt .m .k{font-size:9px;font-weight:800;color:#8491a1}
+.sig-bt .m .v{font-size:14px;font-weight:900;color:#e8eef6;margin-top:4px}
+.sig-list{max-height:220px;overflow:auto;border:1px solid #263341;border-radius:12px;background:#0c1219}
+.sig-list .row{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-bottom:1px solid #1a222c;font-size:11px;font-weight:700}
+.sig-list .row:last-child{border-bottom:0}
+.sig-list .buy{color:#62e3a0}.sig-list .sell{color:#ff6f7c}
+@media(max-width:560px){.sig-conds{grid-template-columns:1fr}.sig-bt{grid-template-columns:repeat(2,1fr)}#sig-tv{height:240px}}
+
+
+.sig-hist-head{font-size:11px;font-weight:900;letter-spacing:.06em;color:#e8eef6;padding:10px 12px 6px;border-bottom:1px solid #1a222c}
+.sig-hist-cols{display:grid;grid-template-columns:1.2fr 1.4fr 0.7fr;gap:8px;padding:6px 12px;font-size:9px;font-weight:800;color:#66717d;border-bottom:1px solid #1a222c}
+.sig-hist-row{display:grid!important;grid-template-columns:1.2fr 1.4fr 0.7fr;gap:8px;align-items:start}
+.sig-hist-px{font-size:10px;color:#8491a1;font-weight:650}
+.sig-hist-row.open{opacity:.85}
+.sig-list{max-height:320px}
+
+.sig-hist-note{font-size:9px;color:#66717d;padding:0 12px 8px;font-weight:650}
+
+.mg-hero{padding:18px 16px;border-bottom:1px solid #1c2633}
+.mg-hero .kicker{font-size:11px;font-weight:800;letter-spacing:.12em;color:#8aa0b8}
+.mg-hero .gate{font-size:26px;font-weight:900;margin-top:8px}
+.mg-hero .gate.on{color:#62e3a0}.mg-hero .gate.wait{color:#e6c878}.mg-hero .gate.off{color:#ff6f7c}
+.mg-metrics{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px;font-weight:800}
+.mg-metrics span{color:#9aa6b5}.mg-metrics b{color:#f4f7fb}
+.mg-warn{margin-top:10px;font-size:12px;color:#e6c878;font-weight:700;line-height:1.4}
+.mg-table{width:100%;border-collapse:collapse;font-size:13px}
+.mg-table th{text-align:left;color:#8491a1;font-size:10px;letter-spacing:.08em;padding:8px 12px;border-bottom:1px solid #1c2633}
+.mg-table td{padding:10px 12px;border-bottom:1px solid #16202a;font-weight:700}
+.mg-table td.sc{font-variant-numeric:tabular-nums}
+.mg-block{padding:14px 16px;border-top:1px solid #1c2633}
+.mg-block h3{margin:0 0 6px;font-size:12px;letter-spacing:.08em;color:#8aa0b8}
+.mg-block p{margin:0;color:#d5dde8;font-size:13px;line-height:1.5;font-weight:650}
+.mg-form{padding:12px 16px;font-size:11px;color:#6b7a8c;line-height:1.55;border-top:1px solid #1c2633;white-space:pre-wrap}
+.mg-hist-wrap{max-height:420px;overflow:auto;border-top:1px solid #1c2633}
+.mg-hist{width:100%;border-collapse:collapse;font-size:12px}
+.mg-hist th{position:sticky;top:0;background:#0e151d;text-align:left;color:#8491a1;font-size:10px;letter-spacing:.06em;padding:8px 10px;border-bottom:1px solid #1c2633}
+.mg-hist td{padding:8px 10px;border-bottom:1px solid #16202a;font-weight:700;white-space:nowrap}
+.mg-hist .on{color:#62e3a0}.mg-hist .off{color:#ff6f7c}.mg-hist .wait{color:#e6c878}
+.coin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:10px 0}
+.coin-stats .st{background:#0b121a;border:1px solid #1c2633;border-radius:12px;padding:10px}
+.coin-stats .lab{font-size:10px;color:#8491a1;font-weight:800;letter-spacing:.06em}
+.coin-stats .val{font-size:16px;font-weight:900;margin-top:4px}
+#coin-fib-tv,#coin-macd-tv{min-height:180px;width:100%}
+#coin-fib-tv{min-height:280px}
+
+.card-pad{padding:14px}
+#coin-panel .card,#breakouts-panel .card,#hunter-panel .card,#verdict-panel .card,#holders-panel .card,#failures-panel .card,#inmemory-panel .card,#keep-panel .card,#sentiment-panel .card,#entrywindow-panel .card,#position-panel .card,#wowdip-panel .card,#omg-panel .card,#pitfalls-panel .card,#strategy-panel .card,#decision-panel .card,#gmgn-panel .card,#wallets-panel .card,#pumpfun-panel .card,#coinstats-panel .card,#fomo-panel .card,#fx-panel .card,#fd-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+.hu-band-now{position:fixed;top:52px;left:0;right:0;z-index:80;display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:rgba(8,13,19,.96);border-bottom:1px solid #2a3644;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 20px #0006}
+.hu-band-now[hidden]{display:none!important}
+.hu-band-now b{font-size:13px;font-weight:900;color:#e8eef6;letter-spacing:.04em}
+.hu-band-now span{font-size:11px;font-weight:700;color:#8491a1}
+.hu-band{display:flex;flex-direction:column;gap:8px;padding-top:4px}
+.hu-band-h{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:2px 0}
+.hu-band-h b{font-size:13px;font-weight:900;color:#e8eef6}
+.hu-band-h span{font-size:11px;color:#8491a1}
+#hunter-panel .card{overflow:visible}
+#coin-panel .card > *,#breakouts-panel .card > *,#hunter-panel .card > *,#holders-panel .card > *{margin-left:0;margin-right:0}
+.hd-card{padding:12px 14px;border-radius:12px;border:1px solid #243041;background:#0b121a}
+.hd-top{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.hd-name{font-weight:900;font-size:15px;color:#e8eef6;display:flex;align-items:center;gap:8px}
+.hd-name img{width:16px;height:16px;border-radius:50%;background:#121a24}
+.hd-count{font-weight:900;font-size:18px;color:#e8eef6}
+.hd-count span{font-size:11px;color:#8491a1;font-weight:700;margin-left:4px}
+.hd-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px}
+@media(max-width:640px){.hd-grid{grid-template-columns:1fr 1fr}}
+.hd-cell{background:#080d13;border:1px solid #ffffff0a;border-radius:10px;padding:8px}
+.hd-cell .lab{font-size:10px;font-weight:800;color:#8491a1;letter-spacing:.06em}
+.hd-cell .val{font-size:15px;font-weight:900;margin-top:4px}
+.hd-cell .sub{font-size:10px;color:#8491a1;margin-top:2px;min-height:14px}
+.hd-foot{margin-top:8px;font-size:11px;color:#8491a1;line-height:1.45}
+.hd-foot a{color:#6eb6ff;text-decoration:none;font-weight:700}
+.hd-solscan{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.hd-solscan-btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:10px;background:#62e3a0;color:#06120b;font:800 13px Inter,system-ui,sans-serif;text-decoration:none}
+.hd-solscan-link{display:inline-flex;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#101821;color:#c5d0dc;font:800 12px Inter,system-ui,sans-serif;text-decoration:none}
+.hd-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.hd-pane{display:flex;flex-direction:column;gap:2px;padding:12px 12px 14px;border-radius:12px;text-decoration:none;min-height:72px}
+.hd-pane-dex{background:#123526;border:1px solid #2a6b4e;color:#62e3a0}
+.hd-pane-hold{background:#101821;border:1px solid #243041;color:#c5d0dc}
+.hd-pane-kicker{font:800 9px/1 Inter,system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;opacity:.7}
+.hd-pane-title{font:800 15px/1.2 Inter,system-ui,sans-serif}
+.hd-pane-sub{font:600 11px/1.3 Inter,system-ui,sans-serif;opacity:.75}
+.hd-mix{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.hd-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px;border:1px solid #243041;background:#080d13;font-size:11px;font-weight:800;color:#c5d0dc;line-height:1}
+.hd-chip .ico{font-size:14px;line-height:1}
+.hd-chip .lab{font-size:10px;letter-spacing:.04em;color:#8491a1}
+.hd-chip .pct{color:#e8eef6}
+.hd-chip .n{font-size:10px;color:#8491a1}
+.hd-chip-top{border-color:#3a4a22;background:#10180c}
+.hd-chip-rest{opacity:.85}
+.hd-depth{margin-top:8px}
+.hd-depth-lab{font-size:10px;font-weight:800;letter-spacing:.08em;color:#8491a1;margin:0 0 6px}
+.hd-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;align-items:stretch}
+.hd-pane{background:#080d13;border:1px solid #1c2633;border-radius:12px;padding:10px}
+.hd-pane-lab{font-size:10px;font-weight:900;letter-spacing:.08em;color:#8491a1;margin:0 0 8px}
+.hd-donut-wrap{display:flex;justify-content:center;margin-bottom:8px}
+.hd-donut{width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.hd-donut-hole{width:56px;height:56px;border-radius:50%;background:#080d13;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.hd-donut-hole b{font-size:14px;font-weight:900;color:#e8eef6;line-height:1}
+.hd-donut-hole span{font-size:8px;font-weight:800;letter-spacing:.06em;color:#8491a1}
+.hd-mix-list{display:flex;flex-direction:column;gap:4px}
+.hd-mix-row{display:grid;grid-template-columns:18px 1fr auto auto;gap:4px;align-items:center;font-size:11px;font-weight:800}
+.hd-mix-row .ico{font-size:14px;line-height:1}
+.hd-mix-row .lab{color:#c5d0dc}
+.hd-mix-row .pct{color:#e8eef6}
+.hd-mix-row .n{color:#8491a1;font-size:10px}
+.hd-mix-rest{opacity:.75}
+.hd-bars{display:flex;flex-direction:column;gap:8px}
+.hd-bar-meta{display:grid;grid-template-columns:18px 1fr auto auto;gap:4px;align-items:center;font-size:11px;font-weight:800;margin-bottom:4px}
+.hd-bar-meta .ico{font-size:14px;line-height:1}
+.hd-bar-meta .lab{color:#c5d0dc}
+.hd-bar-meta .n{color:#8491a1;font-size:10px}
+.hd-bar-meta .pct{color:#e8eef6}
+.hd-bar-track{height:7px;background:#121a24;border-radius:99px;overflow:hidden}
+.hd-bar-fill{height:100%;border-radius:99px;min-width:0}
+@media(max-width:420px){
+  .hd-split{gap:8px}
+  .hd-pane{padding:8px}
+  .hd-donut{width:76px;height:76px}
+  .hd-donut-hole{width:46px;height:46px}
+  .hd-donut-hole b{font-size:12px}
+  .hd-mix-row,.hd-bar-meta{font-size:10px;grid-template-columns:16px 1fr auto auto}
+}
+.hd-ref-sticky{
+  position:sticky;top:52px;z-index:46;
+  margin:0 0 10px;padding:8px 10px;
+  border-radius:12px;border:1px solid #2a3644;
+  background:rgba(8,13,19,.96);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.hd-ref-title{font-size:10px;font-weight:900;letter-spacing:.08em;color:#8491a1;margin:0 0 6px}
+.hd-ref-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.hd-ref-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px;border:1px solid #243041;background:#080d13;font-size:11px;font-weight:800;color:#e8eef6;line-height:1;white-space:nowrap}
+.hd-ref-chip .ico{font-size:14px;line-height:1}
+.fl-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;border:1px solid #243041;background:#0b121a;font-size:11px;font-weight:800;color:#c5d0dc}
+.fl-chip b{color:#ff6f7c}
+.fl-row{padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#0b121a}
+.fl-row .k{font-size:10px;font-weight:900;letter-spacing:.08em;color:#ff8a96}
+.fl-row .m{font-size:13px;font-weight:700;color:#e8eef6;margin-top:4px}
+.fl-row .t{font-size:11px;color:#8491a1;margin-top:3px}
+.fl-live{padding:10px 12px;border-radius:10px;border:1px solid #3a3426;background:#17130d;font-size:12px;color:#c9b8a0;line-height:1.45}
+#im-text{margin:0;white-space:pre-wrap;word-break:break-word;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#dce5ee;background:#080d13;border:1px solid #1c2633;border-radius:12px;padding:12px;max-height:70vh;overflow:auto}
+#st-saved,#st-hunter{flex:1;min-width:140px;height:38px;border-radius:10px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:800;padding:0 10px}
+.st-head{margin-bottom:8px}.st-name{font-size:18px;font-weight:900}.st-name a{font-size:11px;color:#6eb6ff;margin-left:8px;text-decoration:none}
+.st-meta{font-size:12px;color:#8491a1;margin-top:4px}
+.st-vote{padding:12px;border-radius:12px;border:1px solid #243041;background:#0b121a;margin:8px 0}
+.st-vote b{font-size:22px}.st-vote span{display:block;font-size:11px;color:#8491a1;margin-top:4px}
+.st-h{font-size:10px;font-weight:900;letter-spacing:.08em;color:#8491a1;margin:14px 0 6px}
+.st-ul{margin:0;padding-left:18px;color:#dce5ee;font-size:13px;line-height:1.5}
+.st-ul li{margin:0 0 6px}
+.st-row{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid #1a2430;color:#e8eef6;text-decoration:none;font-size:13px}
+.st-row span{color:#8491a1;font-size:12px;text-align:right}
+.st-find{color:#e8eef6;font-size:13px;line-height:1.45}
+.st-note{font-size:11px;color:#8491a1;line-height:1.45;margin-top:8px}
+.st-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.st-chip{display:inline-flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#e8eef6;text-decoration:none;font-weight:800;font-size:13px}
+.st-chip img{width:18px;height:18px;border-radius:4px;background:#121a24}
+#st-log{font-size:12px;line-height:1.5;color:#dce5ee;background:#080d13;border:1px solid #1c2633;border-radius:10px;padding:10px 12px}
+#st-log b{color:#62e3a0}
+.vd-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:0 0 14px;flex-wrap:wrap}
+.vd-name{font-size:18px;font-weight:900}
+.vd-name span{font-size:11px;color:#8491a1;font-weight:700}
+.vd-meta{font-size:12px;color:#8491a1;margin-top:4px}
+.vd-dex{padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#6eb6ff;font-weight:800;font-size:11px;text-decoration:none}
+.vd-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.vd-card{padding:14px;border-radius:14px;border:1px solid #243041;background:#0b121a;min-height:160px}
+.vd-card.hold{border-color:rgba(98,227,160,.4);background:linear-gradient(180deg,#0c1a14,#0b121a)}
+.vd-card.exit{border-color:rgba(255,111,124,.4);background:linear-gradient(180deg,#1a0c10,#0b121a)}
+.vd-k{font-size:11px;font-weight:800;letter-spacing:.08em;color:#8491a1}
+.vd-k span{font-weight:700;letter-spacing:0;color:#66717d}
+.vd-call{font-size:28px;font-weight:900;margin:10px 0 8px;letter-spacing:.04em}
+.vd-why{font-size:13px;line-height:1.45;color:#e8eef6}
+.vd-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.vd-pill{font-size:10px;font-weight:800;padding:3px 7px;border-radius:999px;border:1px solid #243041;color:#c5d0dc}
+.vd-pick{display:flex;flex-direction:column;gap:8px;width:100%}
+#vd-coins{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;width:100%}
+.vd-chip{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:40px;padding:0 10px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font:800 12px Inter,system-ui,sans-serif;cursor:pointer;text-align:left;width:100%}
+.vd-chip.on{border-color:rgba(98,227,160,.45);background:rgba(98,227,160,.12)}
+.vd-chip span{color:#8491a1;font-weight:700;font-size:10px}
+.vd-banner{padding:12px 14px;border-radius:12px;border:1px solid rgba(230,200,120,.35);background:#16120c;color:#e6c878;font-size:13px;line-height:1.45}
+@media(max-width:720px){.vd-grid{grid-template-columns:1fr}}
+.coin-ca{
+  display:grid;
+  grid-template-columns:88px minmax(0,1fr) 72px 72px;
+  gap:8px;
+  align-items:stretch;
+  width:100%;
+}
+.coin-ca select,.coin-ca input,.coin-ca button{
+  height:44px;
+  width:100%;
+  border:1px solid #2a3544;
+  background:#0b121a;
+  color:#e8eef6;
+  border-radius:10px;
+  padding:0 10px;
+  font:700 13px Inter,system-ui,sans-serif;
+  margin:0;
+}
+.coin-ca input{min-width:0;overflow:hidden;text-overflow:ellipsis;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.coin-ca button{cursor:pointer;background:rgba(98,227,160,.2);border-color:rgba(98,227,160,.4);color:#c8f5dc;white-space:nowrap;padding:0 8px}
+#coin-clear{background:rgba(255,111,124,.12)!important;border-color:rgba(255,111,124,.35)!important;color:#ffb0b8!important}
+@media(max-width:720px){
+  .coin-ca{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .coin-ca input{grid-column:1/-1;grid-row:1}
+  .coin-ca select{grid-column:1;grid-row:2}
+  #coin-load{grid-column:2;grid-row:2}
+  #coin-clear{grid-column:3;grid-row:2}
+}
+.coin-meta{font-size:12px;color:#8491a1;line-height:1.45;word-break:break-word}
+#coin-recents-wrap{width:100%}
+#coin-recents{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:8px;
+  max-height:168px;
+  overflow-y:auto;
+  width:100%;
+}
+.coin-recent-chip{
+  display:flex!important;
+  align-items:center;
+  justify-content:space-between;
+  gap:4px;
+  min-height:40px;
+  width:100%;
+  padding:0 8px 0 10px;
+  border-radius:12px;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+.coin-recent-chip.on{border-color:rgba(98,227,160,.45)!important;background:rgba(98,227,160,.12)!important}
+.coin-recent-chip button[data-act="load"]{
+  flex:1;
+  min-width:0;
+  max-width:none!important;
+  text-align:left;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.tf-grid,.coin-tf,#bo-tf{
+  display:grid;
+  grid-template-columns:repeat(10,minmax(0,1fr));
+  gap:6px;
+  width:100%;
+}
+.tf-grid button,.coin-tf button,.bo-tf-btn{
+  width:100%;
+  min-width:0;
+  height:40px;
+  padding:0 2px;
+  text-align:center;
+  border:1px solid #2a3544;
+  background:#0b121a;
+  color:#9aa6b5;
+  border-radius:10px;
+  font:800 12px Inter,system-ui,sans-serif;
+  cursor:pointer;
+}
+.tf-grid button.on,.coin-tf button.on,.bo-tf-btn.on{
+  background:rgba(98,227,160,.28)!important;
+  color:#f4f7fb!important;
+  border-color:rgba(98,227,160,.45)!important;
+}
+.tool-stack{display:flex;flex-direction:column;gap:10px;width:100%}
+.tool-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tool-actions button{height:40px;padding:0 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#e8eef6;font:800 12px Inter,system-ui,sans-serif;cursor:pointer}
+#hu-list,#bo-list{display:flex;flex-direction:column;gap:10px;width:100%}
+.recents-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.recents-head .lab{font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800}
+.recents-head button{height:32px;padding:0 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+.ca-switch{display:flex;gap:6px}
+.ca-switch button.on{background:#e6c878;color:#1a1406;border-color:#e6c878}
+.ca-del-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #243041;border-radius:14px;background:#0b121a;margin-bottom:8px}
+.ca-del-row b{display:block;font-size:14px}
+.ca-del-row span{color:#8491a1;font-size:11px;font-weight:700}
+.ca-del-row button{margin-left:auto;height:34px;padding:0 12px;border:0;border-radius:10px;background:#6b2a34;color:#ffd0d4;font-weight:900;font-size:12px;cursor:pointer}
+#coin-delete-list{max-height:320px;overflow-y:auto}
+#coin-panel.ca-del-mode .card > *:not(#coin-recents-wrap){display:none!important}
+#coin-panel.ca-del-mode .ca-switch,#coin-panel.ca-del-mode .head p,#coin-panel.ca-del-mode #coin-source{display:none!important}
+#coin-panel.ca-del-mode #coin-delete-list{max-height:none}
+#ca-del-modal{position:fixed;inset:0;z-index:10050;background:#000a;display:none;align-items:flex-end;justify-content:center;padding:16px}
+#ca-del-modal.on{display:flex}
+#ca-del-sheet{width:min(420px,100%);background:#12161d;border:1px solid #2a3140;border-radius:22px;padding:18px;margin-bottom:12px}
+#ca-del-sheet p{color:#c5cad6;font-size:14px;line-height:1.45;margin:8px 0 16px}
+#ca-del-sheet .row{display:flex;gap:8px}
+#ca-del-sheet .row button{flex:1;height:44px;border-radius:12px;font-weight:900;font-size:14px;cursor:pointer}
+#ca-del-no{border:1px solid #2a3140;background:transparent;color:#f4f7fb}
+#ca-del-yes{border:0;background:#ff6f7c;color:#1a0a0c}
+@media(max-width:720px){
+  .tf-grid,.coin-tf,#bo-tf{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .tab{font-size:11px;height:34px;padding:0 8px}
+  .shell{width:min(960px,calc(100% - 20px))}
+}
+@keyframes dip-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+#dip-alert-track { display:inline-flex; align-items:center; gap:36px; width:max-content; white-space:nowrap; animation: dip-marquee 28s linear infinite; }
+.fe-lab{font-size:10px;letter-spacing:.16em;font-weight:800;color:#6d7688;margin:0 2px 6px}
+.fe-search,.fe-drop{width:100%;display:flex;align-items:center;gap:10px;min-height:48px;border-radius:16px;border:1px solid #2a3342;background:#10151c;color:#f4f7fb}
+.fe-search{padding:0 14px}
+.fe-search input{flex:1;min-width:0;border:0;background:transparent;color:#f4f7fb;font:inherit;font-weight:700;font-size:15px;outline:none}
+.fe-search input::placeholder{color:#6d7688;font-weight:600}
+.fe-search:focus-within{border-color:#e6b84d;box-shadow:0 0 0 3px #e6b84d22}
+.fe-drop{padding:6px 12px;text-align:left;cursor:pointer}
+.fe-menu{margin-top:8px;border:1px solid #2a3342;background:#0c1117;border-radius:16px;max-height:280px;overflow:auto;box-shadow:0 18px 40px #000c}
+.fe-row{width:100%;display:flex;align-items:center;gap:10px;padding:11px 12px;border:0;border-bottom:1px solid #1c2430;background:transparent;color:#f4f7fb;text-align:left;cursor:pointer}
+.fe-row:last-child{border-bottom:0}
+.fe-row.on{background:#1c1810}
+.fe-ava{width:28px;height:28px;border-radius:99px;display:grid;place-items:center;background:#1a2230;color:#e6b84d;font-weight:900;font-size:12px;flex:none}
+
+.al-sw{width:52px;height:32px;border:0;border-radius:99px;background:#2a3140;position:relative;padding:0;flex:none;cursor:pointer}
+.al-sw[aria-checked="true"]{background:#3dbe7a}
+.al-knob{position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:99px;background:#fff;transition:transform .18s ease}
+.al-sw[aria-checked="true"] .al-knob{transform:translateX(20px)}
+
+#fe-panel .card{padding:16px;display:flex;flex-direction:column;gap:12px}
+</style></head><body>
+<div class="shell"><main>
+<div id="dip-alert" style="display:none;position:sticky;top:0;z-index:30;overflow:hidden;margin:0 0 12px;padding:10px 0;border-radius:12px;border:1px solid #f5a14a;background:#3a2410;color:#f5a14a;font-weight:900;font-size:15px"><div id="dip-alert-track"></div></div>
+<section class="section">
+  <div class="head"><div><h2>Live market</h2><p>BTC · ETH · NASDAQ · Fear &amp; Greed</p></div><span class="source" id="market-source">…</span></div>
+  <div class="card"><div class="market-row">
+    <div class="coin"><div class="lab">BITCOIN</div><div id="btc-price" class="coin-price">…</div><div id="btc-change" class="change">—</div></div>
+    <div class="coin"><div class="lab">ETHEREUM</div><div id="eth-price" class="coin-price">…</div><div id="eth-change" class="change">—</div></div>
+    <div class="coin"><div class="lab">NASDAQ</div><div id="ndx-price" class="coin-price">…</div><div id="ndx-change" class="change">—</div></div>
+    <div class="coin"><div class="lab">FEAR &amp; GREED</div><div id="fg-price" class="coin-price">…</div><div id="fg-change" class="change">—</div></div>
+  </div></div>
+</section>
+<div class="tabs" id="tf-tabs" onselectstart="return false">
+  <button type="button" class="tab" data-tf="alerts" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showAlerts&&window.showAlerts(true);}catch(e){}">Alerts</button>
+  <button type="button" class="tab active" data-tf="fe" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntryDesk&&window.showFomoEntryDesk(true);}catch(e){}">FomoEntry</button>
+  <button type="button" class="tab" data-tf="cal" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showCal&&window.showCal(true);}catch(e){}">Cal</button>
+  <button type="button" class="tab" data-tf="mandates" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMandates&&window.showMandates(true);}catch(e){}">Mandates</button>
+
+
+  <button type="button" class="tab" data-tf="keywords" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showKeywords&&window.showKeywords(true);}catch(e){}">Keywords</button>
+  <button type="button" class="tab" data-tf="gnotes" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showGoldenNotes&&window.showGoldenNotes(true);}catch(e){}">Golden Notes</button>
+  <button type="button" class="tab" data-tf="officeemo" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showOfficeEmotions&&window.showOfficeEmotions(true);}catch(e){}">Office emotions</button>
+  <button type="button" class="tab" data-tf="personalemo" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showPersonalEmotions&&window.showPersonalEmotions(true);}catch(e){}">Personal emotions</button>
+  <button type="button" class="tab" data-tf="whale" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showWhale&&window.showWhale(true);}catch(e){}">Whales</button>
+  <button type="button" class="tab" data-tf="sleeplog" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showSleepLog&&window.showSleepLog(true);}catch(e){}">Sleep</button>
+  <button type="button" class="tab" data-tf="diet" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showDiet&&window.showDiet(true);}catch(e){}">Diet</button>
+  <button type="button" class="tab" data-tf="gym" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showGym&&window.showGym(true);}catch(e){}">Gym</button>
+  <button type="button" class="tab" data-tf="steps" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showSteps&&window.showSteps(true);}catch(e){}">Steps</button>
+  <button type="button" class="tab" data-tf="food" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFood&&window.showFood(true);}catch(e){}">Food</button>
+  <button type="button" class="tab" data-tf="saviour" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showSaviour&&window.showSaviour(true);}catch(e){}">Saviour</button>
+  <button type="button" class="tab" data-tf="weight" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showWeight&&window.showWeight(true);}catch(e){}">Weight</button>
+  <button type="button" class="tab" data-tf="water" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showWater&&window.showWater(true);}catch(e){}">Water</button>
+  <button type="button" class="tab" data-tf="memegate">MemeGate</button>
+  <a class="tab" data-tf="soulscanner" href="https://t.me/soul_scanner_bot" target="_blank" rel="noopener">Soul Scanner</a>
+  <a class="tab" data-tf="cabalhunter" href="https://cabal-hunter.com/map" target="_blank" rel="noopener">Cabal Hunter</a>
+  <a class="tab" data-tf="rugradar" href="https://rugradar0.tech/" target="_blank" rel="noopener">Rug Radar</a>
+  <a class="tab" data-tf="defade" href="https://defade.org/" target="_blank" rel="noopener">DeFade</a>
+  <a class="tab" data-tf="trenchradar" href="https://trench.bot/" target="_blank" rel="noopener">Trench Radar</a>
+  <a class="tab" data-tf="trenchcoat" href="https://trenchcoat.tools/" target="_blank" rel="noopener">Trenchcoat</a>
+  <a class="tab" data-tf="memeassist" href="https://memeassist.com/" target="_blank" rel="noopener">Meme Assist</a>
+  <a class="tab" data-tf="gmgnai" href="https://gmgn.ai/" target="_blank" rel="noopener">GMGN</a>
+  <a class="tab" data-tf="hstrength" href="https://sparsitydata.com/holderstrength?chain=solana" target="_blank" rel="noopener">Holders Strength</a>
+  <a class="tab" data-tf="cvd" href="https://www.coinglass.com/cvd/BTC" target="_blank" rel="noopener">BTC CVD</a>
+  <button type="button" class="tab" data-tf="coin">CA</button>
+  <button type="button" class="tab" data-tf="cadelete" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showCoinDelete&&window.showCoinDelete(true);}catch(e){}">Delete</button>
+  <button type="button" class="tab" data-tf="entrywindow">Entry Window</button>
+  <button type="button" class="tab" data-tf="breakouts">Breakout Memes</button>
+  <button type="button" class="tab" data-tf="hunter">Hunter</button>
+  <button type="button" class="tab" data-tf="holders">Holders</button>
+  <button type="button" class="tab" data-tf="tiers">Tiers</button>
+  <button type="button" class="tab" data-tf="sentiment">Sentiment</button>
+  <button type="button" class="tab" data-tf="failures">Failures</button>
+  <button type="button" class="tab" data-tf="inmemory">InMemory</button>
+  <button type="button" class="tab" data-tf="keep">G-Trade<span class="tab-sub">Notes</span></button>
+  <button type="button" class="tab" data-tf="verdict">Verdict</button>
+  <button type="button" class="tab" data-tf="antifomo">Anti-FOMO</button>
+  <button type="button" class="tab" data-tf="position">Position</button>
+  <button type="button" class="tab" data-tf="wowdip">WOW DIP</button>
+  <button type="button" class="tab" data-tf="omg">OMG</button>
+  <button type="button" class="tab" data-tf="pitfalls">Pitfalls</button>
+  <button type="button" class="tab" data-tf="strategy">Strategy</button>
+  <button type="button" class="tab" data-tf="decision">Decision Check</button>
+  <button type="button" class="tab" data-tf="emotion">Emotional<span class="tab-sub">Checks</span></button>
+  <button type="button" class="tab" data-tf="coinstats" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showCoinstats&&window.showCoinstats(true);}catch(e){}">Coinstats</button>
+  <button type="button" class="tab" data-tf="solchain" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showSolchain&&window.showSolchain(true);}catch(e){}">Solchain</button>
+  <button type="button" class="tab" data-tf="btc" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showBtc&&window.showBtc(true);}catch(e){}">BTC</button>
+  <button type="button" class="tab" data-tf="memes" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMemes&&window.showMemes(true);}catch(e){}">Memes</button>
+  <button type="button" class="tab" data-tf="markets" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMarkets&&window.showMarkets(true);}catch(e){}">Markets</button>
+  <button type="button" class="tab" data-tf="etflive" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showEtfLive&&window.showEtfLive(true);}catch(e){}">ETF Live</button>
+  <button type="button" class="tab" data-tf="dex" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showDex&&window.showDex(true);}catch(e){}">DEX</button>
+  <button type="button" class="tab" data-tf="experience" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showExperience&&window.showExperience(true);}catch(e){}">Experience Entry</button>
+  
+  
+  <button type="button" class="tab" data-tf="fomo" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntry&&window.showFomoEntry(true);}catch(e){}">Fomo Entry</button>
+  <button type="button" class="tab" data-tf="fx" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoExperiences&&window.showFomoExperiences(true);}catch(e){}">Fomo Experiences</button>
+  <button type="button" class="tab" data-tf="fd" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFavDips&&window.showFavDips(true);}catch(e){}">Fav Dip</button>
+  <button type="button" class="tab" data-tf="gmgn">GMGN</button>
+  <button type="button" class="tab" data-tf="pumpfun" onclick="try{window.showPumpfun&&window.showPumpfun(true)}catch(e){}">Pumpfun</button>
+  <button type="button" class="tab" data-tf="wallets">Wallets</button>
+  <button type="button" class="tab" data-tf="1h">1H</button>
+  <button type="button" class="tab" data-tf="pressure" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showTimePressure&&window.showTimePressure(true);}catch(e){}">Time Pressure</button>
+  <button type="button" class="tab" data-tf="midlong" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMidLong&&window.showMidLong(true);}catch(e){}">Mid / Long</button>
+  <button type="button" class="tab" data-tf="4h">4H</button>
+  <button type="button" class="tab" data-tf="1d">1D</button>
+  <button type="button" class="tab" data-tf="trend">Trend</button>
+  <button type="button" class="tab" data-tf="elliott" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showElliott&&window.showElliott(true);}catch(e){}">Elliott</button>
+  <button type="button" class="tab" data-tf="struct">Struct</button>
+  <button type="button" class="tab" data-tf="macro">Macro</button>
+  <button type="button" class="tab" data-tf="1w">1W</button>
+  <button type="button" class="tab" data-tf="1M">1M</button>
+  <button type="button" class="tab-arrange" id="tab-arrange">Arrange</button>
+</div>
+<div id="tf-panels" class="hidden" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Fibonacci · <span id="tf-name">1D</span></h2><p id="fib-sub">swing</p></div><span class="source" id="fib-source">…</span></div>
+  <div class="card">
+    <div class="price-now"><div><div class="big" id="fib-spot">—</div><div class="meta" id="fib-meta">BTC</div></div><div class="meta" id="fib-bias" style="font-weight:800;text-align:right">—</div></div>
+    <div id="fib-tv"></div><div class="ladder" id="fib-ladder"></div>
+    <div class="note">0% swing low · 100% swing high</div>
+  </div>
+</section>
+<section class="section">
+  <div class="head"><div><h2>MACD · <span id="macd-tf-name">1D</span></h2></div><span class="source" id="macd-source">…</span></div>
+  <div class="card">
+    <div id="macd-tv"></div>
+    <div class="tech-strip">
+      <div class="tech-card"><div class="lab">RSI (14)</div><div class="val" id="rsi-val">—</div><div class="sub" id="rsi-sub">—</div><div class="tag tag-neut" id="rsi-tag">…</div></div>
+      <div class="tech-card"><div class="lab">VOLUME</div><div class="val" id="vol-val">—</div><div class="sub" id="vol-sub">vs avg</div><div class="tag tag-neut" id="vol-tag">…</div></div>
+    </div>
+    <div class="note" id="macd-note">HIST = MACD − Signal</div>
+  </div>
+</section>
+<section class="section" id="cvd-section">
+  <div class="head"><div><h2>CVD · Buy vs Sell</h2><p>Cumulative volume delta · this timeframe</p></div><span class="source" id="cvd-source">LIVE</span></div>
+  <div class="card">
+    <div class="tech-strip">
+      <div class="tech-card"><div class="lab">CVD</div><div class="val" id="cvd-val">—</div><div class="sub" id="cvd-sub">cum buy − sell</div><div class="tag tag-neut" id="cvd-tag">…</div></div>
+      <div class="tech-card"><div class="lab">LAST Δ</div><div class="val" id="cvd-delta">—</div><div class="sub" id="cvd-delta-sub">this candle</div><div class="tag tag-neut" id="cvd-delta-tag">…</div></div>
+    </div>
+    <div class="note">Green = buy pressure · Red = sell pressure. Not total volume.</div>
+  </div>
+</section>
+<section class="section">
+  <div class="head"><div><h2>S/R · <span id="sr-tf-name">1D</span></h2></div><span class="source" id="sr-source">…</span></div>
+  <div class="card">
+    <div class="price-now"><div><div class="big" id="sr-spot">—</div><div class="meta" id="sr-meta">BTC</div></div><div class="meta" id="sr-bias" style="font-weight:800;text-align:right">—</div></div>
+    <div class="ladder" id="sr-ladder"></div>
+  </div>
+</section>
+</div>
+
+<div id="antifomo-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Anti-FOMO</h2><p>Pre-planned check · entry quality from S/R + extension · cooling · calendar</p></div><span class="source" id="af-source">LOCAL</span></div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:10px">A · PRE-PLANNED CHECK</div>
+    <div style="font-size:12px;color:#c5d0dc;margin-bottom:10px;line-height:1.45">Was this setup identified <b>before</b> the move? If the coin only became interesting after BTC/ETH pumped → Reactive.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" id="af-pre-yes" onclick="window.afSetPre&&window.afSetPre(true)" style="flex:1;min-width:120px;padding:12px;border-radius:12px;border:1px solid #1e4a32;background:#0e1a14;color:#62e3a0;font-weight:800;cursor:pointer">✅ YES — Pre-planned</button>
+      <button type="button" id="af-pre-no" onclick="window.afSetPre&&window.afSetPre(false)" style="flex:1;min-width:120px;padding:12px;border-radius:12px;border:1px solid #5a2030;background:#1a0e12;color:#ff6f7c;font-weight:800;cursor:pointer">❌ NO — Reactive</button>
+    </div>
+    <div id="af-pre-status" style="margin-top:10px;font-size:13px;font-weight:800;color:#8491a1">Select pre-planned status</div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:10px">B · ENTRY QUALITY (auto from chart engine)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <select id="af-asset" style="padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#0b121a;color:#c5d0dc;font-weight:700">
+        <option value="btc">BTC</option>
+        <option value="eth">ETH</option>
+        <option value="ca">CA (loaded coin)</option>
+      </select>
+      <select id="af-tf" style="padding:10px 12px;border-radius:10px;border:1px solid #243041;background:#0b121a;color:#c5d0dc;font-weight:700">
+        <option value="5m">5m</option>
+        <option value="10m">10m</option>
+        <option value="15m">15m</option>
+        <option value="30m">30m</option>
+        <option value="1h">1H</option>
+        <option value="2h">2H</option>
+        <option value="4h" selected>4H</option>
+        <option value="1d">1D</option>
+        <option value="1w">1W</option>
+        <option value="1M">1M</option>
+      </select>
+      <button type="button" onclick="window.afAssess&&window.afAssess()" style="padding:10px 16px;border-radius:10px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Assess now</button>
+    </div>
+    <div id="af-quality" style="padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a">
+      <div style="font-size:12px;color:#8491a1">Click Assess — uses Support / Resistance + EMA50 extension from closed candles.</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800;margin-bottom:10px">C · DECISION</div>
+    <div id="af-decision" style="padding:16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c);min-height:72px">
+      <div style="font-size:12px;color:#8491a1">Complete A + B to get Anti-FOMO result</div>
+    </div>
+    <div id="af-cooling" style="margin-top:12px;display:none;padding:14px;border-radius:12px;border:1px solid #5a3a20;background:#1a140e">
+      <div style="font-size:11px;font-weight:800;color:#f0a060;letter-spacing:.06em">COOLING TIMER</div>
+      <div id="af-cooling-clock" style="font-size:28px;font-weight:900;color:#f0a060;margin-top:6px">30:00</div>
+      <div style="font-size:12px;color:#c5d0dc;margin-top:6px">30 minutes → reassess. If still a chase → +20–30 minutes again.</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button type="button" onclick="window.afStartCool&&window.afStartCool(30)" style="padding:8px 12px;border-radius:8px;border:0;background:#3a2a18;color:#f0a060;font-weight:700;cursor:pointer">Start 30m</button>
+        <button type="button" onclick="window.afStartCool&&window.afStartCool(20)" style="padding:8px 12px;border-radius:8px;border:0;background:#3a2a18;color:#f0a060;font-weight:700;cursor:pointer">+20m extend</button>
+        <button type="button" onclick="window.afClearCool&&window.afClearCool()" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:transparent;color:#8491a1;font-weight:700;cursor:pointer">Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">FOMO CALENDAR</div>
+      <button type="button" onclick="window.afLogEvent&&window.afLogEvent()" style="padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#c5d0dc;font-weight:700;cursor:pointer">Log current event</button>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:8px;line-height:1.45">One file only: <code style="color:#62e3a0">data/fomo-log.json</code>. Save only when there is a <b style="color:#c5d0dc">delta</b> (local entries not on GitHub).</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <input id="af-git-token" type="password" placeholder="GitHub token (repo scope)" style="flex:1;min-width:180px;padding:8px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#c5d0dc;font-size:12px"/>
+      <button type="button" onclick="window.afGitSync&&window.afGitSync()" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;cursor:pointer">Check delta</button>
+      <button type="button" id="af-git-save-btn" onclick="window.afGitSave&&window.afGitSave()" style="padding:8px 12px;border-radius:8px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Save delta → GitHub</button>
+    </div>
+    <div id="af-git-delta" style="font-size:13px;font-weight:800;color:#e6c878;margin-bottom:6px">Delta: —</div>
+    <div id="af-git-status" style="font-size:11px;color:#8491a1;margin-bottom:8px">Token stays in this browser only</div>
+    <div id="af-cal-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px"></div>
+    <div id="af-cal-detail" style="margin-top:14px;padding:14px;border-radius:12px;border:1px solid #243041;background:#0b121a;display:none"></div>
+  </div>
+
+  <div class="note">Philosophy: don't ask if you're emotional — check pre-planned vs reactive and whether price is stretched or at support. Objective checks from chart engine where possible.</div>
+</section>
+</div>
+
+<div id="trend-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Trend Context</h2><p>1D+1W EMA · MACD · 4H</p></div><span class="source" id="trend-source">…</span></div>
+  <div class="card">
+    <div class="score-box"><div class="big" id="tr-score">—</div><div class="sub" id="tr-score-sub">Confirmation</div></div>
+    <div class="trend-badges">
+      <div class="trend-badge"><div class="lab">1D TREND</div><div class="val" id="tr-1d">—</div></div>
+      <div class="trend-badge"><div class="lab">1W TREND</div><div class="val" id="tr-1w">—</div></div>
+      <div class="trend-badge"><div class="lab">4H SIGNAL</div><div class="val" id="tr-4h">—</div></div>
+    </div>
+    <div class="trend-badges row2">
+      <div class="trend-badge"><div class="lab">1D MOMENTUM</div><div class="val" id="tr-1d-mom">—</div></div>
+      <div class="trend-badge"><div class="lab">1W MOMENTUM</div><div class="val" id="tr-1w-mom">—</div></div>
+      <div class="trend-badge"><div class="lab">4H VOLUME</div><div class="val" id="tr-4h-vol">—</div></div>
+    </div>
+    <div class="trend-badges row2">
+      <div class="trend-badge"><div class="lab">4H CVD</div><div class="val" id="tr-4h-cvd">—</div></div>
+      <div class="trend-badge"><div class="lab">4H LAST Δ</div><div class="val" id="tr-4h-delta">—</div></div>
+      <div class="trend-badge"><div class="lab">CVD BIAS</div><div class="val" id="tr-4h-cvd-bias">—</div></div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-card"><div class="k">1D CLOSE vs EMA</div><div class="v" id="tr-1d-det">—</div></div>
+      <div class="detail-card"><div class="k">1W CLOSE vs EMA</div><div class="v" id="tr-1w-det">—</div></div>
+      <div class="detail-card"><div class="k">1D MACD</div><div class="v" id="tr-1d-macd">—</div></div>
+      <div class="detail-card"><div class="k">1W MACD</div><div class="v" id="tr-1w-macd">—</div></div>
+      <div class="detail-card"><div class="k">4H MACD</div><div class="v" id="tr-macd-det">—</div></div>
+      <div class="detail-card"><div class="k">4H RSI · VOL</div><div class="v" id="tr-rsi-det">—</div></div>
+    </div>
+  </div>
+  <div class="stretch-card" id="stretch-card">
+    <div class="stretch-head"><div class="title">STRETCH SCORE</div><div class="st-dir neu" id="st-dir">—</div><div class="score" id="st-score">—</div><div class="label" id="st-label">—</div></div>
+    <div class="stretch-list" id="st-list"></div>
+    <div class="stretch-note" id="st-interp">Stretch = extension risk on top of trend — does not flip Confirmation.</div>
+  </div>
+  <div class="struct-card">
+    <div class="struct-head">
+      <div class="title">MARKET STRUCTURE · LIQUIDITY</div>
+      <div class="struct-status unav" id="ms-status">⚪ Unavailable</div>
+      <div class="struct-sub" id="ms-sub">Observable book only — not guaranteed support.</div>
+    </div>
+    <div class="struct-grid">
+      <div class="struct-metric"><div class="k">SPREAD</div><div class="v" id="ms-spread">—</div><div class="h" id="ms-spread-h">vs median</div></div>
+      <div class="struct-metric"><div class="k">SIDE DEPTH</div><div class="v" id="ms-bid">—</div><div class="h" id="ms-bid-h">±2% book</div></div>
+      <div class="struct-metric"><div class="k">NEAR-MARKET CONC.</div><div class="v" id="ms-conc">—</div><div class="h">±0.5% / ±2%</div></div>
+      <div class="struct-metric"><div class="k">REF ATR 1.5×</div><div class="v" id="ms-atr">—</div><div class="h" id="ms-atr-h">reference</div></div>
+      <div class="struct-metric"><div class="k">LIQ CLUSTERS</div><div class="v" id="ms-liq">—</div><div class="h" id="ms-liq-h">book peak</div></div>
+      <div class="struct-metric"><div class="k">FRESHNESS</div><div class="v" id="ms-fresh">—</div><div class="h" id="ms-fresh-h">&lt;5s required</div></div>
+    </div>
+    <div class="struct-note">Does not modify Confirmation or Stretch. Liquidity can disappear rapidly.</div>
+  </div>
+  <div class="hm-card" id="btc-hm-card">
+    <div class="struct-head">
+      <div class="title">BTC LIQUIDITY HEATMAP</div>
+      <div class="hm-tf" id="hm-tf">
+        <button type="button" class="hm-tf-btn" data-hmtf="live" onclick="try{window.setHmTf('live')}catch(e){}">LIVE</button>
+        <button type="button" class="hm-tf-btn on" data-hmtf="1h" onclick="try{window.setHmTf('1h')}catch(e){}">1H</button>
+        <button type="button" class="hm-tf-btn" data-hmtf="1d" onclick="try{window.setHmTf('1d')}catch(e){}">1D</button>
+      </div>
+      <div class="struct-status unav" id="hm-status">…</div>
+      <div class="struct-sub" id="hm-source">1H volume at price · daily S/R overlay</div>
+    </div>
+    <div class="hm-verdict" id="hm-verdict">Loading book…</div>
+    <div class="hm-chart" id="hm-chart"></div>
+    <div class="struct-note"><b>LIVE</b> = order book (seconds, flickers). <b>1H</b> = last ~24 hourly candles (default). <b>1D</b> = daily volume. Green below mark / red above. <b>S</b>/<b>R</b> = daily swing. Coinglass liq map is paid. <a href="https://www.coinglass.com/pro/futures/LiquidationHeatMap" target="_blank" rel="noopener">Open Coinglass →</a></div>
+  </div>
+</section>
+</div>
+
+<div id="struct-panel" class="struct-trend-panel">
+<section class="section">
+  <div class="head"><div><h2>Structural Trend</h2><p>HTF thesis · slow · noise-resistant</p></div><span class="source" id="struct-source">…</span></div>
+  <div class="st-primary">
+    <div class="st-title">STRUCTURAL TREND</div>
+    <div class="st-state" id="stt-state">—</div>
+    <div class="st-meta">
+      <span>REGIME <b id="stt-regime">—</b></span>
+      <span>STATE <b id="stt-phase">—</b></span>
+      <span>CONFIDENCE <b id="stt-conf">—</b></span>
+    </div>
+    <div class="st-explain" id="stt-explain">Loading structural assessment…</div>
+  </div>
+  <div class="st-ev" id="stt-evidence"></div>
+  <div class="struct-chart-wrap">
+    <div class="struct-chart-head">
+      <div class="struct-chart-title">1W STRUCTURE CHART · why this label</div>
+      <div class="struct-chart-sub" id="struct-w1-caption">Loading weekly structure…</div>
+    </div>
+    <div id="struct-w1-tv"></div>
+    <div class="struct-chart-legend" id="struct-w1-legend"></div>
+  </div>
+  <div class="st-weights">Weights: 1W struct 30% · 1D struct 25% · 1W EMA 15% · 1D EMA 10% · 1W mom 8% · 1D mom 5% · Vol 4% · 4H 3%</div>
+</section>
+</div>
+
+<div id="macro-panel" class="macro-panel">
+<section class="section">
+  <div class="head"><div><h2>Macro</h2><p>Giant BTC cycle · slow · transition-aware</p></div><span class="source" id="macro-source">…</span></div>
+  <div class="st-primary">
+    <div class="st-title">MACRO</div>
+    <div class="st-state" id="mac-state">—</div>
+    <div class="st-meta">
+      <span>REGIME <b id="mac-regime">—</b></span>
+      <span>RISK <b id="mac-phase">—</b></span>
+      <span>SCORES <b id="mac-conf">—</b></span>
+    </div>
+    <div class="st-explain" id="mac-explain">Loading macro cycle assessment…</div>
+  </div>
+  <div class="st-ev" id="mac-evidence"></div>
+  <div class="mac-hist-wrap" id="mac-history"></div>
+  <div class="st-weights">Calendar 3M/6M/1Y · completed candles only · 1Y guardrail · PARABOLIC rare</div>
+</section>
+</div>
+
+
+<div id="memegate-panel" class="trend-panel" style="display:block">
+<section class="section">
+  <div class="head"><div><h2>BTC MemeGate</h2><p>Permission layer only — not a meme buy signal</p></div><span class="source" id="mg-source">LIVE</span></div>
+  <div class="card">
+    <div class="mg-hero">
+      <div class="kicker">BTC MEME GATE</div>
+      <div class="gate wait" id="mg-gate">🟡 WAIT</div>
+      <div class="mg-metrics">
+        <span>Score <b id="mg-score">—</b></span>
+        <span>Confidence <b id="mg-conf">—</b></span>
+        <span>BTC.D <b id="mg-dom">—</b></span>
+        <span>Entry <b id="mg-entry">—</b></span>
+        <span>Stretch <b id="mg-stretch">—</b></span>
+      </div>
+      <div class="mg-warn">State machine: WATCH → EARLY (25–40%) → STRONG CONFIRMED (BIG SIZE) → STRETCHED (no chase) · OFF = no new size</div>
+    </div>
+    <table class="mg-table">
+      <thead><tr><th>Signal</th><th>Score</th><th>Status</th></tr></thead>
+      <tbody id="mg-rows"></tbody>
+    </table>
+    <div class="mg-block"><h3>WHY</h3><p id="mg-why">—</p></div>
+    <div class="mg-block"><h3>WHAT IS MISSING</h3><p id="mg-miss">—</p></div>
+    <div class="mg-block"><h3>INVALIDATION</h3><p id="mg-inv">—</p></div>
+    <div class="mg-block"><h3>ACTION</h3><p id="mg-act">—</p></div>
+    <div class="mg-block"><h3>STATE HISTORY · DAILY CLOSE</h3><p style="color:#8491a1;font-size:12px;margin:0 0 8px">WATCH → EARLY → STRONG CONFIRMED → STRETCHED · BTC.D hist dampener = 0 in history · +1d/+3d/+7d after day</p></div>
+    <div class="mg-hist-wrap"><table class="mg-hist"><thead><tr><th>Date</th><th>BTC</th><th>Age</th><th>Final</th><th>State</th><th>Entry</th><th>Size</th><th>Why</th><th>+1d</th><th>+3d</th><th>+7d</th></tr></thead><tbody id="mg-hist-body"><tr><td colspan="10" style="color:#8491a1">Loading history…</td></tr></tbody></table></div>
+    <div class="mg-form" id="mg-formulas"></div>
+  </div>
+</section>
+</div>
+
+
+<div id="breakouts-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Breakout Memes</h2><p>Only close / live / matured · quiet coins hidden · Telegram DM from the worker</p></div>
+    <span class="source" id="bo-source">—</span>
+  </div>
+  <div class="card">
+    <div class="tool-stack">
+      <div id="bo-tf" class="tf-grid">
+        <button type="button" data-botf="1m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1m')}catch(e){}">1m</button>
+        <button type="button" data-botf="5m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('5m')}catch(e){}">5m</button>
+        <button type="button" data-botf="10m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('10m')}catch(e){}">10m</button>
+        <button type="button" data-botf="15m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('15m')}catch(e){}">15m</button>
+        <button type="button" data-botf="30m" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('30m')}catch(e){}">30m</button>
+        <button type="button" data-botf="1h" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1h')}catch(e){}">1H</button>
+        <button type="button" data-botf="2h" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('2h')}catch(e){}">2H</button>
+        <button type="button" data-botf="4h" class="bo-tf-btn on" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('4h')}catch(e){}">4H</button>
+        <button type="button" data-botf="1d" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1d')}catch(e){}">1D</button>
+        <button type="button" data-botf="1w" class="bo-tf-btn" onclick="try{window.setBreakoutTF&&window.setBreakoutTF('1w')}catch(e){}">1W</button>
+      </div>
+      <div class="tool-actions">
+      <button type="button" onclick="try{window.scanBreakoutMemes&&window.scanBreakoutMemes()}catch(e){alert(e)}">Scan saved CAs</button>
+      <button type="button" id="bo-live-btn" onclick="try{window.toggleBreakoutLive&&window.toggleBreakoutLive()}catch(e){}">Live watch ON</button>
+      <button type="button" onclick="try{window.pingBreakoutTelegram&&window.pingBreakoutTelegram()}catch(e){alert(e)}">Test Telegram</button>
+      <span id="bo-status" style="font-size:12px;color:#8491a1">DexScreener · saved CAs</span>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:10px;line-height:1.45"><b style="color:#e6c878">EARLY</b> = close to a break, not broken. <b style="color:#62e3a0">LIVE</b> = happened now. <b style="color:#6eb6ff">MATURED</b> = already happened. Quiet coins stay off this page. Phone pings only on LIVE.</div>
+    <div id="bo-alert-bar" style="margin:0 0 12px;padding:10px 12px;border-radius:12px;border:1px solid #243041;background:#0b121a">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">TF ALERTS</span>
+        <button type="button" class="bo-al-mode" data-al-mode="all" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('all')}catch(e){alert(e)}" style="padding:10px 14px;min-height:42px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:900;font-size:13px;cursor:pointer">TURN ALL ON</button>
+        <button type="button" class="bo-al-mode" data-al-mode="picked" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('picked')}catch(e){alert(e)}" style="padding:10px 14px;min-height:42px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:900;font-size:13px;cursor:pointer">Picked</button>
+        <button type="button" class="bo-al-mode" data-al-mode="off" onclick="try{window.setBreakoutAlertMode&&window.setBreakoutAlertMode('off')}catch(e){alert(e)}" style="padding:10px 14px;min-height:42px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:900;font-size:13px;cursor:pointer">TURN ALL OFF</button>
+        <button type="button" onclick="try{window.selectAllBreakoutAlerts&&window.selectAllBreakoutAlerts()}catch(e){alert(e)}" style="padding:10px 14px;min-height:42px;border-radius:10px;border:1px solid #2a6b4e;background:#123526;color:#62e3a0;font-weight:900;font-size:12px;cursor:pointer">Select all coins</button>
+        <span id="bo-al-meta" style="font-size:11px;color:#8491a1;font-weight:700">Telegram · persisted on worker</span>
+      </div>
+      <div id="bo-alert-picks" style="display:none;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+      <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">FOCUS 1m</span>
+      <select id="bo-focus-sel" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:700">
+        <option value="">No 1m focus</option>
+      </select>
+      <button type="button" onclick="try{window.setBreakoutFocus&&window.setBreakoutFocus()}catch(e){alert(e)}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#e6c878;font-weight:800;cursor:pointer">Set focus</button>
+      <button type="button" id="bo-1m-alerts" onclick="try{window.toggleBreakout1mAlerts&&window.toggleBreakout1mAlerts()}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:700;cursor:pointer">1m alerts off</button>
+      <button type="button" id="bo-1m-now" onclick="try{window.fetchBreakout1mNow&&window.fetchBreakout1mNow()}catch(e){alert(e)}" style="padding:7px 12px;border-radius:8px;border:1px solid #2a6b4e;background:#123526;color:#62e3a0;font-weight:800;cursor:pointer">1m now</button>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin:-4px 0 12px;line-height:1.4">1m is on-demand only (saves write quota). Pick a coin → <b style="color:#62e3a0">1m now</b>. Auto tape is 5m and up.</div>
+    <div id="m1m-status" style="margin:0 0 14px;padding:12px 14px;border-radius:14px;border:1px solid #2a3a4c;background:linear-gradient(180deg,#121a24,#0c121a)">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+        <div style="font-size:11px;letter-spacing:.08em;font-weight:900;color:#8491a1">RUN STATUS · CLOUDFLARE ENGINE</div>
+        <button type="button" onclick="try{window.loadMomentum1mStatus&&window.loadMomentum1mStatus(true)}catch(e){}" style="padding:5px 10px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#c5d0dc;font-size:11px;font-weight:700;cursor:pointer">Refresh</button>
+      </div>
+      <div id="m1m-health" style="font-size:13px;font-weight:800;color:#e6c878;margin-bottom:6px">Loading status…</div>
+      <div id="m1m-meta" style="font-size:12px;color:#8491a1;line-height:1.45;margin-bottom:8px">—</div>
+      <div id="m1m-last-alert" style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:8px">Last alert: —</div>
+      <div id="bo-ntfy-hint" style="font-size:11px;color:#8491a1;margin-bottom:8px">Open t.me/MyTradingBreakoutBot → Start → send hi, then tap Test Telegram</div>
+      <div id="m1m-top" style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:#c5d0dc"></div>
+    </div>
+    <div id="bo-list" style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#8491a1">Open this tab → Scan saved CAs</div>
+    </div>
+  </div>
+</section>
+</div>
+<div id="hunter-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Hunter</h2><p>Scan + Hunter watch · not saved CAs · not Breakout</p></div>
+    <span class="source" id="hu-source">API</span>
+  </div>
+  <div id="hu-band-now" class="hu-band-now" hidden></div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      <button type="button" onclick="try{window.refreshHunterTab&&window.refreshHunterTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Scan now</button>
+      <button type="button" class="hu-view" data-hu-view="bands" onclick="try{window.setHunterView&&window.setHunterView('bands')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Bands</button>
+      <button type="button" class="hu-view" data-hu-view="grow" onclick="try{window.setHunterView&&window.setHunterView('grow')}catch(e){}" style="padding:8px 12px;border-radius:10px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;cursor:pointer">Growing wallets</button>
+      <span id="hu-status" style="font-size:12px;color:#8491a1">Hunter every 20 min · saved CAs still 60s</span>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">SOL, ETH and Robinhood sit in the same four market-cap bands. <b style="color:#c5d0dc">Hunter watch</b> is a pin list only — it is not CA recents and those coins do not enter Breakout. Chain icon is next to the ticker. Scanner icons follow the chain. Green ring = you already opened that scan.</div>
+    <div id="hu-list" style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#8491a1">Open Hunter to load names.</div>
+    </div>
+  </div>
+</section>
+</div>
+<div id="keywords-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Keywords</h2><p>Type a word. Tap a bubble to edit it. Saved on GitHub.</p></div>
+  </div>
+  <div class="card" style="padding:12px">
+    <form id="kw-form" style="display:flex;gap:8px;align-items:center">
+      <input id="kw-input" type="text" maxlength="32" placeholder="Type a keyword" autocomplete="off" spellcheck="false" style="flex:1;min-width:0;padding:12px 14px;border-radius:12px;border:1px solid #3d4d63;background:#0b121a;color:#f4f7fb;font-size:16px;font-weight:800">
+      <button type="submit" style="padding:12px 16px;border-radius:12px;border:0;background:#e6b84d;color:#1a1406;font-weight:900;cursor:pointer">Add</button>
+      <span id="kw-status" style="font-size:12px;color:#8491a1;font-weight:700"></span>
+    </form>
+    <div id="kw-stage"></div>
+    <div id="kw-edit">
+      <input id="kw-edit-text" type="text" maxlength="32" autocomplete="off" spellcheck="false">
+      <button type="button" id="kw-edit-save">Save</button>
+      <button type="button" id="kw-edit-del">Delete</button>
+      <button type="button" id="kw-edit-x">Cancel</button>
+    </div>
+  </div>
+</section>
+</div>
+<div id="gnotes-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Golden Notes</h2><p>Upload an X screenshot. AI keeps the useful lines. The image is discarded.</p></div>
+    <span class="source" id="gn-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px">
+    <input id="gn-file" type="file" accept="image/*" multiple hidden>
+    <button type="button" id="gn-pick" style="width:100%;padding:14px;border-radius:14px;border:1px dashed #e6b84d;background:#1a1408;color:#e6b84d;font-weight:900;cursor:pointer">Upload screenshots</button>
+    <div id="gn-tools" class="shot-tools">
+      <div class="gn-sizes"><span>Show</span><button type="button" data-size="10">10</button><button type="button" data-size="20">20</button><input id="gn-any" inputmode="numeric" min="1" max="100" placeholder="Any"></div>
+      <div id="gn-pages" class="shot-pages"></div>
+    </div>
+    <div id="gn-list" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
+  </div>
+</section>
+</div>
+<div id="officeemo-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Office emotions</h2><p>Upload a screenshot. AI keeps the useful lines. The image is discarded.</p></div>
+    <span class="source" id="oe-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px">
+    <input id="oe-file" type="file" accept="image/*" multiple hidden>
+    <button type="button" id="oe-pick" style="width:100%;padding:14px;border-radius:14px;border:1px dashed #e6b84d;background:#1a1408;color:#e6b84d;font-weight:900;cursor:pointer">Upload screenshots</button>
+    <div id="oe-tools" class="shot-tools">
+      <div class="gn-sizes"><span>Show</span><button type="button" data-size="10">10</button><button type="button" data-size="20">20</button><input id="oe-any" inputmode="numeric" min="1" max="100" placeholder="Any"></div>
+      <div id="oe-pages" class="shot-pages"></div>
+    </div>
+    <div id="oe-list" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
+  </div>
+</section>
+</div>
+<div id="personalemo-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Personal emotions</h2><p>Upload a screenshot. AI keeps the useful lines. The image is discarded.</p></div>
+    <span class="source" id="pe-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px">
+    <input id="pe-file" type="file" accept="image/*" multiple hidden>
+    <button type="button" id="pe-pick" style="width:100%;padding:14px;border-radius:14px;border:1px dashed #e6b84d;background:#1a1408;color:#e6b84d;font-weight:900;cursor:pointer">Upload screenshots</button>
+    <div id="pe-tools" class="shot-tools">
+      <div class="gn-sizes"><span>Show</span><button type="button" data-size="10">10</button><button type="button" data-size="20">20</button><input id="pe-any" inputmode="numeric" min="1" max="100" placeholder="Any"></div>
+      <div id="pe-pages" class="shot-pages"></div>
+    </div>
+    <div id="pe-list" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
+  </div>
+</section>
+</div>
+<div id="whale-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Whale Wallets</h2><p>Pick a saved coin. Top 10 is saved for today. Compare two days.</p></div>
+    <span class="source" id="wh-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="wh-app"></div>
+  </div>
+</section>
+</div>
+<div id="md-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Mandates</h2><p></p></div>
+    <span class="source" id="md-source"></span>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="md-app"></div>
+  </div>
+</section>
+</div>
+<div id="tp-panel" class="trend-panel tp-book" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Time Pressure</h2><p>Total in k or L only.</p></div>
+    <span class="source" id="tp-source"></span>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="tp-app" class="tp-app"></div>
+  </div>
+</section>
+</div>
+<div id="ml-panel" class="trend-panel tp-book" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Mid / Long Time Pressures</h2><p>Total in k or L only.</p></div>
+    <span class="source" id="ml-source"></span>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="ml-app" class="tp-app"></div>
+  </div>
+</section>
+</div>
+<div id="cal-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Cal</h2><p></p></div>
+    <span class="source" id="cal-source">32%</span>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="cal-app"></div>
+  </div>
+</section>
+</div>
+<div id="sleep-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Healthy Sleep</h2><p>Tap a day. Before 10:00 pm is green.</p></div>
+    <span class="source" id="sl-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="sl-cal"></div>
+  </div>
+</section>
+</div>
+<div id="sleep-log-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Sleep</h2><p>Tap a day. No entry is green.</p></div>
+    <span class="source" id="slg-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px"><div id="slg-cal"></div></div>
+</section>
+</div>
+<div id="diet-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Diet</h2><p>Tap a day. No entry is green.</p></div>
+    <span class="source" id="diet-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px"><div id="diet-cal"></div></div>
+</section>
+</div>
+<div id="gym-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Gym</h2><p>Tap a day. No entry is green.</p></div>
+    <span class="source" id="gym-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px"><div id="gym-cal"></div></div>
+</section>
+</div>
+<div id="steps-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Steps</h2><p>Tap a day. 5k is green. 3k is yellow. Under 3k is zero.</p></div><span class="source" id="steps-status">READY</span></div>
+  <div class="card" style="padding:12px"><div id="steps-cal"></div></div>
+</section>
+</div>
+<div id="food-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Food</h2><p>Tap a day. No entry is green.</p></div><span class="source" id="food-status">READY</span></div>
+  <div class="card" style="padding:12px"><div id="food-cal"></div></div>
+</section>
+</div>
+<div id="mine-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>My tab</h2><p>Tap a day. No entry is green.</p></div><span class="source" id="mine-status">READY</span></div>
+  <div class="card" style="padding:12px"><div id="mine-cal"></div></div>
+</section>
+</div>
+<div id="saviour-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Saviour logger</h2><p>Any topic. Any day. No entry is green.</p></div>
+    <span class="source" id="sv-status">READY</span>
+  </div>
+  <div class="card" style="padding:12px"><div id="sv-cal"></div></div>
+</section>
+</div>
+<div id="weight-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Weight</h2><p>Log a day. Day, week, and month sit on top.</p></div><span class="source" id="wt-status">READY</span></div>
+  <div class="card" style="padding:12px"><div id="wt-board"></div></div>
+</section>
+</div>
+<div id="water-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Water</h2><p>Tap a glass. Today is on top.</p></div><span class="source" id="wa-status">READY</span></div>
+  <div class="card" style="padding:12px"><div id="wa-board"></div></div>
+</section>
+</div>
+<div id="elliott-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Elliott Wave</h2><p>BTC swings. The wave you are in, and the next target.</p></div><span class="source" id="ew-status">READY</span></div>
+  <div class="card" style="padding:12px"><div id="ew-board"></div></div>
+</section>
+</div>
+<div id="holders-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Holders</h2><p>SOL · growth · tap Dex trading or Holders on Solscan · ETH skipped</p></div>
+    <span class="source" id="hd-source">JUPITER</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      <button type="button" onclick="try{window.refreshHoldersTab&&window.refreshHoldersTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
+      <div style="position:relative;flex:1;min-width:180px">
+        <input id="hd-q" type="search" placeholder="Search name or contract" autocomplete="off" spellcheck="false" style="width:100%;box-sizing:border-box;padding:8px 12px;border-radius:10px;border:1px solid #3d4d63;background:#0b121a;color:#e8eef6;font-weight:700">
+        <div id="hd-suggest" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:#0e151d;border:1px solid #3d4d63;border-radius:12px;overflow:auto;max-height:240px"></div>
+      </div>
+      <span id="hd-status" style="font-size:12px;color:#8491a1">Open this tab to load</span>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">1H and 1D come from Jupiter. 4H / 1W / 1M from our snaps. Whale / shark / depth charts are on Solscan — tap Analytics on a coin. We do not compute them here.</div>
+    <div id="hd-list" style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#8491a1">Open Holders to load SOL coins.</div>
+    </div>
+  </div>
+</section>
+</div>
+<div id="tiers-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Tier classification</h2><p>Paste any mint · whale, shark, dolphin, fish, crab, shrimp</p></div>
+    <span class="source" id="tier-status">READY</span>
+  </div>
+  <div class="card" style="padding:16px">
+    <form id="tier-form" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <input id="tier-mint" placeholder="Token address" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:220px;padding:12px;border-radius:10px;border:0;background:#1a2330;color:#e8eef6;font-weight:700">
+      <button type="submit" style="padding:12px 16px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Check</button>
+    </form>
+    <div style="font-size:11px;color:#8491a1;margin-top:10px;line-height:1.45">Same dollar bands as Solscan. A wallet is a dolphin when this coin in that wallet is worth $10k–$100k.</div>
+    <div id="tier-switch" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+      <button type="button" id="tier-view-bands" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:12px;cursor:pointer">Bands</button>
+      <button type="button" id="tier-view-flows" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Daily flows</button>
+      <button type="button" id="tier-view-bundle" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Bundle check</button>
+      <button type="button" id="tier-view-bubble" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Bubble maps</button>
+      <button type="button" id="tier-view-dex" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Dex likes</button>
+    </div>
+    <div id="tier-view-bands-panel">
+    <div id="tier-meta" style="font-size:12px;color:#8491a1;margin-top:10px"></div>
+    <div id="tier-table" style="margin-top:12px;overflow-x:auto"></div>
+    <div id="tier-commentary"></div>
+    <div id="tier-history"></div>
+    </div>
+    <div id="tier-view-bundle-panel" style="display:none;margin-top:12px"></div>
+    <div id="tier-view-bubble-panel" style="display:none;margin-top:12px">
+      <div style="font-size:11px;letter-spacing:.04em;color:#8491a1">BUBBLE MAPS</div>
+      <div id="tier-bubble-help" style="margin-top:6px;font-size:12px;color:#8491a1;line-height:1.45">Your mark for this coin. It comes back when you paste the same address.</div>
+      <label style="display:flex;gap:10px;align-items:flex-start;margin-top:12px;color:#3dbe7a;font-size:14px;line-height:1.4"><input type="radio" name="tier-bubble" value="ok"> Manually verified and successfully</label>
+      <label style="display:flex;gap:10px;align-items:flex-start;margin-top:10px;color:#ff8a7a;font-size:14px;line-height:1.4"><input type="radio" name="tier-bubble" value="rug"> Manual verification failed BIG RUG</label>
+      <label style="display:flex;gap:10px;align-items:flex-start;margin-top:10px;color:#e6c878;font-size:14px;line-height:1.4"><input type="radio" name="tier-bubble" value="lazy"> Lazy fellow yet to verify</label>
+      <button type="button" id="tier-bubble-change" style="display:none;margin-top:10px;padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Change</button>
+      <div id="tier-bubble-status" style="margin-top:10px;font-size:12px;color:#8491a1"></div>
+    </div>
+    <div id="tier-view-dex-panel" style="display:none;margin-top:12px">
+      <div style="font-size:11px;letter-spacing:.04em;color:#8491a1">DEX LIKES</div>
+      <div id="tier-dex-help" style="margin-top:6px;font-size:12px;color:#8491a1;line-height:1.45">Type what you liked on Dex. Saved for this coin only.</div>
+      <div id="tier-dex-saved" style="display:none;margin-top:12px;font-size:22px;font-weight:800;color:#e8eef6"></div>
+      <textarea id="tier-dex-text" rows="6" placeholder="What you liked on Dexscreener" style="width:100%;margin-top:10px;padding:12px;border-radius:10px;border:0;background:#1a2330;color:#e8eef6;font:600 14px Inter,system-ui,sans-serif;resize:vertical"></textarea>
+      <button type="button" id="tier-dex-save" style="margin-top:10px;padding:12px 16px;border-radius:10px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Save</button>
+      <button type="button" id="tier-dex-change" style="display:none;margin-top:10px;padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Change</button>
+      <div id="tier-dex-status" style="margin-top:8px;font-size:12px;color:#8491a1"></div>
+    </div>
+    <div id="tier-view-flows-panel" style="display:none;margin-top:12px"></div>
+  </div>
+</section>
+</div>
+<div id="sentiment-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Sentiment</h2><p>Pick a coin · X · LunarCrush · TweetScout</p></div>
+    <span class="source" id="st-status">API</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <select id="st-saved"><option value="">Saved CAs — pick one</option></select>
+      <select id="st-hunter"><option value="">Hunter CAs — pick one</option></select>
+      <button type="button" onclick="try{window.refreshSentimentTab&&window.refreshSentimentTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Reload lists</button>
+    </div>
+    <div id="st-board"><div class="st-note">Pick a saved or hunter coin. Stays here. X Live / LunarCrush / TweetScout are links below — tap only if you want them.</div></div>
+  </div>
+</section>
+</div>
+<div id="failures-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Failures</h2><p>Last hour · real 429s, skips, retries · not invented</p></div>
+    <span class="source" id="fl-source">WORKER LOG</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+      <button type="button" onclick="try{window.refreshFailuresTab&&window.refreshFailuresTab()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Refresh</button>
+      <span id="fl-status" style="font-size:12px;color:#8491a1">Open this tab to load</span>
+    </div>
+    <div style="font-size:11px;color:#8491a1;margin-bottom:12px;line-height:1.45">Worker writes a row only when something actually fails (Dex/Gecko 429, retry, hunter skip, no pool, telegram, stale gap). Empty last hour means none — not a fake “all good”.</div>
+    <div id="fl-list" style="display:flex;flex-direction:column;gap:8px">
+      <div style="font-size:12px;color:#8491a1">Open Failures to load the last hour.</div>
+    </div>
+  </div>
+</section>
+</div>
+<div id="inmemory-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>InMemory</h2><p>New-chat handoff prompt · copy into a fresh Grok</p></div>
+    <span class="source">STATIC</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <button type="button" id="im-copy" onclick="try{window.copyInMemoryPrompt&&window.copyInMemoryPrompt()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#62e3a0;color:#06120b;font-weight:800;cursor:pointer">Copy prompt</button>
+      <span style="font-size:12px;color:#8491a1">Paste as the first message in a new chat</span>
+    </div>
+    <pre id="im-text"></pre>
+  </div>
+</section>
+</div>
+
+<div id="keep-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Google Trade Notes</h2><p>One Keep link · opens your notes</p></div>
+    <span class="source">LINK</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <button type="button" onclick="try{window.openKeepLink&&window.openKeepLink()}catch(e){alert(e)}" style="padding:10px 16px;border-radius:10px;border:0;background:#62e3a0;color:#06120b;font-weight:800;cursor:pointer">Open notes</button>
+    </div>
+    <div style="font-size:11px;color:#8491a1;line-height:1.45">Opens your keep.google.com notes. Google blocks embedding inside this PWA. Link saved on this phone only.</div>
+    <label style="display:flex;flex-direction:column;gap:6px;font-size:10px;font-weight:800;letter-spacing:.08em;color:#8491a1">KEEP LINK
+      <input id="keep-url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://keep.google.com/" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #263341;background:#080d13;color:#e8eef6;font:700 13px Inter,system-ui,sans-serif">
+    </label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+      <button type="button" id="keep-save" onclick="try{window.saveKeepLink&&window.saveKeepLink()}catch(e){alert(e)}" style="padding:8px 14px;border-radius:10px;border:0;background:#243041;color:#e8eef6;font-weight:800;cursor:pointer">Save link</button>
+      <span style="font-size:12px;color:#8491a1">Paste a specific note URL if you have one</span>
+    </div>
+  </div>
+</section>
+</div>
+<div id="verdict-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Verdict</h2><p>HOLD or EXIT · short 5m–1h · medium 2h–4h · long 1d–1w · saved coins</p></div>
+    <span class="source" id="vd-status">API</span>
+  </div>
+  <div class="card">
+    <div class="vd-pick">
+      <div class="lab" style="font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">SAVED COINS</div>
+      <div id="vd-coins"></div>
+    </div>
+    <div id="vd-board"></div>
+  </div>
+</section>
+</div>
+<div id="position-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Position Monitor</h2><p>Already in · STRETCHED still watches · not a buy button</p></div>
+    <span class="source" id="pm-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:12px;color:#c5d0dc;line-height:1.45;margin-bottom:12px">STRETCHED blocks <b style="color:#e8eef6">entry</b>, never observation. Acceleration, continuation, exhaustion, retest. Telegram says what changed — CA / Entry Window still decide if you enter.</div>
+    <div id="pm-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
+<div id="wowdip-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>WOW DIP</h2><p>Crash / breakdown surveillance · not a buy button</p></div>
+    <span class="source" id="wd-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45;margin-bottom:10px">Saved CAs only. −20/−30/−40% 1H is classification, not an entry. 5m bounce after a dump can be a dead-cat. Entry Window is suppressed on AVOID.</div>
+    <div id="wd-legend" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <span style="font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;background:#ff6f7c22;color:#ff6f7c;border:1px solid #ff6f7c55">💥 Extreme ≤−40% 1H</span>
+      <span style="font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;background:#f0a06022;color:#f0a060;border:1px solid #f0a06055">🔴 Severe ≤−30% 1H</span>
+      <span style="font-size:10px;font-weight:800;padding:5px 8px;border-radius:999px;background:#e6c87822;color:#e6c878;border:1px solid #e6c87855">🟠 Crash ≤−20% 1H</span>
+    </div>
+    <div id="wd-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
+<div id="omg-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>OMG</h2><p>Parabolic + WOW DIP log · kept 7 days</p></div>
+    <span class="source" id="omg-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45;margin-bottom:10px">Every smash and dump on saved CAs stays here for a week. Same move updates in-place for 6 hours, then a new row. Not a buy list.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="omg-kind" data-omg="all" onclick="try{window.setOmgKind&&window.setOmgKind('all')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:11px;cursor:pointer">All</button>
+      <button type="button" class="omg-kind" data-omg="PARABOLIC" onclick="try{window.setOmgKind&&window.setOmgKind('PARABOLIC')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">Parabolic</button>
+      <button type="button" class="omg-kind" data-omg="WOWDIP" onclick="try{window.setOmgKind&&window.setOmgKind('WOWDIP')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">WOW DIP</button>
+    </div>
+    <div id="omg-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
+<div id="pitfalls-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Pitfalls</h2><p>Every saved CA · tap opens DexScreener socials</p></div>
+    <span class="source" id="pf-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45;margin-bottom:12px">Tap a coin to open its DexScreener token page — Website, Twitter, and the rest. Verify before you size.</div>
+    <div id="pf-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
+<div id="strategy-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Strategy</h2><p>Fund · Rotation · Wallet · saved versions</p></div>
+    <span class="source" id="stgy-status">local</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="stgy-tab" data-stgy="fund" onclick="try{window.setStrategyInner&&window.setStrategyInner('fund')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:12px;cursor:pointer">Fund Strategy</button>
+      <button type="button" class="stgy-tab" data-stgy="rotation" onclick="try{window.setStrategyInner&&window.setStrategyInner('rotation')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Rotation Strategy</button>
+      <button type="button" class="stgy-tab" data-stgy="wallet" onclick="try{window.setStrategyInner&&window.setStrategyInner('wallet')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Wallet Strategy</button>
+    </div>
+    <textarea id="stgy-text" placeholder="Write this strategy here…" style="width:100%;min-height:220px;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font:14px/1.45 Inter,system-ui,sans-serif;resize:vertical"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+      <button type="button" onclick="try{window.saveStrategyVersion&&window.saveStrategyVersion()}catch(e){}" style="padding:8px 14px;border-radius:10px;border:0;background:#1a9b6c;color:#fff;font-weight:800;cursor:pointer">Save version</button>
+      <span style="font-size:11px;color:#8491a1;align-self:center">Draft auto-saves. Save version keeps history for this sub-tab.</span>
+    </div>
+    <div style="margin-top:16px;font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">HISTORY</div>
+    <div id="stgy-hist" style="margin-top:8px;display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</section>
+</div>
+<div id="decision-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Decision Check</h2><p>Before acting — anything to review? · not a buy/sell</p></div>
+    <span class="source" id="dc-status">API</span>
+  </div>
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="dc-view" data-dc="live" onclick="try{window.setDecisionView&&window.setDecisionView('live')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:11px;cursor:pointer">Live</button>
+      <button type="button" class="dc-view" data-dc="hist" onclick="try{window.setDecisionView&&window.setDecisionView('hist')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">Decision History</button>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="dc-filter" data-dc-f="all" onclick="try{window.setDecisionFilter&&window.setDecisionFilter('all')}catch(e){}" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#243041;color:#e8eef6;font-weight:800;font-size:11px;cursor:pointer">All</button>
+      <button type="button" class="dc-filter" data-dc-f="WAIT" onclick="try{window.setDecisionFilter&&window.setDecisionFilter('WAIT')}catch(e){}" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#8491a1;font-weight:800;font-size:11px;cursor:pointer">Wait</button>
+      <button type="button" class="dc-filter" data-dc-f="CHECK" onclick="try{window.setDecisionFilter&&window.setDecisionFilter('CHECK')}catch(e){}" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#8491a1;font-weight:800;font-size:11px;cursor:pointer">Check</button>
+      <button type="button" class="dc-filter" data-dc-f="CLEAR" onclick="try{window.setDecisionFilter&&window.setDecisionFilter('CLEAR')}catch(e){}" style="padding:6px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#8491a1;font-weight:800;font-size:11px;cursor:pointer">Clear</button>
+    </div>
+    <div id="dc-board"></div>
+    <div id="dc-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
+<div id="emotion-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Emotional Checks</h2><p>All ticked is a green day. One miss is red.</p></div>
+    <span class="source" id="em-status">READY</span>
+  </div>
+  <div class="card">
+    <div id="em-board"></div>
+  </div>
+</section>
+</div>
+<div id="alerts-panel" class="trend-panel" style="display:none">
+<section class="section" style="padding-top:8px">
+  <div id="alerts-board" style="max-width:440px;margin:0 auto"></div>
+</section>
+</div>
+<div id="fe-panel" class="trend-panel" style="display:none">
+<section class="section" style="padding-top:8px">
+  <div id="fe-board" style="max-width:440px;margin:0 auto"></div>
+  <span id="fe-status" style="display:none">WAIT</span>
+</section>
+</div>
+<div id="fomo-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Fomo Entry</h2><p>Tick both before you size in.</p></div>
+    <span class="source" id="fomo-status">CHECK</span>
+  </div>
+  <div class="card">
+    <div id="fomo-board"></div>
+  </div>
+</section>
+</div>
+<div id="fx-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Fomo Experiences</h2><p>Table, 5 rows a page. Saved on the server.</p></div>
+    <span class="source" id="fx-status">READY</span>
+  </div>
+  <div class="card">
+    <div id="fx-board"></div>
+  </div>
+</section>
+</div>
+<div id="fd-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Fav Dip / Support</h2><p>Saved coins. Supports update with the 5-minute tape. Engine is the agreed floor.</p></div>
+    <span class="source" id="fd-status">READY</span>
+  </div>
+  <div class="card">
+    <input id="fd-search" placeholder="Search coin" autocomplete="off" style="width:100%;box-sizing:border-box;margin-bottom:12px;padding:12px 14px;border-radius:12px;border:1px solid #3d4d63;background:#0b121a;color:#f4f7fb;font-size:16px;font-weight:700">
+    <div id="fd-board"></div>
+  </div>
+</section>
+</div>
+<div id="coinstats-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Coinstats</h2><p>Saved wallets · current holdings · last 7 days</p></div>
+    <span class="source" id="cs-status">READY</span>
+  </div>
+  <div class="card">
+    <div id="cs-board"></div>
+  </div>
+</section>
+</div>
+<div id="solchain-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Solchain</h2><p>Wallet total. Refresh any time.</p></div><span class="source">LIVE</span></div>
+  <div class="card"><div id="sc-board"></div></div>
+</section>
+</div>
+<div id="btc-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>BTC</h2><p>Point alerts to your Telegram bot.</p></div><span class="source">LIVE</span></div>
+  <div class="card"><div id="btc-board"></div></div>
+</section>
+</div>
+<div id="memes-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Memes</h2><p>Add a coin. It goes on top. Alert goes to Telegram.</p></div><span class="source">LIVE</span></div>
+  <div class="card"><div id="memes-board"></div></div>
+</section>
+</div>
+<div id="markets-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Market states</h2><p>Name it before you buy.</p></div><span class="source">GUIDE</span></div>
+  <div class="card"><div id="markets-board"></div></div>
+</section>
+</div>
+<div id="etf-live-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>ETF Live</h2><p>U.S. spot Bitcoin ETF daily net flows.</p></div><span class="source">FARSIDE</span></div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <iframe id="etf-live-frame" title="ETF Live" src="about:blank" style="width:100%;height:calc(100vh - 120px);border:0;background:#000;display:block"></iframe>
+  </div>
+</section>
+</div>
+<div id="dex-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>DEX volume</h2><p>Same numbers as DefiLlama. Swipe the chart.</p></div><span class="source">DAILY</span></div>
+  <div class="card"><div id="dex-board"></div></div>
+</section>
+</div>
+<div id="experience-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Experience Entry</h2><p>Sixteen rules before a new entry.</p></div><span class="source">RULES</span></div>
+  <div class="card">
+    <div id="experience-tools"></div>
+    <div id="experience-rules">
+      <div style="margin-bottom:12px;color:#8b93a7;font-size:13px;line-height:1.45">Sixteen rules before a new entry. Saved on this phone only.</div>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 1</div><b style="display:block;margin-top:4px;font-size:17px">Three bags</b><p style="margin:12px 0 0;font-weight:800;font-size:20px;line-height:1.3;color:#7dffb3">Fear bag <span style="font-size:28px">50%</span></p><p style="margin:4px 0 0;font-weight:800;font-size:18px;line-height:1.35;color:#7dffb3">Locked.</p><p style="margin:6px 0 0;font-weight:800;font-size:18px;line-height:1.35;color:#7dffb3">Opens only in Fear or Extreme Fear.</p><p style="margin:6px 0 0;font-weight:800;font-size:18px;line-height:1.35;color:#7dffb3">And only in a dip zone.</p><p style="margin:14px 0 0;font-weight:800;font-size:20px;line-height:1.3;color:#7dffb3">Swing bag <span style="font-size:28px">30%</span></p><p style="margin:4px 0 0;color:#d7dee8;font-size:16px;line-height:1.45">The rules below are for this bag only. Position sizing. Newest coins, 10–20% starter. Trade count. Risk cap. Start small, 25–33%. Wait for the weekly setup. Journal. Dry powder.</p><p style="margin:14px 0 0;font-weight:800;font-size:20px;line-height:1.3;color:#7dffb3">Pump/Swing bag <span style="font-size:28px">20%</span></p><p style="margin:4px 0 0;font-weight:800;font-size:18px;line-height:1.35;color:#7dffb3">No rules.</p><p style="margin:6px 0 0;font-weight:800;font-size:18px;line-height:1.35;color:#7dffb3">Trade it your way, full size.</p><p style="margin:6px 0 0;font-weight:800;font-size:18px;line-height:1.35;color:#7dffb3">Your own style.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 2</div><b style="display:block;margin-top:4px;font-size:17px">Miss the pump</b><p style="margin:10px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">It's absolutely fine to miss a pump. It's unacceptable to go underwater or blow my capital.</p><p style="margin:10px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">Missing a pump costs me nothing. Blowing my capital costs me everything.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 3</div><b style="display:block;margin-top:4px;font-size:17px">Cash for dips</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.55">Always keep cash ready for dips. Before I buy anything, I confirm I have money set aside for:</p><p style="margin:10px 0 0;font-weight:800;font-size:16px;line-height:1.45;color:#fff">A normal correction, about <span style="font-size:22px">10%</span>.</p><p style="margin:6px 0 0;font-weight:800;font-size:16px;line-height:1.45;color:#fff">A normal pullback, about <span style="font-size:22px">20%</span>.</p><p style="margin:6px 0 0;font-weight:800;font-size:16px;line-height:1.45;color:#fff">A deep pullback, about <span style="font-size:22px">30%</span>.</p><p style="margin:6px 0 0;font-weight:800;font-size:16px;line-height:1.45;color:#fff">A major crash, <span style="font-size:22px">50%</span> or more.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 4</div><b style="display:block;margin-top:4px;font-size:17px">Position sizing</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Fixed risk per trade. The amount you can lose is the same every time. A coin you like does not get a bigger risk.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 5</div><b style="display:block;margin-top:4px;font-size:17px">Newest coins</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Entry is 10–20% max, as a starter position only. Jeanphil God Gift Recovery.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 6</div><b style="display:block;margin-top:4px;font-size:17px">Trade count limit</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">A ceiling on entries per week. When the count is hit, no new coin until next week.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 7</div><b style="display:block;margin-top:4px;font-size:17px">Risk cap</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">A ceiling on total capital at risk per week. Open risk plus a new entry stays under that number.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 8</div><b style="display:block;margin-top:4px;font-size:17px">Start small</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">The first buy is 25–33% of the planned size. Add the rest only if the setup is still there. This takes the edge off FOMO.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 9</div><b style="display:block;margin-top:4px;font-size:17px">Wait for setup</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">On that coin, one of these must show. A weekly close holding support. Or a breakout retest of weekly resistance. No setup, no entry.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 10</div><b style="display:block;margin-top:4px;font-size:17px">Journal</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Every entry gets logged. Coin, risk, and why the setup was there.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 11</div><b style="display:block;margin-top:4px;font-size:17px">Dry powder</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Do you have dry powder for:</p><p style="margin:10px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">Next week?</p><p style="margin:6px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">Next month?</p><p style="margin:6px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">Next year?</p><p style="margin:6px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">The next biggest opportunity?</p><p style="margin:10px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">If the answer is no, this entry is too big.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 12</div><b style="display:block;margin-top:4px;font-size:17px">Dry zone</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Keep a percent of funds for dry moments.</p><p style="margin:10px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">Price stuck in that zone.</p><p style="margin:6px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">That cash stays there.</p><p style="margin:6px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">Not for a pump.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 13</div><b style="display:block;margin-top:4px;font-size:17px">Fear</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Keep funds for:</p><p style="margin:10px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">Fear.</p><p style="margin:6px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">Extreme Fear.</p><p style="margin:10px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">That money is for those days. A green day does not get it.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 14</div><b style="display:block;margin-top:4px;font-size:17px">Long hold</b><p style="margin:8px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">I stay fully independent from my crypto.</p><p style="margin:10px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">No loans, debts, or outside bills can force a sale.</p><p style="margin:10px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">My setup can carry a hold of <span style="font-size:28px">2–3 years</span> or longer.</p><p style="margin:10px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">Time for the idea to play out. No pressure, no panic, and no need to sell for cash.</p><p style="margin:10px 0 0;color:#d7dee8;font-size:14px;line-height:1.45">(My financial environment must support holding for 2–3 years or longer, allowing time for the investment thesis to unfold without pressure, panic, or liquidity constraints.)</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 15</div><b style="display:block;margin-top:4px;font-size:17px">Nourish</b><p style="margin:10px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#7dffb3">Nourish the right conditions.</p><p style="margin:8px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">The rest will take care of itself.</p></article>
+      <article style="margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #243041"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule 16</div><b style="display:block;margin-top:4px;font-size:17px">Small crash</b><p style="margin:10px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">For a small crash, use a small amount.</p><p style="margin:8px 0 0;font-weight:800;font-size:20px;line-height:1.35;color:#fff">Cash out the small profit.</p><p style="margin:8px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#d7dee8">That helps with monthly bills.</p><p style="margin:8px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#d7dee8">The long hold stays untouched.</p></article>
+    </div>
+    <div id="experience-board" style="display:none"></div>
+  </div>
+</section>
+</div>
+
+
+<div id="gmgn-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>GMGN</h2><p>Hot searches · trending · SOL 1h · volume + quality</p></div>
+    <span class="source" id="gmgn-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45;margin-bottom:10px">Worker polls GMGN every 20 min (2 API calls, weight 3 each). Keeps names with real volume and liquidity — not stables, not thin pools. Not a buy list.</div>
+    <div id="gmgn-sched"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="gmgn-tab" data-gmgn="hot" onclick="try{window.setGmgnInner&&window.setGmgnInner('hot')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:12px;cursor:pointer">Hot searches</button>
+      <button type="button" class="gmgn-tab" data-gmgn="trend" onclick="try{window.setGmgnInner&&window.setGmgnInner('trend')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Trending</button>
+      <button type="button" onclick="try{window.refreshGmgnTab&&window.refreshGmgnTab()}catch(e){}" style="padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer">Scan now</button>
+    </div>
+    <div id="gmgn-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
+<div id="pumpfun-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Pumpfun</h2><p>$10k to $150k · last 60 min · Twitter on</p></div>
+    <span class="source" id="pump-status">live</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45">$150k is the ceiling, not the target. A new coin opens near $3k–$5k, so those were inside the old cap and looked like the filter was off. Those are hidden. This list is coins that moved: $10k up to $150k, younger than 60 min, with Twitter.</div>
+    <div id="pump-list"><div style="color:#e8eef6;font-size:13px;font-weight:800">Loading movers between $10k and $150k…</div></div>
+  </div>
+</section>
+</div>
+<script>
+(function(){
+  if(window.__pfInline) return;
+  window.__pfInline=1;
+  var rows=[], timer=null, pending=null;
+  var f={maxMc:150000,maxAge:60,twitter:true,social:true,sort:'mc'};
+  function $(id){return document.getElementById(id);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&','<':'<','>':'>','"':'"'}[c];});}
+  function api(){try{if(window.BREAKOUT_API)return String(window.BREAKOUT_API).replace(/\/+$/,'');}catch(e){}return 'https://trading-ohlcv.sasipudi.workers.dev';}
+  function usd(n){n=+n;if(!(n>0))return '—';if(n>=1e6)return '$'+(n/1e6).toFixed(n>=10e6?1:2)+'M';if(n>=1e3)return '$'+(n/1e3).toFixed(n>=100e3?0:1)+'k';return '$'+Math.round(n);}
+  function ageMin(t){var m=(Date.now()-(+t||0))/60000;if(!(m>=0))return '';if(m<1)return Math.max(1,Math.round(m*60))+'s';if(m<60)return Math.round(m)+'m';return Math.round(m/60)+'h';}
+  function pass(c){var age=(Date.now()-(+c.created||0))/60000;if(!(age>=0)||age>f.maxAge)return false;var mc=+c.mc||0;var cap=+f.maxMc||150000;var floor=Math.min(10000,cap);if(mc<floor||mc>cap)return false;if(f.twitter&&!c.twitter)return false;var n=[c.twitter,c.telegram,c.website].filter(Boolean).length;if(f.social&&n<1)return false;return true;}
+  function mult(mc){var x=(+mc||0)/4500;if(!(x>1.05))return '';return x.toFixed(x>=10?0:1)+'x';}
+  function controls(){
+    return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin-bottom:10px">'+
+      '<label style="font-size:11px;color:#8491a1;font-weight:800">MAX MC<br><input id="pf-mc" type="number" min="1000" step="1000" value="'+esc(f.maxMc)+'" style="margin-top:4px;width:110px;padding:8px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:800"></label>'+
+      '<label style="font-size:11px;color:#8491a1;font-weight:800">MAX AGE MIN<br><input id="pf-age" type="number" min="1" step="1" value="'+esc(f.maxAge)+'" style="margin-top:4px;width:90px;padding:8px;border-radius:8px;border:1px solid #243041;background:#0b121a;color:#e8eef6;font-weight:800"></label>'+
+      '<label style="font-size:12px;color:#c5d0dc;font-weight:800;display:flex;gap:6px;align-items:center;padding-bottom:8px"><input id="pf-tw" type="checkbox"'+(f.twitter?' checked':'')+'> Twitter</label>'+
+      '<label style="font-size:12px;color:#c5d0dc;font-weight:800;display:flex;gap:6px;align-items:center;padding-bottom:8px"><input id="pf-soc" type="checkbox"'+(f.social?' checked':'')+'> A social</label>'+
+      '<button type="button" id="pf-sort" style="border:0;background:#121a24;color:#e8eef6;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer">'+(f.sort==='new'?'Sort: newest':'Sort: MC')+'</button>'+
+      '<button type="button" id="pf-go" style="border:0;background:#1a9b6c;color:#fff;border-radius:8px;padding:8px 12px;font-size:12px;font-weight:900;cursor:pointer">Apply</button></div>';
+  }
+  function card(c){
+    var x=mult(c.mc);
+    var letter=esc(String(c.symbol||c.name||'?').slice(0,1));
+    return '<div style="display:flex;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid #243041">'+
+      '<div style="width:42px;height:42px;border-radius:10px;background:#1a2430;color:#62e3a0;font-weight:900;display:flex;align-items:center;justify-content:center">'+letter+'</div>'+
+      '<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;gap:8px"><div style="font-weight:900;color:#e8eef6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.name||c.symbol||'—')+'</div><div style="font-weight:900;color:#e8eef6">'+esc(usd(c.mc))+'</div></div>'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:2px;font-size:12px;color:#8491a1"><span>'+esc(c.symbol||'')+' · '+esc(ageMin(c.created))+(c.complete?' · bonded':'')+'</span><span style="color:#62e3a0;font-weight:800">'+(x?esc(x):'')+'</span></div>'+
+      '<div style="margin-top:4px;display:flex;gap:10px;flex-wrap:wrap"><a href="https://pump.fun/coin/'+esc(c.mint)+'" target="_blank" rel="noopener" style="color:#6eb6ff;font-size:12px;font-weight:800">Pump</a><a href="https://dexscreener.com/solana/'+esc(c.mint)+'" target="_blank" rel="noopener" style="color:#6eb6ff;font-size:12px;font-weight:800">Dex</a>'+(c.twitter?'<a href="'+esc(c.twitter)+'" target="_blank" rel="noopener" style="color:#6eb6ff;font-size:12px;font-weight:800">X</a>':'')+'</div></div></div>';
+  }
+  function readForm(){
+    var mc=$('pf-mc'), age=$('pf-age'), tw=$('pf-tw'), soc=$('pf-soc');
+    if(mc) f.maxMc=Math.max(1000,+mc.value||150000);
+    if(age) f.maxAge=Math.max(1,+age.value||60);
+    if(tw) f.twitter=!!tw.checked;
+    if(soc) f.social=!!soc.checked;
+  }
+  function paint(){
+    var list=$('pump-list'); if(!list) return;
+    var hit=rows.filter(pass);
+    hit.sort(function(a,b){return f.sort==='new'?(+b.created||0)-(+a.created||0):(+b.mc||0)-(+a.mc||0);});
+    list.innerHTML=controls()+'<div style="font-size:12px;color:#8491a1;margin-bottom:8px">'+hit.length+' match · scanned '+rows.length+'</div>'+(hit.length?hit.map(card).join(''):'<div style="color:#8491a1;font-size:13px">Nothing under these filters.</div>');
+  }
+  function pull(){
+    if(pending) return pending;
+    var st=$('pump-status');
+    var list=$('pump-list');
+    if(st) st.textContent='loading';
+    var ctrl=(typeof AbortController==='function')?new AbortController():null;
+    var killer=ctrl?setTimeout(function(){try{ctrl.abort();}catch(e){}},10000):null;
+    pending=fetch(api()+'/pumpfun',{cache:'no-store',signal:ctrl?ctrl.signal:undefined}).then(function(r){return r.json();}).then(function(j){
+      rows=j.coins||[];
+      if(st) st.textContent=rows.length?(rows.length+' fresh'):(j.err||j.error||'empty');
+      if(rows.length) paint();
+      else if((j.err||j.error) && list) list.innerHTML='<div style="color:#ff6f7c;font-weight:800">'+esc(j.err||j.error)+'</div>';
+    }).catch(function(e){
+      if(st) st.textContent='error';
+      if(list) list.innerHTML='<div style="color:#ff6f7c;font-size:13px;font-weight:800">'+esc(e&&e.name==='AbortError'?'Feed timed out. Pull to refresh.':(e.message||e))+'</div>';
+    }).then(function(){if(killer)clearTimeout(killer);pending=null;});
+    return pending;
+  }
+  function hideOthers(){
+    ['showBreakoutMemes','showHunter','showKeep','showHolders','showSentiment','showFailures','showInMemory','showVerdict','showEntryWindow','showPositionMonitor','showWowDip','showOmg','showPitfalls','showStrategy','showDecisionCheck','showGmgn','showWallets'].forEach(function(fn){try{window[fn](false);}catch(e){}});
+    ['tf-panels','trend-panel','struct-panel','macro-panel','signal-panel','memegate-panel','coin-panel','antifomo-panel','hunter-panel','breakouts-panel','holders-panel','failures-panel','inmemory-panel','sentiment-panel','keep-panel','verdict-panel','entrywindow-panel','position-panel','wowdip-panel','omg-panel','pitfalls-panel','strategy-panel','decision-panel','gmgn-panel','wallets-panel'].forEach(function(id){
+      var el=$(id); if(!el) return; el.style.display='none'; el.classList.remove('on'); if(id==='tf-panels') el.classList.add('hidden');
+    });
+  }
+  function show(on){
+    var p=$('pumpfun-panel');
+    if(!on){
+      if(p){p.style.display='none';p.classList.remove('on');}
+      if(timer){clearInterval(timer);timer=null;}
+      return;
+    }
+    hideOthers();
+    if(p){p.style.display='block';p.classList.add('on');}
+    var card=p&&p.querySelector('.card');
+    if(card&&!card.getAttribute('data-pf')){
+      card.setAttribute('data-pf','1');
+      card.addEventListener('click',function(ev){
+        var go=ev.target&&ev.target.closest&&ev.target.closest('#pf-go');
+        var sort=ev.target&&ev.target.closest&&ev.target.closest('#pf-sort');
+        if(!go&&!sort) return;
+        ev.preventDefault();
+        readForm();
+        if(sort) f.sort=f.sort==='mc'?'new':'mc';
+        paint();
+      });
+    }
+    pull();
+    if(timer) clearInterval(timer);
+    timer=setInterval(function(){var onp=$('pumpfun-panel'); if(!onp||onp.style.display==='none')return; pull();},25000);
+  }
+  window.showPumpfun=show;
+  var tabs=document.getElementById('tf-tabs');
+  if(tabs) tabs.addEventListener('click',function(ev){
+    var b=ev.target&&ev.target.closest&&ev.target.closest('[data-tf]');
+    if(!b) return;
+    setTimeout(function(){
+      var act=document.querySelector('#tf-tabs .tab.active');
+      show(!!(act&&act.getAttribute('data-tf')==='pumpfun'));
+    },0);
+  });
+  setTimeout(function(){
+    var act=document.querySelector('#tf-tabs .tab.active');
+    if(act&&act.getAttribute('data-tf')==='pumpfun') show(true);
+  },0);
+})();
+</script>
+<div id="wallets-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Wallet tracker</h2><p>FOMO leaders · on-chain buys · CA overlay</p></div>
+    <span class="source" id="wt-status">API</span>
+  </div>
+  <div class="card">
+    <div style="font-size:11px;color:#8491a1;line-height:1.45;margin-bottom:10px">FOMO has no public API. Leaders come from the public top-100 wallet list (6h). Buys are new token accounts on the top 8 Solana wallets (30m). Saved CAs get Entry Window / CA state. Not a buy list.</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="wt-tab" data-wt="leaders" onclick="try{window.setWalletInner&&window.setWalletInner('leaders')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:12px;cursor:pointer">Leaders</button>
+      <button type="button" class="wt-tab" data-wt="buys" onclick="try{window.setWalletInner&&window.setWalletInner('buys')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Buys</button>
+      <button type="button" class="wt-tab" data-wt="signals" onclick="try{window.setWalletInner&&window.setWalletInner('signals')}catch(e){}" style="padding:8px 12px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:12px;cursor:pointer">Signals</button>
+      <button type="button" onclick="try{window.refreshWalletsTab&&window.refreshWalletsTab()}catch(e){}" style="padding:8px 12px;border-radius:8px;border:0;background:#243041;color:#e8eef6;font-weight:800;font-size:12px;cursor:pointer">Scan now</button>
+    </div>
+    <div id="wt-list" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</section>
+</div>
+<div id="entrywindow-panel" class="trend-panel" style="display:none">
+<div class="ew-sticky">
+      <div class="ew-sticky-tf">
+        <span style="font-size:11px;letter-spacing:.06em;color:#8491a1;font-weight:800">SETUP TF</span>
+        <button type="button" class="ew-tf" data-ew-tf="all" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('all')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#1a9b6c;color:#fff;font-weight:800;font-size:11px;cursor:pointer">All</button>
+        <button type="button" class="ew-tf" data-ew-tf="5m" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('5m')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">5m</button>
+        <button type="button" class="ew-tf" data-ew-tf="15m" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('15m')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">15m</button>
+        <button type="button" class="ew-tf" data-ew-tf="1h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1H</button>
+        <button type="button" class="ew-tf" data-ew-tf="2h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('2h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">2H</button>
+        <button type="button" class="ew-tf" data-ew-tf="4h" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('4h')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">4H</button>
+        <button type="button" class="ew-tf" data-ew-tf="1d" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1d')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1D</button>
+        <button type="button" class="ew-tf" data-ew-tf="1w" onclick="try{window.setEntryWindowTf&&window.setEntryWindowTf('1w')}catch(e){}" style="padding:7px 10px;border-radius:8px;border:1px solid #243041;background:#121a24;color:#c5d0dc;font-weight:800;font-size:11px;cursor:pointer">1W</button>
+      </div>
+      <div class="ew-coin-row">
+        <div class="ew-looking" id="ew-looking" style="margin:0">Looking at ALL TF</div>
+        <select id="ew-coin-sel" class="ew-coin-sel">
+          <option value="">All coins · by state</option>
+        </select>
+      </div>
+      <div class="ew-states" id="ew-states"></div>
+    </div>
+<section class="section">
+  <div class="head">
+    <div><h2>Entry Window</h2><p>Don't chase · setup TF = WHERE · 5m = WHEN · saved CAs</p></div>
+    <span class="source" id="ew-status">API</span>
+  </div>
+  <div class="card">
+    <div id="ew-list" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div id="ew-signals" style="margin-top:14px"></div>
+    <div style="margin-top:18px;font-size:11px;letter-spacing:.08em;color:#8491a1;font-weight:800">PAPER · BREAKOUT vs PULLBACK</div>
+    <div id="ew-paper" style="margin-top:8px"></div>
+  </div>
+</section>
+</div>
+<div id="coin-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Meme CA · Indicators</h2><p>ETH / SOL · GeckoTerminal OHLCV · same stack as BTC TFs</p></div><span class="source" id="coin-source">—</span></div>
+  <div class="card">
+    <div class="coin-ca">
+      <select id="coin-chain"><option value="eth">ETH</option><option value="solana">SOL</option></select>
+      <input id="coin-ca" type="text" placeholder="Full CA e.g. Ai66LHZG9M…pump" spellcheck="false" autocomplete="off"/>
+      <button type="button" id="coin-load" onclick="try{window.loadCoin&&window.loadCoin()}catch(e){alert(e)}">Load</button>
+      <button type="button" id="coin-clear" onclick="try{window.clearCoin&&window.clearCoin()}catch(e){}" style="background:rgba(255,111,124,.12);border-color:rgba(255,111,124,.35);color:#ffb0b8">Clear</button>
+    </div>
+    <div class="coin-meta" id="coin-meta">Paste CA → pick chain → Load. Uses top-liquidity pool.</div>
+    <div id="coin-recents-wrap">
+      <div class="recents-head">
+        <div class="ca-switch">
+          <button type="button" id="ca-tab-coins" class="on">Coins</button>
+          <button type="button" id="ca-tab-del">Delete</button>
+        </div>
+        <button type="button" onclick="try{window.coinRecentsSync&&window.coinRecentsSync()}catch(e){}">Sync GitHub</button>
+      </div>
+      <div id="coin-recents-status" class="coin-meta"></div>
+      <div id="coin-recents"></div>
+      <div id="coin-delete-list" style="display:none"></div>
+    </div>
+    <div class="coin-tf" id="coin-tf">
+      <button type="button" data-ctf="1m" onclick="try{window.setCoinTF&&window.setCoinTF('1m')}catch(e){}">1m</button>
+      <button type="button" data-ctf="5m" onclick="try{window.setCoinTF&&window.setCoinTF('5m')}catch(e){}">5m</button>
+      <button type="button" data-ctf="10m" onclick="try{window.setCoinTF&&window.setCoinTF('10m')}catch(e){}">10m</button>
+      <button type="button" data-ctf="15m" onclick="try{window.setCoinTF&&window.setCoinTF('15m')}catch(e){}">15m</button>
+      <button type="button" data-ctf="30m" onclick="try{window.setCoinTF&&window.setCoinTF('30m')}catch(e){}">30m</button>
+      <button type="button" data-ctf="1h" onclick="try{window.setCoinTF&&window.setCoinTF('1h')}catch(e){}">1H</button>
+      <button type="button" data-ctf="2h" onclick="try{window.setCoinTF&&window.setCoinTF('2h')}catch(e){}">2H</button>
+      <button type="button" data-ctf="4h" class="on" onclick="try{window.setCoinTF&&window.setCoinTF('4h')}catch(e){}">4H</button>
+      <button type="button" data-ctf="1d" onclick="try{window.setCoinTF&&window.setCoinTF('1d')}catch(e){}">1D</button>
+      <button type="button" data-ctf="1w" onclick="try{window.setCoinTF&&window.setCoinTF('1w')}catch(e){}">1W</button>
+    </div>
+    <div id="ca-sig-tabs" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px"></div>
+    <div id="ca-state-list" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px"></div>
+    <div id="coin-entry-box" style="margin:0 0 14px;padding:14px 16px;border-radius:14px;border:1px solid #243041;background:linear-gradient(180deg,#121a24,#0d141c)"><div style="color:#8491a1;font-size:12px">Load CA → CA signal (WATCH / EARLY / STRONG / STRETCHED / OFF)</div></div>
+    <div class="price-now"><div><div class="big" id="coin-spot">—</div><div class="meta" id="coin-spot-meta">—</div></div><div class="meta" id="coin-bias" style="font-weight:800;text-align:right">—</div></div>
+    <div class="coin-stats">
+      <div class="st"><div class="lab">RSI 14</div><div class="val" id="coin-rsi">—</div></div>
+      <div class="st"><div class="lab">MACD</div><div class="val" id="coin-macd">—</div></div>
+      <div class="st"><div class="lab">VOLUME</div><div class="val" id="coin-vol">—</div></div>
+      <div class="st"><div class="lab">CVD</div><div class="val" id="coin-cvd">—</div></div>
+    </div>
+    <div class="head" style="padding:16px 0 6px"><div><h2 style="font-size:15px">MACD chart</h2></div></div>
+    <div id="coin-macd-tv"></div>
+    <div class="head" style="padding:16px 0 6px"><div><h2 style="font-size:15px">S / R pivots</h2></div></div>
+    <div class="ladder" id="coin-sr-ladder"></div>
+    <div class="note" id="coin-note">OHLCV via GeckoTerminal · CVD approximate from candle body · not CEX flow</div>
+  </div>
+</section>
+</div>
+</main></div>
+<script src="alerts-tab.js?v=20261010-al4"></script>
+<div id="ca-del-modal" aria-hidden="true">
+  <div id="ca-del-sheet">
+    <b>Delete this coin?</b>
+    <p id="ca-del-copy">Are you sure? It will leave your saved list and GitHub.</p>
+    <div class="row">
+      <button type="button" id="ca-del-no">Cancel</button>
+      <button type="button" id="ca-del-yes">Delete</button>
+    </div>
+  </div>
+</div>
+<script src="overview-app.js?v=20261121-ml1"></script>
+<script src="overview-groups.js?v=20261121-ml1"></script>
+<script src="breakout-tab.js?v=20261018-free1"></script>
+<script src="hunter-tab.js?v=20261018-free1"></script>
+<script src="holders-tab.js?v=20261018-free1"></script>
+<script src="keywords-tab.js?v=20261114-emo1"></script>
+<script src="golden-notes.js?v=20261114-emo1"></script>
+<script src="sleep-tab.js?v=20260930-sl3"></script>
+<script src="life-log.js?v=20261110-mine1"></script>
+<script src="weight-tab.js?v=20261108-wt1"></script>
+<script src="water-tab.js?v=20261109-wa2"></script>
+<script src="elliott-tab.js?v=20261108-ew2"></script>
+<script src="cal-tab.js?v=20261015-sale2"></script>
+<script src="mandates-tab.js?v=20261014-md6"></script>
+<script src="time-pressure.js?v=20261121-ml4"></script>
+<script src="commentary.js?v=20260924-c3"></script>
+<script src="tiers-tab.js?v=20261018-free1"></script>
+<script src="failures-tab.js?v=20260915-f3"></script>
+<script src="inmemory-tab.js?v=20260916-im10"></script>
+<script src="keep-tab.js?v=20260915-k2"></script>
+<script src="sentiment-tab.js?v=20260916-s7"></script>
+<script src="verdict-tab.js?v=20260915-v6"></script>
+<script src="entry-window-tab.js?v=20261018-free1"></script>
+<script src="position-tab.js?v=20260922-nofp"></script>
+<script src="crash-tab.js?v=20261018-free1"></script>
+<script src="omg-tab.js?v=20260919-omg1"></script>
+<script src="pitfalls-tab.js?v=20260919-pf1"></script>
+<script src="strategy-tab.js?v=20260919-st1"></script>
+<script src="decision-tab.js?v=20261018-free1"></script>
+<script src="emotion-tab.js?v=20260924-em1"></script>
+<script src="fomo-entry-tab.js?v=20260926-fe4"></script>
+<script type="module" src="fomoentry-tab.mjs?v=20261018-free1"></script>
+<script src="fomo-experiences-tab.js?v=20260927-fx8"></script>
+<script src="fav-dips-tab.js?v=20261018-free1"></script>
+<script src="coinstats-tab.js?v=20261018-free1"></script>
+<script src="solchain-tab.js?v=20261012-sc7"></script>
+<script src="btc-tab.js?v=20261105-anystep"></script>
+<script src="meme-tab.js?v=20261108-mc2"></script>
+<script src="markets-tab.js?v=20261021-ms1"></script>
+<script src="dex-tab.js?v=20261028-dx6"></script>
+<script src="experience-entry-tab.js?v=20261108-rule2"></script>
+<script src="etf-live-tab.js?v=20261108-etf1"></script>
+<script src="gmgn-tab.js?v=20261018-free1"></script>
+<script src="wallets-tab.js?v=20261018-free1"></script>
+<script src="pumpfun-tab.js?v=20261018-free1"></script>
+<script src="whale-tab.js?v=20261002-wh4"></script>
+<script src="site-nav.js?v=20261121-ml3"></script>
+</body></html>

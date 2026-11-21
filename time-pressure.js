@@ -1,4 +1,4 @@
-/* Time Pressure books. Name, amount in k or L, exact total on top. Edit or delete any row. */
+/* Time Pressure books. Name, amount in k or L. Total on top is k or L only. Edit, clear, or delete any row. */
 (function () {
   var API = "https://trading-ohlcv.sasipudi.workers.dev/life-log";
 
