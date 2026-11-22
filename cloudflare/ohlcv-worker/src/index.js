@@ -496,7 +496,7 @@ export class OhlcvEngine {
             rawIdeas.forEach((row) => {
               if (!row || ideaRows.length >= 200) return;
               const id = String(row.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
-              const text = String(row.text || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+              const text = String(row.text || '').replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim().slice(0, 800);
               if (!id || !text || ideaRows.some((item) => item.id === id)) return;
               ideaRows.push({ id, text, t: Number(row.t) || 0 });
             });
@@ -598,7 +598,7 @@ export class OhlcvEngine {
             incomingIdeas.forEach((row) => {
               if (nextIdeas.length >= 200) return;
               const id = String(row && row.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
-              const text = String(row && row.text || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+              const text = String(row && row.text || '').replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim().slice(0, 800);
               if (!id || !text || nextIdeas.some((item) => item.id === id)) return;
               nextIdeas.push({ id, text, t: Number(row && row.t) || Date.now() });
             });

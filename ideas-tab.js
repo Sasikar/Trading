@@ -16,7 +16,15 @@
     });
   }
   function nid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-  function keep(raw) { return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 240); }
+  function keep(raw) {
+    return String(raw || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim()
+      .slice(0, 800);
+  }
   function cleanRow(row) {
     if (!row) return null;
     var id = String(row.id || "").replace(/[^a-z0-9]/gi, "").slice(0, 24);
@@ -51,10 +59,10 @@
     if (old) draft = old.value;
     var body = rows.map(function (row) {
       if (editing === row.id) {
-        return '<li class="tp-row"><form class="tp-form" data-id="' + esc(row.id) + '"><input data-field="text" value="' + esc(row.text) + '" maxlength="240" placeholder="Idea" aria-label="Idea"><button type="submit">Save</button><button type="button" data-act="wipe" data-id="' + esc(row.id) + '">Clear</button><button type="button" data-act="cancel" aria-label="Cancel">×</button></form></li>';
+        return '<li class="id-card"><form class="id-edit" data-id="' + esc(row.id) + '"><textarea data-field="text" maxlength="800" rows="5" placeholder="Write the idea" aria-label="Idea">' + esc(row.text) + '</textarea><div class="id-actions"><button type="submit" class="id-save">Save</button><button type="button" class="id-clear" data-act="wipe" data-id="' + esc(row.id) + '">Clear</button><button type="button" class="id-x" data-act="cancel" aria-label="Cancel">×</button></div></form></li>';
       }
       var label = row.text || "Empty row";
-      return '<li class="tp-row"><span class="tp-name">' + esc(label) + '</span><span class="tp-acts"><button type="button" class="tp-pen" data-act="edit" data-id="' + esc(row.id) + '">Edit</button><button type="button" class="tp-clear" data-act="ask" data-id="' + esc(row.id) + '">Clear</button></span></li>';
+      return '<li class="id-card"><p class="id-copy">' + esc(label) + '</p><div class="id-actions"><button type="button" class="id-editbtn" data-act="edit" data-id="' + esc(row.id) + '">Edit</button><button type="button" class="id-clear" data-act="ask" data-id="' + esc(row.id) + '">Clear</button></div></li>';
     }).join("");
     var ask = "";
     if (asking) {
@@ -63,10 +71,10 @@
       if (hit) ask = '<div class="tp-ask">Clear this idea?<button type="button" data-act="yes" data-id="' + esc(hit.id) + '">Clear</button><button type="button" data-act="no">Keep</button></div>';
     }
     root.innerHTML =
-      '<form id="id-add" class="tp-form"><input id="id-text" maxlength="240" placeholder="New idea" value="' + esc(draft) + '" aria-label="New idea"><button type="button" class="id-plus" data-act="add" aria-label="New row">+</button><button type="button" data-act="wipe">Clear</button></form>' +
-      '<p class="tp-hint">+ always adds a row. Clear wipes the entry.</p>' +
-      '<p id="id-status" class="tp-status"></p>' + ask +
-      '<ul class="tp-list">' + body + "</ul>";
+      '<form id="id-add" class="id-compose"><textarea id="id-text" maxlength="800" rows="4" placeholder="New idea" aria-label="New idea">' + esc(draft) + '</textarea><div class="id-actions"><button type="button" class="id-plus" data-act="add" aria-label="New row">+</button><button type="button" class="id-clear" data-act="wipe">Clear</button></div></form>' +
+      '<p class="id-hint">+ always adds a row. Edit opens a multi-line box. Clear wipes the entry.</p>' +
+      '<p id="id-status" class="id-status"></p>' + ask +
+      '<ul class="id-list">' + body + "</ul>";
   }
   function savedRows() { return rows.map(cleanRow).filter(Boolean); }
   function apply(view) {
@@ -208,7 +216,13 @@
         if (again) again.focus();
         return;
       }
-      if (act === "edit") { editing = id; asking = ""; paint(); }
+      if (act === "edit") {
+        editing = id;
+        asking = "";
+        paint();
+        var open = document.querySelector('#id-app form[data-id="' + id + '"] textarea');
+        if (open) open.focus();
+      }
       if (act === "cancel") { editing = ""; paint(); }
       if (act === "ask") {
         var hit = null;
@@ -231,7 +245,7 @@
   if (!document.getElementById("id-style")) {
     var css = document.createElement("style");
     css.id = "id-style";
-    css.textContent = ".id-plus{min-width:42px;font-size:22px;line-height:1}body.id-on main>section.section,body.id-on main>.trend-panel:not(#id-panel),body.id-on main>.struct-trend-panel,body.id-on #tf-panels{display:none!important}body.id-on #id-panel{display:block!important}";
+    css.textContent = "#id-app{font-family:Inter,system-ui,sans-serif;color:#e7eef8}#id-app textarea{display:block;width:100%;min-height:96px;box-sizing:border-box;resize:vertical;border:1px solid #314158;border-radius:14px;background:#0c121a;color:#f7f4ec;padding:12px 14px;font:500 16px/1.5 Inter,system-ui,sans-serif;color-scheme:dark}#id-app textarea::placeholder{color:#8b97a8}#id-app textarea:focus{outline:none;border-color:#e6c878;box-shadow:0 0 0 3px rgba(230,200,120,.16)}.id-compose,.id-edit{display:flex;flex-direction:column;gap:10px}.id-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center}.id-plus,.id-save,.id-clear,.id-editbtn,.id-x{border:0;border-radius:12px;height:40px;padding:0 14px;cursor:pointer;font:800 14px/1 Inter,system-ui,sans-serif}.id-plus{min-width:48px;background:#e6c878;color:#1c1508;font-size:22px}.id-save{background:#e6c878;color:#1c1508}.id-editbtn{background:#243044;color:#f4f7fb}.id-clear{background:#2c1c24;color:#ffb0ba}.id-x{width:40px;padding:0;background:#1c2633;color:#d5deea;font-size:18px}.id-hint,.id-status{margin:10px 2px 0;color:#93a0b2;font:600 13px/1.4 Inter,system-ui,sans-serif}.id-status{min-height:18px;color:#c9b27a}.id-list{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}.id-card{background:#141c27;border:1px solid #2a384a;border-radius:16px;padding:14px}.id-copy{margin:0 0 12px;white-space:pre-wrap;word-break:break-word;color:#f4f7fb;font:500 16px/1.5 Inter,system-ui,sans-serif}.id-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;color:#ffb4be;font:800 14px/1.3 Inter,system-ui,sans-serif}.id-ask button{border:0;border-radius:999px;padding:8px 12px;font:800 13px Inter,system-ui,sans-serif;cursor:pointer}.id-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.id-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.id-on #id-panel h2{color:#f6f3ea;font:800 28px/1.1 Inter,system-ui,sans-serif;letter-spacing:-.03em}body.id-on main>section.section,body.id-on main>.trend-panel:not(#id-panel),body.id-on main>.struct-trend-panel,body.id-on #tf-panels{display:none!important}body.id-on #id-panel{display:block!important}";
     document.head.appendChild(css);
   }
   pull();
