@@ -207,7 +207,7 @@
         p.classList.remove("on");
         return;
       }
-      document.body.classList.remove("life-on", "md-on", "cal-on", "tp-on", "ml-on");
+      document.body.classList.remove("life-on", "md-on", "cal-on", "tp-on", "ml-on", "id-on");
       document.body.classList.add(opt.body);
       var panels = $("tf-panels");
       if (panels) { panels.classList.add("hidden"); panels.style.display = "none"; }

@@ -399,7 +399,7 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/life-log' || path === '/api/life-log') {
-        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, custom: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} }, pressure: { rows: [] }, midlong: { rows: [] } });
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, custom: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} }, pressure: { rows: [] }, midlong: { rows: [] }, ideas: { rows: [] } });
         const cleanTopic = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
         const readLife = () => {
           let data = blank();
@@ -491,6 +491,16 @@ export class OhlcvEngine {
             };
             data.pressure = readMoneyRows(saved.pressure);
             data.midlong = readMoneyRows(saved.midlong);
+            const ideaRows = [];
+            const rawIdeas = saved.ideas && Array.isArray(saved.ideas.rows) ? saved.ideas.rows : [];
+            rawIdeas.forEach((row) => {
+              if (!row || ideaRows.length >= 200) return;
+              const id = String(row.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+              const text = String(row.text || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+              if (!id || !text || ideaRows.some((item) => item.id === id)) return;
+              ideaRows.push({ id, text, t: Number(row.t) || 0 });
+            });
+            data.ideas = { rows: ideaRows };
           } catch (e) {}
           return data;
         };
@@ -578,6 +588,21 @@ export class OhlcvEngine {
               next.push({ id, text, n, t: Number(row && row.t) || Date.now() });
             });
             data[book].rows = next;
+          } else if (body.section === 'ideas') {
+            if (!data.ideas) data.ideas = { rows: [] };
+            if (String(body.act || '') !== 'save') {
+              return new Response(JSON.stringify({ ok: false, error: 'Bad row' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+            }
+            const nextIdeas = [];
+            const incomingIdeas = Array.isArray(body.rows) ? body.rows : [];
+            incomingIdeas.forEach((row) => {
+              if (nextIdeas.length >= 200) return;
+              const id = String(row && row.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+              const text = String(row && row.text || '').replace(/\s+/g, ' ').trim().slice(0, 240);
+              if (!id || !text || nextIdeas.some((item) => item.id === id)) return;
+              nextIdeas.push({ id, text, t: Number(row && row.t) || Date.now() });
+            });
+            data.ideas.rows = nextIdeas;
           } else if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             return new Response(JSON.stringify({ ok: false, error: 'Pick a date' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
           } else if (body.section === 'sleep') {

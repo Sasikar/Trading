@@ -4,7 +4,7 @@
     health: ["sleeplog", "diet", "gym", "saviour", "weight"],
     sindhu: ["steps", "food"],
     surya: ["water"],
-    trade: ["fe", "fomo", "experience", "entrywindow", "decision", "antifomo", "position", "btc", "memes", "coin", "breakouts", "alerts", "pumpfun", "fd", "emotion", "verdict", "fx"],
+    trade: ["ideas", "fe", "fomo", "experience", "entrywindow", "decision", "antifomo", "position", "btc", "memes", "coin", "breakouts", "alerts", "pumpfun", "fd", "emotion", "verdict", "fx"],
     scanners: ["soulscanner", "cabalhunter", "rugradar", "defade", "trenchradar", "trenchcoat", "memeassist"],
     time: ["1h", "4h", "1d", "1w", "1M", "trend", "struct", "macro", "elliott", "pressure", "midlong"],
     research: ["cvd", "gmgn", "gmgnai", "hstrength", "holders", "hunter", "tiers", "sentiment", "failures", "inmemory", "keep", "keywords", "gnotes", "officeemo", "personalemo", "whale", "coinstats", "solchain", "markets", "etflive", "dex", "wallets", "cal", "mandates", "wowdip", "omg", "pitfalls", "strategy", "memegate", "cadelete"]
