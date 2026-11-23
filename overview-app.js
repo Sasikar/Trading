@@ -105,6 +105,26 @@ async function loadMarket(){
     }
   }catch(e){console.warn('fng',e); set('fg-price','—'); set('fg-change','Unavailable');}
 
+  // US futures — ES, Nasdaq, Dow, VIX. Green up, red down. Session is New York time.
+  try{
+    const et=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+    const day=et.getDay();
+    const mins=et.getHours()*60+et.getMinutes();
+    const session=(day===0||day===6)?'WKND':(mins<9*60+30?'PRE':(mins<16*60?'OPEN':'AH'));
+    set('fut-session', session, '#e6c878');
+    const cj=await jget('https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols='+encodeURIComponent('@SP.1|@ND.1|@DJ.1|@VX.1')+'&requestMethod=itv&noCache=1&output=json&_='+Date.now());
+    const qs=cj&&cj.FormattedQuoteResult&&cj.FormattedQuoteResult.FormattedQuote||[];
+    const map={'@SP.1':'fut-es','@ND.1':'fut-nq','@DJ.1':'fut-ym','@VX.1':'fut-vx'};
+    qs.forEach(function(q){
+      const id=map[q&&q.symbol];
+      if(!id) return;
+      const pct=q.change_pct!=null?+String(q.change_pct).replace(/%/g,'').replace(/,/g,''):NaN;
+      if(!isFinite(pct)){ set(id,'—'); return; }
+      set(id,(pct>=0?'+':'')+pct.toFixed(2)+'%', pct>=0?'#62e3a0':'#ff6f7c');
+      any=true;
+    });
+  }catch(e){console.warn('futures',e);}
+
   if($('mkt-status')) $('mkt-status').textContent=any?'LIVE / SNAPSHOT':'OFFLINE';
 }
 
