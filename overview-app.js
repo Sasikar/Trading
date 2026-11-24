@@ -125,8 +125,13 @@ async function loadMarket(){
     });
   }catch(e){console.warn('futures',e);}
 
-  // BTC ETF — today and the day before, so a flat print still shows momentum.
+  // BTC ETF — today and the day before, side by side.
   try{
+    var etfBar=document.querySelector('.etf-live');
+    if(etfBar && !document.getElementById('etf-prev-side')){
+      etfBar.insertAdjacentHTML('beforeend','<span style="width:1px;height:14px;background:#ffffff22;margin:0 4px;flex:none"></span><div class="lab">PREV</div><b id="etf-prev-side">—</b><span id="etf-prev-flow" class="etf-amt">—</span><span id="etf-prev-day" class="lab"></span>');
+      etfBar.style.flexWrap='nowrap';
+    }
     const book=await jget('./etf-flows.json?_='+Date.now());
     const rows=book&&Array.isArray(book.data)?book.data:[];
     const paintFlow=function(row, sideId, flowId, dayId){

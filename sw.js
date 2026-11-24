@@ -5,13 +5,11 @@ self.addEventListener('activate', function (e) {
       return self.clients.matchAll({ type: 'window' });
     }).then(function (list) {
       return Promise.all(list.map(function (c) {
-        if (!c.url || c.url.indexOf('home.html') !== -1) return null;
+        if (!c.url) return null;
         var u = new URL(c.url);
-        if (u.pathname.endsWith('/index.html') || u.pathname.endsWith('/')) {
-          var dir = u.pathname.endsWith('/') ? u.pathname : u.pathname.replace(/index\.html$/, '');
-          return c.navigate(dir + 'home.html?fresh=' + Date.now());
-        }
-        return null;
+        if (u.search.indexOf('boot=') !== -1) return null;
+        var dir = u.pathname.replace(/[^/]*$/, '');
+        return c.navigate(dir + 'home.html?boot=' + Date.now());
       }));
     });
   }));
