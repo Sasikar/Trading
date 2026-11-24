@@ -85,21 +85,26 @@
     var root = $("sr-app");
     var panel = $("survive-panel");
     if (!root || !panel || !panel.classList.contains("on")) return;
+    var card = "margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a";
+    var field = "display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:0;border:0;background:transparent;color:#fff;font-size:17px;font-weight:800;color-scheme:dark";
+    var area = "display:block;width:100%;box-sizing:border-box;margin-top:10px;padding:0;border:0;background:transparent;color:#fff;font-size:18px;font-weight:800;line-height:1.4;resize:vertical;color-scheme:dark";
+    var gold = "border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406";
+    var link = "border:0;background:transparent;font-weight:800;padding:0";
     var body = rows.map(function (row, i) {
       if (editing === row.id) {
-        return '<li class="sr-card"><form class="sr-edit" data-id="' + esc(row.id) + '"><input data-field="title" maxlength="80" value="' + esc(row.title) + '" placeholder="Title" aria-label="Title"><textarea data-field="text" maxlength="1200" rows="6" placeholder="Rule" aria-label="Rule">' + esc(row.text) + '</textarea><div class="sr-actions"><button type="submit">Save</button><button type="button" data-act="wipe" data-id="' + esc(row.id) + '">Clear</button><button type="button" data-act="cancel" aria-label="Cancel">×</button></div></form></li>';
+        return '<li style="list-style:none"><article style="' + card + '"><form data-id="' + esc(row.id) + '"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule ' + (i + 1) + '</div><input data-field="title" maxlength="80" value="' + esc(row.title) + '" placeholder="Title" aria-label="Title" style="' + field + '"><textarea data-field="text" maxlength="1200" rows="5" placeholder="Write the rule." aria-label="Rule" style="' + area + '">' + esc(row.text) + '</textarea><div style="display:flex;gap:14px;align-items:center;margin-top:12px"><button type="submit" style="' + gold + '">Save</button><button type="button" data-act="wipe" data-id="' + esc(row.id) + '" style="' + link + ';color:#ff8a7a">Clear</button><button type="button" data-act="cancel" style="' + link + ';color:#c5d0dc">Cancel</button></div></form></article></li>';
       }
       var lines = String(row.text || "Empty rule").split("\n").map(function (line) {
-        return "<p>" + esc(line || " ") + "</p>";
+        return '<p style="margin:10px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">' + esc(line || " ") + "</p>";
       }).join("");
-      return '<li class="sr-card"><div class="sr-k">Rule ' + (i + 1) + '</div><b>' + esc(row.title || "Untitled") + "</b>" + lines + '<div class="sr-actions"><button type="button" data-act="edit" data-id="' + esc(row.id) + '">Edit</button><button type="button" class="sr-clear" data-act="ask" data-id="' + esc(row.id) + '">Clear</button></div></li>';
+      return '<li style="list-style:none"><article style="' + card + '"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule ' + (i + 1) + "</div><b style=\"display:block;margin-top:4px;font-size:17px\">" + esc(row.title || "Untitled") + "</b>" + lines + '<div style="margin-top:8px"><button type="button" data-act="edit" data-id="' + esc(row.id) + '" style="' + link + ';color:#e6c878;margin-right:14px">Edit</button><button type="button" class="sr-clear" data-act="ask" data-id="' + esc(row.id) + '" style="' + link + ';color:#ff8a7a">Clear</button></div></article></li>';
     }).join("");
     var ask = "";
-    if (asking) ask = '<div class="sr-ask">Clear this rule?<button type="button" data-act="yes" data-id="' + esc(asking) + '">Clear</button><button type="button" data-act="no">Keep</button></div>';
+    if (asking) ask = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;color:#ff8a7a;font-size:14px;font-weight:800">Clear this rule?<button type="button" data-act="yes" data-id="' + esc(asking) + '" style="border:0;border-radius:999px;padding:8px 12px;background:#ff6b6b;color:#1a0c10;font-weight:800">Clear</button><button type="button" data-act="no" style="border:0;border-radius:999px;padding:8px 12px;background:#243140;color:#f4f7fb;font-weight:800">Keep</button></div>';
     root.innerHTML =
-      '<form id="sr-add" class="sr-compose"><input id="sr-title" maxlength="80" placeholder="Title" aria-label="Title"><textarea id="sr-text" maxlength="1200" rows="4" placeholder="New rule" aria-label="New rule"></textarea><div class="sr-actions"><button type="button" class="sr-plus" data-act="add" aria-label="New rule">+</button><button type="button" class="sr-clear" data-act="wipe">Clear</button></div></form>' +
-      '<p id="sr-status" class="sr-status"></p>' + ask +
-      '<ol class="sr-list">' + body + "</ol>";
+      '<article style="' + card + '"><form id="sr-add"><div style="color:#7dffb3;font-size:12px;font-weight:800">New rule</div><input id="sr-title" maxlength="80" placeholder="Title" aria-label="Title" style="' + field + '"><textarea id="sr-text" maxlength="1200" rows="3" placeholder="Write the rule." aria-label="New rule" style="' + area + '"></textarea><div style="display:flex;gap:14px;align-items:center;margin-top:12px"><button type="button" data-act="add" style="' + gold + '">Enter</button><button type="button" data-act="wipe" style="' + link + ';color:#ff8a7a">Clear</button></div></form></article>' +
+      '<p id="sr-status" style="min-height:18px;margin:8px 2px;color:#8b93a7;font-size:13px;font-weight:700"></p>' + ask +
+      '<ol style="list-style:none;margin:0;padding:0">' + body + "</ol>";
   }
   function savedRows() { return rows.map(cleanRow).filter(Boolean); }
   function apply(view) {
@@ -273,7 +278,7 @@
   if (!document.getElementById("sr-style")) {
     var css = document.createElement("style");
     css.id = "sr-style";
-    css.textContent = "#survive-panel .head h2{color:#f4fff8;font:800 26px/1.1 Inter,system-ui,sans-serif;letter-spacing:-.03em}#sr-app{font-family:Inter,system-ui,sans-serif;color:#e7eef8}#sr-app input,#sr-app textarea{display:block;width:100%;box-sizing:border-box;border:1px solid #2f6b4a;border-radius:14px;background:#0c121a;color:#f7f4ec;padding:12px 14px;font:600 16px/1.45 Inter,system-ui,sans-serif;color-scheme:dark}#sr-app textarea{min-height:96px;resize:vertical;margin-top:8px}#sr-app input:focus,#sr-app textarea:focus{outline:none;border-color:#7dffb3;box-shadow:0 0 0 3px rgba(125,255,179,.14)}.sr-compose{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}.sr-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}.sr-actions button,.sr-plus{border:0;border-radius:12px;height:40px;padding:0 14px;cursor:pointer;font:800 14px/1 Inter,system-ui,sans-serif;background:#243044;color:#f4f7fb}.sr-plus,.sr-actions button[type=submit]{background:#7dffb3;color:#06210f}.sr-clear{background:#2c1c24!important;color:#ffb0ba!important}.sr-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.sr-card{background:#101820;border:1px solid #24543a;border-radius:16px;padding:14px}.sr-k{color:#7dffb3;font:800 12px/1 Inter,system-ui,sans-serif;letter-spacing:.04em}.sr-card b{display:block;margin:4px 0 8px;font-size:17px;color:#fff}.sr-card p{margin:6px 0 0;white-space:pre-wrap;word-break:break-word;color:#f4f7fb;font:600 16px/1.45 Inter,system-ui,sans-serif}.sr-status{min-height:18px;margin:0 0 8px;color:#9dccb2;font:700 13px/1.3 Inter,system-ui,sans-serif}.sr-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;color:#ffb4be;font:800 14px Inter,system-ui,sans-serif}.sr-ask button{border:0;border-radius:999px;padding:8px 12px;font:800 13px Inter,system-ui,sans-serif;cursor:pointer}.sr-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.sr-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.sr-on main>section.section:not(#survive-panel section),body.sr-on #tf-panels{display:none!important}body.sr-on #survive-panel{display:block!important}";
+    css.textContent = "body.sr-on #tf-panels{display:none!important}body.sr-on #survive-panel{display:block!important}";
     document.head.appendChild(css);
   }
   pull();
