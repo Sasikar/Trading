@@ -169,7 +169,7 @@ async function loadMarket(){
     const num=function(v){const n=+String(v==null?'':v).replace(/[%,]/g,'');return isFinite(n)?n:NaN;};
     const pctTxt=function(n){return !isFinite(n)?'—':(n>=0?'+':'')+n.toFixed(1)+'%';};
     const colOf=function(n){return !isFinite(n)?'':(n>=0?'#62e3a0':'#ff6f7c');};
-    const pxTxt=function(n,d){return !isFinite(n)?'—':'$'+n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});};
+    const pxTxt=function(n,d){return !isFinite(n)?'—':'$'+n.toFixed(d);};
     const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
     const today=ny.getFullYear()+String(ny.getMonth()+1).padStart(2,'0')+String(ny.getDate()).padStart(2,'0');
     const barsOf=async function(symbol){
@@ -207,7 +207,7 @@ async function loadMarket(){
       if(isFinite(last)) any=true;
     };
     paint(by['@GC.1'], goldBars, 'gold-px','gold-pct','gold-yd', 0);
-    paint(by['@CL.1'], oilBars, 'oil-px','oil-pct','oil-yd', 2);
+    paint(by['@CL.1'], oilBars, 'oil-px','oil-pct','oil-yd', 1);
   }catch(e){console.warn('goldoil',e);}
 
   if($('mkt-status')) $('mkt-status').textContent=any?'LIVE / SNAPSHOT':'OFFLINE';
