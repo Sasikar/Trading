@@ -232,30 +232,44 @@ async function loadMarket(){
       const words=String(title||'').replace(/\s+/g,' ').trim().split(' ').slice(0,2).join(' ');
       return words.slice(0,12);
     };
+    const eventMs=function(iso){
+      const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?(?:([+-])(\d{2}):?(\d{2})|Z)?/);
+      if(!m) return NaN;
+      let ms=Date.UTC(+m[1], +m[2]-1, +m[3], +m[4], +m[5], +(m[6]||0));
+      if(m[7]==='+'||m[7]==='-'){
+        const off=(+m[8]*60 + +(m[9]||0))*60000;
+        ms=m[7]==='-'?ms+off:ms-off;
+      }
+      return ms;
+    };
     const istWhen=function(iso){
-      const d=new Date(iso);
-      if(!isFinite(d.getTime())) return '';
-      const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Kolkata',weekday:'short',hour:'numeric',minute:'2-digit',hour12:true}).formatToParts(d);
-      const pick=function(type){const hit=parts.filter(function(p){return p.type===type;})[0];return hit?hit.value:'';};
-      let hour=pick('hour');
-      const minute=pick('minute');
-      const day=pick('weekday');
-      const ap=pick('dayPeriod').toLowerCase().replace(/\./g,'');
-      if(minute==='00') return day+' '+hour+ap;
-      return day+' '+hour+':'+minute+ap;
+      const ms=eventMs(iso);
+      if(!isFinite(ms)) return '';
+      const ist=new Date(ms+(5*60+30)*60000);
+      const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      let h=ist.getUTCHours();
+      const min=ist.getUTCMinutes();
+      const ap=h>=12?'pm':'am';
+      h=h%12||12;
+      const hm=min?h+':'+String(min).padStart(2,'0'):String(h);
+      return days[ist.getUTCDay()]+' '+hm+ap;
     };
     let raw=null;
     try{ raw=await jget('https://trading-ohlcv.sasipudi.workers.dev/us-calendar'); }catch(e){}
     if(!Array.isArray(raw)){
       try{ raw=await jget('https://nfs.faireconomy.media/ff_calendar_thisweek.json'); }catch(e){}
     }
-    let loaded=Array.isArray(raw);
+    let loaded=Array.isArray(raw)&&raw.length>0;
     const now=Date.now();
     const rows=loaded?raw.filter(function(row){
       if(!row||String(row.country||'').toUpperCase()!=='USD') return false;
-      if(String(row.impact||'').toLowerCase()!=='high') return false;
-      const t=new Date(row.date).getTime();
-      return isFinite(t)&&t>=now-30*60*1000;
+      const impact=String(row.impact||'').toLowerCase();
+      const title=String(row.title||'').toLowerCase();
+      const important=impact==='high'||/pce|cpi|gdp|nfp|payroll|fomc|fed funds|ppi|retail sales/.test(title);
+      if(!important||impact==='holiday'||impact==='low') return false;
+      const t=eventMs(row.date);
+      if(!isFinite(t)) return impact==='high';
+      return t>=now-6*60*60*1000;
     }):[];
     const groups={};
     const order=[];

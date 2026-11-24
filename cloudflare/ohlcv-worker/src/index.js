@@ -1323,18 +1323,20 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const path = new URL(request.url).pathname.replace(/\/+$/, '') || '/';
     if (path === '/us-calendar') {
+      let body = '[]';
       try {
         const r = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
           headers: { accept: 'application/json', 'user-agent': 'Mozilla/5.0' }
         });
         const text = await r.text();
-        return new Response(r.ok ? text : '[]', {
-          status: 200,
-          headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'public, max-age=300' }
-        });
-      } catch (e) {
-        return new Response('[]', { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
-      }
+        if (r.ok && text.trim().charAt(0) === '[') body = text;
+      } catch (e) {}
+      if (body === '[]' && globalThis.__usCal) body = globalThis.__usCal;
+      if (body !== '[]') globalThis.__usCal = body;
+      return new Response(body, {
+        status: body === '[]' ? 503 : 200,
+        headers: { ...CORS, 'content-type': 'application/json', 'cache-control': 'no-store' }
+      });
     }
     const scanOff = {
       '/tiers': 1, '/api/tiers': 1,
