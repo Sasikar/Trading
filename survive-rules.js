@@ -86,7 +86,7 @@
     var panel = $("survive-panel");
     if (!root || !panel || !panel.classList.contains("on")) return;
     var card = "margin:0 0 10px;padding:14px;border-radius:16px;background:#12161d;border:1px solid #3dbe7a";
-    var field = "display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:0;border:0;background:transparent;color:#fff;font-size:17px;font-weight:800;color-scheme:dark";
+    var field = "display:block;width:100%;box-sizing:border-box;margin-top:8px;padding:0;border:0;background:transparent;color:#7dffb3;font-size:17px;font-weight:800;color-scheme:dark";
     var area = "display:block;width:100%;box-sizing:border-box;margin-top:10px;padding:0;border:0;background:transparent;color:#fff;font-size:18px;font-weight:800;line-height:1.4;resize:vertical;color-scheme:dark";
     var gold = "border:0;border-radius:999px;padding:10px 16px;font-weight:800;background:#e6c878;color:#1a1406";
     var link = "border:0;background:transparent;font-weight:800;padding:0";
@@ -97,7 +97,7 @@
       var lines = String(row.text || "Empty rule").split("\n").map(function (line) {
         return '<p style="margin:10px 0 0;font-weight:800;font-size:18px;line-height:1.4;color:#fff">' + esc(line || " ") + "</p>";
       }).join("");
-      return '<li style="list-style:none"><article style="' + card + '"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule ' + (i + 1) + "</div><b style=\"display:block;margin-top:4px;font-size:17px\">" + esc(row.title || "Untitled") + "</b>" + lines + '<div style="margin-top:8px"><button type="button" data-act="edit" data-id="' + esc(row.id) + '" style="' + link + ';color:#e6c878;margin-right:14px">Edit</button><button type="button" class="sr-clear" data-act="ask" data-id="' + esc(row.id) + '" style="' + link + ';color:#ff8a7a">Clear</button></div></article></li>';
+      return '<li style="list-style:none"><article style="' + card + '"><div style="color:#7dffb3;font-size:12px;font-weight:800">Rule ' + (i + 1) + "</div><b style=\"display:block;margin-top:4px;font-size:17px;color:#7dffb3\">" + esc(row.title || "Untitled") + "</b>" + lines + '<div style="margin-top:8px"><button type="button" data-act="edit" data-id="' + esc(row.id) + '" style="' + link + ';color:#e6c878;margin-right:14px">Edit</button><button type="button" class="sr-clear" data-act="ask" data-id="' + esc(row.id) + '" style="' + link + ';color:#ff8a7a">Clear</button></div></article></li>';
     }).join("");
     var ask = "";
     if (asking) ask = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;color:#ff8a7a;font-size:14px;font-weight:800">Clear this rule?<button type="button" data-act="yes" data-id="' + esc(asking) + '" style="border:0;border-radius:999px;padding:8px 12px;background:#ff6b6b;color:#1a0c10;font-weight:800">Clear</button><button type="button" data-act="no" style="border:0;border-radius:999px;padding:8px 12px;background:#243140;color:#f4f7fb;font-weight:800">Keep</button></div>';
