@@ -399,7 +399,7 @@ export class OhlcvEngine {
         return new Response(JSON.stringify({ ok: true, items: dips.items, saved: dips.saved }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
       }
       if (path === '/life-log' || path === '/api/life-log') {
-        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, custom: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} }, pressure: { rows: [] }, midlong: { rows: [] }, ideas: { rows: [] } });
+        const blank = () => ({ sleep: {}, diet: { sweet: {}, biryani: {}, carbs: {} }, saviour: { topics: [], logs: {} }, custom: { topics: [], logs: {} }, gym: {}, food: {}, steps: {}, weight: { goal: 80, days: {} }, water: { goal: 3000, days: {} }, pressure: { rows: [] }, midlong: { rows: [] }, ideas: { rows: [] }, survive: { rows: [] } });
         const cleanTopic = (value) => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 32);
         const readLife = () => {
           let data = blank();
@@ -501,6 +501,17 @@ export class OhlcvEngine {
               ideaRows.push({ id, text, t: Number(row.t) || 0 });
             });
             data.ideas = { rows: ideaRows };
+            const surviveRows = [];
+            const rawSurvive = saved.survive && Array.isArray(saved.survive.rows) ? saved.survive.rows : [];
+            rawSurvive.forEach((row) => {
+              if (!row || surviveRows.length >= 40) return;
+              const id = String(row.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+              const title = String(row.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+              const text = String(row.text || '').replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim().slice(0, 1200);
+              if (!id || !title || !text || surviveRows.some((item) => item.id === id)) return;
+              surviveRows.push({ id, title, text, t: Number(row.t) || 0 });
+            });
+            data.survive = { rows: surviveRows };
           } catch (e) {}
           return data;
         };
@@ -603,6 +614,22 @@ export class OhlcvEngine {
               nextIdeas.push({ id, text, t: Number(row && row.t) || Date.now() });
             });
             data.ideas.rows = nextIdeas;
+          } else if (body.section === 'survive') {
+            if (!data.survive) data.survive = { rows: [] };
+            if (String(body.act || '') !== 'save') {
+              return new Response(JSON.stringify({ ok: false, error: 'Bad row' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
+            }
+            const nextSurvive = [];
+            const incomingSurvive = Array.isArray(body.rows) ? body.rows : [];
+            incomingSurvive.forEach((row) => {
+              if (nextSurvive.length >= 40) return;
+              const id = String(row && row.id || '').replace(/[^a-z0-9]/gi, '').slice(0, 24);
+              const title = String(row && row.title || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+              const text = String(row && row.text || '').replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim().slice(0, 1200);
+              if (!id || !title || !text || nextSurvive.some((item) => item.id === id)) return;
+              nextSurvive.push({ id, title, text, t: Number(row && row.t) || Date.now() });
+            });
+            data.survive.rows = nextSurvive;
           } else if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
             return new Response(JSON.stringify({ ok: false, error: 'Pick a date' }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } });
           } else if (body.section === 'sleep') {
