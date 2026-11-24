@@ -160,6 +160,56 @@ async function loadMarket(){
     paintFlow(prev,'etf-prev-side','etf-prev-flow','etf-prev-day');
   }catch(e){console.warn('etf',e);}
 
+  // Gold and WTI oil on one line: price, today %, yesterday %.
+  try{
+    if(!document.getElementById('gold-px')){
+      var etfAnchor=document.querySelector('.etf-live');
+      if(etfAnchor) etfAnchor.insertAdjacentHTML('afterend','<div class="etf-live" id="go-line" aria-label="Gold and oil"><div class="lab">GOLD</div><b id="gold-px">—</b><span id="gold-pct" class="etf-amt">—</span><span class="lab">YD</span><span id="gold-yd" class="etf-amt">—</span><span class="etf-split"></span><div class="lab">OIL</div><b id="oil-px">—</b><span id="oil-pct" class="etf-amt">—</span><span class="lab">YD</span><span id="oil-yd" class="etf-amt">—</span></div>');
+    }
+    const num=function(v){const n=+String(v==null?'':v).replace(/[%,]/g,'');return isFinite(n)?n:NaN;};
+    const pctTxt=function(n){return !isFinite(n)?'—':(n>=0?'+':'')+n.toFixed(1)+'%';};
+    const colOf=function(n){return !isFinite(n)?'':(n>=0?'#62e3a0':'#ff6f7c');};
+    const pxTxt=function(n,d){return !isFinite(n)?'—':'$'+n.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});};
+    const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
+    const today=ny.getFullYear()+String(ny.getMonth()+1).padStart(2,'0')+String(ny.getDate()).padStart(2,'0');
+    const barsOf=async function(symbol){
+      const query='query ChartQuery($symbol:String!,$timeRange:String){chartData(symbol:$symbol,timeRange:$timeRange){priceBars{tradeTime close}}}';
+      const r=await fetch('https://webql.cnbcfm.com/graphql',{method:'POST',cache:'no-store',credentials:'omit',headers:{'content-type':'application/json'},body:JSON.stringify({operationName:'ChartQuery',variables:{symbol:symbol,timeRange:'1M'},query:query})});
+      if(!r.ok) return [];
+      const j=await r.json();
+      const bars=j&&j.data&&j.data.chartData&&j.data.chartData.priceBars||[];
+      const days={};
+      bars.forEach(function(b){const c=num(b&&b.close);const d=b&&String(b.tradeTime||'').slice(0,8);if(d&&isFinite(c)) days[d]=c;});
+      return Object.keys(days).sort().map(function(d){return {d:d,c:days[d]};});
+    };
+    const yday=function(series){
+      if(series.length<2) return NaN;
+      const last=series[series.length-1];
+      const live=last.d===today;
+      const a=live?series[series.length-2]:series[series.length-1];
+      const b=live?series[series.length-3]:series[series.length-2];
+      if(!a||!b||!b.c) return NaN;
+      return (a.c-b.c)/b.c*100;
+    };
+    const qj=await jget('https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols='+encodeURIComponent('@GC.1|@CL.1')+'&requestMethod=itv&noCache=1&output=json&_='+Date.now());
+    const quotes=qj&&qj.FormattedQuoteResult&&qj.FormattedQuoteResult.FormattedQuote||[];
+    const by={};
+    quotes.forEach(function(q){if(q&&q.symbol) by[q.symbol]=q;});
+    const goldBars=await barsOf('@GC.1');
+    const oilBars=await barsOf('@CL.1');
+    const paint=function(q,bars,pxId,pctId,ydId,digits){
+      const last=num(q&&q.last);
+      const pct=num(q&&q.change_pct);
+      const yd=yday(bars);
+      set(pxId, pxTxt(last,digits), '#f4f7fb');
+      set(pctId, pctTxt(pct), colOf(pct));
+      set(ydId, pctTxt(yd), colOf(yd));
+      if(isFinite(last)) any=true;
+    };
+    paint(by['@GC.1'], goldBars, 'gold-px','gold-pct','gold-yd', 0);
+    paint(by['@CL.1'], oilBars, 'oil-px','oil-pct','oil-yd', 2);
+  }catch(e){console.warn('goldoil',e);}
+
   if($('mkt-status')) $('mkt-status').textContent=any?'LIVE / SNAPSHOT':'OFFLINE';
 }
 
