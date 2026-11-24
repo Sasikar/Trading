@@ -21,6 +21,10 @@
 .fut{background:#080d13;border:1px solid #ffffff0a;border-radius:12px;padding:8px 4px;text-align:center;min-width:0}
 .fut .lab{font-size:10px;letter-spacing:.08em}
 .fut-pct{margin-top:2px;font-size:13px;font-weight:800;letter-spacing:-.02em;color:#8b97a8}
+.etf-live{display:flex;align-items:center;gap:10px;margin:0 14px 14px;padding:10px 12px;border-radius:12px;background:#080d13;border:1px solid #ffffff0a}
+.etf-live .lab{font-size:10px;letter-spacing:.08em;font-weight:800;color:var(--muted)}
+.etf-live b{font-size:16px;font-weight:900;letter-spacing:.06em}
+.etf-live #etf-flow{font-size:16px;font-weight:900}
 @media(max-width:800px){.market-row{grid-template-columns:1fr 1fr}}
 .coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
 .coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
@@ -607,6 +611,12 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <div class="fut"><div class="lab">NQ</div><div id="fut-nq" class="fut-pct">—</div></div>
     <div class="fut"><div class="lab">DOW</div><div id="fut-ym" class="fut-pct">—</div></div>
     <div class="fut"><div class="lab">VIX</div><div id="fut-vx" class="fut-pct">—</div></div>
+  </div>
+  <div class="etf-live" aria-label="Bitcoin ETF buys or sells">
+    <div class="lab">BTC ETF</div>
+    <b id="etf-side">—</b>
+    <span id="etf-flow">—</span>
+    <span id="etf-day" class="lab"></span>
   </div></div>
 </section>
 <div class="tabs" id="tf-tabs" onselectstart="return false">
@@ -1900,7 +1910,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261124-sr3"></script>
+<script src="overview-app.js?v=20261124-etf1"></script>
 <script src="overview-groups.js?v=20261124-sr6"></script>
 <script src="breakout-tab.js?v=20261018-free1"></script>
 <script src="hunter-tab.js?v=20261018-free1"></script>
