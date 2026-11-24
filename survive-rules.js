@@ -83,9 +83,8 @@
   }
   function paint() {
     var root = $("sr-app");
-    var box = $("survive-block");
-    if (!root) return;
-    if (box && box.classList.contains("sr-closed")) { root.innerHTML = ""; return; }
+    var panel = $("survive-panel");
+    if (!root || !panel || !panel.classList.contains("on")) return;
     var body = rows.map(function (row, i) {
       if (editing === row.id) {
         return '<li class="sr-card"><form class="sr-edit" data-id="' + esc(row.id) + '"><input data-field="title" maxlength="80" value="' + esc(row.title) + '" placeholder="Title" aria-label="Title"><textarea data-field="text" maxlength="1200" rows="6" placeholder="Rule" aria-label="Rule">' + esc(row.text) + '</textarea><div class="sr-actions"><button type="submit">Save</button><button type="button" data-act="wipe" data-id="' + esc(row.id) + '">Clear</button><button type="button" data-act="cancel" aria-label="Cancel">×</button></div></form></li>';
@@ -241,18 +240,40 @@
       if (act === "yes") remove(id);
     });
   }
-  var fold = $("sr-fold");
-  if (fold) fold.addEventListener("click", function () {
-    var box = $("survive-block");
-    if (!box) return;
-    var closed = box.classList.toggle("sr-closed");
-    fold.setAttribute("aria-expanded", closed ? "false" : "true");
+  function show(on) {
+    var p = $("survive-panel");
+    if (!p) return;
+    if (!on) {
+      document.body.classList.remove("sr-on");
+      p.style.display = "none";
+      p.classList.remove("on");
+      return;
+    }
+    document.body.classList.remove("life-on", "md-on", "cal-on", "tp-on", "ml-on", "id-on", "sr-on");
+    document.body.classList.add("sr-on");
+    var panels = $("tf-panels");
+    if (panels) { panels.classList.add("hidden"); panels.style.display = "none"; }
+    document.querySelectorAll(".trend-panel, .struct-trend-panel").forEach(function (el) {
+      if (el.id === "survive-panel") return;
+      el.style.display = "none";
+      el.classList.remove("on");
+    });
+    p.style.display = "block";
+    p.classList.add("on");
     paint();
-  });
+    if (p.scrollIntoView) p.scrollIntoView({ block: "start" });
+  }
+  window.showSurvive = show;
+  var tabs = $("tf-tabs");
+  if (tabs) tabs.addEventListener("click", function (ev) {
+    var b = ev.target && ev.target.closest && ev.target.closest("[data-tf]");
+    if (!b || b.getAttribute("data-tf") === "survive") return;
+    show(false);
+  }, true);
   if (!document.getElementById("sr-style")) {
     var css = document.createElement("style");
     css.id = "sr-style";
-    css.textContent = "#survive-block{margin:0 0 14px}#survive-block .head{cursor:pointer}#survive-block .head h2{color:#f4fff8;font:800 26px/1.1 Inter,system-ui,sans-serif;letter-spacing:-.03em}#sr-app{font-family:Inter,system-ui,sans-serif;color:#e7eef8}#sr-app input,#sr-app textarea{display:block;width:100%;box-sizing:border-box;border:1px solid #2f6b4a;border-radius:14px;background:#0c121a;color:#f7f4ec;padding:12px 14px;font:600 16px/1.45 Inter,system-ui,sans-serif;color-scheme:dark}#sr-app textarea{min-height:96px;resize:vertical;margin-top:8px}#sr-app input:focus,#sr-app textarea:focus{outline:none;border-color:#7dffb3;box-shadow:0 0 0 3px rgba(125,255,179,.14)}.sr-compose{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}.sr-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}.sr-actions button,.sr-plus{border:0;border-radius:12px;height:40px;padding:0 14px;cursor:pointer;font:800 14px/1 Inter,system-ui,sans-serif;background:#243044;color:#f4f7fb}.sr-plus,.sr-actions button[type=submit]{background:#7dffb3;color:#06210f}.sr-clear{background:#2c1c24!important;color:#ffb0ba!important}.sr-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.sr-card{background:#101820;border:1px solid #24543a;border-radius:16px;padding:14px}.sr-k{color:#7dffb3;font:800 12px/1 Inter,system-ui,sans-serif;letter-spacing:.04em}.sr-card b{display:block;margin:4px 0 8px;font-size:17px;color:#fff}.sr-card p{margin:6px 0 0;white-space:pre-wrap;word-break:break-word;color:#f4f7fb;font:600 16px/1.45 Inter,system-ui,sans-serif}.sr-status{min-height:18px;margin:0 0 8px;color:#9dccb2;font:700 13px/1.3 Inter,system-ui,sans-serif}.sr-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;color:#ffb4be;font:800 14px Inter,system-ui,sans-serif}.sr-ask button{border:0;border-radius:999px;padding:8px 12px;font:800 13px Inter,system-ui,sans-serif;cursor:pointer}.sr-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.sr-ask button[data-act=no]{background:#243044;color:#f4f7fb}#survive-block.sr-closed #sr-app{display:none}body:has(.trend-panel.on) #survive-block,body:has(.struct-trend-panel.on) #survive-block{display:none!important}";
+    css.textContent = "#survive-panel .head h2{color:#f4fff8;font:800 26px/1.1 Inter,system-ui,sans-serif;letter-spacing:-.03em}#sr-app{font-family:Inter,system-ui,sans-serif;color:#e7eef8}#sr-app input,#sr-app textarea{display:block;width:100%;box-sizing:border-box;border:1px solid #2f6b4a;border-radius:14px;background:#0c121a;color:#f7f4ec;padding:12px 14px;font:600 16px/1.45 Inter,system-ui,sans-serif;color-scheme:dark}#sr-app textarea{min-height:96px;resize:vertical;margin-top:8px}#sr-app input:focus,#sr-app textarea:focus{outline:none;border-color:#7dffb3;box-shadow:0 0 0 3px rgba(125,255,179,.14)}.sr-compose{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}.sr-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}.sr-actions button,.sr-plus{border:0;border-radius:12px;height:40px;padding:0 14px;cursor:pointer;font:800 14px/1 Inter,system-ui,sans-serif;background:#243044;color:#f4f7fb}.sr-plus,.sr-actions button[type=submit]{background:#7dffb3;color:#06210f}.sr-clear{background:#2c1c24!important;color:#ffb0ba!important}.sr-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}.sr-card{background:#101820;border:1px solid #24543a;border-radius:16px;padding:14px}.sr-k{color:#7dffb3;font:800 12px/1 Inter,system-ui,sans-serif;letter-spacing:.04em}.sr-card b{display:block;margin:4px 0 8px;font-size:17px;color:#fff}.sr-card p{margin:6px 0 0;white-space:pre-wrap;word-break:break-word;color:#f4f7fb;font:600 16px/1.45 Inter,system-ui,sans-serif}.sr-status{min-height:18px;margin:0 0 8px;color:#9dccb2;font:700 13px/1.3 Inter,system-ui,sans-serif}.sr-ask{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px;color:#ffb4be;font:800 14px Inter,system-ui,sans-serif}.sr-ask button{border:0;border-radius:999px;padding:8px 12px;font:800 13px Inter,system-ui,sans-serif;cursor:pointer}.sr-ask button[data-act=yes]{background:#ff6f7c;color:#1a0c10}.sr-ask button[data-act=no]{background:#243044;color:#f4f7fb}body.sr-on main>section.section:not(#survive-panel section),body.sr-on #tf-panels{display:none!important}body.sr-on #survive-panel{display:block!important}";
     document.head.appendChild(css);
   }
   pull();

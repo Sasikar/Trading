@@ -25,9 +25,6 @@
 .coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
 .coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
 .change{font-size:11px;font-weight:800;margin-top:4px}.up{color:var(--green)}.down{color:var(--red)}
-#survive-block{margin:0 0 8px}
-#survive-block .head{cursor:pointer}
-#survive-block.sr-closed .card{display:none}
 .tabs{display:flex;flex-wrap:wrap;justify-content:flex-start;align-items:center;gap:4px;padding:4px;background:#0a1018;border:1px solid var(--line);border-radius:14px;margin:8px 0 10px;overflow:visible}
 .tabs::-webkit-scrollbar{display:none}
 .tab{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:36px;min-width:auto;border:0;background:transparent;color:#9aa6b5;font:800 12px Inter,system-ui,sans-serif;padding:0 10px;border-radius:10px;cursor:grab;white-space:nowrap;letter-spacing:.02em}
@@ -612,11 +609,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <div class="fut"><div class="lab">VIX</div><div id="fut-vx" class="fut-pct">—</div></div>
   </div></div>
 </section>
-<section class="section sr-closed" id="survive-block">
-  <div class="head" id="sr-fold" role="button" tabindex="0" aria-expanded="false"><div><h2>Survive Rules</h2><p>Tap to open. Tap again and it goes away.</p></div><span class="source">TAP</span></div>
-  <div class="card" style="padding:12px"><div id="sr-app"></div></div>
-</section>
 <div class="tabs" id="tf-tabs" onselectstart="return false">
+  <button type="button" class="tab" data-tf="survive" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showSurvive&&window.showSurvive(true);}catch(e){}">Survive Rules</button>
   <button type="button" class="tab" data-tf="alerts" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showAlerts&&window.showAlerts(true);}catch(e){}">Alerts</button>
   <button type="button" class="tab active" data-tf="fe" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showFomoEntryDesk&&window.showFomoEntryDesk(true);}catch(e){}">FomoEntry</button>
   <button type="button" class="tab" data-tf="cal" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showCal&&window.showCal(true);}catch(e){}">Cal</button>
@@ -1632,6 +1626,12 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <div class="card"><div id="dex-board"></div></div>
 </section>
 </div>
+<div id="survive-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head"><div><h2>Survive Rules</h2><p>Add, edit, or clear a rule.</p></div><span class="source">RULES</span></div>
+  <div class="card" style="padding:12px"><div id="sr-app"></div></div>
+</section>
+</div>
 <div id="experience-panel" class="trend-panel" style="display:none">
 <section class="section">
   <div class="head"><div><h2>Experience Entry</h2><p>Weekly entries. Rules live under Survive Rules.</p></div><span class="source">LOG</span></div>
@@ -1900,8 +1900,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261123-fut1"></script>
-<script src="overview-groups.js?v=20261122-id1"></script>
+<script src="overview-app.js?v=20261124-sr3"></script>
+<script src="overview-groups.js?v=20261124-sr3"></script>
 <script src="breakout-tab.js?v=20261018-free1"></script>
 <script src="hunter-tab.js?v=20261018-free1"></script>
 <script src="holders-tab.js?v=20261018-free1"></script>
@@ -1942,7 +1942,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <script src="markets-tab.js?v=20261021-ms1"></script>
 <script src="dex-tab.js?v=20261028-dx6"></script>
 <script src="experience-entry-tab.js?v=20261108-rule2"></script>
-<script src="survive-rules.js?v=20261124-sr2"></script>
+<script src="survive-rules.js?v=20261124-sr3"></script>
 <script src="etf-live-tab.js?v=20261108-etf1"></script>
 <script src="gmgn-tab.js?v=20261018-free1"></script>
 <script src="wallets-tab.js?v=20261018-free1"></script>
