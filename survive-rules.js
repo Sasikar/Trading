@@ -83,7 +83,9 @@
   }
   function paint() {
     var root = $("sr-app");
+    var box = $("survive-block");
     if (!root) return;
+    if (box && box.classList.contains("sr-closed")) { root.innerHTML = ""; return; }
     var body = rows.map(function (row, i) {
       if (editing === row.id) {
         return '<li class="sr-card"><form class="sr-edit" data-id="' + esc(row.id) + '"><input data-field="title" maxlength="80" value="' + esc(row.title) + '" placeholder="Title" aria-label="Title"><textarea data-field="text" maxlength="1200" rows="6" placeholder="Rule" aria-label="Rule">' + esc(row.text) + '</textarea><div class="sr-actions"><button type="submit">Save</button><button type="button" data-act="wipe" data-id="' + esc(row.id) + '">Clear</button><button type="button" data-act="cancel" aria-label="Cancel">×</button></div></form></li>';
@@ -197,7 +199,6 @@
   if (!rows.length) { rows = seedRows(); seeded = true; saveLocal(); }
   var root = $("sr-app");
   if (root) {
-    paint();
     root.addEventListener("submit", function (ev) {
       var form = ev.target;
       if (!form || !root.contains(form)) return;
@@ -246,6 +247,7 @@
     if (!box) return;
     var closed = box.classList.toggle("sr-closed");
     fold.setAttribute("aria-expanded", closed ? "false" : "true");
+    paint();
   });
   if (!document.getElementById("sr-style")) {
     var css = document.createElement("style");
