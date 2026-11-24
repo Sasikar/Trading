@@ -28,6 +28,8 @@
 #go-line{gap:3px;margin-left:10px;margin-right:10px;padding:7px 6px}
 #go-line b,#go-line .etf-amt{font-size:10px}
 #go-line .lab{font-size:8px;letter-spacing:0}
+#us-events{overflow-x:auto;gap:6px}
+#us-events-line{font-size:12px;font-weight:800;white-space:nowrap;color:#f4f7fb}
 @media(max-width:800px){.market-row{grid-template-columns:1fr 1fr}}
 .coin{background:#080d13;border:1px solid #ffffff0a;border-radius:14px;padding:14px}
 .coin .lab{font-size:11px;font-weight:800;color:var(--muted)}.coin-price{font-size:20px;font-weight:900;margin-top:6px}
@@ -638,6 +640,10 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     <span id="oil-pct" class="etf-amt">—</span>
     <span class="lab">YD</span>
     <span id="oil-yd" class="etf-amt">—</span>
+  </div>
+  <div class="etf-live" id="us-events" aria-label="Important US events this week">
+    <div class="lab">US</div>
+    <span id="us-events-line">…</span>
   </div></div>
 </section>
 <div class="tabs" id="tf-tabs" onselectstart="return false">
@@ -1931,7 +1937,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261124-go2"></script>
+<script src="overview-app.js?v=20261124-us1"></script>
 <script src="overview-groups.js?v=20261124-sr6"></script>
 <script src="breakout-tab.js?v=20261018-free1"></script>
 <script src="hunter-tab.js?v=20261018-free1"></script>

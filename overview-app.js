@@ -210,6 +210,70 @@ async function loadMarket(){
     paint(by['@CL.1'], oilBars, 'oil-px','oil-pct','oil-yd', 1);
   }catch(e){console.warn('goldoil',e);}
 
+  // Important US releases this week, times in India. One line.
+  try{
+    if(!document.getElementById('us-events-line')){
+      var goAnchor=document.getElementById('go-line')||document.querySelector('.etf-live');
+      if(goAnchor) goAnchor.insertAdjacentHTML('afterend','<div class="etf-live" id="us-events"><div class="lab">US</div><span id="us-events-line">…</span></div>');
+    }
+    const shortEv=function(title){
+      const t=String(title||'').toLowerCase();
+      if(t.indexOf('fomc')>=0||t.indexOf('federal funds')>=0||t.indexOf('fed funds')>=0||t.indexOf('interest rate')>=0) return 'FOMC';
+      if(t.indexOf('non-farm')>=0||t.indexOf('nonfarm')>=0||t.indexOf('payroll')>=0) return 'NFP';
+      if(t.indexOf('pce')>=0) return 'PCE';
+      if(t.indexOf('cpi')>=0) return 'CPI';
+      if(t.indexOf('gdp')>=0) return 'GDP';
+      if(t.indexOf('ppi')>=0) return 'PPI';
+      if(t.indexOf('retail sales')>=0) return 'RETAIL';
+      if(t.indexOf('unemployment rate')>=0) return 'JOBS';
+      if(t.indexOf('ism ')>=0) return 'ISM';
+      if(t.indexOf('jolts')>=0) return 'JOLTS';
+      if(t.indexOf('powell')>=0) return 'FED';
+      const words=String(title||'').replace(/\s+/g,' ').trim().split(' ').slice(0,2).join(' ');
+      return words.slice(0,12);
+    };
+    const istWhen=function(iso){
+      const d=new Date(iso);
+      if(!isFinite(d.getTime())) return '';
+      const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Kolkata',weekday:'short',hour:'numeric',minute:'2-digit',hour12:true}).formatToParts(d);
+      const pick=function(type){const hit=parts.filter(function(p){return p.type===type;})[0];return hit?hit.value:'';};
+      let hour=pick('hour');
+      const minute=pick('minute');
+      const day=pick('weekday');
+      const ap=pick('dayPeriod').toLowerCase().replace(/\./g,'');
+      if(minute==='00') return day+' '+hour+ap;
+      return day+' '+hour+':'+minute+ap;
+    };
+    let raw=null;
+    try{ raw=await jget('https://trading-ohlcv.sasipudi.workers.dev/us-calendar'); }catch(e){}
+    if(!Array.isArray(raw)){
+      try{ raw=await jget('https://nfs.faireconomy.media/ff_calendar_thisweek.json'); }catch(e){}
+    }
+    let loaded=Array.isArray(raw);
+    const now=Date.now();
+    const rows=loaded?raw.filter(function(row){
+      if(!row||String(row.country||'').toUpperCase()!=='USD') return false;
+      if(String(row.impact||'').toLowerCase()!=='high') return false;
+      const t=new Date(row.date).getTime();
+      return isFinite(t)&&t>=now-30*60*1000;
+    }):[];
+    const groups={};
+    const order=[];
+    rows.forEach(function(row){
+      const when=istWhen(row.date);
+      const name=shortEv(row.title);
+      if(!when||!name) return;
+      if(!groups[when]){ groups[when]=[]; order.push(when); }
+      if(groups[when].indexOf(name)<0) groups[when].push(name);
+    });
+    const line=order.map(function(when){ return groups[when].join(' · ')+' '+when; }).join('   ');
+    const el=document.getElementById('us-events-line');
+    if(el){
+      el.textContent=loaded?(line||'No important events'):'…';
+      el.style.color=line?'#f4f7fb':'#8b93a7';
+    }
+  }catch(e){console.warn('usevents',e);}
+
   if($('mkt-status')) $('mkt-status').textContent=any?'LIVE / SNAPSHOT':'OFFLINE';
 }
 
