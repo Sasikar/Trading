@@ -125,27 +125,34 @@ async function loadMarket(){
     });
   }catch(e){console.warn('futures',e);}
 
-  // BTC ETF — latest daily net flow. Plus is a buy, minus is a sell.
+  // BTC ETF — today and the day before, so a flat print still shows momentum.
   try{
     const book=await jget('./etf-flows.json?_='+Date.now());
     const rows=book&&Array.isArray(book.data)?book.data:[];
-    const last=rows.length?rows[rows.length-1]:null;
-    const n=last?+last[1]:NaN;
-    if(last&&isFinite(n)){
+    const paintFlow=function(row, sideId, flowId, dayId){
+      const n=row?+row[1]:NaN;
+      if(!row||!isFinite(n)){
+        set(sideId,'—');
+        set(flowId,'—');
+        set(dayId,'');
+        return false;
+      }
       const buy=n>0;
       const flat=n===0;
       const abs=Math.abs(n);
       const money=abs>=1000?(abs/1000).toFixed(2).replace(/\.00$/,'')+'B':abs.toFixed(1).replace(/\.0$/,'')+'M';
-      const day=String(last[0]||'');
+      const day=String(row[0]||'');
       const short=day.length>=10?day.slice(5).replace('-','/'):day;
-      set('etf-side', flat?'FLAT':(buy?'BUY':'SELL'), flat?'#e6c878':(buy?'#62e3a0':'#ff6f7c'));
-      set('etf-flow', (buy?'+':(flat?'':'-'))+'$'+money, flat?'#e6c878':(buy?'#62e3a0':'#ff6f7c'));
-      set('etf-day', short);
-      any=true;
-    } else {
-      set('etf-side','—');
-      set('etf-flow','—');
-    }
+      const col=flat?'#e6c878':(buy?'#62e3a0':'#ff6f7c');
+      set(sideId, flat?'FLAT':(buy?'BUY':'SELL'), col);
+      set(flowId, (buy?'+':(flat?'':'-'))+'$'+money, col);
+      set(dayId, short);
+      return true;
+    };
+    const last=rows.length?rows[rows.length-1]:null;
+    const prev=rows.length>1?rows[rows.length-2]:null;
+    if(paintFlow(last,'etf-side','etf-flow','etf-day')) any=true;
+    paintFlow(prev,'etf-prev-side','etf-prev-flow','etf-prev-day');
   }catch(e){console.warn('etf',e);}
 
   if($('mkt-status')) $('mkt-status').textContent=any?'LIVE / SNAPSHOT':'OFFLINE';
