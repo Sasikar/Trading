@@ -255,9 +255,9 @@ async function loadMarket(){
       return days[ist.getUTCDay()]+' '+hm+ap;
     };
     let raw=null;
-    try{ raw=await jget('https://trading-ohlcv.sasipudi.workers.dev/us-calendar'); }catch(e){}
-    if(!Array.isArray(raw)){
-      try{ raw=await jget('https://nfs.faireconomy.media/ff_calendar_thisweek.json'); }catch(e){}
+    try{ raw=await jget('./us-week.json?_='+Date.now()); }catch(e){}
+    if(!Array.isArray(raw)||!raw.length){
+      try{ raw=await jget('https://trading-ohlcv.sasipudi.workers.dev/us-calendar'); }catch(e){}
     }
     let loaded=Array.isArray(raw)&&raw.length>0;
     const now=Date.now();
