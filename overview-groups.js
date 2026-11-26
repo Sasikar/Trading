@@ -8,7 +8,7 @@
     trade: ["ideas", "fe", "fomo", "experience", "entrywindow", "decision", "antifomo", "position", "btc", "memes", "coin", "breakouts", "alerts", "pumpfun", "fd", "emotion", "verdict", "fx"],
     scanners: ["soulscanner", "cabalhunter", "rugradar", "defade", "trenchradar", "trenchcoat", "memeassist"],
     time: ["1h", "4h", "1d", "1w", "1M", "trend", "struct", "macro", "elliott", "pressure", "midlong"],
-    research: ["cvd", "gmgn", "gmgnai", "hstrength", "holders", "hunter", "tiers", "sentiment", "failures", "inmemory", "keep", "keywords", "gnotes", "officeemo", "personalemo", "whale", "coinstats", "solchain", "markets", "etflive", "dex", "wallets", "cal", "mandates", "wowdip", "omg", "pitfalls", "strategy", "memegate", "cadelete"]
+    research: ["shots", "cvd", "gmgn", "gmgnai", "hstrength", "holders", "hunter", "tiers", "sentiment", "failures", "inmemory", "keep", "keywords", "gnotes", "officeemo", "personalemo", "whale", "coinstats", "solchain", "markets", "etflive", "dex", "wallets", "cal", "mandates", "wowdip", "omg", "pitfalls", "strategy", "memegate", "cadelete"]
   };
   var ORDER = { survive: 6, mine: 8, health: 10, sindhu: 12, surya: 14, trade: 20, scanners: 30, research: 40, time: 50 };
   var LABEL = { survive: "Survive", mine: "Mine", health: "Health", sindhu: "Sindhu", surya: "Surya", trade: "Trade", scanners: "Scanners", research: "Research", time: "Time" };

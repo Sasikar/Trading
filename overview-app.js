@@ -3420,7 +3420,7 @@ async function caRefreshStates(){
 function showCoin(on, opts){
   const panels=$('tf-panels'),trend=$('trend-panel'),sp=$('struct-panel'),mp=$('macro-panel'),sg=$('signal-panel'),mg=$('memegate-panel'),cp=$('coin-panel'),af=$('antifomo-panel'),bo=$('breakouts-panel');
   if(on){
-    ['showAlerts','showFomoEntry','showFomoEntryDesk','showFomoExperiences','showFavDips','showCal','showMandates','showKeywords','showSleep','showSleepLog','showDiet','showGym','showSteps','showFood','showSaviour','showWeight','showWater','showTimePressure','showMidLong','showIdeas','showSurvive','showElliott','showGoldenNotes','showOfficeEmotions','showPersonalEmotions','showWhale','showEmotion','showCoinstats','showSolchain','showTiers','showEtfLive'].forEach(function(fn){
+    ['showAlerts','showFomoEntry','showFomoEntryDesk','showFomoExperiences','showFavDips','showCal','showMandates','showKeywords','showSleep','showSleepLog','showDiet','showGym','showSteps','showFood','showSaviour','showWeight','showWater','showTimePressure','showMidLong','showIdeas','showShots','showSurvive','showElliott','showGoldenNotes','showOfficeEmotions','showPersonalEmotions','showWhale','showEmotion','showCoinstats','showSolchain','showTiers','showEtfLive'].forEach(function(fn){
       try{ if(window[fn]) window[fn](false); }catch(e){}
     });
     document.body.classList.remove('cal-on','md-on','sl-on');

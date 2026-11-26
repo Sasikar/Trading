@@ -716,6 +716,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   <button type="button" class="tab" data-tf="wallets">Wallets</button>
   <button type="button" class="tab" data-tf="1h">1H</button>
   <button type="button" class="tab" data-tf="ideas" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showIdeas&&window.showIdeas(true);}catch(e){}">Ideas</button>
+  <button type="button" class="tab" data-tf="shots" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showShots&&window.showShots(true);}catch(e){}">Screenshots</button>
   <button type="button" class="tab" data-tf="pressure" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showTimePressure&&window.showTimePressure(true);}catch(e){}">Time Pressure</button>
   <button type="button" class="tab" data-tf="midlong" onclick="event.stopImmediatePropagation();var p=document.getElementById('tf-panels');if(p){p.classList.add('hidden');p.style.display='none';}document.querySelectorAll('#tf-tabs .tab').forEach(function(b){b.classList.remove('active');});this.classList.add('active');try{window.showMidLong&&window.showMidLong(true);}catch(e){}">Mid / Long</button>
   <button type="button" class="tab" data-tf="4h">4H</button>
@@ -1192,6 +1193,16 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
   </div>
   <div class="card" style="padding:12px">
     <div id="ml-app" class="tp-app"></div>
+  </div>
+</section>
+</div>
+<div id="sh-panel" class="trend-panel" style="display:none">
+<section class="section">
+  <div class="head">
+    <div><h2>Screenshots</h2><p>+ makes a tab. Upload keeps the picture so you can read it.</p></div>
+  </div>
+  <div class="card" style="padding:12px">
+    <div id="sh-app"></div>
   </div>
 </section>
 </div>
@@ -1937,8 +1948,8 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
     </div>
   </div>
 </div>
-<script src="overview-app.js?v=20261125-us3"></script>
-<script src="overview-groups.js?v=20261124-sr6"></script>
+<script src="overview-app.js?v=20261126-sh1"></script>
+<script src="overview-groups.js?v=20261126-sh1"></script>
 <script src="breakout-tab.js?v=20261018-free1"></script>
 <script src="hunter-tab.js?v=20261018-free1"></script>
 <script src="holders-tab.js?v=20261018-free1"></script>
@@ -1952,6 +1963,7 @@ body.tab-arranging{-webkit-user-select:none!important;user-select:none!important
 <script src="cal-tab.js?v=20261015-sale2"></script>
 <script src="mandates-tab.js?v=20261014-md6"></script>
 <script src="time-pressure.js?v=20261122-id1"></script>
+<script src="shots-tab.js?v=20261126-sh1"></script>
 <script src="ideas-tab.js?v=20261122-id2"></script>
 <script src="commentary.js?v=20260924-c3"></script>
 <script src="tiers-tab.js?v=20261018-free1"></script>
