@@ -3,7 +3,7 @@
   if (!document.getElementById("sh-css")) {
     var css = document.createElement("style");
     css.id = "sh-css";
-    css.textContent = "#sh-app{color:#f4f7fb}#sh-app .sh-bar{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px}#sh-app .sh-plus,#sh-app .sh-tab,#sh-app .sh-up,#sh-app .sh-del{border:0;border-radius:999px;font-weight:800;cursor:pointer}#sh-app .sh-plus{flex:none;width:42px;height:42px;background:#e6c878;color:#1a1406;font-size:22px}#sh-app .sh-tab{flex:none;padding:10px 14px;background:#17202b;color:#c5d0dc}#sh-app .sh-tab.sh-on{background:#e6c878;color:#1a1406}#sh-app .sh-tools{display:flex;gap:8px;margin:8px 0}#sh-app .sh-up{padding:10px 14px;background:#243044;color:#f4f7fb}#sh-app .sh-del,#sh-app .sh-pic button{padding:10px 14px;background:#2a1a22;color:#ff8a7a}#sh-app .sh-status,#sh-app .sh-empty{color:#8b93a7;font-size:13px;font-weight:700}#sh-app .sh-pic{margin:12px 0;padding:8px;border-radius:16px;background:#10161f}#sh-app .sh-pic img{display:block;width:100%;height:auto;border-radius:12px}#sh-app .sh-pic button{margin-top:8px}";
+    css.textContent = "#sh-app{color:#f4f7fb}#sh-app .sh-bar{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px}#sh-app .sh-new{display:flex;gap:8px;margin-bottom:10px}#sh-app .sh-name,#sh-app .sh-rename{flex:1;min-width:0;padding:12px 14px;border:0;border-radius:14px;background:#141c27;color:#f4f7fb;font-size:16px;font-weight:700}#sh-app .sh-plus,#sh-app .sh-tab,#sh-app .sh-up,#sh-app .sh-del{border:0;border-radius:999px;font-weight:800;cursor:pointer}#sh-app .sh-plus{flex:none;width:46px;background:#e6c878;color:#1a1406;font-size:22px}#sh-app .sh-tab{flex:none;padding:10px 14px;background:#17202b;color:#c5d0dc}#sh-app .sh-tab.sh-on{background:#e6c878;color:#1a1406}#sh-app .sh-tools{display:flex;gap:8px;margin:8px 0}#sh-app .sh-up{padding:10px 14px;background:#243044;color:#f4f7fb}#sh-app .sh-del,#sh-app .sh-pic button{padding:10px 14px;background:#2a1a22;color:#ff8a7a}#sh-app .sh-status,#sh-app .sh-empty{color:#8b93a7;font-size:13px;font-weight:700}#sh-app .sh-pic{margin:12px 0;padding:8px;border-radius:16px;background:#10161f}#sh-app .sh-pic img{display:block;width:100%;height:auto;border-radius:12px}#sh-app .sh-pic button{margin-top:8px}";
     document.head.appendChild(css);
   }
   var albums = [];
@@ -88,24 +88,43 @@
       pics = '<p class="sh-empty">Tap + to make a tab.</p>';
     }
     var tools = album
-      ? '<div class="sh-tools"><button type="button" class="sh-up" data-act="pick">Upload</button><button type="button" class="sh-del" data-act="drop-tab" data-id="' + esc(album.id) + '">Delete tab</button></div>'
+      ? '<input id="sh-rename" class="sh-rename" maxlength="24" value="' + esc(album.name) + '" aria-label="Tab name" style="width:100%;box-sizing:border-box;margin-bottom:8px">' +
+        '<div class="sh-tools"><button type="button" class="sh-up" data-act="pick">Upload</button><button type="button" class="sh-del" data-act="drop-tab" data-id="' + esc(album.id) + '">Delete tab</button></div>'
       : "";
+    var typed = "";
+    var oldName = $("sh-name");
+    if (oldName) typed = oldName.value;
     root.innerHTML =
-      '<div class="sh-bar"><button type="button" class="sh-plus" data-act="add" aria-label="New tab">+</button>' + tabs + '</div>' +
+      '<form class="sh-new" id="sh-add"><input id="sh-name" class="sh-name" maxlength="24" placeholder="Name this tab" aria-label="New tab name" value="' + esc(typed) + '"><button type="submit" class="sh-plus" aria-label="New tab">+</button></form>' +
+      '<div class="sh-bar">' + tabs + '</div>' +
       tools +
       '<p id="sh-status" class="sh-status"></p>' +
       '<div class="sh-pics">' + pics + '</div>' +
       '<input id="sh-file" type="file" accept="image/*" multiple hidden>';
   }
+  function tabName(raw) {
+    return String(raw || "").replace(/\s+/g, " ").trim().slice(0, 24);
+  }
   function addTab() {
     if (albums.length >= 24) { status("24 tabs is the limit"); return; }
-    var n = albums.length + 1;
-    var album = { id: nid(), name: "Shots " + n, shots: [] };
+    var input = $("sh-name");
+    var name = tabName(input && input.value);
+    if (!name) { status("Type a name first"); if (input) input.focus(); return; }
+    var album = { id: nid(), name: name, shots: [] };
     albums.push(album);
     active = album.id;
+    if (input) input.value = "";
     paint();
     writeAll();
     status("Tab added");
+  }
+  function rename(raw) {
+    var album = current();
+    var name = tabName(raw);
+    if (!album || !name || name === album.name) return;
+    album.name = name;
+    paint();
+    writeAll();
   }
   function shrink(file) {
     return new Promise(function (resolve, reject) {
@@ -207,7 +226,13 @@
       } else if (act === "drop") dropShot(id);
       else if (act === "drop-tab") dropTab(id);
     });
+    root.addEventListener("submit", function (ev) {
+      if (!ev.target || ev.target.id !== "sh-add") return;
+      ev.preventDefault();
+      addTab();
+    });
     root.addEventListener("change", function (ev) {
+      if (ev.target && ev.target.id === "sh-rename") rename(ev.target.value);
       if (ev.target && ev.target.id === "sh-file") {
         addFiles(ev.target.files);
         ev.target.value = "";
