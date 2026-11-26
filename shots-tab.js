@@ -88,8 +88,8 @@
       pics = '<p class="sh-empty">Tap + to make a tab.</p>';
     }
     var tools = album
-      ? '<input id="sh-rename" class="sh-rename" maxlength="24" value="' + esc(album.name) + '" aria-label="Tab name" style="width:100%;box-sizing:border-box;margin-bottom:8px">' +
-        '<div class="sh-tools"><button type="button" class="sh-up" data-act="pick">Upload</button><button type="button" class="sh-del" data-act="drop-tab" data-id="' + esc(album.id) + '">Delete tab</button></div>'
+      ? '<input id="sh-rename" class="sh-rename" maxlength="24" value="' + esc(album.name) + '" aria-label="Tab name" style="width:100%;box-sizing:border-box;margin:8px 0">' +
+        '<div class="sh-tools"><button type="button" class="sh-up" data-act="pick">Upload</button></div>'
       : "";
     var typed = "";
     var oldName = $("sh-name");
@@ -224,7 +224,6 @@
         var input = $("sh-file");
         if (input) input.click();
       } else if (act === "drop") dropShot(id);
-      else if (act === "drop-tab") dropTab(id);
     });
     root.addEventListener("submit", function (ev) {
       if (!ev.target || ev.target.id !== "sh-add") return;
