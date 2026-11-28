@@ -5108,7 +5108,9 @@ export class Engine {
       lastDir: saved.lastDir === 'down' ? 'down' : (saved.lastDir === 'up' ? 'up' : ''),
       lastMove: Number(saved.lastMove) || 0,
       lastAlertAt: Number(saved.lastAlertAt) || 0,
-      live: saved.live === true
+      live: saved.live === true,
+      upTarget: Number(saved.upTarget) || 0,
+      downTarget: Number(saved.downTarget) || 0
     };
   }
   saveBtc(state) {
@@ -5117,6 +5119,10 @@ export class Engine {
   btcView(state, error) {
     const price = state.lastPrice || 0;
     const anchor = state.anchor || 0;
+    const stepUp = anchor ? anchor + state.step : 0;
+    const stepDown = anchor ? Math.max(0, anchor - state.step) : 0;
+    const upTarget = Number(state.upTarget) || 0;
+    const downTarget = Number(state.downTarget) || 0;
     return {
       ok: !error,
       error: error || '',
@@ -5124,8 +5130,10 @@ export class Engine {
       step: state.step,
       on: state.on,
       anchor,
-      up: anchor ? anchor + state.step : 0,
-      down: anchor ? Math.max(0, anchor - state.step) : 0,
+      up: upTarget > 0 ? upTarget : stepUp,
+      down: downTarget > 0 ? downTarget : stepDown,
+      upTarget,
+      downTarget,
       lastDir: state.lastDir,
       lastMove: state.lastMove,
       lastAlertAt: state.lastAlertAt,
@@ -5183,6 +5191,8 @@ export class Engine {
       state.on = patch.on;
       state.anchor = 0;
     }
+    if (patch && patch.up != null) state.upTarget = Number(patch.up) > 0 ? Math.round(Number(patch.up)) : 0;
+    if (patch && patch.down != null) state.downTarget = Number(patch.down) > 0 ? Math.round(Number(patch.down)) : 0;
     let error = '';
     let price = Number(livePrice) || 0;
     if (!(price > 0)) {
@@ -5216,8 +5226,46 @@ export class Engine {
     const walkTo = async (mark) => {
       let guard = 0;
       while (guard < 12 && state.on) {
-        const up = state.anchor + step;
-        const down = state.anchor - step;
+        if (state.upTarget > 0 && mark >= state.upTarget) {
+          const level = state.upTarget;
+          const from = state.anchor;
+          state.upTarget = 0;
+          state.anchor = level;
+          state.lastDir = 'up';
+          state.lastMove = Math.round(level - from);
+          state.lastAlertAt = Date.now();
+          this.saveBtc(state);
+          if (token && chat) {
+            try { await sendTelegram(token, chat, '🟢 BTC UP ↑ ' + usd(level)); }
+            catch (e) {
+              state.upTarget = level;
+              this.saveBtc(state);
+              return false;
+            }
+          }
+          return true;
+        }
+        if (state.downTarget > 0 && mark <= state.downTarget) {
+          const level = state.downTarget;
+          const from = state.anchor;
+          state.downTarget = 0;
+          state.anchor = level;
+          state.lastDir = 'down';
+          state.lastMove = Math.round(level - from);
+          state.lastAlertAt = Date.now();
+          this.saveBtc(state);
+          if (token && chat) {
+            try { await sendTelegram(token, chat, '🔴 BTC DOWN ↓ ' + usd(level)); }
+            catch (e) {
+              state.downTarget = level;
+              this.saveBtc(state);
+              return false;
+            }
+          }
+          return true;
+        }
+        const up = state.upTarget > 0 ? Infinity : state.anchor + step;
+        const down = state.downTarget > 0 ? -Infinity : state.anchor - step;
         let dir = 0;
         if (mark >= up) dir = 1;
         else if (mark <= down) dir = -1;
@@ -5363,6 +5411,8 @@ export class Engine {
           pct: used,
           base,
           extra: hasExtra ? extra : 0,
+          upPx: row.upPx == null ? (Number(prev.upPx) || 0) : (Number(row.upPx) > 0 ? Number(row.upPx) : 0),
+          downPx: row.downPx == null ? (Number(prev.downPx) || 0) : (Number(row.downPx) > 0 ? Number(row.downPx) : 0),
           on: alertOn,
           anchor: alertOn !== wasOn ? 0 : (Number(prev.anchor) > 0 ? Number(prev.anchor) : (phone > 0 ? phone : 0))
         };
@@ -5396,7 +5446,7 @@ export class Engine {
         continue;
       }
       if (state.on === false || coin.on === false) continue;
-      const pct = coin.pct || 10;
+      const pct = coin.base || coin.pct || 10;
       const upF = 1 + pct / 100;
       const downF = 1 - pct / 100;
       let guard = 0;
@@ -5409,12 +5459,20 @@ export class Engine {
         this.saveMemeWatch(state);
       };
       try {
-        if (downF > 0 && quote.price <= coin.anchor * downF) {
+        if (coin.upPx > 0 && quote.price >= coin.upPx) {
+          const level = coin.upPx;
+          coin.upPx = 0;
+          await send('up', level);
+        } else if (coin.downPx > 0 && quote.price <= coin.downPx) {
+          const level = coin.downPx;
+          coin.downPx = 0;
+          await send('down', level);
+        } else if (!(coin.downPx > 0) && downF > 0 && quote.price <= coin.anchor * downF) {
           while (quote.price <= coin.anchor * downF && guard < 8) {
             await send('down', coin.anchor * downF);
             guard += 1;
           }
-        } else if (quote.price >= coin.anchor * upF) {
+        } else if (!(coin.upPx > 0) && quote.price >= coin.anchor * upF) {
           while (quote.price >= coin.anchor * upF && guard < 8) {
             await send('up', coin.anchor * upF);
             guard += 1;
@@ -5437,6 +5495,8 @@ export class Engine {
           pct: row.pct,
           base: row.base || row.pct,
           extra: row.extra || 0,
+          upPx: row.upPx || 0,
+          downPx: row.downPx || 0,
           on: row.on !== false,
           anchor: row.anchor || 0,
           price: row.price || 0

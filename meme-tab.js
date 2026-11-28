@@ -81,6 +81,8 @@
   function paint() {
     var root = $("memes-board");
     if (!root) return;
+    var focus = document.activeElement;
+    if (focus && root.contains(focus) && (focus.hasAttribute("data-up") || focus.hasAttribute("data-down") || focus.id === "meme-ca")) return;
     var on = state.on !== false;
     var shown = state.coins.slice().sort(function (a, b) {
       var d = coinAny(b.pct) - coinAny(a.pct);
@@ -99,9 +101,9 @@
       var price = Number(q.price) || 0;
       var cap = mc(q.mc);
       var pct = coinAny(c.base || c.pct);
-      var extra = c.extra ? String(c.extra) : "";
-      var used = extra ? coinAny(extra) : pct;
-      var b = c.anchor > 0 ? band(c.anchor, used) : { up: 0, down: 0 };
+      var bandPx = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
+      var upPx = Number(c.upPx) > 0 ? Number(c.upPx) : bandPx.up;
+      var downPx = Number(c.downPx) > 0 ? Number(c.downPx) : bandPx.down;
       var mint = String(c.mint || "");
       var short = mint.length > 12 ? mint.slice(0, 4) + "…" + mint.slice(-4) : mint;
       return '<div style="margin-top:6px;padding:7px 8px;border:1px solid #2a3140;border-radius:12px;background:#12161d">' +
@@ -116,12 +118,9 @@
         "</svg></button>" +
         '<button type="button" data-drop="' + esc(qid(c.chain, c.mint)) + '" aria-label="Remove" style="border:0;background:#2a1518;color:#ff8a7a;border-radius:8px;width:26px;height:26px;font-weight:900;color-scheme:dark">×</button></div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
-        '<label style="display:flex;align-items:center;gap:4px;color:#8b93a7;font-size:11px;white-space:nowrap">Every' +
-        '<input readonly tabindex="-1" value="' + pct + '" aria-label="Fixed percent" style="width:42px;color-scheme:dark;background:#0e131a;color:#8b93a7;border:1px solid #3d4a5c;border-radius:8px;padding:3px 4px;font-weight:800;text-align:center">' +
-        '<input data-extra="' + esc(qid(c.chain, c.mint)) + '" type="number" min="1" step="1" inputmode="numeric" placeholder="Add" value="' + esc(extra) + '" aria-label="Your percent" style="width:52px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:3px 4px;font-weight:800">' +
-        "%</label>" +
-        '<div style="flex:1;padding:4px 6px;border-radius:8px;background:#102018;font-size:11px;color:#3dbe7a;white-space:nowrap">↑ ' + px(b.up) + "</div>" +
-        '<div style="flex:1;padding:4px 6px;border-radius:8px;background:#2a1518;font-size:11px;color:#ff8a7a;white-space:nowrap">↓ ' + px(b.down) + "</div></div></div>";
+        '<span style="color:#8b93a7;font-size:11px;font-weight:800;white-space:nowrap">Every ' + pct + '%</span>' +
+        '<label style="flex:1;min-width:0;background:#102018;border-radius:8px;padding:4px 6px"><div style="color:#8b93a7;font-size:10px;font-weight:800">UP</div><input data-up="' + esc(qid(c.chain, c.mint)) + '" inputmode="decimal" value="' + (upPx > 0 ? upPx : "") + '" aria-label="Up price" style="width:100%;box-sizing:border-box;color-scheme:dark;background:transparent;color:#3dbe7a;border:0;padding:0;font-size:12px;font-weight:800"></label>' +
+        '<label style="flex:1;min-width:0;background:#2a1518;border-radius:8px;padding:4px 6px"><div style="color:#8b93a7;font-size:10px;font-weight:800">DOWN</div><input data-down="' + esc(qid(c.chain, c.mint)) + '" inputmode="decimal" value="' + (downPx > 0 ? downPx : "") + '" aria-label="Down price" style="width:100%;box-sizing:border-box;color-scheme:dark;background:transparent;color:#ff8a7a;border:0;padding:0;font-size:12px;font-weight:800"></label></div></div>';
     }).join("");
     root.innerHTML =
       '<form id="meme-add" style="display:flex;gap:8px">' +
@@ -132,11 +131,8 @@
       '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On · phone can sleep" : "Off") + "</div></div>" +
       '<button type="button" id="meme-toggle" class="al-sw" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Alerts"><span class="al-knob"></span></button></div>' +
       '<label style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:#12161d;border:1px solid #2a3140;color:#f4f7fb">' +
-      '<span><b style="display:block;font-size:14px">All coins</b><span style="display:block;margin-top:2px;color:#8b93a7;font-size:11px">Sets every coin. One coin can still be different.</span></span>' +
-      '<span style="display:flex;align-items:center;gap:4px;color:#8b93a7;font-size:12px;white-space:nowrap">Every' +
-      '<input readonly tabindex="-1" value="' + coinPct(state.pct) + '" aria-label="Fixed percent" style="width:42px;color-scheme:dark;background:#0e131a;color:#8b93a7;border:1px solid #3d4a5c;border-radius:8px;padding:6px 4px;font-weight:800;text-align:center">' +
-      '<input id="meme-all-extra" type="number" min="1" step="1" inputmode="numeric" placeholder="Add" value="' + esc(state.extra || "") + '" aria-label="Your percent for all" style="width:58px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:6px 4px;font-weight:800">' +
-      "%</span></label>" +
+      '<span><b style="display:block;font-size:14px">All coins</b><span style="display:block;margin-top:2px;color:#8b93a7;font-size:11px">Fixed percent. Edit Up or Down on a coin.</span></span>' +
+      '<span style="color:#8b93a7;font-size:12px;white-space:nowrap">Every ' + coinPct(state.pct) + '%</span></label>' +
       '<input id="meme-find" placeholder="Search ticker or contract" autocomplete="off" value="' + esc(find) + '" style="margin-top:8px;width:100%;color-scheme:dark;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;border-radius:12px;padding:10px;font-size:14px">' +
       (rows || '<div style="margin-top:14px;color:#8b93a7;font-size:13px">' + (state.coins.length ? "No match." : "No coins yet.") + "</div>");
     var form = $("meme-add");
@@ -155,19 +151,6 @@
       again.focus();
       try { again.setSelectionRange(pos, pos); } catch (e) {}
     });
-    var allExtra = $("meme-all-extra");
-    if (allExtra) allExtra.addEventListener("change", function () {
-      var raw = String(allExtra.value || "").trim();
-      var n = Math.round(Number(raw));
-      state.extra = raw && isFinite(n) && n >= 1 ? String(n) : "";
-      state.coins.forEach(function (c) {
-        c.extra = state.extra;
-        c.pct = state.extra ? coinAny(state.extra) : coinAny(c.base || c.pct);
-      });
-      write();
-      paint();
-      sync(null, true);
-    });
     var btn = $("meme-toggle");
     if (btn) btn.addEventListener("click", function () {
       state.on = !(state.on !== false);
@@ -175,17 +158,24 @@
       arm();
       sync();
     });
-    root.querySelectorAll("[data-extra]").forEach(function (input) {
+    function levelOf(input) {
+      return Number(String(input.value || "").replace(/[$,]/g, ""));
+    }
+    root.querySelectorAll("[data-up],[data-down]").forEach(function (input) {
       input.addEventListener("change", function () {
-        var id = String(input.getAttribute("data-extra") || "");
+        var up = input.hasAttribute("data-up");
+        var id = String(input.getAttribute(up ? "data-up" : "data-down") || "");
         var chain = id.slice(0, id.indexOf(":"));
         var mint = id.slice(id.indexOf(":") + 1);
-        var raw = String(input.value || "").trim();
-        var n = Math.round(Number(raw));
         state.coins.forEach(function (c) {
           if (c.mint !== mint || (c.chain || "solana") !== chain) return;
-          c.extra = raw && isFinite(n) && n >= 1 ? String(n) : "";
-          c.pct = c.extra ? coinAny(c.extra) : coinAny(c.base || c.pct);
+          var pct = coinAny(c.base || c.pct);
+          var guess = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
+          var n = levelOf(input);
+          var fallback = up ? guess.up : guess.down;
+          var same = !(n > 0) || (fallback > 0 && Math.abs(n - fallback) / fallback < 0.0001);
+          if (up) c.upPx = same ? 0 : n;
+          else c.downPx = same ? 0 : n;
         });
         write();
         paint();
@@ -233,7 +223,7 @@
         quotes[qid(chain, mint)] = quotes[qid(chain, mint)] || {};
         quotes[qid(chain, mint)].price = row.price;
       }
-      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinAny(row.pct), base: coinAny(row.base || row.pct), extra: Number(row.extra) >= 1 ? String(row.extra) : "", on: row.on !== false };
+      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinAny(row.pct), base: coinAny(row.base || row.pct), upPx: Number(row.upPx) || 0, downPx: Number(row.downPx) || 0, on: row.on !== false };
     });
     state.error = "";
   }
@@ -259,11 +249,10 @@
       body: JSON.stringify({
         on: state.on !== false,
         pct: coinPct(state.pct),
-        extra: state.extra || "",
         applyAll: !!applyAll,
         drop: drop || [],
         coins: state.coins.map(function (c) {
-          return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinAny(c.extra || c.base || c.pct), base: coinAny(c.base || c.pct), extra: c.extra || "", anchor: Number(c.anchor) || 0, on: c.on !== false };
+          return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinAny(c.base || c.pct), base: coinAny(c.base || c.pct), upPx: Number(c.upPx) || 0, downPx: Number(c.downPx) || 0, anchor: Number(c.anchor) || 0, on: c.on !== false };
         })
       })
     }).then(function (r) { return r.json(); }).then(function (view) {
@@ -326,7 +315,7 @@
       quotes[qid(chain, mint)] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
       var prev = null;
       state.coins.forEach(function (c) { if (qid(c.chain, c.mint) === qid(chain, mint)) prev = c; });
-      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinAny(prev ? prev.pct : state.pct), base: coinAny(prev ? (prev.base || prev.pct) : state.pct), extra: prev && prev.extra ? prev.extra : "", on: prev ? prev.on !== false : true };
+      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinAny(prev ? (prev.base || prev.pct) : state.pct), base: coinAny(prev ? (prev.base || prev.pct) : state.pct), upPx: prev ? Number(prev.upPx) || 0 : 0, downPx: prev ? Number(prev.downPx) || 0 : 0, on: prev ? prev.on !== false : true };
       state.coins = [coin].concat(state.coins.filter(function (c) { return qid(c.chain, c.mint) !== qid(chain, mint); })).slice(0, 40);
       state.error = "";
       write();
