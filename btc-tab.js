@@ -2,7 +2,7 @@
   if (window.__btcTab) return;
   window.__btcTab = 1;
   var KEY = "trading_btc_alert_v1";
-  var state = { on: true, step: 200, anchor: 0, lastDir: "", lastMove: 0, lastAlertAt: 0, price: 0, error: "", checked: 0 };
+  var state = { on: true, step: 2000, extra: "", anchor: 0, lastDir: "", lastMove: 0, lastAlertAt: 0, price: 0, error: "", checked: 0 };
   var open = false;
   var timer = 0;
   var pulling = false;
@@ -31,6 +31,7 @@
       if (s && typeof s === "object") {
         if (typeof s.on === "boolean") state.on = s.on;
         if (s.step) state.step = s.step;
+        if (s.extra != null) state.extra = s.extra;
         if (s.anchor) state.anchor = s.anchor;
         if (s.lastDir) state.lastDir = s.lastDir;
         if (s.lastMove) state.lastMove = s.lastMove;
@@ -41,7 +42,7 @@
   function write() {
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        on: state.on, step: state.step, anchor: state.anchor,
+        on: state.on, step: state.step, extra: state.extra, anchor: state.anchor,
         lastDir: state.lastDir, lastMove: state.lastMove, lastAlertAt: state.lastAlertAt
       }));
     } catch (e) {}
@@ -60,10 +61,15 @@
       el.classList.remove("on");
     });
   }
+  function usedStep() {
+    var extra = Math.round(Number(state.extra));
+    if (isFinite(extra) && extra >= 1) return extra;
+    return 2000;
+  }
   function levels() {
-    var step = state.step || 200;
+    var step = usedStep();
     var base = state.anchor > 0 ? state.anchor : state.price;
-    return { up: base + step, down: Math.max(0, base - step) };
+    return { up: base + step, down: Math.max(0, base - step), step: step };
   }
   function paint() {
     var root = $("btc-board");
@@ -74,8 +80,9 @@
     root.innerHTML =
       '<div style="font-size:40px;font-weight:900;letter-spacing:-.04em">' + usd(state.price) + "</div>" +
       '<div style="margin-top:4px;color:#8b93a7;font-size:13px">' + (state.error ? esc(state.error) : "Watched on the server every 2 minutes, even if this phone is asleep or on silent. Each step goes to Telegram.") + "</div>" +
-      '<label style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:10px"><b id="btc-step-label">Every ' + (state.step || 200) + ' points</b>' +
-      '<input id="btc-step" type="number" min="1" step="1" inputmode="numeric" value="' + (state.step || 200) + '" style="width:110px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:10px;padding:8px 10px;font-weight:800;font-size:16px"></label>' +
+      '<label style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:8px"><b>Every 2000 points</b>' +
+      '<span style="display:flex;align-items:center;gap:6px"><input id="btc-fixed" type="text" readonly value="2000" aria-label="Fixed points" style="width:72px;color-scheme:dark;background:#0e131a;color:#8b93a7;border:1px solid #3d4a5c;border-radius:10px;padding:8px 8px;font-weight:800;font-size:16px;text-align:center">' +
+      '<input id="btc-extra" type="number" min="1" step="1" inputmode="numeric" placeholder="Add" value="' + esc(state.extra || "") + '" aria-label="Your points" style="width:84px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:10px;padding:8px 8px;font-weight:800;font-size:16px"></span></label>' +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
       '<div style="flex:1;padding:12px;border-radius:14px;background:#102018"><div style="color:#8b93a7;font-size:11px;font-weight:800">UP</div><b style="color:#3dbe7a">' + usd(lv.up) + "</b></div>" +
       '<div style="flex:1;padding:12px;border-radius:14px;background:#2a1518"><div style="color:#8b93a7;font-size:11px;font-weight:800">DOWN</div><b style="color:#ff8a7a">' + usd(lv.down) + "</b></div></div>" +
@@ -83,19 +90,21 @@
       '<div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:14px;background:#12161d">' +
       '<div><div style="font-weight:900">Alerts</div><div style="margin-top:2px;color:#8b93a7;font-size:12px">' + (on ? "On · phone can sleep" : "Off") + "</div></div>" +
       '<button type="button" id="btc-toggle" class="al-sw" role="switch" aria-checked="' + (on ? "true" : "false") + '" aria-label="Alerts"><span class="al-knob"></span></button></div>';
-    var bar = $("btc-step");
-    var label = $("btc-step-label");
-    if (bar) {
-      bar.addEventListener("input", function () {
-        if (label) label.textContent = "Every " + bar.value + " points";
-      });
-      bar.addEventListener("change", function () {
-        var n = Math.round(Number(bar.value));
-        if (!isFinite(n) || n < 1) n = state.step || 200;
-        state.step = n;
-        bar.value = String(n);
-        if (label) label.textContent = "Every " + n + " points";
+    var extra = $("btc-extra");
+    if (extra) {
+      extra.addEventListener("change", function () {
+        var raw = String(extra.value || "").trim();
+        var n = Math.round(Number(raw));
+        if (!raw || !isFinite(n) || n < 1) {
+          state.extra = "";
+          extra.value = "";
+        } else {
+          state.extra = String(n);
+          extra.value = String(n);
+        }
+        state.step = usedStep();
         write();
+        paint();
         pushSettings();
       });
     }
@@ -115,7 +124,10 @@
     }
     if (view.price) state.price = view.price;
     if (view.anchor) state.anchor = view.anchor;
-    if (view.step) state.step = view.step;
+    if (view.step) {
+      state.step = view.step;
+      state.extra = Number(view.step) === 2000 ? "" : String(view.step);
+    }
     if (typeof view.on === "boolean") state.on = view.on;
     state.lastDir = view.lastDir || "";
     state.lastMove = view.lastMove || 0;
@@ -127,7 +139,7 @@
     fetch(API, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ step: state.step || 200, on: state.on !== false })
+      body: JSON.stringify({ step: usedStep(), on: state.on !== false })
     }).then(function (r) { return r.json(); }).then(function (view) {
       apply(view);
       if (open) paint();
