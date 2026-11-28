@@ -85,6 +85,21 @@
     pct = coinAny(pct);
     return { up: anchor * (1 + pct / 100), down: anchor * (1 - pct / 100) };
   }
+  function walked(anchor, pct, price) {
+    anchor = Number(anchor) || 0;
+    price = Number(price) || 0;
+    if (!(anchor > 0)) return price;
+    var upF = 1 + coinAny(pct) / 100;
+    var downF = 1 - coinAny(pct) / 100;
+    var guard = 0;
+    while (price > 0 && guard < 12) {
+      if (price >= anchor * upF) anchor = anchor * upF;
+      else if (downF > 0 && price <= anchor * downF) anchor = anchor * downF;
+      else break;
+      guard += 1;
+    }
+    return anchor;
+  }
   function paint() {
     var root = $("memes-board");
     if (!root) return;
@@ -108,9 +123,11 @@
       var price = Number(q.price) || 0;
       var cap = mc(q.mc);
       var pct = coinAny(c.base || c.pct);
-      var bandPx = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
-      var upPx = Number(c.upPx) > 0 ? Number(c.upPx) : bandPx.up;
-      var downPx = Number(c.downPx) > 0 ? Number(c.downPx) : bandPx.down;
+      var live = price > 0 ? price : Number(c.anchor) || 0;
+      var anchor = walked(c.anchor > 0 ? c.anchor : live, pct, live);
+      var bandPx = anchor > 0 ? band(anchor, pct) : { up: 0, down: 0 };
+      var upPx = Number(c.upPx) > live ? Number(c.upPx) : bandPx.up;
+      var downPx = Number(c.downPx) > 0 && Number(c.downPx) < live ? Number(c.downPx) : bandPx.down;
       var mint = String(c.mint || "");
       var short = mint.length > 12 ? mint.slice(0, 4) + "…" + mint.slice(-4) : mint;
       return '<div style="margin-top:6px;padding:7px 8px;border:1px solid #2a3140;border-radius:12px;background:#12161d">' +
@@ -177,7 +194,9 @@
         state.coins.forEach(function (c) {
           if (c.mint !== mint || (c.chain || "solana") !== chain) return;
           var pct = coinAny(c.base || c.pct);
-          var guess = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
+          var live = Number((quotes[qid(c.chain, c.mint)] || {}).price) || Number(c.anchor) || 0;
+          var anchor = walked(c.anchor > 0 ? c.anchor : live, pct, live);
+          var guess = anchor > 0 ? band(anchor, pct) : { up: 0, down: 0 };
           var n = levelOf(input);
           var fallback = up ? guess.up : guess.down;
           var same = !(n > 0) || (fallback > 0 && Math.abs(n - fallback) / fallback < 0.0001);
@@ -228,7 +247,7 @@
       var mint = chain === "solana" ? row.mint : String(row.mint).toLowerCase();
       if (row.price > 0) {
         quotes[qid(chain, mint)] = quotes[qid(chain, mint)] || {};
-        quotes[qid(chain, mint)].price = row.price;
+        if (!(quotes[qid(chain, mint)].price > 0)) quotes[qid(chain, mint)].price = row.price;
       }
       return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinAny(row.pct), base: coinAny(row.base || row.pct), upPx: Number(row.upPx) || 0, downPx: Number(row.downPx) || 0, on: row.on !== false };
     });
@@ -339,6 +358,7 @@
   function pull() {
     if (pulling || !state.coins.length) return;
     pulling = true;
+    var gen = listGen;
     var groups = { solana: [], ethereum: [], robinhood: [] };
     state.coins.forEach(function (c) {
       var chain = c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana";
@@ -355,6 +375,7 @@
       }
     });
     Promise.all(jobs).then(function (groups) {
+        if (gen !== listGen) return;
         var list = [].concat.apply([], groups);
         state.coins.forEach(function (c) {
           var pair = bestPair(list, c.mint);
@@ -368,7 +389,13 @@
         if (open) paint();
       })
       .catch(function () { state.error = "DexScreener did not answer."; if (open) paint(); })
-      .then(function () { pulling = false; });
+      .then(function () {
+        return fetch(WATCH, { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (view) {
+          if (gen !== listGen) return;
+          applyWatch(view);
+        }).catch(function () {});
+      })
+      .then(function () { pulling = false; if (open) paint(); });
   }
   function arm() {
     if (timer) clearInterval(timer);

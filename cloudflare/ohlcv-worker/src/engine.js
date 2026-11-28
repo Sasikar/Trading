@@ -5364,6 +5364,41 @@ export class Engine {
     return out;
   }
   async checkMemeWatch(patch) {
+    if (this._memeWatchRun) {
+      try { await this._memeWatchRun; } catch (e) {}
+      if (!patch) return this.memeWatchView(this.memeWatchState());
+    }
+    const run = this._checkMemeWatch(patch);
+    this._memeWatchRun = run;
+    try { return await run; }
+    finally { if (this._memeWatchRun === run) this._memeWatchRun = null; }
+  }
+  memeWatchView(state) {
+    const mints = Object.keys(state.coins || {});
+    return {
+      ok: true,
+      on: state.on,
+      pct: state.pct || 10,
+      coins: mints.map((key) => {
+        const row = state.coins[key] || {};
+        const cut = String(key).indexOf(':');
+        return {
+          mint: row.mint || (cut >= 0 ? String(key).slice(cut + 1) : key),
+          chain: row.chain || (cut >= 0 ? String(key).slice(0, cut) : 'solana'),
+          symbol: row.symbol,
+          pct: row.pct,
+          base: row.base || row.pct,
+          extra: row.extra || 0,
+          upPx: row.upPx || 0,
+          downPx: row.downPx || 0,
+          on: row.on !== false,
+          anchor: row.anchor || 0,
+          price: row.price || 0
+        };
+      })
+    };
+  }
+  async _checkMemeWatch(patch) {
     const state = this.memeWatchState();
     if (patch && typeof patch.on === 'boolean') state.on = patch.on;
     if (patch && patch.pct != null) {
