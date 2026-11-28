@@ -2,7 +2,7 @@
   if (window.__memePoints) return;
   window.__memePoints = 1;
   var KEY = "trading_meme_alerts_v1";
-  var state = { on: true, pct: 10, coins: [], imported: false, error: "" };
+  var state = { on: true, pct: 10, extra: "", coins: [], imported: false, error: "" };
   var quotes = {};
   var open = false;
   var timer = 0;
@@ -98,8 +98,10 @@
       var q = quotes[qid(c.chain, c.mint)] || {};
       var price = Number(q.price) || 0;
       var cap = mc(q.mc);
-      var pct = coinAny(c.pct);
-      var b = c.anchor > 0 ? band(c.anchor, pct) : { up: 0, down: 0 };
+      var pct = coinAny(c.base || c.pct);
+      var extra = c.extra ? String(c.extra) : "";
+      var used = extra ? coinAny(extra) : pct;
+      var b = c.anchor > 0 ? band(c.anchor, used) : { up: 0, down: 0 };
       var mint = String(c.mint || "");
       var short = mint.length > 12 ? mint.slice(0, 4) + "…" + mint.slice(-4) : mint;
       return '<div style="margin-top:6px;padding:7px 8px;border:1px solid #2a3140;border-radius:12px;background:#12161d">' +
@@ -115,7 +117,8 @@
         '<button type="button" data-drop="' + esc(qid(c.chain, c.mint)) + '" aria-label="Remove" style="border:0;background:#2a1518;color:#ff8a7a;border-radius:8px;width:26px;height:26px;font-weight:900;color-scheme:dark">×</button></div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
         '<label style="display:flex;align-items:center;gap:4px;color:#8b93a7;font-size:11px;white-space:nowrap">Every' +
-        '<input data-pct="' + esc(qid(c.chain, c.mint)) + '" type="number" min="1" step="1" value="' + pct + '" style="width:64px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:3px 4px;font-weight:800">' +
+        '<input readonly tabindex="-1" value="' + pct + '" aria-label="Fixed percent" style="width:42px;color-scheme:dark;background:#0e131a;color:#8b93a7;border:1px solid #3d4a5c;border-radius:8px;padding:3px 4px;font-weight:800;text-align:center">' +
+        '<input data-extra="' + esc(qid(c.chain, c.mint)) + '" type="number" min="1" step="1" inputmode="numeric" placeholder="Add" value="' + esc(extra) + '" aria-label="Your percent" style="width:52px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:3px 4px;font-weight:800">' +
         "%</label>" +
         '<div style="flex:1;padding:4px 6px;border-radius:8px;background:#102018;font-size:11px;color:#3dbe7a;white-space:nowrap">↑ ' + px(b.up) + "</div>" +
         '<div style="flex:1;padding:4px 6px;border-radius:8px;background:#2a1518;font-size:11px;color:#ff8a7a;white-space:nowrap">↓ ' + px(b.down) + "</div></div></div>";
@@ -131,7 +134,8 @@
       '<label style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:14px;background:#12161d;border:1px solid #2a3140;color:#f4f7fb">' +
       '<span><b style="display:block;font-size:14px">All coins</b><span style="display:block;margin-top:2px;color:#8b93a7;font-size:11px">Sets every coin. One coin can still be different.</span></span>' +
       '<span style="display:flex;align-items:center;gap:4px;color:#8b93a7;font-size:12px;white-space:nowrap">Every' +
-      '<input id="meme-all-pct" type="number" min="1" max="100" step="1" value="' + coinPct(state.pct) + '" style="width:52px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:6px 4px;font-weight:800">' +
+      '<input readonly tabindex="-1" value="' + coinPct(state.pct) + '" aria-label="Fixed percent" style="width:42px;color-scheme:dark;background:#0e131a;color:#8b93a7;border:1px solid #3d4a5c;border-radius:8px;padding:6px 4px;font-weight:800;text-align:center">' +
+      '<input id="meme-all-extra" type="number" min="1" step="1" inputmode="numeric" placeholder="Add" value="' + esc(state.extra || "") + '" aria-label="Your percent for all" style="width:58px;color-scheme:dark;background:#0e131a;color:#f4f7fb;border:1px solid #3d4a5c;border-radius:8px;padding:6px 4px;font-weight:800">' +
       "%</span></label>" +
       '<input id="meme-find" placeholder="Search ticker or contract" autocomplete="off" value="' + esc(find) + '" style="margin-top:8px;width:100%;color-scheme:dark;border:1px solid #3d4a5c;background:#0e131a;color:#f4f7fb;border-radius:12px;padding:10px;font-size:14px">' +
       (rows || '<div style="margin-top:14px;color:#8b93a7;font-size:13px">' + (state.coins.length ? "No match." : "No coins yet.") + "</div>");
@@ -151,10 +155,15 @@
       again.focus();
       try { again.setSelectionRange(pos, pos); } catch (e) {}
     });
-    var allPct = $("meme-all-pct");
-    if (allPct) allPct.addEventListener("change", function () {
-      state.pct = coinPct(allPct.value);
-      state.coins.forEach(function (c) { c.pct = state.pct; });
+    var allExtra = $("meme-all-extra");
+    if (allExtra) allExtra.addEventListener("change", function () {
+      var raw = String(allExtra.value || "").trim();
+      var n = Math.round(Number(raw));
+      state.extra = raw && isFinite(n) && n >= 1 ? String(n) : "";
+      state.coins.forEach(function (c) {
+        c.extra = state.extra;
+        c.pct = state.extra ? coinAny(state.extra) : coinAny(c.base || c.pct);
+      });
       write();
       paint();
       sync(null, true);
@@ -166,13 +175,17 @@
       arm();
       sync();
     });
-    root.querySelectorAll("[data-pct]").forEach(function (input) {
+    root.querySelectorAll("[data-extra]").forEach(function (input) {
       input.addEventListener("change", function () {
-        var id = String(input.getAttribute("data-pct") || "");
+        var id = String(input.getAttribute("data-extra") || "");
         var chain = id.slice(0, id.indexOf(":"));
         var mint = id.slice(id.indexOf(":") + 1);
+        var raw = String(input.value || "").trim();
+        var n = Math.round(Number(raw));
         state.coins.forEach(function (c) {
-          if (c.mint === mint && (c.chain || "solana") === chain) c.pct = coinAny(input.value);
+          if (c.mint !== mint || (c.chain || "solana") !== chain) return;
+          c.extra = raw && isFinite(n) && n >= 1 ? String(n) : "";
+          c.pct = c.extra ? coinAny(c.extra) : coinAny(c.base || c.pct);
         });
         write();
         paint();
@@ -220,7 +233,7 @@
         quotes[qid(chain, mint)] = quotes[qid(chain, mint)] || {};
         quotes[qid(chain, mint)].price = row.price;
       }
-      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinAny(row.pct), on: row.on !== false };
+      return { mint: mint, chain: chain, symbol: row.symbol || "COIN", name: "", anchor: Number(row.anchor) || 0, pct: coinAny(row.pct), base: coinAny(row.base || row.pct), extra: Number(row.extra) >= 1 ? String(row.extra) : "", on: row.on !== false };
     });
     state.error = "";
   }
@@ -246,10 +259,11 @@
       body: JSON.stringify({
         on: state.on !== false,
         pct: coinPct(state.pct),
+        extra: state.extra || "",
         applyAll: !!applyAll,
         drop: drop || [],
         coins: state.coins.map(function (c) {
-          return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinAny(c.pct), anchor: Number(c.anchor) || 0, on: c.on !== false };
+          return { mint: c.mint, chain: c.chain === "robinhood" || c.chain === "ethereum" ? c.chain : "solana", symbol: c.symbol || "COIN", pct: coinAny(c.extra || c.base || c.pct), base: coinAny(c.base || c.pct), extra: c.extra || "", anchor: Number(c.anchor) || 0, on: c.on !== false };
         })
       })
     }).then(function (r) { return r.json(); }).then(function (view) {
@@ -312,7 +326,7 @@
       quotes[qid(chain, mint)] = { price: price, mc: Number(pair.marketCap) || Number(pair.fdv) || 0 };
       var prev = null;
       state.coins.forEach(function (c) { if (qid(c.chain, c.mint) === qid(chain, mint)) prev = c; });
-      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinAny(prev ? prev.pct : state.pct), on: prev ? prev.on !== false : true };
+      var coin = { mint: mint, chain: chain, symbol: pair.baseToken.symbol || "COIN", name: pair.baseToken.name || "", anchor: price, pct: coinAny(prev ? prev.pct : state.pct), base: coinAny(prev ? (prev.base || prev.pct) : state.pct), extra: prev && prev.extra ? prev.extra : "", on: prev ? prev.on !== false : true };
       state.coins = [coin].concat(state.coins.filter(function (c) { return qid(c.chain, c.mint) !== qid(chain, mint); })).slice(0, 40);
       state.error = "";
       write();

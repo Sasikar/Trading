@@ -5346,8 +5346,12 @@ export class Engine {
         if (chain === 'solana' && !sol) return;
         const key = chain + ':' + mint;
         const prev = state.coins[key] || state.coins[mint] || {};
-        let pct = Math.round(Number(row.pct));
-        if (!isFinite(pct) || pct < 1) pct = 10;
+        let base = Math.round(Number(row.base));
+        if (!isFinite(base) || base < 1) base = Math.round(Number(prev.base));
+        if (!isFinite(base) || base < 1) base = Math.round(Number(prev.pct)) || state.pct || 10;
+        let extra = Math.round(Number(row.extra));
+        const hasExtra = row.extra !== '' && row.extra != null && isFinite(extra) && extra >= 1;
+        const used = hasExtra ? extra : base;
         const alertOn = row.on !== false;
         const wasOn = prev.on !== false;
         const phone = Number(row.anchor);
@@ -5356,7 +5360,9 @@ export class Engine {
           mint,
           symbol: String(row.symbol || prev.symbol || 'COIN').slice(0, 24),
           chain,
-          pct,
+          pct: used,
+          base,
+          extra: hasExtra ? extra : 0,
           on: alertOn,
           anchor: alertOn !== wasOn ? 0 : (Number(prev.anchor) > 0 ? Number(prev.anchor) : (phone > 0 ? phone : 0))
         };
@@ -5365,8 +5371,15 @@ export class Engine {
       if (keys.length > 40) keys.slice(40).forEach((key) => { delete next[key]; });
       state.coins = next;
     }
-    if (patch && patch.applyAll && state.pct) {
-      Object.keys(state.coins).forEach((key) => { state.coins[key].pct = state.pct; });
+    if (patch && patch.applyAll) {
+      const extra = Math.round(Number(patch.extra));
+      const has = patch.extra !== '' && patch.extra != null && isFinite(extra) && extra >= 1;
+      Object.keys(state.coins).forEach((key) => {
+        const coin = state.coins[key];
+        if (!(coin.base >= 1)) coin.base = coin.pct || state.pct || 10;
+        coin.extra = has ? extra : 0;
+        coin.pct = has ? extra : coin.base;
+      });
     }
     const mints = Object.keys(state.coins);
     const quotes = mints.length ? await this.memeWatchPrices(state.coins) : {};
@@ -5422,6 +5435,8 @@ export class Engine {
           chain: row.chain || (cut >= 0 ? String(key).slice(0, cut) : 'solana'),
           symbol: row.symbol,
           pct: row.pct,
+          base: row.base || row.pct,
+          extra: row.extra || 0,
           on: row.on !== false,
           anchor: row.anchor || 0,
           price: row.price || 0
