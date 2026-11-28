@@ -39,6 +39,13 @@
     if (n >= 0.01) return "$" + n.toFixed(4);
     return "$" + n.toPrecision(4);
   }
+  function dexIn(n) {
+    var s = px(n);
+    if (s === "—") return "";
+    s = s.replace(/^\$/, "").replace(/,/g, "");
+    if (s.indexOf(".") >= 0) s = s.replace(/0+$/, "").replace(/\.$/, "");
+    return s;
+  }
   function mc(n) {
     n = Number(n);
     if (!(n > 0)) return "";
@@ -119,8 +126,8 @@
         '<button type="button" data-drop="' + esc(qid(c.chain, c.mint)) + '" aria-label="Remove" style="border:0;background:#2a1518;color:#ff8a7a;border-radius:8px;width:26px;height:26px;font-weight:900;color-scheme:dark">×</button></div>' +
         '<div style="display:flex;align-items:center;gap:6px;margin-top:6px">' +
         '<span style="color:#8b93a7;font-size:11px;font-weight:800;white-space:nowrap">Every ' + pct + '%</span>' +
-        '<label style="flex:1;min-width:0;background:#102018;border-radius:8px;padding:4px 6px"><div style="color:#8b93a7;font-size:10px;font-weight:800">UP</div><input data-up="' + esc(qid(c.chain, c.mint)) + '" inputmode="decimal" value="' + (upPx > 0 ? upPx : "") + '" aria-label="Up price" style="width:100%;box-sizing:border-box;color-scheme:dark;background:transparent;color:#3dbe7a;border:0;padding:0;font-size:12px;font-weight:800"></label>' +
-        '<label style="flex:1;min-width:0;background:#2a1518;border-radius:8px;padding:4px 6px"><div style="color:#8b93a7;font-size:10px;font-weight:800">DOWN</div><input data-down="' + esc(qid(c.chain, c.mint)) + '" inputmode="decimal" value="' + (downPx > 0 ? downPx : "") + '" aria-label="Down price" style="width:100%;box-sizing:border-box;color-scheme:dark;background:transparent;color:#ff8a7a;border:0;padding:0;font-size:12px;font-weight:800"></label></div></div>';
+        '<label style="flex:1;min-width:0;background:#102018;border-radius:8px;padding:4px 6px"><div style="color:#8b93a7;font-size:10px;font-weight:800">UP</div><input data-up="' + esc(qid(c.chain, c.mint)) + '" inputmode="decimal" value="' + dexIn(upPx) + '" aria-label="Up price" style="width:100%;box-sizing:border-box;color-scheme:dark;background:transparent;color:#3dbe7a;border:0;padding:0;font-size:12px;font-weight:800"></label>' +
+        '<label style="flex:1;min-width:0;background:#2a1518;border-radius:8px;padding:4px 6px"><div style="color:#8b93a7;font-size:10px;font-weight:800">DOWN</div><input data-down="' + esc(qid(c.chain, c.mint)) + '" inputmode="decimal" value="' + dexIn(downPx) + '" aria-label="Down price" style="width:100%;box-sizing:border-box;color-scheme:dark;background:transparent;color:#ff8a7a;border:0;padding:0;font-size:12px;font-weight:800"></label></div></div>';
     }).join("");
     root.innerHTML =
       '<form id="meme-add" style="display:flex;gap:8px">' +
